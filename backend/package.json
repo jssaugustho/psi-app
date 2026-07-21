@@ -1,0 +1,28 @@
+{
+  "name": "foxbase-backend",
+  "version": "1.0.0",
+  "description": "Backend template for Foxbase: Fastify API, TS Workers, RabbitMQ and Postgres RLS",
+  "main": "dist/apis/core/server.js",
+  "scripts": {
+    "build": "rimraf dist && tsc",
+    "start:api": "node dist/apis/core/server.js",
+    "start:worker": "node dist/workers/index.js",
+    "dev:api": "ts-node-dev --respawn --transpile-only src/apis/core/server.ts",
+    "dev:worker": "ts-node-dev --respawn --transpile-only src/workers/index.ts"
+  },
+  "dependencies": {
+    "@fastify/websocket": "^8.2.0",
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.26.2",
+    "postgres": "^3.4.4",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5",
+    "@types/node": "^20.11.30",
+    "rimraf": "^5.0.5",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.4.3"
+  }
+}
