@@ -1,0 +1,120 @@
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
+
+export const profiles = pgTable('profiles', {
+  id: uuid('id').primaryKey(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  phone: text('phone'),
+  email: text('email').notNull().unique(),
+  avatarUrl: text('avatar_url'),
+  role: text('role').$type<'admin' | 'user'>().default('user').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const tenants = pgTable('tenants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  domain: text('domain'),
+  isPrimary: boolean('is_primary').default(false).notNull(),
+  ownerId: uuid('owner_id').references(() => profiles.id),
+
+  // Identidade Visual White-Label
+  logoLightUrl: text('logo_light_url'),
+  logoDarkUrl: text('logo_dark_url'),
+  iconLightUrl: text('icon_light_url'),
+  iconDarkUrl: text('icon_dark_url'),
+
+  // Cores do Gradiente e Contraste
+  gradientColorStart: text('gradient_color_start').default('#4F46E5').notNull(),
+  gradientColorEnd: text('gradient_color_end').default('#06B6D4').notNull(),
+  contrastColor: text('contrast_color').default('#FFFFFF').notNull(),
+
+  // Cores de Fundo, Cartões e Texto (Temas Claro / Escuro)
+  bgLightColor: text('bg_light_color').default('#F8FAFC').notNull(),
+  bgDarkColor: text('bg_dark_color').default('#020617').notNull(),
+  cardLightColor: text('card_light_color').default('#FFFFFF').notNull(),
+  cardDarkColor: text('card_dark_color').default('#0F172A').notNull(),
+  textLightColor: text('text_light_color').default('#0F172A').notNull(),
+  textDarkColor: text('text_dark_color').default('#F8FAFC').notNull(),
+
+  // Configurações Customizadas de E-mail
+  emailDomain: text('email_domain'),
+  resendApiKey: text('resend_api_key'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const platformSettings = pgTable('platform_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  cloudflareApiToken: text('cloudflare_api_token'),
+  cloudflareZoneId: text('cloudflare_zone_id'),
+  cloudflareAccountId: text('cloudflare_account_id'),
+  r2BucketName: text('r2_bucket_name'),
+  r2PublicDomain: text('r2_public_domain'),
+  r2AccessKeyId: text('r2_access_key_id'),
+  r2SecretAccessKey: text('r2_secret_access_key'),
+  // Resend — envio de e-mails transacionais
+  resendApiKey: text('resend_api_key'),
+  resendFromDomain: text('resend_from_domain'),
+  hasResend: boolean('has_resend').default(false).notNull(),
+  primaryTenantId: uuid('primary_tenant_id').references(() => tenants.id),
+  isConfigured: boolean('is_configured').default(false).notNull(),
+  baseTenantPrice: integer('base_tenant_price').default(0).notNull(),
+  additionalMemberPrice: integer('additional_member_price').default(0).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Profile = typeof profiles.$inferSelect;
+export type NewProfile = typeof profiles.$inferInsert;
+
+export type Tenant = typeof tenants.$inferSelect;
+export type NewTenant = typeof tenants.$inferInsert;
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+export type NewPlatformSetting = typeof platformSettings.$inferInsert;
+
+export const systemStatusLogs = pgTable('system_status_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  serviceName: text('service_name').notNull(),
+  status: text('status').$type<'operational' | 'degraded' | 'down'>().notNull(),
+  responseTimeMs: integer('response_time_ms'),
+  message: text('message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SystemStatusLog = typeof systemStatusLogs.$inferSelect;
+export type NewSystemStatusLog = typeof systemStatusLogs.$inferInsert;
+
+// ── E-mail Logs ────────────────────────────────────────────────────────────
+export const emailLogs = pgTable('email_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  toEmail: text('to_email').notNull(),
+  subject: text('subject').notNull(),
+  template: text('template').notNull(),
+  htmlBody: text('html_body').notNull(),
+  status: text('status').$type<'sent' | 'failed'>().default('sent').notNull(),
+  error: text('error'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailLog = typeof emailLogs.$inferSelect;
+export type NewEmailLog = typeof emailLogs.$inferInsert;
+
+export const tenantMembers = pgTable('tenant_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  role: text('role').$type<'admin' | 'agent'>().default('agent').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type TenantMember = typeof tenantMembers.$inferSelect;
+export type NewTenantMember = typeof tenantMembers.$inferInsert;
+

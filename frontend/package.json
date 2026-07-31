@@ -1,26 +1,21 @@
 {
-  "name": "frontend",
+  "name": "psi-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.2.10",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "dev:web": "turbo run dev --filter=@psi/web",
+    "dev:admin": "turbo run dev --filter=@psi/admin",
+    "build:web": "turbo run build --filter=@psi/web",
+    "build:admin": "turbo run build --filter=@psi/admin",
+    "build": "turbo run build"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.10",
-    "tailwindcss": "^4",
+    "turbo": "^2.4.0",
     "typescript": "^5"
   }
 }

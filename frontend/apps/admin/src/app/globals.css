@@ -1,0 +1,177 @@
+@import "tailwindcss";
+@source "../../../../packages/ui";
+
+:root {
+  /* ── Gradiente & Contraste da Marca ── */
+  --brand-gradient-start: #4F46E5;
+  --brand-gradient-end: #06B6D4;
+  --brand-contrast-color: #FFFFFF;
+  --brand-gradient: linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end));
+
+  /* ── Paleta Principal (tema escuro por padrão) ── */
+  --brand-bg-color: #020617;
+  --brand-card-bg-color: #0F172A;
+  --brand-text-color: #F8FAFC;
+
+  /* ── Superfícies derivadas com opacidade neutra ── */
+  /* Usadas por borders, hovers, inputs — sem cor fixa, apenas sobre a base do tema */
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-active: rgba(255, 255, 255, 0.10);
+  --surface-input: rgba(0, 0, 0, 0.30);
+  --surface-muted: rgba(255, 255, 255, 0.60); /* opacidade do texto secundário */
+
+  /* ── Status semânticos (neutros — usam a cor de texto com opacidade) ── */
+  --status-success-bg: rgba(16, 185, 129, 0.10);
+  --status-success-border: rgba(16, 185, 129, 0.25);
+  --status-success-text: #34D399;
+  --status-error-bg: rgba(239, 68, 68, 0.10);
+  --status-error-border: rgba(239, 68, 68, 0.25);
+  --status-error-text: #F87171;
+  --status-warning-bg: rgba(245, 158, 11, 0.10);
+  --status-warning-border: rgba(245, 158, 11, 0.25);
+  --status-warning-text: #FCD34D;
+  --status-info-bg: rgba(99, 102, 241, 0.10);
+  --status-info-border: rgba(99, 102, 241, 0.25);
+  --status-info-text: rgba(255, 255, 255, 0.75);
+}
+
+/* ── Quando o tema claro está ativo, ajusta as superfícies derivadas ── */
+html.light {
+  --surface-border: rgba(0, 0, 0, 0.10);
+  --surface-hover: rgba(0, 0, 0, 0.04);
+  --surface-active: rgba(0, 0, 0, 0.08);
+  --surface-input: rgba(255, 255, 255, 0.80);
+  --surface-muted: rgba(0, 0, 0, 0.55);
+  --status-info-text: rgba(0, 0, 0, 0.70);
+}
+
+body {
+  color: var(--brand-text-color);
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--brand-gradient-start) 6%, var(--brand-bg-color)) 0%, 
+    color-mix(in srgb, var(--brand-gradient-end) 6%, var(--brand-bg-color)) 100%
+  );
+  background-attachment: fixed;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ── Utilitários reutilizáveis ── */
+.brand-surface {
+  background-color: var(--brand-card-bg-color);
+  border: 1px solid var(--surface-border);
+  color: var(--brand-text-color);
+}
+
+.brand-text-muted {
+  color: var(--brand-text-color);
+  opacity: 0.6;
+}
+
+.brand-input {
+  background: var(--surface-input);
+  border: 1px solid var(--surface-border);
+  color: var(--brand-text-color);
+}
+
+.brand-input:focus {
+  outline: none;
+  border-color: var(--brand-gradient-start);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-gradient-start) 20%, transparent);
+}
+
+.brand-hover:hover {
+  background: var(--surface-hover);
+}
+
+/* ── Animação de Entrada de Páginas (Fade & Slide Up) ── */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Glassmorphism Otimizado ── */
+.glass-sm {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid var(--surface-border);
+}
+.glass-md {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--surface-border);
+}
+.glass-lg {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border);
+}
+
+/* Overrides para tema claro para garantir legibilidade */
+html.light .glass-sm {
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+html.light .glass-md {
+  background: rgba(255, 255, 255, 0.80);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+html.light .glass-lg {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Blobs Animados Otimizados (GPU Composited) ── */
+@keyframes blob-1-move {
+  0% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(40px, -60px) scale(1.1) rotate(120deg);
+  }
+  66% {
+    transform: translate(-30px, 30px) scale(0.95) rotate(240deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1) rotate(360deg);
+  }
+}
+
+@keyframes blob-2-move {
+  0% {
+    transform: translate(0px, 0px) scale(1) rotate(360deg);
+  }
+  50% {
+    transform: translate(-50px, 50px) scale(1.08) rotate(180deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+}
+
+.animate-blob-1 {
+  animation: blob-1-move 22s infinite alternate ease-in-out;
+  will-change: transform;
+}
+
+.animate-blob-2 {
+  animation: blob-2-move 28s infinite alternate ease-in-out;
+  will-change: transform;
+}

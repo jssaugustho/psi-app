@@ -38,3 +38,8 @@ Thumbs.db
 # Docker volumes
 postgres_data/
 rabbitmq_data/
+
+# Turbo cache
+.turbo/
+**/.turbo/
+

@@ -1,0 +1,519 @@
+'use client';
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useBrand } from '@/context/BrandContext';
+import { api, Tenant, PlatformSetupStatusResponse } from '@/lib/api';
+import { AppShell } from '@psi/ui';
+import { WhiteLabelSettings } from '@/components/white-label-settings';
+import { ResendSettings } from '@/components/resend-settings';
+import { BillingSettings } from '@/components/billing-settings';
+import { Link } from '@/components/Link';
+
+const BillingIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+  </svg>
+);
+
+const HomeIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
+
+const StatusIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+const PaletteIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+  </svg>
+);
+
+const MailIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+);
+
+const CloudIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+  </svg>
+);
+
+const UserIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+const EnvelopeIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+);
+
+const KeyIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2a2 2 0 002 2m0 0v12a2 2 0 01-2 2h-2a2 2 0 01-2-2V9a2 2 0 002-2h2z" />
+  </svg>
+);
+
+const GlobeIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+  </svg>
+);
+
+const OfficeIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+  </svg>
+);
+
+const BucketIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+  </svg>
+);
+
+const LinkIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+  </svg>
+);
+
+type Tab = 'white-label' | 'email' | 'cloudflare' | 'billing' | 'conta';
+
+const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'white-label', label: 'White-Label', icon: <PaletteIcon /> },
+  { id: 'email', label: 'E-mail', icon: <MailIcon /> },
+  { id: 'cloudflare', label: 'Cloudflare & R2', icon: <CloudIcon /> },
+  { id: 'billing', label: 'Assinaturas', icon: <BillingIcon /> },
+  { id: 'conta', label: 'Minha Conta', icon: <UserIcon /> },
+];
+
+export default function SettingsPage() {
+  const { user, loading, logout, setIsProfileOpen } = useAuth();
+  const { tenant: brandTenant, theme, toggleTheme, reloadBrand } = useBrand();
+  const router = useRouter();
+
+  const [activeTab, setActiveTab] = useState<Tab>('white-label');
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as Tab;
+      if (tabParam && tabs.some((t) => t.id === tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tabId: Tab) => {
+    setActiveTab(tabId);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tabId);
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
+  };
+  const [loadingTenant, setLoadingTenant] = useState(true);
+  const [tenantError, setTenantError] = useState('');
+  const [platformStatus, setPlatformStatus] = useState<PlatformSetupStatusResponse | null>(null);
+
+  const loadTenant = useCallback(async () => {
+    setLoadingTenant(true);
+    setTenantError('');
+    try {
+      const [tenantRes, statusRes] = await Promise.all([
+        api.getPrimaryTenant(),
+        api.getPlatformSetupStatus(),
+      ]);
+      setTenant(tenantRes.tenant);
+      setPlatformStatus(statusRes);
+    } catch (err: any) {
+      setTenantError(err.message || 'Erro ao buscar configurações.');
+    } finally {
+      setLoadingTenant(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+      return;
+    }
+    if (user) loadTenant();
+  }, [user, loading, router, loadTenant]);
+
+  const handleTenantSaved = async (updated: Tenant) => {
+    setTenant(updated);
+    await reloadBrand();
+  };
+
+  const menuItems = [
+    { label: 'Painel Geral', href: '/dashboard', icon: <HomeIcon />, active: false },
+    { label: 'Status do App', href: '/dashboard/status', icon: <StatusIcon />, active: false },
+    { label: 'Tenants', href: '/dashboard/tenants', icon: <OfficeIcon />, active: false },
+    { label: 'Usuários', href: '/dashboard/users', icon: <UsersIcon />, active: false },
+    { label: 'E-mails', href: '/dashboard/emails', icon: <EnvelopeIcon />, active: false },
+    { label: 'Configurações', href: '/dashboard/settings', icon: <SettingsIcon />, active: true },
+  ];
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ color: 'var(--brand-text-color)' }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
+              borderTopColor: 'var(--brand-gradient-start)',
+            }}
+          />
+          <p className="text-sm" style={{ opacity: 0.6 }}>Carregando…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AppShell
+      appName={brandTenant?.name || 'Admin'}
+      logoUrl={theme === 'dark' ? brandTenant?.logoDarkUrl : brandTenant?.logoLightUrl}
+      iconUrl={theme === 'dark' ? brandTenant?.iconDarkUrl : brandTenant?.iconLightUrl}
+      menuItems={menuItems}
+      user={user}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+      onLogout={logout}
+      onEditProfile={() => setIsProfileOpen(true)}
+      LinkComponent={Link}
+    >
+      <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">Configurações</h1>
+          <p className="text-sm mt-1" style={{ opacity: 0.6 }}>
+            Gerencie as configurações globais da plataforma
+          </p>
+        </div>
+
+        {loadingTenant ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: 'var(--brand-text-color)' }}>
+            <div
+              className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
+                borderTopColor: 'var(--brand-gradient-start)',
+              }}
+            />
+            <p className="text-sm" style={{ opacity: 0.6 }}>Carregando configurações…</p>
+          </div>
+        ) : (
+          <>
+            {/* Tab Bar */}
+            <div
+              className="flex gap-1 p-1 rounded-2xl w-fit glass-sm"
+            >
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border-none"
+                  style={
+                    activeTab === tab.id
+                      ? {
+                          background: 'var(--brand-gradient)',
+                          color: 'var(--brand-contrast-color)',
+                          boxShadow: '0 2px 12px color-mix(in srgb, var(--brand-gradient-start) 25%, transparent)',
+                        }
+                      : {
+                          background: 'transparent',
+                          color: 'var(--brand-text-color)',
+                          opacity: 0.65,
+                        }
+                  }
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div
+              className="glass-md rounded-2xl p-6 md:p-8 transition-colors duration-300"
+              style={{
+                color: 'var(--brand-text-color)',
+              }}
+            >
+              {/* ── ABA: WHITE-LABEL ── */}
+              {activeTab === 'white-label' && (
+                <>
+                  {tenantError ? (
+                    <div
+                      className="px-4 py-3 rounded-xl text-sm"
+                      style={{
+                        background: 'var(--status-error-bg)',
+                        border: '1px solid var(--status-error-border)',
+                        color: 'var(--status-error-text)',
+                      }}
+                    >
+                      <svg className="w-4 h-4 text-red-500 inline mr-2 align-middle" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      {tenantError}
+                      <button
+                        onClick={loadTenant}
+                        className="ml-3 underline text-xs hover:no-underline"
+                        style={{ color: 'inherit' }}
+                      >
+                        Tentar novamente
+                      </button>
+                    </div>
+                  ) : tenant ? (
+                    <WhiteLabelSettings tenant={tenant} onSaved={handleTenantSaved} />
+                  ) : (
+                    <p className="text-sm" style={{ opacity: 0.6 }}>Nenhum tenant configurado ainda.</p>
+                  )}
+                </>
+              )}
+
+              {/* ── ABA: E-MAIL (RESEND) ── */}
+              {activeTab === 'email' && (
+                <ResendSettings
+                  currentFromDomain={platformStatus?.resend_from_domain ?? null}
+                  hasResend={platformStatus?.has_resend ?? false}
+                  onSaved={loadTenant}
+                />
+              )}
+
+              {/* ── ABA: CLOUDFLARE ── */}
+              {activeTab === 'cloudflare' && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-base font-bold mb-1">Cloudflare & R2</h2>
+                    <p className="text-sm" style={{ opacity: 0.6 }}>
+                      Para alterar as credenciais do Cloudflare ou do bucket R2, reconfigure-as abaixo.
+                      As credenciais atuais são armazenadas de forma criptografada.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { label: 'API Token', hint: 'Não exibido por segurança', icon: <KeyIcon /> },
+                      { label: 'Zone ID', hint: 'Identificador da zona DNS', icon: <GlobeIcon /> },
+                      { label: 'Account ID', hint: 'ID da conta Cloudflare', icon: <OfficeIcon /> },
+                      { label: 'Bucket R2', hint: 'Nome do bucket de armazenamento', icon: <BucketIcon /> },
+                      { label: 'Domínio Público R2', hint: 'URL pública de acesso aos arquivos', icon: <LinkIcon /> },
+                      { label: 'Access Key ID', hint: 'Chave de acesso ao R2', icon: <KeyIcon /> },
+                    ].map((field) => (
+                      <div
+                        key={field.label}
+                        className="glass-sm flex items-start gap-3 p-3 rounded-xl"
+                      >
+                        <span className="text-lg mt-0.5">{field.icon}</span>
+                        <div>
+                          <p className="text-xs font-semibold">{field.label}</p>
+                          <p className="text-[11px] mt-0.5" style={{ opacity: 0.5 }}>{field.hint}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Aviso — usa variável semântica de warning */}
+                  <div
+                    className="flex items-start gap-3 p-4 rounded-xl"
+                    style={{
+                      background: 'var(--status-warning-bg)',
+                      border: '1px solid var(--status-warning-border)',
+                    }}
+                  >
+                    <span className="text-xl" style={{ color: 'var(--status-warning-text)' }}>
+                      <svg className="w-5 h-5 text-amber-500 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--status-warning-text)' }}>
+                        Atenção ao reconfigurar
+                      </p>
+                      <p className="text-xs mt-1" style={{ opacity: 0.7 }}>
+                        Alterar as credenciais do Cloudflare irá invalidar o bucket atual e pode
+                        causar indisponibilidade dos logos já hospedados. Faça a migração com cuidado.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <a
+                      href="/dashboard"
+                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{
+                        border: '1px solid var(--surface-border)',
+                        color: 'var(--brand-text-color)',
+                        opacity: 0.75,
+                      }}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Reconfigurar via Wizard Inicial
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* ── ABA: ASSINATURAS (BILLING) ── */}
+              {activeTab === 'billing' && (
+                <BillingSettings />
+              )}
+
+              {/* ── ABA: CONTA ── */}
+              {activeTab === 'conta' && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-base font-bold mb-1">Minha Conta</h2>
+                    <p className="text-sm" style={{ opacity: 0.6 }}>
+                      Dados do administrador logado atualmente.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {user?.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt="Foto de perfil"
+                        className="w-16 h-16 rounded-2xl object-cover shadow-lg shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg shrink-0"
+                        style={{
+                          background: 'var(--brand-gradient)',
+                          color: 'var(--brand-contrast-color)',
+                        }}
+                      >
+                        {user?.nome?.[0]?.toUpperCase()}
+                        {user?.sobrenome?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <p className="font-bold text-lg">{user?.nome} {user?.sobrenome}</p>
+                        <button
+                          onClick={() => setIsProfileOpen(true)}
+                          className="px-2 py-1 rounded-lg border border-slate-700/60 hover:bg-slate-800/40 text-[10px] font-bold uppercase tracking-wider cursor-pointer bg-transparent transition-all flex items-center gap-1 shrink-0"
+                          style={{ color: 'var(--brand-text-color)' }}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                          Editar Perfil
+                        </button>
+                      </div>
+                      <p className="text-sm" style={{ opacity: 0.6 }}>{user?.email}</p>
+                      {/* Badge de role — usa variável semântica de sucesso */}
+                      <span
+                        className="inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                        style={{
+                          background: 'var(--status-success-bg)',
+                          border: '1px solid var(--status-success-border)',
+                          color: 'var(--status-success-text)',
+                        }}
+                      >
+                        {user?.role}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      {
+                        label: 'Membro desde',
+                        value: user?.created_at
+                          ? new Date(user.created_at).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : '—',
+                        mono: false,
+                      },
+                      { label: 'ID do Usuário', value: user?.id ?? '—', mono: true },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="p-4 rounded-xl space-y-1"
+                        style={{
+                          border: '1px solid var(--surface-border)',
+                          background: 'var(--surface-hover)',
+                        }}
+                      >
+                        <p className="text-[10px] uppercase font-bold tracking-wider" style={{ opacity: 0.4 }}>
+                          {item.label}
+                        </p>
+                        <p className={`text-sm font-medium ${item.mono ? 'font-mono text-xs opacity-70' : ''}`}>
+                          {item.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '1rem' }}>
+                    <button
+                      onClick={logout}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-transparent"
+                      style={{
+                        color: 'var(--status-error-text)',
+                        border: '1px solid var(--status-error-border)',
+                      }}
+                      onMouseEnter={(e) =>
+                        ((e.currentTarget as HTMLButtonElement).style.background = 'var(--status-error-bg)')
+                      }
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLButtonElement).style.background = 'transparent')
+                      }
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Sair da Sessão
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </AppShell>
+  );
+}

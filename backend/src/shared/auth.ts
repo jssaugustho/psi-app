@@ -1,0 +1,148 @@
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'foxbase_super_secret_jwt_token_for_local_dev_32_chars';
+const GOTRUE_URL = process.env.GOTRUE_URL || 'http://gotrue:9999';
+const SERVICE_SECRET_KEY = process.env.SERVICE_SECRET_KEY || 'c3d9a7e1-8f2b-4d5c-9e1a-6f4b3a2c1d0e';
+
+/**
+ * Gera um JWT com role service_role assinado com JWT_SECRET
+ * Utilizado para autenticar chamadas à API Admin do GoTrue
+ */
+export function generateServiceRoleJwt(): string {
+  const payload = {
+    role: 'service_role',
+    iss: 'supabase',
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hora
+  };
+  return jwt.sign(payload, JWT_SECRET);
+}
+
+/**
+ * Interface dos dados do perfil de usuário estendido
+ */
+export interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string;
+  role: 'admin' | 'user';
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Interface do payload decodificado do JWT do usuário
+ */
+export interface JwtUserPayload {
+  sub: string; // User ID
+  email: string;
+  role: string;
+  exp: number;
+}
+
+/**
+ * Valida um token JWT de usuário enviado no Authorization header
+ */
+export function verifyUserJwt(token: string): JwtUserPayload {
+  return jwt.verify(token, JWT_SECRET) as JwtUserPayload;
+}
+
+/**
+ * Valida a Service Secret Key
+ */
+export function isValidServiceSecret(key: string | undefined): boolean {
+  return !!key && key === SERVICE_SECRET_KEY;
+}
+
+/**
+ * Cria um usuário no GoTrue usando a API Admin do GoTrue
+ */
+export async function createGoTrueUser(
+  email: string,
+  password: string,
+  metadata: Record<string, any> = {},
+  baseUrl?: string
+) {
+  const adminToken = generateServiceRoleJwt();
+  const targetUrl = baseUrl ? `${baseUrl}/admin/users` : `${GOTRUE_URL}/admin/users`;
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: metadata,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message = (errorBody as any)?.msg || (errorBody as any)?.error_description || (errorBody as any)?.message || 'Erro ao criar usuário no GoTrue';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Realiza autenticação no GoTrue (/token)
+ */
+export async function loginGoTrueUser(email: string, password: string, baseUrl?: string) {
+  const targetUrl = baseUrl ? `${baseUrl}/token?grant_type=password` : `${GOTRUE_URL}/token?grant_type=password`;
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message = (errorBody as any)?.error_description || (errorBody as any)?.msg || 'Credenciais inválidas';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Renova um access_token usando o refresh_token via GoTrue
+ * Endpoint GoTrue: POST /token?grant_type=refresh_token
+ */
+export async function refreshGoTrueToken(refreshToken: string, baseUrl?: string) {
+  const targetUrl = baseUrl
+    ? `${baseUrl}/token?grant_type=refresh_token`
+    : `${GOTRUE_URL}/token?grant_type=refresh_token`;
+
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      (errorBody as any)?.error_description ||
+      (errorBody as any)?.msg ||
+      'Refresh token inválido ou expirado';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
