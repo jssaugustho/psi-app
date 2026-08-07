@@ -146,3 +146,47 @@ export async function refreshGoTrueToken(refreshToken: string, baseUrl?: string)
 
   return await response.json();
 }
+
+/**
+ * Gera um link de ação no GoTrue (Magic Link, Convite, Confirmação, Recuperação)
+ * via API Admin (/admin/generate_link) sem enviar e-mail automaticamente.
+ */
+export async function generateGoTrueLink(
+  type: 'magiclink' | 'signup' | 'invite' | 'recovery',
+  email: string,
+  redirectTo: string,
+  metadata: Record<string, any> = {},
+  baseUrl?: string
+) {
+  const adminToken = generateServiceRoleJwt();
+  const targetUrl = baseUrl
+    ? `${baseUrl}/admin/generate_link`
+    : `${GOTRUE_URL}/admin/generate_link`;
+
+  const response = await fetch(targetUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({
+      type,
+      email,
+      user_metadata: metadata,
+      redirect_to: redirectTo,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      (errorBody as any)?.msg ||
+      (errorBody as any)?.error_description ||
+      (errorBody as any)?.message ||
+      'Erro ao gerar link no GoTrue';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+

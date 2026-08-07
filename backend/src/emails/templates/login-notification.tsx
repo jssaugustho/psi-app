@@ -10,6 +10,7 @@ export interface LoginNotificationProps {
   gradientStart: string;
   gradientEnd: string;
   logoUrl?: string | null;
+  appType?: 'app' | 'admin';
 }
 
 /** Faz parse simplificado do user-agent para texto legível */
@@ -60,6 +61,7 @@ export function LoginNotificationEmail({
   gradientStart,
   gradientEnd,
   logoUrl,
+  appType,
 }: LoginNotificationProps) {
   const { date, time } = formatDate(loginAt);
   const deviceLabel = parseDevice(device);
@@ -205,14 +207,16 @@ export function LoginNotificationEmail({
               ) : (
                 <p style={styles.headerTitle}>{brandName}</p>
               )}
-              <p style={styles.headerSubtitle}>Notificação de acesso</p>
+              <p style={styles.headerSubtitle}>
+                {appType === 'admin' ? 'Acesso ao Backoffice' : 'Acesso ao Aplicativo'}
+              </p>
             </div>
 
             {/* Body */}
             <div style={styles.body2}>
               <p style={styles.greeting}>Olá, {userName}!</p>
               <p style={styles.intro}>
-                Detectamos um novo acesso à sua conta. Confira os detalhes abaixo.
+                Detectamos um novo acesso à sua conta {appType === 'admin' ? 'de administrador (Backoffice)' : 'no aplicativo'}. Confira os detalhes abaixo.
                 Se foi você, pode ignorar este e-mail com segurança.
               </p>
 

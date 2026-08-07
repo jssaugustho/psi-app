@@ -1,6 +1,6 @@
 # 🎨 Padrão de Glassmorphism (Tabelas, Cards e Modais)
 
-Este documento estabelece as diretrizes obrigatórias para a aplicação do estilo de **Glassmorphism** na interface administrativa e demais páginas da plataforma. O uso correto deste padrão garante consistência visual, sofisticação e legibilidade em ambos os temas (claro e escuro).
+Este documento estabelece as diretrizes obrigatórias para a aplicação do estilo de **Glassmorphism** na interface administrativa (Backoffice Admin) e no portal do cliente (Web App). O uso correto deste padrão garante consistência visual, sofisticação e legibilidade em ambos os temas (claro e escuro).
 
 ---
 

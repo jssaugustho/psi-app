@@ -21,21 +21,7 @@ export default function RootLayout({
         <AuthProvider>
           <BrandProvider>
             <ProgressProvider>
-              {/* Blobs de fundo animados (Altamente otimizados no compositor da GPU) */}
-              <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none select-none">
-                <div
-                  className="absolute top-[-15%] left-[-15%] w-[60vw] h-[60vw] rounded-full opacity-[0.08] filter blur-[120px] animate-blob-1"
-                  style={{
-                    background: 'var(--brand-gradient-start)',
-                  }}
-                />
-                <div
-                  className="absolute bottom-[-15%] right-[-15%] w-[60vw] h-[60vw] rounded-full opacity-[0.08] filter blur-[120px] animate-blob-2"
-                  style={{
-                    background: 'var(--brand-gradient-end)',
-                  }}
-                />
-              </div>
+
               {children}
             </ProgressProvider>
           </BrandProvider>

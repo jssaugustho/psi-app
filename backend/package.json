@@ -7,19 +7,20 @@
     "build": "rimraf dist && tsc",
     "start:api": "node dist/apis/core/server.js",
     "start:worker": "node dist/workers/index.js",
-    "start:upload": "node dist/apis/upload/server.js",
     "dev:api": "ts-node-dev --respawn --transpile-only src/apis/core/server.ts",
     "dev:worker": "ts-node-dev --respawn --transpile-only src/workers/index.ts",
-    "dev:upload": "ts-node-dev --respawn --transpile-only src/apis/upload/server.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "ts-node src/scripts/migrate.ts",
     "db:reset": "node -e \"const postgres = require('postgres'); const sql = postgres('postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable'); async function run() { await sql.unsafe('TRUNCATE TABLE auth.users CASCADE; TRUNCATE TABLE public.profiles CASCADE;'); console.log('✅ Banco de dados limpo com sucesso!'); process.exit(0); } run();\"",
-    "bootstrap": "ts-node src/scripts/bootstrap.ts"
+    "bootstrap": "ts-node src/scripts/bootstrap.ts",
+    "test-leads-webhook": "ts-node src/scripts/test-leads-webhook.ts",
+    "reset-crm": "ts-node src/scripts/reset-crm.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
+    "@aws-sdk/s3-request-presigner": "^3.1102.0",
     "@fastify/cors": "^8.5.0",
     "@fastify/multipart": "7.7.3",
     "@fastify/websocket": "^8.2.0",
@@ -37,7 +38,6 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "resend": "^6.18.0",
-    "sharp": "^0.33.5",
     "socket.io": "^4.7.5",
     "zod": "^3.25.76"
   },

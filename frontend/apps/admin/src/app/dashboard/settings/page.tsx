@@ -1,15 +1,13 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, Tenant, PlatformSetupStatusResponse } from '@/lib/api';
-import { AppShell } from '@psi/ui';
 import { WhiteLabelSettings } from '@/components/white-label-settings';
 import { ResendSettings } from '@/components/resend-settings';
 import { BillingSettings } from '@/components/billing-settings';
-import { Link } from '@/components/Link';
+import { LoadingSpinner } from '@psi/ui';
 
 const BillingIcon = () => (
   <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -17,24 +15,7 @@ const BillingIcon = () => (
   </svg>
 );
 
-const HomeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
 
-const StatusIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
-const SettingsIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
 
 const PaletteIcon = () => (
   <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -60,15 +41,9 @@ const UserIcon = () => (
   </svg>
 );
 
-const EnvelopeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+const OfficeIcon = () => (
+  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
   </svg>
 );
 
@@ -84,11 +59,7 @@ const GlobeIcon = () => (
   </svg>
 );
 
-const OfficeIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-);
+
 
 const BucketIcon = () => (
   <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -113,9 +84,8 @@ const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function SettingsPage() {
-  const { user, loading, logout, setIsProfileOpen } = useAuth();
-  const { tenant: brandTenant, theme, toggleTheme, reloadBrand } = useBrand();
-  const router = useRouter();
+  const { user, setIsProfileOpen, logout } = useAuth();
+  const { reloadBrand } = useBrand();
 
   const [activeTab, setActiveTab] = useState<Tab>('white-label');
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -160,61 +130,21 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
-      return;
-    }
     if (user) loadTenant();
-  }, [user, loading, router, loadTenant]);
+  }, [user, loadTenant]);
 
   const handleTenantSaved = async (updated: Tenant) => {
     setTenant(updated);
     await reloadBrand();
   };
 
-  const menuItems = [
-    { label: 'Painel Geral', href: '/dashboard', icon: <HomeIcon />, active: false },
-    { label: 'Status do App', href: '/dashboard/status', icon: <StatusIcon />, active: false },
-    { label: 'Tenants', href: '/dashboard/tenants', icon: <OfficeIcon />, active: false },
-    { label: 'Usuários', href: '/dashboard/users', icon: <UsersIcon />, active: false },
-    { label: 'E-mails', href: '/dashboard/emails', icon: <EnvelopeIcon />, active: false },
-    { label: 'Configurações', href: '/dashboard/settings', icon: <SettingsIcon />, active: true },
-  ];
 
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ color: 'var(--brand-text-color)' }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
-              borderTopColor: 'var(--brand-gradient-start)',
-            }}
-          />
-          <p className="text-sm" style={{ opacity: 0.6 }}>Carregando…</p>
-        </div>
-      </div>
-    );
+  if (loadingTenant) {
+    return <LoadingSpinner message="Carregando configurações..." className="min-h-[50vh]" />;
   }
 
   return (
-    <AppShell
-      appName={brandTenant?.name || 'Admin'}
-      logoUrl={theme === 'dark' ? brandTenant?.logoDarkUrl : brandTenant?.logoLightUrl}
-      iconUrl={theme === 'dark' ? brandTenant?.iconDarkUrl : brandTenant?.iconLightUrl}
-      menuItems={menuItems}
-      user={user}
-      theme={theme}
-      onToggleTheme={toggleTheme}
-      onLogout={logout}
-      onEditProfile={() => setIsProfileOpen(true)}
-      LinkComponent={Link}
-    >
-      <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
+    <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold">Configurações</h1>
@@ -224,16 +154,7 @@ export default function SettingsPage() {
         </div>
 
         {loadingTenant ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: 'var(--brand-text-color)' }}>
-            <div
-              className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
-                borderTopColor: 'var(--brand-gradient-start)',
-              }}
-            />
-            <p className="text-sm" style={{ opacity: 0.6 }}>Carregando configurações…</p>
-          </div>
+          <LoadingSpinner message="Carregando configurações..." className="py-20" />
         ) : (
           <>
             {/* Tab Bar */}
@@ -513,7 +434,6 @@ export default function SettingsPage() {
             </div>
           </>
         )}
-      </div>
-    </AppShell>
+    </div>
   );
 }

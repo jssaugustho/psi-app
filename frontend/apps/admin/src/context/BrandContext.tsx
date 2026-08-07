@@ -52,15 +52,15 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     if (currentTheme === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
-      root.style.setProperty('--brand-bg-color', t?.bgLightColor || '#F8FAFC');
-      root.style.setProperty('--brand-card-bg-color', t?.cardLightColor || '#FFFFFF');
-      root.style.setProperty('--brand-text-color', t?.textLightColor || '#0F172A');
+      root.style.setProperty('--brand-bg-color', '#FAFAFA');       // zinc-50
+      root.style.setProperty('--brand-card-bg-color', '#FFFFFF');  // white
+      root.style.setProperty('--brand-text-color', '#09090B');     // zinc-950
     } else {
       root.classList.remove('light');
       root.classList.add('dark');
-      root.style.setProperty('--brand-bg-color', t?.bgDarkColor || '#020617');
-      root.style.setProperty('--brand-card-bg-color', t?.cardDarkColor || '#0F172A');
-      root.style.setProperty('--brand-text-color', t?.textDarkColor || '#F8FAFC');
+      root.style.setProperty('--brand-bg-color', '#09090B');       // zinc-950
+      root.style.setProperty('--brand-card-bg-color', '#18181B');  // zinc-900
+      root.style.setProperty('--brand-text-color', '#F4F4F5');     // zinc-100
     }
 
     // Favicon e Título
@@ -70,14 +70,18 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         : t?.iconDarkUrl || t?.iconLightUrl;
 
     if (iconUrl) {
-      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
-      if (!link) {
-        link = document.createElement('link');
+      const existingIcons = document.querySelectorAll("link[rel*='icon']");
+      if (existingIcons.length > 0) {
+        existingIcons.forEach((el) => {
+          (el as HTMLLinkElement).href = iconUrl;
+        });
+      } else {
+        const link = document.createElement('link');
         link.type = 'image/x-icon';
         link.rel = 'shortcut icon';
+        link.href = iconUrl;
         document.getElementsByTagName('head')[0].appendChild(link);
       }
-      link.href = iconUrl;
     }
 
     if (t?.name) {
@@ -94,14 +98,38 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   const loadBrand = useCallback(async () => {
     try {
-      const res = await api.getPrimaryTenant();
-      if (res?.tenant) {
-        setTenant(res.tenant);
-        applyBrandStyles(res.tenant, theme);
+      const host = typeof window !== 'undefined' ? window.location.hostname : '';
+      let resolvedTenant: Tenant | null = null;
+
+      // 1. Tentar resolver por domínio customizado ou por subdomínio (slug)
+      if (host && host !== 'localhost' && host !== '127.0.0.1') {
+        resolvedTenant = await api.getTenantByDomain(host);
+        
+        if (!resolvedTenant) {
+          const parts = host.split('.');
+          if (parts.length > 2) {
+            const slugCandidate = parts[0];
+            resolvedTenant = await api.getTenantBySlug(slugCandidate);
+          }
+        }
+      }
+
+      // 2. Fallback para o tenant principal caso não tenha encontrado por domínio
+      if (!resolvedTenant) {
+        const primaryRes = await api.getPrimaryTenant();
+        if (primaryRes?.tenant) {
+          resolvedTenant = primaryRes.tenant;
+        }
+      }
+
+      if (resolvedTenant) {
+        setTenant(resolvedTenant);
+        applyBrandStyles(resolvedTenant, theme);
       } else {
         applyBrandStyles(null, theme);
       }
     } catch (err) {
+      console.error('Erro ao resolver branding:', err);
       applyBrandStyles(null, theme);
     } finally {
       setLoading(false);

@@ -1,12 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useBrand } from '@/context/BrandContext';
-import { AppShell } from '@psi/ui';
-import { Link } from '@/components/Link';
 import { api } from '@/lib/api';
+import { LoadingSpinner, Select } from '@psi/ui';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────
 interface EmailLog {
@@ -309,9 +306,7 @@ function EmailPreviewModal({
 
 // ── Página Principal ──────────────────────────────────────────────────────
 export default function EmailsPage() {
-  const { user, loading, logout, setIsProfileOpen } = useAuth();
-  const { tenant: brandTenant, theme, toggleTheme } = useBrand();
-  const router = useRouter();
+  const { user } = useAuth();
 
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [total, setTotal] = useState(0);
@@ -327,15 +322,6 @@ export default function EmailsPage() {
 
   // Preview modal
   const [previewLog, setPreviewLog] = useState<EmailLog | null>(null);
-
-  const menuItems = [
-    { label: 'Painel Geral', href: '/dashboard', icon: <HomeIcon />, active: false },
-    { label: 'Status do App', href: '/dashboard/status', icon: <StatusIcon />, active: false },
-    { label: 'Tenants', href: '/dashboard/tenants', icon: <OfficeIcon />, active: false },
-    { label: 'Usuários', href: '/dashboard/users', icon: <UsersIcon />, active: false },
-    { label: 'E-mails', href: '/dashboard/emails', icon: <EnvelopeIcon />, active: true },
-    { label: 'Configurações', href: '/dashboard/settings', icon: <SettingsIcon />, active: false },
-  ];
 
   const loadLogs = useCallback(async () => {
     if (!user) return;
@@ -356,9 +342,8 @@ export default function EmailsPage() {
   }, [user, page, statusFilter, templateFilter, search]);
 
   useEffect(() => {
-    if (!loading && !user) { router.replace('/login'); return; }
     if (user) loadLogs();
-  }, [user, loading, router, loadLogs]);
+  }, [user, loadLogs]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -377,293 +362,257 @@ export default function EmailsPage() {
     cursor: 'pointer',
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ color: 'var(--brand-text-color)' }}>
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
-              borderTopColor: 'var(--brand-gradient-start)',
-            }}
-          />
-          <p className="text-sm" style={{ opacity: 0.6 }}>Carregando…</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
-      <AppShell
-        appName={brandTenant?.name || 'Admin'}
-        logoUrl={theme === 'dark' ? brandTenant?.logoDarkUrl : brandTenant?.logoLightUrl}
-        iconUrl={theme === 'dark' ? brandTenant?.iconDarkUrl : brandTenant?.iconLightUrl}
-        menuItems={menuItems}
-        user={user}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onLogout={logout}
-        onEditProfile={() => setIsProfileOpen(true)}
-        LinkComponent={Link}
-      >
-        <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">E-mails Transacionais</h1>
-              <p className="text-sm mt-1" style={{ opacity: 0.6 }}>
-                Acompanhe todos os e-mails enviados pela plataforma
-              </p>
-            </div>
-            <button
-              onClick={() => { setPage(0); loadLogs(); }}
-              disabled={loadingLogs}
-              className="glass-sm flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border-none"
-              style={{
-                color: 'var(--brand-text-color)',
-              }}
+      <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">E-mails Transacionais</h1>
+            <p className="text-sm mt-1" style={{ opacity: 0.6 }}>
+              Acompanhe todos os e-mails enviados pela plataforma
+            </p>
+          </div>
+          <button
+            onClick={() => { setPage(0); loadLogs(); }}
+            disabled={loadingLogs}
+            className="glass-sm flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border-none"
+            style={{
+              color: 'var(--brand-text-color)',
+            }}
+          >
+            <span className={loadingLogs ? 'animate-spin' : ''}><RefreshIcon /></span>
+            Atualizar
+          </button>
+        </div>
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'Total de E-mails', value: total, color: 'var(--brand-gradient-start)' },
+            { label: 'Enviados', value: logs.filter(l => l.status === 'sent').length, color: '#10B981' },
+            { label: 'Com falha', value: logs.filter(l => l.status === 'failed').length, color: '#EF4444' },
+          ].map(stat => (
+            <div
+              key={stat.label}
+              className="glass-md rounded-2xl p-5"
             >
-              <span className={loadingLogs ? 'animate-spin' : ''}><RefreshIcon /></span>
-              Atualizar
-            </button>
-          </div>
-
-          {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Total de E-mails', value: total, color: 'var(--brand-gradient-start)' },
-              { label: 'Enviados', value: logs.filter(l => l.status === 'sent').length, color: '#10B981' },
-              { label: 'Com falha', value: logs.filter(l => l.status === 'failed').length, color: '#EF4444' },
-            ].map(stat => (
-              <div
-                key={stat.label}
-                className="glass-md rounded-2xl p-5"
-              >
-                <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
-                <p className="text-xs mt-1" style={{ opacity: 0.55 }}>{stat.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Filters */}
-          <div
-            className="glass-md rounded-2xl p-4"
-          >
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Search */}
-              <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 min-w-48">
-                <div
-                  className="glass-sm flex items-center gap-2 flex-1 rounded-xl px-3 py-2"
-                >
-                  <span style={{ opacity: 0.4, color: 'var(--brand-text-color)' }}><SearchIcon /></span>
-                  <input
-                    type="text"
-                    placeholder="Buscar por e-mail destinatário…"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="flex-1 bg-transparent border-none outline-none text-sm"
-                    style={{ color: 'var(--brand-text-color)' }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-sm font-medium cursor-pointer border-none transition-all"
-                  style={{
-                    background: 'var(--brand-gradient)',
-                    color: 'var(--brand-contrast-color)',
-                  }}
-                >
-                  Buscar
-                </button>
-              </form>
-
-              {/* Status filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-                className="glass-sm"
-                style={filterSelectStyle}
-              >
-                <option value="">Todos os status</option>
-                <option value="sent">Enviados</option>
-                <option value="failed">Com falha</option>
-              </select>
-
-              {/* Template filter */}
-              <select
-                value={templateFilter}
-                onChange={(e) => { setTemplateFilter(e.target.value); setPage(0); }}
-                className="glass-sm"
-                style={filterSelectStyle}
-              >
-                <option value="">Todos os templates</option>
-                <option value="login_notification">Notif. de Login</option>
-              </select>
-
-              {(search || statusFilter || templateFilter) && (
-                <button
-                  onClick={() => {
-                    setSearch(''); setSearchInput('');
-                    setStatusFilter(''); setTemplateFilter(''); setPage(0);
-                  }}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer border-none transition-all"
-                  style={{
-                    background: 'rgba(239,68,68,0.1)',
-                    color: '#F87171',
-                    border: '1px solid rgba(239,68,68,0.2)',
-                  }}
-                >
-                  Limpar filtros
-                </button>
-              )}
+              <p className="text-2xl font-bold" style={{ color: stat.color }}>{stat.value}</p>
+              <p className="text-xs mt-1" style={{ opacity: 0.55 }}>{stat.label}</p>
             </div>
-          </div>
+          ))}
+        </div>
 
-          {/* Table */}
-          <div
-            className="glass-md rounded-2xl overflow-hidden"
-          >
-            {error && (
-              <div className="p-6 text-center" style={{ color: '#F87171' }}>
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-
-            {!error && (
-              <div className="overflow-x-auto">
-                <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                      {['Para', 'Assunto', 'Template', 'Status', 'Data de envio'].map((col) => (
-                        <th
-                          key={col}
-                          className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                          style={{ opacity: 0.5, color: 'var(--brand-text-color)' }}
-                        >
-                          {col}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingLogs && (
-                      <tr>
-                        <td colSpan={5} className="text-center py-12" style={{ color: 'var(--brand-text-color)', opacity: 0.4 }}>
-                          <div className="flex items-center justify-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
-                              style={{
-                                borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
-                                borderTopColor: 'var(--brand-gradient-start)',
-                              }}
-                            />
-                            <span className="text-sm">Buscando e-mails…</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-
-                    {!loadingLogs && logs.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="text-center py-12">
-                          <div className="flex flex-col items-center gap-3" style={{ opacity: 0.4, color: 'var(--brand-text-color)' }}>
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                            </svg>
-                            <p className="text-sm">Nenhum e-mail encontrado</p>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-
-                    {!loadingLogs && logs.map((log) => (
-                      <tr
-                        key={log.id}
-                        onClick={() => setPreviewLog(log)}
-                        className="cursor-pointer transition-colors"
-                        style={{ borderBottom: '1px solid var(--surface-border)' }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-glass)';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
-                        }}
-                      >
-                        <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-text-color)' }}>
-                          {log.to_email}
-                        </td>
-                        <td className="px-5 py-3.5 text-sm max-w-xs truncate" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
-                          {log.subject}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className="text-xs px-2.5 py-1 rounded-full font-medium"
-                            style={{
-                              background: 'var(--surface-glass)',
-                              border: '1px solid var(--surface-border)',
-                              color: 'var(--brand-text-color)',
-                            }}
-                          >
-                            {templateLabel(log.template)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span
-                            className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                            style={
-                              log.status === 'sent'
-                                ? { background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }
-                                : { background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }
-                            }
-                          >
-                            {log.status === 'sent' ? 'Enviado' : 'Falhou'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
-                          {formatDate(log.sent_at)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Pagination */}
-            {!loadingLogs && totalPages > 1 && (
+        {/* Filters */}
+        <div
+          className="glass-md rounded-2xl p-4"
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <form onSubmit={handleSearch} className="flex items-center gap-2 flex-1 min-w-48">
               <div
-                className="flex items-center justify-between px-5 py-3"
-                style={{ borderTop: '1px solid var(--surface-border)', color: 'var(--brand-text-color)' }}
+                className="glass-sm flex items-center gap-2 flex-1 rounded-xl px-3 py-2"
               >
-                <p className="text-xs" style={{ opacity: 0.5 }}>
-                  Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={page === 0}
-                    onClick={() => setPage(p => p - 1)}
-                    className="glass-sm p-1.5 rounded-lg cursor-pointer border-none transition-all disabled:opacity-30"
-                    style={{ color: 'var(--brand-text-color)' }}
-                  >
-                    <ChevronLeftIcon />
-                  </button>
-                  <span className="text-xs px-2">{page + 1} / {totalPages}</span>
-                  <button
-                    disabled={page >= totalPages - 1}
-                    onClick={() => setPage(p => p + 1)}
-                    className="glass-sm p-1.5 rounded-lg cursor-pointer border-none transition-all disabled:opacity-30"
-                    style={{ color: 'var(--brand-text-color)' }}
-                  >
-                    <ChevronRightIcon />
-                  </button>
-                </div>
+                <span style={{ opacity: 0.4, color: 'var(--brand-text-color)' }}><SearchIcon /></span>
+                <input
+                  type="text"
+                  placeholder="Buscar por e-mail destinatário…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="flex-1 bg-transparent border-none outline-none text-sm"
+                  style={{ color: 'var(--brand-text-color)' }}
+                />
               </div>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl text-sm font-medium cursor-pointer border-none transition-all"
+                style={{
+                  background: 'var(--brand-gradient)',
+                  color: 'var(--brand-contrast-color)',
+                }}
+              >
+                Buscar
+              </button>
+            </form>
+
+            {/* Status filter */}
+            {/* Status filter */}
+            <Select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+              options={[
+                { value: '', label: 'Todos os status' },
+                { value: 'sent', label: 'Enviados' },
+                { value: 'failed', label: 'Com falha' },
+              ]}
+              variant="glass"
+              className="min-w-[150px]"
+            />
+
+            {/* Template filter */}
+            <Select
+              value={templateFilter}
+              onChange={(e) => { setTemplateFilter(e.target.value); setPage(0); }}
+              options={[
+                { value: '', label: 'Todos os templates' },
+                { value: 'login_notification', label: 'Notif. de Login' },
+              ]}
+              variant="glass"
+              className="min-w-[170px]"
+            />
+
+            {(search || statusFilter || templateFilter) && (
+              <button
+                onClick={() => {
+                  setSearch(''); setSearchInput('');
+                  setStatusFilter(''); setTemplateFilter(''); setPage(0);
+                }}
+                className="text-xs px-3 py-2 rounded-lg cursor-pointer border-none transition-all"
+                style={{
+                  background: 'rgba(239,68,68,0.1)',
+                  color: '#F87171',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                }}
+              >
+                Limpar filtros
+              </button>
             )}
           </div>
         </div>
-      </AppShell>
+
+        {/* Table */}
+        <div
+          className="glass-md rounded-2xl overflow-hidden"
+        >
+          {error && (
+            <div className="p-6 text-center" style={{ color: '#F87171' }}>
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
+          {!error && (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                    {['Para', 'Assunto', 'Template', 'Status', 'Data de envio'].map((col) => (
+                      <th
+                        key={col}
+                        className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
+                        style={{ opacity: 0.5, color: 'var(--brand-text-color)' }}
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingLogs && (
+                    <tr>
+                      <td colSpan={5}>
+                        <LoadingSpinner message="Buscando e-mails..." className="py-12" />
+                      </td>
+                    </tr>
+                  )}
+
+                  {!loadingLogs && logs.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-12">
+                        <div className="flex flex-col items-center gap-3" style={{ opacity: 0.4, color: 'var(--brand-text-color)' }}>
+                          <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                          </svg>
+                          <p className="text-sm">Nenhum e-mail encontrado</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {!loadingLogs && logs.map((log) => (
+                    <tr
+                      key={log.id}
+                      onClick={() => setPreviewLog(log)}
+                      className="cursor-pointer transition-colors"
+                      style={{ borderBottom: '1px solid var(--surface-border)' }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-glass)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLTableRowElement).style.background = 'transparent';
+                      }}
+                    >
+                      <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-text-color)' }}>
+                        {log.to_email}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm max-w-xs truncate" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
+                        {log.subject}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className="text-xs px-2.5 py-1 rounded-full font-medium"
+                          style={{
+                            background: 'var(--surface-glass)',
+                            border: '1px solid var(--surface-border)',
+                            color: 'var(--brand-text-color)',
+                          }}
+                        >
+                          {templateLabel(log.template)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                          style={
+                            log.status === 'sent'
+                              ? { background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }
+                              : { background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }
+                          }
+                        >
+                          {log.status === 'sent' ? 'Enviado' : 'Falhou'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
+                        {formatDate(log.sent_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loadingLogs && totalPages > 1 && (
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderTop: '1px solid var(--surface-border)', color: 'var(--brand-text-color)' }}
+            >
+              <p className="text-xs" style={{ opacity: 0.5 }}>
+                Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} de {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage(p => p - 1)}
+                  className="glass-sm p-1.5 rounded-lg cursor-pointer border-none transition-all disabled:opacity-30"
+                  style={{ color: 'var(--brand-text-color)' }}
+                >
+                  <ChevronLeftIcon />
+                </button>
+                <span className="text-xs px-2">{page + 1} / {totalPages}</span>
+                <button
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage(p => p + 1)}
+                  className="glass-sm p-1.5 rounded-lg cursor-pointer border-none transition-all disabled:opacity-30"
+                  style={{ color: 'var(--brand-text-color)' }}
+                >
+                  <ChevronRightIcon />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Preview Modal */}
       {previewLog && (

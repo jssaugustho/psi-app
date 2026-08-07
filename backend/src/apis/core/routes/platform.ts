@@ -7,6 +7,7 @@ import { platformSettings, tenants, emailLogs } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Schemas Zod de Validação
 const SaveCloudflareBodySchema = z.object({
@@ -204,76 +205,90 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
-  // POST /v1/platform/upload (Upload direto de arquivo para o Cloudflare R2)
-  fastify.post('/upload', async (request, reply) => {
-    try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
-      }
-      verifyUserJwt(authHeader.split(' ')[1]);
+  // POST /v1/platform/upload/presign
+  // Gera uma Presigned URL para o cliente fazer upload diretamente no Cloudflare R2.
+  // O arquivo NUNCA passa pela VPS — apenas a URL assinada é gerada aqui.
+  fastify.post(
+    '/upload/presign',
+    {
+      schema: {
+        body: z.object({
+          filename: z.string().min(1, 'filename é obrigatório'),
+          content_type: z.string().min(1, 'content_type é obrigatório'),
+          upload_type: z.enum(['avatar', 'logo', 'icon', 'asset']).default('asset'),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        // 1. Validar JWT
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        verifyUserJwt(authHeader.split(' ')[1]);
 
-      const data = await request.file();
-      if (!data) {
-        return reply.status(400).send({ error: 'Requisição inválida', message: 'Nenhum arquivo enviado.' });
-      }
+        // 2. Buscar credenciais do R2
+        const settings = await db.query.platformSettings.findFirst();
+        if (
+          !settings ||
+          !settings.cloudflareAccountId ||
+          !settings.r2BucketName ||
+          !settings.r2AccessKeyId ||
+          !settings.r2SecretAccessKey
+        ) {
+          return reply.status(400).send({
+            error: 'R2 Não Configurado',
+            message: 'As credenciais do Cloudflare R2 ainda não foram salvas na plataforma.',
+          });
+        }
 
-      // Buscar credenciais do R2
-      const settings = await db.query.platformSettings.findFirst();
-      if (
-        !settings ||
-        !settings.cloudflareAccountId ||
-        !settings.r2BucketName ||
-        !settings.r2AccessKeyId ||
-        !settings.r2SecretAccessKey
-      ) {
-        return reply.status(400).send({
-          error: 'R2 Não Configurado',
-          message: 'As credenciais do Cloudflare R2 ainda não foram salvas na plataforma.',
+        const { filename, content_type, upload_type } = request.body;
+
+        // 3. Sanitizar filename e montar chave única no R2
+        const baseName = filename.split('.').slice(0, -1).join('.') || 'file';
+        const cleanName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 60);
+        const fileKey = `media/${upload_type}/${cleanName}-${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+
+        // 4. Criar cliente S3 apontado para o R2
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
+          credentials: {
+            accessKeyId: settings.r2AccessKeyId.trim(),
+            secretAccessKey: settings.r2SecretAccessKey.trim(),
+          },
         });
-      }
 
-      const buffer = await data.toBuffer();
-
-      // Extensão e chave do arquivo no S3
-      const ext = data.filename.split('.').pop() || 'png';
-      const fileKey = `assets/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-
-      // Cliente AWS S3 para Cloudflare R2
-      const s3Client = new S3Client({
-        region: 'auto',
-        endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
-        credentials: {
-          accessKeyId: settings.r2AccessKeyId.trim(),
-          secretAccessKey: settings.r2SecretAccessKey.trim(),
-        },
-      });
-
-      await s3Client.send(
-        new PutObjectCommand({
+        // 5. Gerar a Presigned URL (PUT) — expira em 5 minutos
+        const command = new PutObjectCommand({
           Bucket: settings.r2BucketName.trim(),
           Key: fileKey,
-          Body: buffer,
-          ContentType: data.mimetype,
-        })
-      );
+          ContentType: content_type,
+        });
 
-      const publicDomain = settings.r2PublicDomain || `https://${settings.r2BucketName}.${settings.cloudflareAccountId}.r2.cloudflarestorage.com`;
-      const publicUrl = `${publicDomain}/${fileKey}`;
+        const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
 
-      return reply.send({
-        url: publicUrl,
-        key: fileKey,
-        filename: data.filename,
-      });
-    } catch (err: any) {
-      fastify.log.error(err);
-      return reply.status(500).send({
-        error: 'Erro no Upload',
-        message: err.message || 'Não foi possível realizar o upload para o Cloudflare R2.',
-      });
+        const publicDomain = settings.r2PublicDomain
+          ? settings.r2PublicDomain.replace(/\/$/, '')
+          : `https://${settings.r2BucketName}.${settings.cloudflareAccountId}.r2.cloudflarestorage.com`;
+
+        const publicUrl = `${publicDomain}/${fileKey}`;
+
+        return reply.send({
+          upload_url: uploadUrl,
+          public_url: publicUrl,
+          key: fileKey,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro ao gerar URL de upload',
+          message: err.message || 'Não foi possível gerar a Presigned URL.',
+        });
+      }
     }
-  });
+  );
 
   // POST /v1/platform/setup/tenant (Cadastra/Atualiza o Tenant-Pai Principal)
   fastify.post(

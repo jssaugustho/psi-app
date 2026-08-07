@@ -15,6 +15,27 @@
       "when": 1784663358710,
       "tag": "0001_spooky_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785727777712,
+      "tag": "0002_fuzzy_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785731721032,
+      "tag": "0003_happy_callisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785861372101,
+      "tag": "0004_sparkling_ink",
+      "breakpoints": true
     }
   ]
 }

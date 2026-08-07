@@ -122,7 +122,8 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
     setError(null);
     setUploadingField(field);
     try {
-      const res = await api.uploadFile(file);
+      const uploadType = field.includes('icon') ? 'icon' : 'logo';
+      const res = await api.uploadImage(file, uploadType);
       if (field === 'logoLight') setLogoLightUrl(res.url);
       if (field === 'logoDark') setLogoDarkUrl(res.url);
       if (field === 'iconLight') setIconLightUrl(res.url);

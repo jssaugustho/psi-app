@@ -85,7 +85,6 @@ services:
       - gotrue
       - postgrest
       - api
-      - upload
     volumes:
       - ./.docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -117,28 +116,6 @@ services:
     command: npm run dev:api
     ports:
       - "5000:5000"
-    networks:
-      - foxbase-network
-
-  # 📤 API de Upload e Otimização de Imagens (Microsserviço separado)
-  upload:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: foxbase-upload
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - .:/usr/src/app
-    environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-foxbase_secure_pwd}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
-      JWT_SECRET: ${JWT_SECRET:-foxbase_super_secret_jwt_token_for_local_dev_32_chars}
-      PORT: 5001
-      NODE_ENV: development
-    command: npm run dev:upload
-    ports:
-      - "5001:5001"
     networks:
       - foxbase-network
 

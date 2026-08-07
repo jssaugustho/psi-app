@@ -53,7 +53,7 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
     setUploading(true);
     setError('');
     try {
-      const { url } = await api.uploadFile(file);
+      const { url } = await api.uploadImage(file, 'avatar');
       setAvatarUrl(url);
     } catch (err: any) {
       setError(`Erro ao enviar foto: ${err.message || 'Falha no upload.'}`);
@@ -118,15 +118,17 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop com desfoque */}
       <div
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 70%, transparent)',
+        }}
         onClick={onClose}
       />
 
       {/* Modal Container */}
       <div
-        className="glass-lg w-full max-w-md rounded-2xl border border-slate-700/40 p-6 shadow-2xl relative z-10 overflow-y-auto max-h-[90vh] space-y-6"
+        className="brand-modal w-full max-w-md rounded-2xl p-6 shadow-2xl relative z-10 overflow-y-auto max-h-[90vh] space-y-6"
         style={{
-          backgroundColor: 'var(--brand-card-bg-color, rgba(15, 23, 42, 0.95))',
           color: 'var(--brand-text-color)',
         }}
       >
@@ -151,7 +153,7 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           <div className="flex flex-col items-center space-y-2 mb-2">
             <div
               onClick={handleAvatarClick}
-              className="w-20 h-20 rounded-full border-2 border-slate-700/40 relative group overflow-hidden flex items-center justify-center bg-slate-800 cursor-pointer shadow-lg hover:border-[var(--brand-gradient-start)] transition-all shrink-0"
+              className="w-20 h-20 rounded-full border-2 border-[var(--surface-border)] relative group overflow-hidden flex items-center justify-center bg-[var(--surface-hover)] cursor-pointer shadow-lg hover:border-[var(--brand-gradient-start)] transition-all shrink-0"
             >
               {avatarUrl ? (
                 <img
@@ -240,7 +242,7 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
                 type="email"
                 disabled
                 value={user.email}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-700/40 text-xs font-semibold opacity-50 cursor-not-allowed bg-slate-900/40 text-[var(--brand-text-color)]"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--surface-border)] text-xs font-semibold opacity-50 cursor-not-allowed bg-[var(--surface-input)] text-[var(--brand-text-color)]"
               />
               <p className="text-[10px] opacity-40 mt-1">O e-mail de acesso não pode ser alterado.</p>
             </div>
@@ -255,7 +257,7 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           </div>
 
           {/* Alterar Senha (Opcional) */}
-          <div className="pt-2 border-t border-slate-800 space-y-4">
+          <div className="pt-2 border-t border-[var(--surface-border)] space-y-4">
             <p className="text-[10px] font-bold uppercase tracking-widest opacity-45">🔒 Alterar Senha (Deixe em branco para manter)</p>
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -294,12 +296,12 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--surface-border)]">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-transparent hover:bg-slate-800/40 border border-slate-700/60 cursor-pointer disabled:opacity-50 transition-all"
+              className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-transparent hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] cursor-pointer disabled:opacity-50 transition-all"
               style={{ color: 'var(--brand-text-color)' }}
             >
               Cancelar

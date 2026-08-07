@@ -21,7 +21,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center" style={{ color: 'var(--brand-text-color)' }}>
       <div className="animate-pulse flex items-center gap-2">
-        <div className="w-4 h-4 rounded-full bg-indigo-500 animate-ping" />
+        <div className="w-4 h-4 rounded-full animate-ping" style={{ backgroundColor: "var(--brand-gradient-start)" }} />
         <span>Carregando Backoffice...</span>
       </div>
     </div>

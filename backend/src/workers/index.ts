@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
 import { getChannel, assertQuorumQueue } from '../shared/queue';
 import { db } from '../shared/db';
-import { systemStatusLogs, emailLogs, platformSettings } from '../shared/schema';
+import { systemStatusLogs, emailLogs, platformSettings, tenants } from '../shared/schema';
 import { lt, sql, eq, gt, and } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { renderEmailTemplate, TemplateName, TemplatePropsMap } from '../emails/render';
+import { deriveEmailDomain } from '../shared/email-domain';
 
 dotenv.config();
 
@@ -83,17 +84,18 @@ async function main() {
       try {
         parsedPayload = JSON.parse(msg.content.toString());
 
-        const { template, to, props } = parsedPayload as {
+        const { template, to, props, tenantId } = parsedPayload as {
           template: TemplateName;
           to: string;
+          tenantId?: string;
           props: TemplatePropsMap[TemplateName];
         };
 
-        // 1. Buscar configurações do Resend no banco
+        // 1. Buscar configurações do Resend no banco (API key vem SEMPRE da plataforma)
         const settings = await db.query.platformSettings.findFirst();
 
-        if (!settings?.resendApiKey || !settings?.resendFromDomain) {
-          const errMsg = 'Configurações do Resend ausentes (API Key ou domínio de envio).';
+        if (!settings?.resendApiKey) {
+          const errMsg = 'Configurações do Resend ausentes: API Key da plataforma não configurada.';
           console.error(`❌ ${errMsg}`);
           
           await db.insert(emailLogs).values({
@@ -107,6 +109,7 @@ async function main() {
               device: (props as any).device ?? null,
               ip: (props as any).ip ?? null,
               loginAt: (props as any).loginAt ?? null,
+              tenantId: tenantId ?? null,
             },
           });
 
@@ -114,7 +117,50 @@ async function main() {
           return;
         }
 
-        // 2. Verificar se o domínio de envio está ativo e verificado no Resend
+        // 1b. Resolver o domínio de envio efetivo (ordem de prioridade):
+        //   1. emailDomain do tenant (explícito)
+        //   2. no-reply.<rootDomain> derivado do domínio principal
+        //      → no-reply SEMPRE no nível raiz, mesmo se o tenant usa subdomínio
+        //      → ex: app.clinica.com.br → no-reply.clinica.com.br
+        //   3. resendFromDomain da plataforma (fallback global)
+        let effectiveFromDomain: string | null = null;
+        if (tenantId) {
+          const tenantRow = await db.query.tenants.findFirst({
+            where: eq(tenants.id, tenantId),
+          });
+          effectiveFromDomain = tenantRow?.emailDomain ?? null;
+          // Derivar no-reply.<rootDomain> se emailDomain não foi configurado explicitamente
+          if (!effectiveFromDomain && tenantRow?.domain) {
+            effectiveFromDomain = deriveEmailDomain(tenantRow.domain);
+          }
+        }
+        if (!effectiveFromDomain) {
+          effectiveFromDomain = settings.resendFromDomain ?? null;
+        }
+
+        if (!effectiveFromDomain) {
+          const errMsg = 'Domínio de envio não configurado (nem no tenant nem na plataforma).';
+          console.error(`❌ ${errMsg}`);
+          await db.insert(emailLogs).values({
+            toEmail: to,
+            subject: parsedPayload.subject ?? 'Notificação',
+            template,
+            htmlBody: '',
+            status: 'failed',
+            error: errMsg,
+            metadata: {
+              device: (props as any).device ?? null,
+              ip: (props as any).ip ?? null,
+              loginAt: (props as any).loginAt ?? null,
+              tenantId: tenantId ?? null,
+            },
+          });
+          channel.nack(msg, false, false);
+          return;
+        }
+
+        // 2. Verificar se o domínio de envio (efetivo) está verificado no Resend
+        //    A API key usada é sempre a da plataforma, mesmo para domínios de tenants filhos.
         let isVerified = false;
         let verifyError = '';
         try {
@@ -123,17 +169,17 @@ async function main() {
           });
           if (!listRes.ok) {
             const err = await listRes.json().catch(() => ({}));
-            verifyError = `Erro ao listar domínios no Resend: ${err.message || listRes.statusText}`;
+            verifyError = `Erro ao listar domínios no Resend: ${(err as any).message || listRes.statusText}`;
           } else {
             const listData = (await listRes.json()) as {
               data?: { id: string; name: string; status: string }[];
             };
-            const targetDomain = settings.resendFromDomain.toLowerCase();
+            const targetDomain = effectiveFromDomain.toLowerCase();
             const domainEntry = listData.data?.find((d) => d.name.toLowerCase() === targetDomain);
             if (!domainEntry) {
-              verifyError = `Domínio de envio "${settings.resendFromDomain}" não encontrado na conta do Resend.`;
+              verifyError = `Domínio de envio "${effectiveFromDomain}" não encontrado na conta do Resend.`;
             } else if (domainEntry.status !== 'verified') {
-              verifyError = `Domínio de envio "${settings.resendFromDomain}" não está verificado (status atual: ${domainEntry.status}).`;
+              verifyError = `Domínio de envio "${effectiveFromDomain}" não está verificado (status atual: ${domainEntry.status}).`;
             } else {
               isVerified = true;
             }
@@ -203,17 +249,22 @@ async function main() {
         // 4. Gerar assunto padrão por template
         const subjectMap: Record<TemplateName, string> = {
           login_notification: 'Novo acesso detectado na sua conta',
+          invite_member: 'Você foi convidado para colaborar em um consultório',
         };
         const subject = parsedPayload.subject ?? subjectMap[template] ?? 'Notificação';
 
         // 5. Renderizar HTML a partir do template react
         const htmlBody = renderEmailTemplate(template, props as TemplatePropsMap[typeof template]);
 
-        // 6. Enviar via Resend
+        // 6. Enviar via Resend (sempre com a API key da plataforma, domínio do tenant)
         const resend = new Resend(settings.resendApiKey);
-        const fromAddress = settings.resendFromDomain.includes('@')
-          ? settings.resendFromDomain
-          : `no-reply@${settings.resendFromDomain}`;
+        const cleanFromAddress = effectiveFromDomain.includes('@')
+          ? effectiveFromDomain
+          : `no-reply@${effectiveFromDomain}`;
+        
+        const senderBrandName = (props as any)?.brandName ?? 'Plataforma';
+        const safeBrandName = senderBrandName.replace(/"/g, '');
+        const fromAddress = `"${safeBrandName}" <${cleanFromAddress}>`;
 
         let sendError: string | null = null;
         let emailStatus: 'sent' | 'failed' = 'sent';
@@ -251,6 +302,8 @@ async function main() {
             device: (props as any).device ?? null,
             ip: (props as any).ip ?? null,
             loginAt: (props as any).loginAt ?? null,
+            tenantId: tenantId ?? null,
+            fromDomain: effectiveFromDomain,
           },
         });
 

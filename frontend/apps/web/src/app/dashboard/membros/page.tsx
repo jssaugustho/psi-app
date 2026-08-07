@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api, Tenant, TenantMember } from '@/lib/api';
-import { AppShell, Card, Button, Input } from '@psi/ui';
-import Link from 'next/link';
+import { Card, Button, Input, LoadingSpinner, Select, SelectWithHelper } from '@psi/ui';
+import { Mail, Shield, User, X, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function MembrosPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -18,17 +18,16 @@ export default function MembrosPage() {
   
   // Form states
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'agent'>('agent');
+  const [role, setRole] = useState<'admin' | 'secretaria' | 'psicologo' | 'agent'>('secretaria');
   const [addingMember, setAddingMember] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Check authentication
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [authLoading, user, router]);
+  // Modal states for managing single collaborator details
+  const [selectedMember, setSelectedMember] = useState<TenantMember | null>(null);
+  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Load tenants for user
   const loadTenants = useCallback(async () => {
@@ -92,7 +91,7 @@ export default function MembrosPage() {
       await api.addTenantMemberByEmail(selectedTenant.id, email.trim(), role);
       setSuccess(`Membro ${email} adicionado com sucesso!`);
       setEmail('');
-      setRole('agent');
+      setRole('secretaria');
       await loadMembers();
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar membro à equipe.');
@@ -102,7 +101,7 @@ export default function MembrosPage() {
   };
 
   // Change member role
-  const handleRoleChange = async (memberId: string, newRole: 'admin' | 'agent') => {
+  const handleRoleChange = async (memberId: string, newRole: 'admin' | 'secretaria' | 'psicologo' | 'agent') => {
     setError('');
     setSuccess('');
     try {
@@ -128,26 +127,50 @@ export default function MembrosPage() {
     }
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-        <div className="animate-pulse flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-indigo-500 animate-ping" />
-          <span>Carregando equipe...</span>
-        </div>
-      </div>
-    );
+  const handleOpenMemberModal = async (member: TenantMember) => {
+    if (member.user_id === user?.id) return;
+    
+    setSelectedMember(member);
+    setError('');
+    setSuccess('');
+    setEmailLogs([]);
+    
+    if (member.profile?.email) {
+      setLoadingLogs(true);
+      try {
+        const logs = await api.getEmailLogsByEmail(member.profile.email);
+        setEmailLogs(logs);
+      } catch (err: any) {
+        console.error('Erro ao carregar logs de e-mail:', err);
+      } finally {
+        setLoadingLogs(false);
+      }
+    }
+  };
+
+  const handleModalResend = async () => {
+    if (!selectedMember || !selectedTenant) return;
+    setResending(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.resendInvite(selectedTenant.id, selectedMember.profile!.email);
+      setSuccess('Convite reenviado com sucesso!');
+      const logs = await api.getEmailLogsByEmail(selectedMember.profile!.email);
+      setEmailLogs(logs);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao reenviar convite.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  if (loading || !user) {
+    return <LoadingSpinner message="Carregando dados da equipe..." className="min-h-[50vh]" />;
   }
 
-  const menuItems = [
-    { label: 'Perfil', href: '/dashboard', active: false },
-    { label: 'Equipe', href: '/dashboard/membros', active: true },
-    { label: 'Faturamento', href: '/dashboard/faturamento', active: false },
-  ];
-
   return (
-    <AppShell appName="Psi App" menuItems={menuItems} user={user} onLogout={logout} LinkComponent={Link}>
-      <div className="space-y-6 max-w-4xl mx-auto animate-page-enter">
+    <div className="space-y-6 max-w-4xl mx-auto animate-page-enter">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -161,17 +184,13 @@ export default function MembrosPage() {
           {tenants.length > 1 && (
             <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-1.5">
               <span className="text-xs text-slate-400">Espaço:</span>
-              <select
+              <Select
                 value={selectedTenant?.id || ''}
                 onChange={(e) => setSelectedTenant(tenants.find(t => t.id === e.target.value) || null)}
-                className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer"
-              >
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id} className="bg-slate-950 text-slate-200">
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                options={tenants.map((t) => ({ value: t.id, label: t.name }))}
+                variant="transparent"
+                className="text-xs"
+              />
             </div>
           )}
         </div>
@@ -212,14 +231,27 @@ export default function MembrosPage() {
                     />
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-semibold text-slate-300">Papel (Role) *</label>
-                      <select
+                      <SelectWithHelper
                         value={role}
-                        onChange={(e) => setRole(e.target.value as 'admin' | 'agent')}
-                        className="bg-slate-950 border border-slate-800 text-sm rounded-xl px-3 h-[42px] outline-none text-slate-200 focus:border-indigo-500 transition-colors"
-                      >
-                        <option value="agent">Agente (Apenas usa recursos)</option>
-                        <option value="admin">Administrador (Configura e gerencia)</option>
-                      </select>
+                        onChange={(e) => setRole(e.target.value as 'admin' | 'secretaria' | 'psicologo' | 'agent')}
+                        options={[
+                          { 
+                            value: 'secretaria', 
+                            label: 'Secretária(o)', 
+                            helper: 'Gerencia leads, formulários de anamnese, agendamentos e registros financeiros.' 
+                          },
+                          { 
+                            value: 'psicologo', 
+                            label: 'Psicólogo', 
+                            helper: 'Acesso completo ao prontuário clínico dos pacientes, sessões, evolução e agenda pessoal.' 
+                          },
+                          { 
+                            value: 'admin', 
+                            label: 'Administrador', 
+                            helper: 'Acesso total às configurações do consultório, dados de faturamento, membros da equipe e integrações.' 
+                          },
+                        ]}
+                      />
                     </div>
                     <Button type="submit" className="w-full h-[42px]" submitting={addingMember}>
                       Adicionar à Equipe
@@ -256,7 +288,11 @@ export default function MembrosPage() {
                         </tr>
                       ) : (
                         members.map((member) => (
-                          <tr key={member.id} className="hover:bg-slate-900/10 transition-colors">
+                          <tr 
+                            key={member.id} 
+                            onClick={() => handleOpenMemberModal(member)}
+                            className={`transition-colors ${member.user_id !== user?.id ? 'cursor-pointer hover:bg-white/5' : 'opacity-85'}`}
+                          >
                             <td className="py-3 px-2 text-slate-200">
                               {member.profile ? `${member.profile.nome} ${member.profile.sobrenome}` : 'Usuário Externo'}
                             </td>
@@ -265,18 +301,36 @@ export default function MembrosPage() {
                             </td>
                             <td className="py-3 px-2">
                               {isTenantAdmin && member.user_id !== user.id ? (
-                                <select
-                                  value={member.role}
-                                  onChange={(e) => handleRoleChange(member.id, e.target.value as 'admin' | 'agent')}
-                                  className="bg-slate-950 border border-slate-800 text-xs rounded-lg px-2 py-1 outline-none text-slate-300 focus:border-indigo-500 transition-colors"
-                                >
-                                  <option value="agent">Agente</option>
-                                  <option value="admin">Administrador</option>
-                                </select>
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <Select
+                                    value={member.role}
+                                    onChange={(e) => handleRoleChange(member.id, e.target.value as 'admin' | 'secretaria' | 'psicologo' | 'agent')}
+                                    options={[
+                                      { value: 'secretaria', label: 'Secretária(o)' },
+                                      { value: 'psicologo', label: 'Psicólogo' },
+                                      { value: 'admin', label: 'Administrador' },
+                                      { value: 'agent', label: 'Agente' },
+                                    ]}
+                                    className="text-xs max-w-[140px]"
+                                  />
+                                </div>
                               ) : (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium font-mono uppercase ${
-                                  member.role === 'admin' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-                                }`}>
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium font-mono uppercase border"
+                                  style={
+                                    member.role === 'admin'
+                                      ? {
+                                          background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)',
+                                          color: 'var(--brand-gradient-start)',
+                                          borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)',
+                                        }
+                                      : {
+                                          background: 'rgba(255, 255, 255, 0.05)',
+                                          color: '#94A3B8',
+                                          borderColor: 'rgba(255, 255, 255, 0.08)',
+                                        }
+                                  }
+                                >
                                   {member.role}
                                 </span>
                               )}
@@ -285,7 +339,10 @@ export default function MembrosPage() {
                               <td className="py-3 px-2 text-right">
                                 {member.user_id !== user.id ? (
                                   <button
-                                    onClick={() => handleRemoveMember(member.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveMember(member.id);
+                                    }}
                                     className="bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold px-3 py-1 rounded-lg border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer"
                                   >
                                     Remover
@@ -310,7 +367,166 @@ export default function MembrosPage() {
             <p className="text-xs text-slate-500 mt-1">Peça para um administrador te convidar.</p>
           </div>
         )}
-      </div>
-    </AppShell>
+
+      {/* Modal de Gestão de Colaborador e Logs de Envio */}
+      {selectedMember && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fade-in">
+          <Card className="w-full max-w-lg p-6 space-y-6 relative border border-slate-800 shadow-2xl glass-lg text-left">
+            {/* Botão de Fechar */}
+            <button 
+              onClick={() => setSelectedMember(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition-colors bg-transparent border-none cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header do Modal */}
+            <div className="space-y-1.5 text-left pr-8">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-100 truncate">
+                  {selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome 
+                    ? 'Convite Enviado' 
+                    : `${selectedMember.profile?.nome} ${selectedMember.profile?.sobrenome}`}
+                </h3>
+                {selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                    Pendente
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Membro Ativo
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                <Mail className="w-3.5 h-3.5 opacity-60" />
+                {selectedMember.profile?.email}
+              </p>
+            </div>
+
+            {/* Configurações de Papel */}
+            <div className="space-y-2 text-left">
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wide">
+                Função na Equipe
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Select
+                    value={selectedMember.role}
+                    onChange={async (e) => {
+                      const newRole = e.target.value as any;
+                      await handleRoleChange(selectedMember.id, newRole);
+                      setSelectedMember(prev => prev ? { ...prev, role: newRole } : null);
+                    }}
+                    options={[
+                      { value: 'secretaria', label: 'Secretária(o)' },
+                      { value: 'psicologo', label: 'Psicólogo' },
+                      { value: 'admin', label: 'Administrador' },
+                      { value: 'agent', label: 'Agente' },
+                    ]}
+                    className="text-xs"
+                  />
+                </div>
+                
+                {selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome ? (
+                  <Button
+                    onClick={handleModalResend}
+                    disabled={resending}
+                    variant="outline"
+                    className="text-xs h-10 px-4 flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
+                    {resending ? 'Reenviando...' : 'Reenviar'}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Histórico de E-mails / Envios */}
+            <div className="space-y-3 text-left">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-indigo-400" />
+                Histórico de Envios
+              </h4>
+
+              <div className="bg-slate-950/40 border border-slate-900 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                {loadingLogs ? (
+                  <div className="p-4 text-center text-xs text-slate-500 animate-pulse">
+                    Buscando logs de e-mail...
+                  </div>
+                ) : emailLogs.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-500 italic">
+                    Nenhum e-mail registrado para este endereço.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-900/60">
+                    {emailLogs.map((log) => {
+                      const sentDate = new Date(log.created_at || log.createdAt);
+                      return (
+                        <div key={log.id} className="p-3 text-xs flex justify-between items-start hover:bg-slate-950/20 transition-all">
+                          <div className="space-y-1 pr-4">
+                            <p className="font-semibold text-slate-300 truncate max-w-[260px]" title={log.subject}>
+                              {log.subject}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {sentDate.toLocaleDateString('pt-BR')} às {sentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          
+                          {log.status === 'sent' ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
+                              Enviado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-400 border border-red-500/10" title={log.error || 'Falha de entrega'}>
+                              Falhou
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ações de exclusão */}
+            <div className="pt-2 border-t border-slate-800 flex gap-3">
+              <Button
+                onClick={() => setSelectedMember(null)}
+                variant="outline"
+                className="flex-1 text-xs"
+              >
+                Fechar
+              </Button>
+              
+              <button
+                onClick={async () => {
+                  const isPending = selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome;
+                  const confirmText = isPending
+                    ? 'Deseja realmente cancelar este convite? O acesso do colaborador será revogado.'
+                    : 'Deseja realmente remover o acesso deste colaborador?';
+                  if (!confirm(confirmText)) return;
+                  
+                  try {
+                    await api.removeTenantMember(selectedMember.id);
+                    setSuccess(isPending ? 'Convite cancelado com sucesso!' : 'Membro removido da equipe!');
+                    setSelectedMember(null);
+                    await loadMembers();
+                  } catch (err: any) {
+                    setError(err.message || 'Erro ao remover colaborador da equipe.');
+                  }
+                }}
+                className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold h-10 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer flex items-center justify-center font-sans"
+              >
+                {selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome 
+                  ? 'Cancelar Convite' 
+                  : 'Remover Acesso'}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }

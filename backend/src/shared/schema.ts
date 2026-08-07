@@ -43,6 +43,10 @@ export const tenants = pgTable('tenants', {
   emailDomain: text('email_domain'),
   resendApiKey: text('resend_api_key'),
 
+  // Configurações do CRM (Fontes de Tráfego)
+  trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook']).notNull(),
+  defaultTrafficSource: text('default_traffic_source').default('Manual').notNull(),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -110,11 +114,92 @@ export const tenantMembers = pgTable('tenant_members', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
   userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
-  role: text('role').$type<'admin' | 'agent'>().default('agent').notNull(),
+  role: text('role').$type<'admin' | 'secretaria' | 'psicologo' | 'agent'>().default('secretaria').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type TenantMember = typeof tenantMembers.$inferSelect;
 export type NewTenantMember = typeof tenantMembers.$inferInsert;
+
+// ── CRM: Pipeline Columns (Estágios do Funil) ────────────────────────────────
+export const pipelineColumns = pgTable('pipeline_columns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  slug: text('slug').default('').notNull(),
+  color: text('color').default('#6366F1').notNull(),
+  category: text('category').$type<'pendente' | 'acolhimento' | 'paciente' | 'alta' | 'negativa'>().default('acolhimento').notNull(),
+  order: integer('order').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PipelineColumn = typeof pipelineColumns.$inferSelect;
+export type NewPipelineColumn = typeof pipelineColumns.$inferInsert;
+
+// ── CRM: Contacts (Leads / Pacientes em triagem) ─────────────────────────────
+export const contacts = pgTable('contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  status: text('status').notNull(), // mapeia para name de pipeline_columns
+  source: text('source'), // ex: Instagram, Google Ads, Indicação, Webhook
+  screeningNotes: text('screening_notes'),
+  nextContactAt: timestamp('next_contact_at', { withTimezone: true }),
+  lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
+  
+  // Novos Campos Clínicos
+  emergencyContactName: text('emergency_contact_name'),
+  emergencyContactRelation: text('emergency_contact_relation'),
+  emergencyContactPhone: text('emergency_contact_phone'),
+  isMinor: boolean('is_minor').default(false).notNull(),
+  acceptedContractAt: timestamp('accepted_contract_at', { withTimezone: true }),
+
+  // Parâmetros de Rastreamento UTM
+  utmSource: text('utm_source'),
+  utmMedium: text('utm_medium'),
+  utmCampaign: text('utm_campaign'),
+  utmTerm: text('utm_term'),
+  utmContent: text('utm_content'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Contact = typeof contacts.$inferSelect;
+export type NewContact = typeof contacts.$inferInsert;
+
+// ── CRM: Interaction History (Timeline de contatos e logs) ───────────────────
+export const interactionHistory = pgTable('interaction_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  type: text('type').$type<'comment' | 'status_change' | 'appointment' | 'email_sent'>().notNull(),
+  durationSeconds: integer('duration_seconds'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type InteractionHistory = typeof interactionHistory.$inferSelect;
+export type NewInteractionHistory = typeof interactionHistory.$inferInsert;
+
+// ── CRM: Email Campaigns (Campanhas de E-mail White-label) ──────────────────
+export const emailCampaigns = pgTable('email_campaigns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  status: text('status').$type<'draft' | 'sending' | 'sent'>().default('draft').notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type NewEmailCampaign = typeof emailCampaigns.$inferInsert;
+
 

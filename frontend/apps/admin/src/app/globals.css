@@ -9,12 +9,15 @@
   --brand-gradient: linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end));
 
   /* ── Paleta Principal (tema escuro por padrão) ── */
-  --brand-bg-color: #020617;
-  --brand-card-bg-color: #0F172A;
-  --brand-text-color: #F8FAFC;
+  --brand-bg-color: #09090B;
+  --brand-card-bg-color: #18181B;
+  --brand-text-color: #F4F4F5;
+
+  /* ── Base de Mistura (color-mix) — muda por tema ── */
+  /* Garante que superfícies sempre carregam o matiz da marca, sem virar cinza */
+  --mix-base: #000000; /* dark: mistura com preto */
 
   /* ── Superfícies derivadas com opacidade neutra ── */
-  /* Usadas por borders, hovers, inputs — sem cor fixa, apenas sobre a base do tema */
   --surface-border: rgba(255, 255, 255, 0.08);
   --surface-hover: rgba(255, 255, 255, 0.05);
   --surface-active: rgba(255, 255, 255, 0.10);
@@ -38,6 +41,7 @@
 
 /* ── Quando o tema claro está ativo, ajusta as superfícies derivadas ── */
 html.light {
+  --mix-base: #FFFFFF; /* light: mistura com branco */
   --surface-border: rgba(0, 0, 0, 0.10);
   --surface-hover: rgba(0, 0, 0, 0.04);
   --surface-active: rgba(0, 0, 0, 0.08);
@@ -48,10 +52,13 @@ html.light {
 
 body {
   color: var(--brand-text-color);
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--brand-gradient-start) 6%, var(--brand-bg-color)) 0%, 
-    color-mix(in srgb, var(--brand-gradient-end) 6%, var(--brand-bg-color)) 100%
-  );
+  background: 
+    radial-gradient(circle at 15% 15%, color-mix(in srgb, var(--brand-gradient-start) 6%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, color-mix(in srgb, var(--brand-gradient-end) 6%, transparent) 0%, transparent 40%),
+    linear-gradient(135deg, 
+      color-mix(in srgb, var(--brand-gradient-start) 4%, var(--brand-bg-color)) 0%, 
+      color-mix(in srgb, var(--brand-gradient-end) 4%, var(--brand-bg-color)) 100%
+    );
   background-attachment: fixed;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   transition: background-color 0.3s, color 0.3s;
@@ -85,6 +92,76 @@ body {
   background: var(--surface-hover);
 }
 
+/* ── Overlay de Fundo (Modais, Drawers) ── */
+/* Mistura a cor do gradiente com preto/branco por tema — elimina o cinza puro */
+.brand-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--brand-gradient-start) 12%, rgba(0, 0, 0, 0.72));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 40;
+}
+
+/* ── Badge / Tag de Status ── */
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--brand-gradient-start) 12%, transparent);
+  color: var(--brand-gradient-start);
+  border: 1px solid color-mix(in srgb, var(--brand-gradient-start) 25%, transparent);
+}
+
+/* ── Divider de Seção ── */
+.brand-divider {
+  border: none;
+  border-top: 1px solid var(--surface-border);
+  margin: 0;
+}
+
+/* ── Popup / Dropdown Flutuante ── */
+/* Superfície com 8% do gradiente misturado com preto (dark) ou branco (light) */
+.brand-popup {
+  background: color-mix(in srgb, var(--brand-gradient-start) 8%, var(--mix-base));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--surface-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--brand-gradient-start) 20%, rgba(0,0,0,0.40));
+}
+
+/* ── Toolbar / Header de seção ── */
+.brand-toolbar {
+  background: color-mix(in srgb, var(--brand-gradient-start) 6%, var(--mix-base));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+/* ── Acento de gradiente da marca (substitui bg-indigo-600 etc.) ── */
+.brand-accent {
+  background: var(--brand-gradient);
+  color: var(--brand-contrast-color);
+}
+
+/* ── Texto com cor de gradiente da marca ── */
+.brand-accent-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Borda com a cor do gradiente ── */
+.brand-accent-border {
+  border: 1px solid color-mix(in srgb, var(--brand-gradient-start) 30%, transparent);
+}
+
 /* ── Animação de Entrada de Páginas (Fade & Slide Up) ── */
 @keyframes page-enter {
   from {
@@ -102,76 +179,86 @@ body {
 }
 
 /* ── Glassmorphism Otimizado ── */
+/* Usa color-mix para misturar o gradiente da marca com preto/branco por tema */
+/* Isso garante matiz da marca em todas as superfícies, sem cair em cinza puro */
 .glass-sm {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* ~5% gradiente + preto/branco — chip, input, badge container */
+  background: color-mix(in srgb, var(--brand-gradient-start) 5%, var(--mix-base));
   border: 1px solid var(--surface-border);
 }
 .glass-md {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* ~8% gradiente — card, coluna kanban, container de seção */
+  background: color-mix(in srgb, var(--brand-gradient-start) 8%, var(--mix-base));
   border: 1px solid var(--surface-border);
 }
 .glass-lg {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* ~11% gradiente — modais secundários, overlays amplos */
+  background: color-mix(in srgb, var(--brand-gradient-start) 11%, var(--mix-base));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--surface-border);
+}
+/* ── Modal Flutuante ── */
+/* 9% gradiente — painel principal de modais */
+.brand-modal {
+  background: color-mix(in srgb, var(--brand-gradient-start) 9%, var(--mix-base));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--surface-border);
 }
 
-/* Overrides para tema claro para garantir legibilidade */
-html.light .glass-sm {
-  background: rgba(255, 255, 255, 0.70);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-html.light .glass-md {
-  background: rgba(255, 255, 255, 0.80);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-html.light .glass-lg {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+/* ── Overrides de Contraste para Tema Claro (Acessibilidade) ── */
+html.light .text-slate-50 { color: #0f172a !important; }
+html.light .text-slate-100 { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+html.light .text-slate-600 { color: #94a3b8 !important; }
+
+/* ── Scrollbars Customizadas (Glassmorphism style) ── */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
-/* ── Blobs Animados Otimizados (GPU Composited) ── */
-@keyframes blob-1-move {
-  0% {
-    transform: translate(0px, 0px) scale(1) rotate(0deg);
-  }
-  33% {
-    transform: translate(40px, -60px) scale(1.1) rotate(120deg);
-  }
-  66% {
-    transform: translate(-30px, 30px) scale(0.95) rotate(240deg);
-  }
-  100% {
-    transform: translate(0px, 0px) scale(1) rotate(360deg);
-  }
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-@keyframes blob-2-move {
-  0% {
-    transform: translate(0px, 0px) scale(1) rotate(360deg);
-  }
-  50% {
-    transform: translate(-50px, 50px) scale(1.08) rotate(180deg);
-  }
-  100% {
-    transform: translate(0px, 0px) scale(1) rotate(0deg);
-  }
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.animate-blob-1 {
-  animation: blob-1-move 22s infinite alternate ease-in-out;
-  will-change: transform;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  transition: background 0.2s;
 }
 
-.animate-blob-2 {
-  animation: blob-2-move 28s infinite alternate ease-in-out;
-  will-change: transform;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+html.light .custom-scrollbar {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+html.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+html.light .custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.32);
 }

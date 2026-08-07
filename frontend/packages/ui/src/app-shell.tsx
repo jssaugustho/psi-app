@@ -20,12 +20,14 @@ export interface AppShellProps {
     email: string;
     role?: string;
     avatarUrl?: string | null;
+    avatar_url?: string | null;
   } | null;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
   onLogout?: () => void;
   onEditProfile?: () => void;
   LinkComponent?: React.ComponentType<any>;
+  headerRightActions?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -40,6 +42,7 @@ export function AppShell({
   onLogout,
   onEditProfile,
   LinkComponent,
+  headerRightActions,
   children,
 }: AppShellProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -74,10 +77,10 @@ export function AppShell({
       >
         <div>
           {/* Logo */}
-          <div className="flex items-center justify-between gap-2 mb-8 h-10">
-            <div className="flex items-center gap-2 max-w-[200px] overflow-hidden">
+          <div className="flex items-center justify-between gap-2 mb-8">
+            <div className="flex items-center gap-2 w-full overflow-hidden">
               {logoUrl ? (
-                <img src={logoUrl} alt={appName} className="max-h-10 max-w-full object-contain" />
+                <img src={logoUrl} alt={appName} className="w-full h-auto object-contain" />
               ) : (
                 <>
                   {iconUrl ? (
@@ -148,7 +151,7 @@ export function AppShell({
               <div
                 ref={menuRef}
                 style={{
-                  backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                  backgroundColor: theme === 'light' ? 'rgba(255, 255, 255, 0.95)' : undefined,
                   borderColor: 'var(--surface-border)',
                   color: 'var(--brand-text-color)',
                 }}
@@ -195,9 +198,9 @@ export function AppShell({
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex flex-1 items-center gap-3 overflow-hidden text-left bg-transparent border-none cursor-pointer p-1 rounded-lg hover:bg-[var(--surface-hover)] transition-all"
               >
-                {user.avatarUrl ? (
+                {(user.avatarUrl || user.avatar_url) ? (
                   <img
-                    src={user.avatarUrl}
+                    src={user.avatarUrl || user.avatar_url || ''}
                     alt="Foto de perfil"
                     className="w-9 h-9 rounded-full object-cover shrink-0 shadow-md"
                   />
@@ -244,29 +247,32 @@ export function AppShell({
             {/* Título ou Breadcrumb opcional pode ser inserido aqui */}
           </div>
 
-          {/* Lado Direito - Botão de Alternar Tema */}
-          {onToggleTheme && (
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              style={{
-                border: '1px solid var(--surface-border)',
-                color: 'var(--brand-text-color)',
-              }}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all text-base cursor-pointer shrink-0 bg-transparent hover:bg-[var(--surface-hover)]"
-              title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
-            >
-              {theme === 'dark' ? (
-                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10 5 5 0 000-10z" />
-                </svg>
-              ) : (
-                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-          )}
+          {/* Lado Direito - Botões de Ação */}
+          <div className="flex items-center gap-3">
+            {headerRightActions}
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                style={{
+                  border: '1px solid var(--surface-border)',
+                  color: 'var(--brand-text-color)',
+                }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-all text-base cursor-pointer shrink-0 bg-transparent hover:bg-[var(--surface-hover)]"
+                title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+              >
+                {theme === 'dark' ? (
+                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10 5 5 0 000-10z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Corpo da Página */}

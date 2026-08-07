@@ -98,9 +98,27 @@ graph TD
 
 ---
 
+### 7. 🌐 SSR (Server-Side Rendering) e Autenticação no Next.js
+
+* **Onde fica:** Páginas do App Router do Next.js sem a diretiva `'use client'` em `apps/web/src/app` e `apps/admin/src/app`.
+* **Armazenamento de Sessão Híbrido**:
+  * Ao fazer login, registrar ou realizar refresh no token, o JWT `token` deve ser salvo tanto no `localStorage` (para uso em requisições de Client Components expostos no frontend) quanto nos cookies (`document.cookie` com `SameSite=Lax; Secure`) para estar disponível do lado do servidor (SSR).
+  * No logout, limpe ambos (remover do `localStorage` e expirar o cookie definindo `max-age=0`).
+* **Proteção e Validação SSR**:
+  * Em Server Components que requerem login ou permissões restritas (ex: `/dashboard/configuracoes`), recupere o `token` através de `cookies()` da biblioteca `next/headers`.
+  * Verifique a validade da sessão consultando a rota do backend `/auth/me` enviando o token no cabeçalho `Authorization: Bearer <token>`.
+  * Se o token não existir ou o backend retornar erro, redirecione imediatamente via `redirect('/login')`.
+* **RBAC e Validação baseada em Tenants no Servidor**:
+  * Para páginas de configuração que pertencem a um tenant (onde o usuário precisa ser dono ou admin), resolva o tenant ativo no servidor inspecionando o cabeçalho `Host` (através de `headers()`) e buscando a correspondência na tabela `tenants`.
+  * Verifique as credenciais administrativas do usuário no tenant no servidor: se `tenant.owner_id === user.id` ou se o usuário possui papel `admin` em `tenant_members` para o tenant ativo.
+  * Caso não possua papel administrativo/dono no tenant, use `redirect('/dashboard')` (ou página equivalente) para bloquear o acesso antes que qualquer componente do cliente seja carregado.
+
+---
+
 ## 🚫 Práticas Proibidas (Anti-patterns)
 
 1. ❌ **Ignorar RLS e criar rotas Fastify para ler registros**: Isso infla o código do servidor HTTP desnecessariamente e ignora os benefícios nativos do PostgREST.
 2. ❌ **Prender conexões de banco de dados nos Workers**: Sempre use limites estritos de conexões de pool (`POSTGRES_POOL_SIZE`) para que réplicas de workers e APIs não gerem exaustão de conexões no PostgreSQL.
 3. ❌ **Nack sem "requeue=false" em loops de erro**: Nunca dê `nack` reenfileirando a mensagem infinitamente (`nack(msg, false, true)`) caso o erro seja permanente (ex: falha de autenticação do provedor de e-mail). Isso gerará gargalos e sobrecarga crítica de CPU e logs na fila.
 4. ❌ **Deixar de verificar o formato do remetente**: Em integrações com o Resend, garanta que o remetente sempre seja enviado como um endereço de e-mail completo (`no-reply@domain.com`) e não apenas o domínio (`domain.com`).
+5. ❌ **Executar checagens de permissões de configuração apenas no frontend**: Se uma página administrativa de tenant for acessada, sua validação de permissão de admin/owner deve ocorrer do lado do servidor via SSR (Server Components) para impedir que dados indevidos sejam baixados no cliente.

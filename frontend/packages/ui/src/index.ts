@@ -2,3 +2,6 @@ export * from './button';
 export * from './input';
 export * from './card';
 export * from './app-shell';
+export * from './loading-spinner';
+export * from './select';
+export * from './select-with-helper';

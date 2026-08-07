@@ -4,8 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api, Tenant, TenantSubscription } from '@/lib/api';
-import { AppShell, Card, Button } from '@psi/ui';
-import Link from 'next/link';
+import { Card, Button, LoadingSpinner, Select } from '@psi/ui';
 
 export default function FaturamentoPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -17,12 +16,7 @@ export default function FaturamentoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Check auth
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
-  }, [authLoading, user, router]);
+
 
   // Load tenants
   const loadTenants = useCallback(async () => {
@@ -73,28 +67,14 @@ export default function FaturamentoPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-        <div className="animate-pulse flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-indigo-500 animate-ping" />
-          <span>Carregando faturamento...</span>
-        </div>
-      </div>
-    );
+  if (loading || !user) {
+    return <LoadingSpinner message="Carregando faturamento..." className="min-h-[50vh]" />;
   }
-
-  const menuItems = [
-    { label: 'Perfil', href: '/dashboard', active: false },
-    { label: 'Equipe', href: '/dashboard/membros', active: false },
-    { label: 'Faturamento', href: '/dashboard/faturamento', active: true },
-  ];
 
   const isOwner = selectedTenant?.ownerId === user.id;
 
   return (
-    <AppShell appName="Psi App" menuItems={menuItems} user={user} onLogout={logout} LinkComponent={Link}>
-      <div className="space-y-6 max-w-4xl mx-auto animate-page-enter">
+    <div className="space-y-6 max-w-4xl mx-auto animate-page-enter">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -108,17 +88,13 @@ export default function FaturamentoPage() {
           {tenants.length > 1 && (
             <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-1.5">
               <span className="text-xs text-slate-400">Espaço:</span>
-              <select
+              <Select
                 value={selectedTenant?.id || ''}
                 onChange={(e) => setSelectedTenant(tenants.find(t => t.id === e.target.value) || null)}
-                className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer"
-              >
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id} className="bg-slate-950 text-slate-200">
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                options={tenants.map((t) => ({ value: t.id, label: t.name }))}
+                variant="transparent"
+                className="text-xs"
+              />
             </div>
           )}
         </div>
@@ -166,7 +142,7 @@ export default function FaturamentoPage() {
                     {/* Total */}
                     <div className="flex justify-between items-center pt-3 text-base font-bold">
                       <span className="text-slate-100">Total Mensal</span>
-                      <span className="font-mono text-indigo-400 text-lg">
+                      <span className="font-mono text-lg" style={{ color: 'var(--brand-gradient-start)' }}>
                         {formatMoney(subscription.total_price)}
                       </span>
                     </div>
@@ -195,10 +171,10 @@ export default function FaturamentoPage() {
 
             {/* Direita - Cartão do Dono e Status */}
             <div className="space-y-6">
-              <Card className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/40 border border-indigo-500/20">
+              <Card className="bg-gradient-to-br from-slate-950 via-slate-900 to-[color-mix(in_srgb,var(--brand-gradient-start)_4%,transparent)] border" style={{ borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)' }}>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border" style={{ color: 'var(--brand-gradient-start)', background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)' }}>
                       Plano Ativo
                     </span>
                     <span className="text-xs text-slate-500 font-mono">BRL</span>
@@ -250,7 +226,6 @@ export default function FaturamentoPage() {
             <p className="text-xs text-slate-500 mt-1">Inscreva-se em um espaço de trabalho ou crie seu próprio tenant no backoffice.</p>
           </div>
         )}
-      </div>
-    </AppShell>
+    </div>
   );
 }

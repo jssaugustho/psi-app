@@ -1,3 +1,5 @@
+import { compressImage, type UploadType } from '@psi/image-utils';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
 
 const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
@@ -56,6 +58,8 @@ export interface Tenant {
   textDarkColor?: string;
   emailDomain?: string | null;
   resendApiKey?: string | null;
+  traffic_sources?: string[];
+  default_traffic_source?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -213,10 +217,27 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     ? endpoint
     : `${API_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (err: any) {
+    console.error('Falha de conexão com o backend:', err);
+    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
+      window.location.href = '/offline';
+    }
+    throw new Error('Servidor de API indisponível.');
+  }
+
+  // Verificar status 502, 503, 504 (erros de proxy/gateway)
+  if ([502, 503, 504].includes(response.status)) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
+      window.location.href = '/offline';
+    }
+    throw new Error('Servidor de API temporariamente indisponível.');
+  }
 
   // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez
   if (response.status === 401 && !_isRetry) {
@@ -275,7 +296,7 @@ export const api = {
   login: (body: { email: string; password: string }) =>
     fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, appType: 'admin' }),
     }),
 
   // Buscar perfil do usuário logado (PostgREST + RLS)
@@ -304,14 +325,53 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // Upload de arquivo para o Cloudflare R2
-  uploadFile: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return fetchApi<{ url: string; key: string; filename: string }>('/platform/upload', {
+  // Pede ao backend uma Presigned URL para upload direto no Cloudflare R2
+  getUploadPresignedUrl: (body: {
+    filename: string;
+    content_type: string;
+    upload_type: UploadType;
+  }) =>
+    fetchApi<{ upload_url: string; public_url: string; key: string }>('/platform/upload/presign', {
       method: 'POST',
-      body: formData,
+      body: JSON.stringify(body),
+    }),
+
+  /**
+   * Pipeline completo de upload:
+   * 1. Comprime a imagem client-side com Canvas API
+   * 2. Solicita Presigned URL ao backend
+   * 3. Faz PUT direto no Cloudflare R2 (sem passar pela VPS)
+   * Retorna a URL pública permanente do arquivo.
+   */
+  uploadImage: async (file: File, type: UploadType): Promise<{ url: string; key: string }> => {
+    // 1. Comprimir client-side
+    const compressed = await compressImage(file, type);
+
+    // 2. Pedir Presigned URL diretamente via fetchApi
+    const { upload_url, public_url, key } = await fetchApi<{ upload_url: string; public_url: string; key: string }>(
+      '/platform/upload/presign',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: compressed.name,
+          content_type: compressed.type,
+          upload_type: type,
+        }),
+      }
+    );
+
+    // 3. PUT direto no R2 — a VPS nunca toca no arquivo
+    const uploadRes = await fetch(upload_url, {
+      method: 'PUT',
+      body: compressed,
+      headers: { 'Content-Type': compressed.type },
     });
+
+    if (!uploadRes.ok) {
+      throw new Error(`Falha ao enviar arquivo para o R2: ${uploadRes.statusText}`);
+    }
+
+    return { url: public_url, key };
   },
 
   // Configurar Tenant-Pai Principal e Identidade Visual White-Label
@@ -499,7 +559,7 @@ export const api = {
   },
 
   getTenantMembers: async (tenantId: string) => {
-    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${tenantId}&select=id,tenant_id,user_id,role,created_at,updated_at,profile:profiles(id,first_name,last_name,email,phone)`);
+    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${tenantId}&select=id,tenant_id,user_id,role,created_at,updated_at,profile:profiles(id,nome:first_name,sobrenome:last_name,email,phone)`);
   },
 
   addTenantMemberByEmail: async (tenantId: string, email: string, role: 'admin' | 'agent') => {
@@ -540,7 +600,7 @@ export const api = {
   },
 
   getTenantsList: async () => {
-    return fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?order=created_at.desc`);
+    return fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc`);
   },
 
   updateTenantOwner: async (tenantId: string, ownerId: string | null) => {
@@ -555,7 +615,7 @@ export const api = {
   },
 
   getTenantById: async (id: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?id=eq.${id}`);
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&id=eq.${id}`);
     return res[0];
   },
 
@@ -613,6 +673,16 @@ export const api = {
     await fetchApi(`${PGRST_BASE_URL}/tenants?id=eq.${id}`, {
       method: 'DELETE'
     });
+  },
+
+  getTenantByDomain: async (domain: string) => {
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&domain=eq.${domain}`);
+    return res[0] || null;
+  },
+
+  getTenantBySlug: async (slug: string) => {
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&slug=eq.${slug}`);
+    return res[0] || null;
   },
 };
 

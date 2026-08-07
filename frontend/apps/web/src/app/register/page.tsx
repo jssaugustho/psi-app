@@ -30,19 +30,26 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-clip-text text-transparent" style={{ background: "var(--brand-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
             Criar sua Conta
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
             Preencha os campos para registrar seu perfil
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-lg text-center">
+          <div
+            className="text-sm p-3 rounded-lg text-center font-medium"
+            style={{
+              background: 'var(--status-error-bg)',
+              border: '1px solid var(--status-error-border)',
+              color: 'var(--status-error-text)',
+            }}
+          >
             {error}
           </div>
         )}
@@ -99,9 +106,9 @@ export default function RegisterPage() {
           </Button>
         </form>
 
-        <div className="text-center text-xs text-slate-400">
+        <div className="text-center text-xs" style={{ color: 'var(--brand-text-color)', opacity: 0.65 }}>
           Já possui uma conta?{' '}
-          <Link href="/register" className="text-indigo-400 hover:underline font-medium">
+          <Link href="/login" className="hover:underline font-medium" style={{ color: "var(--brand-gradient-start)" }}>
             Entrar
           </Link>
         </div>

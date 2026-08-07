@@ -3,43 +3,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useBrand } from '@/context/BrandContext';
 import { api, Tenant, User } from '@/lib/api';
-import { AppShell, Card, Button, Input } from '@psi/ui';
-import { Link } from '@/components/Link';
+import { Card, Button, Input, LoadingSpinner, Select } from '@psi/ui';
 
 // ── Ícones SVG ────────────────────────────────────────────────────────────
-const HomeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-const StatusIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-const SettingsIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-const EnvelopeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-  </svg>
-);
-const UsersIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-  </svg>
-);
-const OfficeIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-);
+
 const SearchIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -57,8 +25,7 @@ const CloseIcon = () => (
 );
 
 export default function TenantsPage() {
-  const { user: currentUser, loading: authLoading, logout, setIsProfileOpen } = useAuth();
-  const { tenant: brandTenant, theme, toggleTheme } = useBrand();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
 
   // Estados dos tenants e busca
@@ -100,14 +67,10 @@ export default function TenantsPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!currentUser) {
-        router.push('/login');
-      } else if (currentUser.role === 'admin') {
-        loadData();
-      }
+    if (currentUser) {
+      loadData();
     }
-  }, [authLoading, currentUser, router, loadData]);
+  }, [currentUser, loadData]);
 
   // Abrir Modal de Criação
   const handleOpenCreate = () => {
@@ -160,40 +123,14 @@ export default function TenantsPage() {
     return owner ? `${owner.nome} ${owner.sobrenome} (${owner.email})` : 'Usuário não encontrado';
   };
 
-  const menuItems = [
-    { label: 'Painel Geral', href: '/dashboard', icon: <HomeIcon />, active: false },
-    { label: 'Status do App', href: '/dashboard/status', icon: <StatusIcon />, active: false },
-    { label: 'Tenants', href: '/dashboard/tenants', icon: <OfficeIcon />, active: true },
-    { label: 'Usuários', href: '/dashboard/users', icon: <UsersIcon />, active: false },
-    { label: 'E-mails', href: '/dashboard/emails', icon: <EnvelopeIcon />, active: false },
-    { label: 'Configurações', href: '/dashboard/settings', icon: <SettingsIcon />, active: false },
-  ];
 
-  if (authLoading || (!currentUser && authLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-        <div className="animate-pulse flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-indigo-500 animate-ping" />
-          <span>Carregando painel de tenants...</span>
-        </div>
-      </div>
-    );
+
+  if (loadingTenants) {
+    return <LoadingSpinner message="Carregando tenants..." className="min-h-[50vh]" />;
   }
 
   return (
-    <AppShell
-      appName={brandTenant?.name || 'Admin'}
-      logoUrl={theme === 'dark' ? brandTenant?.logoDarkUrl : brandTenant?.logoLightUrl}
-      iconUrl={theme === 'dark' ? brandTenant?.iconDarkUrl : brandTenant?.iconLightUrl}
-      menuItems={menuItems}
-      user={currentUser}
-      theme={theme}
-      onToggleTheme={toggleTheme}
-      onLogout={logout}
-      onEditProfile={() => setIsProfileOpen(true)}
-      LinkComponent={Link}
-    >
-      <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
+    <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -232,7 +169,7 @@ export default function TenantsPage() {
               placeholder="Buscar por nome, slug ou domínio..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none transition-colors focus:border-indigo-500 text-slate-200"
+              className="w-full rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none transition-colors brand-input"
             />
           </div>
         </Card>
@@ -281,7 +218,7 @@ export default function TenantsPage() {
                             {tenant.iconLightUrl ? (
                               <img src={tenant.iconLightUrl} className="w-6 h-6 object-contain rounded-md" alt="" />
                             ) : (
-                              <div className="w-6 h-6 rounded-md bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-[10px] border border-indigo-500/20">
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center font-bold text-[10px] border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)', color: 'var(--brand-gradient-start)' }}>
                                 {tenant.name[0]?.toUpperCase()}
                               </div>
                             )}
@@ -302,7 +239,7 @@ export default function TenantsPage() {
                         </td>
                         <td className="py-3.5 px-3 text-center">
                           {tenant.isPrimary ? (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/25">
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 25%, transparent)', color: 'var(--brand-gradient-start)' }}>
                               Principal (Pai)
                             </span>
                           ) : (
@@ -319,7 +256,6 @@ export default function TenantsPage() {
             </div>
           )}
         </Card>
-      </div>
 
       {/* ── MODAL: NOVO TENANT ── */}
       {isCreateModalOpen && (
@@ -370,18 +306,17 @@ export default function TenantsPage() {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-300">Proprietário (Owner)</label>
-                <select
+                <Select
                   value={createForm.ownerId}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, ownerId: e.target.value }))}
-                  className="bg-slate-950 border border-slate-800 text-sm rounded-xl px-3 h-[42px] outline-none text-slate-200 focus:border-indigo-500 transition-colors"
-                >
-                  <option value="none">Selecione o proprietário...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nome} {u.sobrenome} ({u.email})
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'none', label: 'Selecione o proprietário...' },
+                    ...users.map((u) => ({
+                      value: u.id,
+                      label: `${u.nome} ${u.sobrenome} (${u.email})`,
+                    })),
+                  ]}
+                />
               </div>
 
               <div className="flex items-center gap-2 pt-2">
@@ -390,7 +325,7 @@ export default function TenantsPage() {
                   id="create_is_primary"
                   checked={createForm.isPrimary}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, isPrimary: e.target.checked }))}
-                  className="w-4 h-4 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500"
+                  className="w-4 h-4 rounded border" style={{ borderColor: "var(--surface-border)", background: "var(--surface-input)", accentColor: "var(--brand-gradient-start)" }}
                 />
                 <label htmlFor="create_is_primary" className="text-xs text-slate-300 font-semibold cursor-pointer">
                   Definir como Tenant Principal (Pai) da plataforma
@@ -414,6 +349,6 @@ export default function TenantsPage() {
           </div>
         </div>
       )}
-    </AppShell>
+    </div>
   );
 }

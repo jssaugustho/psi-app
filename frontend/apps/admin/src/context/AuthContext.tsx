@@ -42,6 +42,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('token_expires_at');
+    if (typeof window !== 'undefined') {
+      document.cookie = 'token=; path=/; max-age=0; SameSite=Lax; Secure';
+    }
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     setUser(null);
     router.push('/login');
@@ -79,6 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('token_expires_at', String(data.expires_at));
+      if (typeof window !== 'undefined') {
+        document.cookie = `token=${data.access_token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+      }
       scheduleRefresh(); // agenda o próximo ciclo
     } catch {
       // Refresh falhou: sessão encerrada
@@ -96,6 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ─── carregamento inicial da sessão ──────────────────────────────────────
   useEffect(() => {
     async function loadUser() {
+      if (typeof window !== 'undefined' && window.location.pathname === '/offline') {
+        setLoading(false);
+        return;
+      }
       const token = localStorage.getItem('token');
       if (token) {
         try {
@@ -124,6 +134,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     localStorage.setItem('token', res.access_token);
     localStorage.setItem('refresh_token', res.refresh_token);
+    if (typeof window !== 'undefined') {
+      document.cookie = `token=${res.access_token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+    }
 
     // Calcula e persiste o timestamp absoluto de expiração
     const expiresAt = Math.floor(Date.now() / 1000) + (res.expires_in ?? 3600);

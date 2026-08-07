@@ -112,35 +112,6 @@ async function checkCoreApi() {
   }
 }
 
-async function checkUploadService() {
-  const start = Date.now();
-  try {
-    const res = await fetch('http://upload:5001/health', {
-      method: 'GET',
-      signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(3000) : undefined,
-    });
-    const duration = Date.now() - start;
-    if (res.ok) {
-      return {
-        status: duration > 400 ? 'degraded' as const : 'operational' as const,
-        responseTimeMs: duration,
-        message: null,
-      };
-    } else {
-      return {
-        status: 'down' as const,
-        responseTimeMs: duration,
-        message: `HTTP Status ${res.status}`,
-      };
-    }
-  } catch (err: any) {
-    return {
-      status: 'down' as const,
-      responseTimeMs: Date.now() - start,
-      message: err.message || 'Falha ao conectar com o serviço de upload',
-    };
-  }
-}
 
 // Publica status individual no RabbitMQ
 async function publishStatus(
@@ -168,12 +139,11 @@ async function publishStatus(
 // Executa todos os checks e envia para a fila do RabbitMQ
 export async function runAllSystemChecks() {
   console.log('🛡️ Iniciando self-checks de saúde do sistema...');
-  const [dbRes, gotrueRes, nginxRes, coreApiRes, uploadRes] = await Promise.all([
+  const [dbRes, gotrueRes, nginxRes, coreApiRes] = await Promise.all([
     checkDatabase(),
     checkGoTrue(),
     checkNginx(),
     checkCoreApi(),
-    checkUploadService(),
   ]);
 
   await Promise.all([
@@ -181,7 +151,6 @@ export async function runAllSystemChecks() {
     publishStatus('Auth', gotrueRes),
     publishStatus('API Gateway', nginxRes),
     publishStatus('Core API', coreApiRes),
-    publishStatus('Upload Service', uploadRes),
   ]);
   console.log('🛡️ Self-checks finalizados e publicados.');
 }
@@ -240,7 +209,7 @@ export async function statusRoutes(fastifyApp: FastifyInstance) {
         // Para 24h, usaremos blocos de 30 minutos (48 blocos no total)
         // Para 7d, usaremos blocos de 3 horas (56 blocos no total)
         const bucketSizeMinutes = range === '7d' ? 180 : 30;
-        const services = ['Database', 'Auth', 'API Gateway', 'Core API', 'Upload Service', 'Workers'];
+        const services = ['Database', 'Auth', 'API Gateway', 'Core API', 'Workers'];
 
         // Gerar buckets vazios sequenciais para garantir que não haverá gaps
         const nowMs = Date.now();

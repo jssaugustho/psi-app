@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@psi/image-utils": "*",
     "@psi/ui": "*",
     "next": "16.2.10",
     "react": "19.2.4",
