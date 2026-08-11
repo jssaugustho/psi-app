@@ -769,7 +769,7 @@ export default function TenantBrandingPage() {
 
       {/* ── MODAL: CONFIRMAR EXCLUSÃO DEFINITIVA ── */}
       {isDeleteModalOpen && tenant && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
           <div className="glass-lg w-full max-w-md rounded-2xl border border-red-500/20 p-6 space-y-6 animate-scale-up">
             <div className="flex justify-between items-center">
               <div>
@@ -827,7 +827,7 @@ export default function TenantBrandingPage() {
 
       {/* ── MODAL: CONFIRMAR ALTERAÇÃO DE TENANT PRINCIPAL ── */}
       {isConfirmPrimaryModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
           <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up">
             <div className="flex justify-between items-center">
               <div>

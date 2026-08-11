@@ -56,3 +56,8 @@ Ajustamos o layout da Linha do Tempo (Timeline) para corrigir o problema em que 
   - Atualizados os componentes [`select.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select.tsx) e [`select-with-helper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select-with-helper.tsx) na variante `glass` para possuir altura fixa `h-9` (36px) em vez de `py-2`.
   - **Motivo do Erro**: Ao abrir o dropdown, a animação de rotação 180° do SVG do chevron no seletor baseado em padding criava uma micro-flutuação de tamanho da caixa física, resultando em layout shift. Com `h-9`, a altura permanece perfeitamente idêntica.
 
+- **Espaçamento do Chevron em Relação ao Texto**:
+  - Adicionada a classe `gap-2` (8px) na classe `base` do botão nos componentes [`select.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select.tsx) e [`select-with-helper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select-with-helper.tsx).
+  - Isso garante que, mesmo quando a largura do componente estiver comprimida ou o texto das opções for muito longo, haja sempre um espaçamento mínimo confortável e legível entre o final do texto e o ícone do chevron, assim como já ocorre com o ícone de filtro.
+
+

@@ -114,9 +114,7 @@ select:disabled {
 .brand-overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--brand-gradient-start) 12%, rgba(0, 0, 0, 0.72));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--brand-gradient-start) 10%, rgba(0, 0, 0, 0.85));
   z-index: 40;
 }
 
@@ -278,4 +276,33 @@ html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 
 html.light .custom-scrollbar::-webkit-scrollbar-thumb:active {
   background: rgba(0, 0, 0, 0.32);
+}
+
+/* Editor sidebar scrollbar — themed to tenant brand color */
+.editor-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 25%, transparent) transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.editor-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 20%, transparent);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 45%, transparent);
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 65%, transparent);
 }

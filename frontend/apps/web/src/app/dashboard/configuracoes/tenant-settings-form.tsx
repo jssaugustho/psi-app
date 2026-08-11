@@ -5,6 +5,7 @@ import { api, PipelineColumn } from '@/lib/api';
 import { Card, Button, Input, Select } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
 import { deriveEmailDomain } from '@/lib/email-domain';
+import { MediaLibraryModal } from '@/components/media-library-modal';
 import {
   Edit,
   Trash2,
@@ -103,23 +104,22 @@ const ColorPicker = ({
 const UploadBox = ({
   label,
   url,
-  onUpload,
+  onChange,
   onClear,
-  uploading,
+  tenantId,
   previewBg,
 }: {
   label: string;
   url: string;
-  onUpload: (file: File) => void;
+  onChange: (url: string) => void;
   onClear: () => void;
-  uploading: boolean;
+  tenantId: string;
   previewBg: string;
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const handleClick = () => {
-    if (uploading) return;
-    inputRef.current?.click();
+    setLibraryOpen(true);
   };
 
   return (
@@ -150,18 +150,18 @@ const UploadBox = ({
           </>
         ) : (
           <div className="text-xs opacity-50 hover:opacity-100 transition-opacity py-4 px-6 flex flex-col items-center gap-1 text-slate-400">
-            <span>{uploading ? '⏳ Enviando…' : '+ Adicionar'}</span>
+            <span>+ Selecionar</span>
           </div>
         )}
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onUpload(file);
+
+      <MediaLibraryModal
+        isOpen={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        tenantId={tenantId}
+        onSelectImage={(asset) => {
+          onChange(asset.url);
+          setLibraryOpen(false);
         }}
       />
     </div>
@@ -469,33 +469,33 @@ export default function TenantSettingsForm({ tenant }: TenantSettingsFormProps) 
                   <UploadBox
                     label="Logo (Tema Claro)"
                     url={logoLightUrl}
-                    onUpload={(f) => handleUpload('logoLightUrl', f)}
+                    onChange={(url) => setLogoLightUrl(url)}
                     onClear={() => setLogoLightUrl('')}
-                    uploading={uploadingField === 'logoLightUrl'}
+                    tenantId={tenant.id}
                     previewBg="#F8FAFC"
                   />
                   <UploadBox
                     label="Logo (Tema Escuro)"
                     url={logoDarkUrl}
-                    onUpload={(f) => handleUpload('logoDarkUrl', f)}
+                    onChange={(url) => setLogoDarkUrl(url)}
                     onClear={() => setLogoDarkUrl('')}
-                    uploading={uploadingField === 'logoDarkUrl'}
+                    tenantId={tenant.id}
                     previewBg="#09090B"
                   />
                   <UploadBox
                     label="Ícone (Tema Claro)"
                     url={iconLightUrl}
-                    onUpload={(f) => handleUpload('iconLightUrl', f)}
+                    onChange={(url) => setIconLightUrl(url)}
                     onClear={() => setIconLightUrl('')}
-                    uploading={uploadingField === 'iconLightUrl'}
+                    tenantId={tenant.id}
                     previewBg="#F8FAFC"
                   />
                   <UploadBox
                     label="Ícone (Tema Escuro)"
                     url={iconDarkUrl}
-                    onUpload={(f) => handleUpload('iconDarkUrl', f)}
+                    onChange={(url) => setIconDarkUrl(url)}
                     onClear={() => setIconDarkUrl('')}
-                    uploading={uploadingField === 'iconDarkUrl'}
+                    tenantId={tenant.id}
                     previewBg="#09090B"
                   />
                 </div>

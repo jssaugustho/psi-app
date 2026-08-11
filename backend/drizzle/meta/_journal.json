@@ -36,6 +36,20 @@
       "when": 1785861372101,
       "tag": "0004_sparkling_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786086496435,
+      "tag": "0005_lazy_longshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786316461234,
+      "tag": "0006_futuristic_shotgun",
+      "breakpoints": true
     }
   ]
 }

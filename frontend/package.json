@@ -10,8 +10,10 @@
   "scripts": {
     "dev:web": "turbo run dev --filter=@psi/web",
     "dev:admin": "turbo run dev --filter=@psi/admin",
+    "dev:sites": "turbo run dev --filter=@psi/sites",
     "build:web": "turbo run build --filter=@psi/web",
     "build:admin": "turbo run build --filter=@psi/admin",
+    "build:sites": "turbo run build --filter=@psi/sites",
     "build": "turbo run build"
   },
   "devDependencies": {

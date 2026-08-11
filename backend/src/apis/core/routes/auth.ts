@@ -570,7 +570,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         if (!invitingTenant) {
           return reply.status(404).send({
             error: 'Não encontrado',
-            message: 'O consultório especificado não foi encontrado.',
+            message: 'O tenant/clínica especificado não foi encontrado.',
           });
         }
 
@@ -589,7 +589,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         if (!isInviterAdmin) {
           return reply.status(403).send({
             error: 'Proibido',
-            message: 'Você não possui permissões administrativas neste consultório para convidar membros.',
+            message: 'Você não possui permissões administrativas neste espaço clínico para convidar membros.',
           });
         }
 
@@ -627,7 +627,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           if (existingMember) {
             return reply.status(400).send({
               error: 'Erro',
-              message: 'Este usuário já faz parte deste consultório.',
+              message: 'Este usuário já faz parte deste espaço clínico.',
             });
           }
 
@@ -685,7 +685,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           template: 'invite_member',
           to: targetEmail,
           tenantId,
-          subject: `Você foi convidado para colaborar no consultório ${brandName}`,
+          subject: `Você foi convidado para colaborar na clínica ${brandName}`,
           props: {
             userName: existingProfile ? `${existingProfile.firstName}`.trim() : 'Colaborador',
             inviterName,
@@ -703,7 +703,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         return reply.status(200).send({
           message: isNewUser
             ? 'Novo usuário convidado com sucesso! E-mail de ativação enfileirado.'
-            : 'Usuário existente associado ao consultório com sucesso! E-mail de notificação enfileirado.',
+            : 'Usuário existente associado ao tenant com sucesso! E-mail de notificação enfileirado.',
           user_id: targetUserId,
           is_new: isNewUser,
         });
@@ -751,7 +751,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           where: eq(tenants.id, tenantId),
         });
         if (!invitingTenant) {
-          return reply.status(404).send({ error: 'Não encontrado', message: 'Consultório não encontrado.' });
+          return reply.status(404).send({ error: 'Não encontrado', message: 'Clínica/Tenant não encontrado.' });
         }
 
         const inviterMember = await db.query.tenantMembers.findFirst({
@@ -774,7 +774,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           where: and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, targetUser.id)),
         });
         if (!memberRecord) {
-          return reply.status(404).send({ error: 'Não encontrado', message: 'Colaborador não é membro deste consultório.' });
+          return reply.status(404).send({ error: 'Não encontrado', message: 'Colaborador não é membro deste espaço clínico.' });
         }
 
         // 3. Rate limiting de 60 segundos baseando-se nos logs de e-mail do destinatário
@@ -829,7 +829,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           template: 'invite_member',
           to: targetEmail,
           tenantId,
-          subject: `Reenvio: Convite para colaborar no consultório ${brandName}`,
+          subject: `Reenvio: Convite para colaborar na clínica ${brandName}`,
           props: {
             userName: targetUser.firstName === 'Colaborador' ? 'Colaborador' : targetUser.firstName,
             inviterName,

@@ -7,12 +7,17 @@ import { useBrand } from '@/context/BrandContext';
 import { Button, Input, Card } from '@psi/ui';
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const { tenant, theme, toggleTheme } = useBrand();
+  const { login, user, loading: authLoading } = useAuth();
+  const { tenant, theme, toggleTheme, isBootReady } = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
+  if (isBootReady && !authLoading && user) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,10 +39,7 @@ export default function LoginPage() {
       : tenant?.logoDarkUrl || tenant?.logoLightUrl;
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 relative"
-      style={{ backgroundColor: 'var(--brand-bg-color)', transition: 'background-color 0.3s' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
       {/* Botão de alternância de tema no canto superior direito */}
       <div className="absolute top-4 right-4 z-10">
         <button

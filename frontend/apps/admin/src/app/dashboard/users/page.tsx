@@ -380,7 +380,7 @@ export default function UsersListPage() {
         {isEditModalOpen && selectedUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+              className="absolute inset-0 bg-black/85 transition-opacity duration-300"
               onClick={() => setIsEditModalOpen(false)}
             />
             <div
@@ -476,7 +476,7 @@ export default function UsersListPage() {
         {isCreateModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+              className="absolute inset-0 bg-black/85 transition-opacity duration-300"
               onClick={() => setIsCreateModalOpen(false)}
             />
             <div

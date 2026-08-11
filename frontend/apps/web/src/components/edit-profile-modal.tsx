@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { api, User } from '../lib/api';
-import { Input } from '@psi/ui';
+import { Input, BrandModal, Button } from '@psi/ui';
+import { useBrand } from '@/context/BrandContext';
+import { MediaLibraryModal } from './media-library-modal';
+import { Loader2 } from 'lucide-react';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -24,7 +27,21 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { tenant } = useBrand();
+
+  // Media Library and Crop States
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [selectedAsset, setSelectedAsset] = useState<{ id: string; name: string } | null>(null);
+
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
+  const frameW = 280;
+  const frameH = 280; // 1:1 Ratio for profile avatar
 
   // Inicializar formulário com dados do usuário
   useEffect(() => {
@@ -43,29 +60,138 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
   if (!isOpen || !user) return null;
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click();
+    setLibraryOpen(true);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    dragStartRef.current = {
+      x: e.clientX - offset.x,
+      y: e.clientY - offset.y
+    };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    setOffset({
+      x: e.clientX - dragStartRef.current.x,
+      y: e.clientY - dragStartRef.current.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
+  const handleSelectFromLibrary = (asset: { url: string; id: string; key: string; name: string }) => {
+    setLibraryOpen(false);
+    setSelectedAsset({ id: asset.id, name: asset.name });
+    setCropImageSrc(asset.url);
+    setZoom(1);
+    setOffset({ x: 0, y: 0 });
+    setCropModalOpen(true);
+  };
+
+  const handleCropAndSave = async () => {
+    if (!cropImageSrc || !selectedAsset || !tenant) return;
 
     setUploading(true);
-    setError('');
+    setCropModalOpen(false);
+
     try {
-      const { url } = await api.uploadImage(file, 'avatar');
+      const croppedFile = await new Promise<File>((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = cropImageSrc.includes('?') ? `${cropImageSrc}&t=${Date.now()}` : `${cropImageSrc}?t=${Date.now()}`;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 400;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return reject(new Error('Canvas context not available'));
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, 400, 400);
+
+          const imgRatio = img.width / img.height;
+          let baseW = frameW;
+          let baseH = frameH;
+
+          if (imgRatio > 1) {
+            baseH = frameH;
+            baseW = frameH * imgRatio;
+          } else {
+            baseW = frameW;
+            baseH = frameW / imgRatio;
+          }
+
+          const centerX = frameW / 2 + offset.x;
+          const centerY = frameH / 2 + offset.y;
+          const drawX = centerX - (baseW * zoom) / 2;
+          const drawY = centerY - (baseH * zoom) / 2;
+
+          const scaleToTarget = 400 / frameW;
+          const canvasDrawX = drawX * scaleToTarget;
+          const canvasDrawY = drawY * scaleToTarget;
+          const canvasDrawW = (baseW * zoom) * scaleToTarget;
+          const canvasDrawH = (baseH * zoom) * scaleToTarget;
+
+          ctx.drawImage(img, canvasDrawX, canvasDrawY, canvasDrawW, canvasDrawH);
+
+          const supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+          const outputMime = supportsWebP ? 'image/webp' : 'image/jpeg';
+          const outputExt = supportsWebP ? 'webp' : 'jpg';
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                return reject(new Error('Blob generation failed'));
+              }
+              const baseName = selectedAsset.name.split('.').slice(0, -1).join('.') || 'avatar';
+              const fileResult = new File([blob], `${baseName}_avatar.${outputExt}`, {
+                type: outputMime,
+                lastModified: Date.now(),
+              });
+              resolve(fileResult);
+            },
+            outputMime,
+            0.85
+          );
+        };
+        img.onerror = () => reject(new Error('Image load failed'));
+      });
+
+      const { url, key } = await api.uploadImage(croppedFile, 'avatar');
+
+      await api.registerMediaAsset({
+        tenantId: tenant.id,
+        name: croppedFile.name,
+        key,
+        url,
+        mimeType: croppedFile.type,
+        fileSize: croppedFile.size,
+        isCropped: true,
+        parentId: selectedAsset.id,
+        usageContext: `profile:${user.id}`
+      });
+
       setAvatarUrl(url);
     } catch (err: any) {
-      setError(`Erro ao enviar foto: ${err.message || 'Falha no upload.'}`);
+      console.error(err);
+      setError(err.message || 'Erro ao processar avatar.');
     } finally {
       setUploading(false);
+      setCropImageSrc(null);
+      setSelectedAsset(null);
     }
   };
 
   const handleRemoveAvatar = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita abrir o seletor de arquivos
+    e.stopPropagation();
     setAvatarUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,11 +242,11 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop com desfoque */}
+      {/* Backdrop escurecido */}
       <div
-        className="absolute inset-0 backdrop-blur-sm"
+        className="absolute inset-0"
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 70%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
         }}
         onClick={onClose}
       />
@@ -204,14 +330,6 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
                 Remover Foto
               </button>
             )}
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-              accept="image/*"
-            />
           </div>
 
           {/* Nome & Sobrenome */}
@@ -326,6 +444,108 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           </div>
         </form>
       </div>
+
+      {/* Media Library Selector */}
+      {tenant && (
+        <MediaLibraryModal
+          isOpen={libraryOpen}
+          onClose={() => setLibraryOpen(false)}
+          tenantId={tenant.id}
+          onSelectImage={handleSelectFromLibrary}
+        />
+      )}
+
+      {/* Visual Crop Modal */}
+      <BrandModal
+        isOpen={cropModalOpen}
+        onClose={() => {
+          setCropModalOpen(false);
+          setCropImageSrc(null);
+          setSelectedAsset(null);
+        }}
+      >
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Ajustar e Recortar Avatar</h3>
+            <p className="text-[10px] text-slate-400">Arraste a foto e ajuste o zoom para enquadrar na área destacada.</p>
+          </div>
+
+          {/* Workspace */}
+          <div 
+            className="relative bg-zinc-950 border border-white/5 rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
+            style={{ width: '100%', height: '360px' }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {/* Cutout Highlight Target Area (1:1 Circle overlay for avatar) */}
+            <div 
+              className="absolute z-20 pointer-events-none rounded-full border border-dashed border-[#CC8667]"
+              style={{
+                width: `${frameW}px`,
+                height: `${frameH}px`,
+                boxShadow: '0 0 0 9999px rgba(9, 9, 11, 0.75)'
+              }}
+            />
+
+            {/* Draggable Panned and Zoomed Image */}
+            {cropImageSrc && (
+              <img
+                src={cropImageSrc}
+                alt="Crop Workspace"
+                className="max-w-none origin-center pointer-events-none"
+                style={{
+                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                  width: 'auto',
+                  height: 'auto',
+                  maxHeight: '100%',
+                  maxWidth: '100%'
+                }}
+              />
+            )}
+          </div>
+
+          {/* Zoom Slider Control */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+              <span>Zoom</span>
+              <span>{Math.round(zoom * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="4"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => setZoom(parseFloat(e.target.value))}
+              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#CC8667]"
+            />
+          </div>
+
+          {/* Modal Action Buttons */}
+          <div className="flex gap-2 justify-end pt-2">
+            <Button
+              type="button"
+              onClick={() => {
+                setCropModalOpen(false);
+                setCropImageSrc(null);
+                setSelectedAsset(null);
+              }}
+              className="text-[10px] uppercase font-bold bg-zinc-900 border border-white/5 text-slate-400 hover:text-white cursor-pointer px-4 h-8"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCropAndSave}
+              className="text-[10px] uppercase font-bold brand-accent cursor-pointer px-4 h-8"
+            >
+              Recortar e Salvar
+            </Button>
+          </div>
+        </div>
+      </BrandModal>
     </div>
   );
 }

@@ -80,25 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading || checkingPlatform || (!user && !checkingPlatform)) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ color: 'var(--brand-text-color)' }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)',
-              borderTopColor: 'var(--brand-gradient-start)',
-            }}
-          />
-          <p className="text-sm" style={{ opacity: 0.6 }}>
-            Verificando status do sistema e plataforma...
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // ── Acesso negado ─────────────────────────────────────────────────────────

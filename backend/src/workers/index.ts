@@ -249,7 +249,7 @@ async function main() {
         // 4. Gerar assunto padrão por template
         const subjectMap: Record<TemplateName, string> = {
           login_notification: 'Novo acesso detectado na sua conta',
-          invite_member: 'Você foi convidado para colaborar em um consultório',
+          invite_member: 'Você foi convidado para colaborar em um espaço clínico',
         };
         const subject = parsedPayload.subject ?? subjectMap[template] ?? 'Notificação';
 

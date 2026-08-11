@@ -370,7 +370,7 @@ export default function MembrosPage() {
 
       {/* Modal de Gestão de Colaborador e Logs de Envio */}
       {selectedMember && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-[1000] animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center p-4 z-[1000] animate-fade-in">
           <Card className="w-full max-w-lg p-6 space-y-6 relative border border-slate-800 shadow-2xl glass-lg text-left">
             {/* Botão de Fechar */}
             <button 

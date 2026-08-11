@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { X, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
+import { BrandModal } from '@psi/ui';
 
 interface ContractModalProps {
   isOpen: boolean;
@@ -10,8 +11,6 @@ interface ContractModalProps {
 }
 
 export function ContractModal({ isOpen, onClose, patientName }: ContractModalProps) {
-  if (!isOpen) return null;
-
   const contractContent = `
 # CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PSICOLOGIA
 
@@ -39,41 +38,27 @@ Este é um documento de valor ético e profissional.
 `;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="brand-overlay" onClick={onClose} />
-
-      {/* Modal Content */}
-      <div className="brand-modal w-full max-w-2xl max-h-[80vh] flex flex-col rounded-2xl shadow-2xl relative z-10 animate-page-enter">
-        {/* Header */}
-        <div className="p-5 border-b border-[var(--surface-border)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-[var(--brand-gradient-start)]" />
-            <h2 className="text-lg font-bold text-slate-100">Contrato de Prestação de Serviços</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-white/5 transition-all"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-slate-300 text-sm leading-relaxed custom-scrollbar whitespace-pre-wrap">
-          {contractContent}
-        </div>
-
-        {/* Footer */}
-        <div className="p-5 border-t border-[var(--surface-border)] flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 text-sm font-semibold text-white rounded-xl shadow-lg bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
-          >
-            Fechar
-          </button>
-        </div>
+    <BrandModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-2xl" showCloseButton={true}>
+      {/* Header */}
+      <div className="flex items-center gap-2 border-b border-[var(--surface-border)] pb-4 -mt-2">
+        <FileText className="w-5 h-5 text-[var(--brand-gradient-start)]" />
+        <h2 className="text-lg font-bold text-slate-100">Contrato de Prestação de Serviços</h2>
       </div>
-    </div>
+
+      {/* Content */}
+      <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-4 text-slate-300 text-xs leading-relaxed custom-scrollbar whitespace-pre-wrap">
+        {contractContent}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-[var(--surface-border)] pt-4 flex justify-end">
+        <button
+          onClick={onClose}
+          className="px-5 py-2 text-xs font-semibold text-white rounded-xl shadow-lg bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none uppercase tracking-wider"
+        >
+          Fechar
+        </button>
+      </div>
+    </BrandModal>
   );
 }

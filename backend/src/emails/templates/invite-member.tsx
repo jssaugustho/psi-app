@@ -175,7 +175,7 @@ export function InviteMemberEmail({
             <div style={styles.body2}>
               <p style={styles.greeting}>Olá, {userName}!</p>
               <p style={styles.intro}>
-                Você foi convidado por <strong>{inviterName}</strong> para colaborar na equipe do consultório <strong>{tenantName}</strong>. 
+                Você foi convidado por <strong>{inviterName}</strong> para colaborar na equipe da clínica <strong>{tenantName}</strong>. 
                 {isNewUser 
                   ? ' Como este é seu primeiro acesso, clique no botão abaixo para definir sua senha de acesso e concluir a configuração do seu perfil.'
                   : ' Clique no botão abaixo para confirmar seu acesso e começar a colaborar.'}
@@ -187,7 +187,7 @@ export function InviteMemberEmail({
                   <tbody>
                     <tr>
                       <td style={{ ...styles.infoRow, display: 'table-row' }}>
-                        <td style={styles.infoLabel}>Consultório</td>
+                        <td style={styles.infoLabel}>Clínica</td>
                         <td style={styles.infoValue}>{tenantName}</td>
                       </td>
                     </tr>
@@ -210,7 +210,7 @@ export function InviteMemberEmail({
               {/* Action Button */}
               <div style={styles.buttonWrapper}>
                 <a href={actionLink} style={styles.button}>
-                  {isNewUser ? 'Definir Senha e Acessar' : 'Acessar Consultório'}
+                  {isNewUser ? 'Definir Senha e Acessar' : 'Acessar Clínica'}
                 </a>
               </div>
             </div>
@@ -218,7 +218,7 @@ export function InviteMemberEmail({
             {/* Footer */}
             <div style={styles.footer}>
               <p style={styles.footerText}>
-                Este e-mail foi enviado porque você foi convidado no consultório {tenantName}.<br />
+                Este e-mail foi enviado porque você foi convidado na clínica {tenantName}.<br />
                 Se não reconhece este convite, pode ignorar este e-mail.
               </p>
               <p style={styles.footerBrand}>{brandName} &mdash; Acesso seguro</p>

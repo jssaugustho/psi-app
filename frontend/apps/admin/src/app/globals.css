@@ -97,9 +97,7 @@ body {
 .brand-overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--brand-gradient-start) 12%, rgba(0, 0, 0, 0.72));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--brand-gradient-start) 10%, rgba(0, 0, 0, 0.85));
   z-index: 40;
 }
 

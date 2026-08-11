@@ -1,0 +1,140 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+@source "../../../../packages/ui";
+
+:root {
+  /* ── Gradiente & Contraste da Marca ── */
+  --brand-gradient-start: #4F46E5;
+  --brand-gradient-end: #06B6D4;
+  --brand-contrast-color: #FFFFFF;
+  --brand-gradient: linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end));
+
+  /* ── Paleta Principal (tema escuro por padrão) ── */
+  --brand-bg-color: #09090B;
+  --brand-card-bg-color: #18181B;
+  --brand-text-color: #F4F4F5;
+
+  /* ── Base de Mistura (color-mix) — muda por tema ── */
+  --mix-base: #000000; /* dark: mistura com preto */
+
+  /* ── Superfícies derivadas com opacidade neutra ── */
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-active: rgba(255, 255, 255, 0.10);
+  --surface-input: rgba(0, 0, 0, 0.30);
+  --surface-muted: rgba(255, 255, 255, 0.60);
+
+  /* ── Status semânticos (neutros) ── */
+  --status-success-bg: rgba(16, 185, 129, 0.10);
+  --status-success-border: rgba(16, 185, 129, 0.25);
+  --status-success-text: #34D399;
+  --status-error-bg: rgba(239, 68, 68, 0.10);
+  --status-error-border: rgba(239, 68, 68, 0.25);
+  --status-error-text: #F87171;
+  --status-warning-bg: rgba(245, 158, 11, 0.10);
+  --status-warning-border: rgba(245, 158, 11, 0.25);
+  --status-warning-text: #FCD34D;
+  --status-info-bg: rgba(99, 102, 241, 0.10);
+  --status-info-border: rgba(99, 102, 241, 0.25);
+  --status-info-text: rgba(255, 255, 255, 0.75);
+}
+
+html.light {
+  --mix-base: #FFFFFF;
+  --surface-border: rgba(0, 0, 0, 0.10);
+  --surface-hover: rgba(0, 0, 0, 0.04);
+  --surface-active: rgba(0, 0, 0, 0.08);
+  --surface-input: rgba(255, 255, 255, 0.80);
+  --surface-muted: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Classes Utilitárias do Glassmorphic Design ── */
+.glass-sm {
+  background: color-mix(in srgb, var(--brand-gradient-start) 2%, var(--mix-base));
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--surface-border);
+}
+.glass-md {
+  background: color-mix(in srgb, var(--brand-gradient-start) 4%, var(--mix-base));
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--surface-border);
+}
+.glass-lg {
+  background: color-mix(in srgb, var(--brand-gradient-start) 7%, var(--mix-base));
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border);
+}
+
+.brand-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 40;
+}
+
+.brand-modal {
+  background: color-mix(in srgb, var(--brand-gradient-start) 9%, var(--mix-base));
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.brand-input {
+  background: var(--surface-input);
+  border: 1px solid var(--surface-border);
+  color: var(--brand-text-color);
+  transition: all 0.2s ease-in-out;
+}
+.brand-input:focus {
+  border-color: var(--brand-gradient-start);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-gradient-start) 25%, transparent);
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--brand-gradient-start) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-gradient-start) 20%, transparent);
+  color: var(--brand-text-color);
+}
+
+.brand-accent {
+  background: var(--brand-gradient);
+  color: var(--brand-contrast-color);
+  transition: all 0.2s ease-in-out;
+}
+.brand-accent:hover {
+  opacity: 0.90;
+  transform: translateY(-1px);
+}
+
+.brand-accent-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-divider {
+  border: 0;
+  border-top: 1px solid var(--surface-border);
+  width: 100%;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page-enter {
+  animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

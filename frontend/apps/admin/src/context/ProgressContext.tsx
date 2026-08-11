@@ -35,7 +35,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => {
       setLoading(false);
       setProgress(0);
-    }, 200);
+    }, 350);
   };
 
   // Efeito para simular um progresso incremental realista
@@ -56,16 +56,18 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   return (
     <ProgressContext.Provider value={{ start, stop, loading }}>
       {/* Barra de carregamento fixa no topo na cor do gradiente do tenant */}
-      {loading && (
-        <div
-          className="fixed top-0 left-0 h-[3px] z-[9999] transition-all duration-150 ease-out"
-          style={{
-            width: `${progress}%`,
-            background: 'var(--brand-gradient)',
-            boxShadow: '0 1px 10px rgba(6, 182, 212, 0.4)',
-          }}
-        />
-      )}
+      <div
+        className="fixed top-0 left-0 h-[3px] z-[9999]"
+        style={{
+          width: loading ? `${progress}%` : '0%',
+          background: 'var(--brand-gradient)',
+          boxShadow: loading ? '0 1px 10px rgba(6, 182, 212, 0.4)' : 'none',
+          opacity: loading ? 1 : 0,
+          transitionProperty: 'width, opacity',
+          transitionDuration: loading ? '150ms, 0ms' : '150ms, 350ms',
+          transitionTimingFunction: 'ease-out',
+        }}
+      />
       {children}
     </ProgressContext.Provider>
   );

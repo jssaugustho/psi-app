@@ -202,4 +202,83 @@ export const emailCampaigns = pgTable('email_campaigns', {
 export type EmailCampaign = typeof emailCampaigns.$inferSelect;
 export type NewEmailCampaign = typeof emailCampaigns.$inferInsert;
 
+// Tabela de Modelos de Contrato Clínico
+export const contractTemplates = pgTable('contract_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(), // Nome identificador (Ex: "Contrato Adulto TCC")
+  content: text('content').notNull(), // Corpo do contrato com markdown/html
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Tabela de Páginas de Captação
+export const capturePages = pgTable('capture_pages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').notNull(),
+  slug: text('slug').notNull(), // Caminho relativo padrão (Ex: "terapia")
+  isActive: boolean('is_active').default(true).notNull(),
+
+  // Configurações de Domínio & SEO (Aba 3)
+  customDomain: text('custom_domain'), // Ex: "terapia.geovannabastos.com.br"
+  seoConfig: jsonb('seo_config').$type<{
+    metaTitle: string;
+    metaDescription: string;
+    ogImageUrl?: string;
+  }>().notNull(),
+
+  // Configuração Visual & Textos da Landing Page (Aba 1)
+  siteConfig: jsonb('site_config').$type<Record<string, any>>().notNull(),
+
+  dictionary: jsonb('dictionary').$type<Record<string, any>>().notNull(),
+
+  // Árvore do Fluxo de Etapas (Aba 2 - React Flow Model)
+  formFlow: jsonb('form_flow').$type<Record<string, any>>().notNull(),
+
+  // --- Rascunho / Staging (Salvamento Automático) ---
+  titleDraft: text('title_draft'),
+  slugDraft: text('slug_draft'),
+  customDomainDraft: text('custom_domain_draft'),
+  seoConfigDraft: jsonb('seo_config_draft').$type<{
+    metaTitle: string;
+    metaDescription: string;
+    ogImageUrl?: string;
+  }>(),
+  siteConfigDraft: jsonb('site_config_draft').$type<Record<string, any>>(),
+  dictionaryDraft: jsonb('dictionary_draft').$type<Record<string, any>>(),
+  formFlowDraft: jsonb('form_flow_draft').$type<Record<string, any>>(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Tabela de Galeria de Mídia (Compartilhada por Tenant para uso público)
+export const mediaAssets = pgTable('media_assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  key: text('key').unique().notNull(),
+  url: text('url').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  width: integer('width'),
+  height: integer('height'),
+  isCropped: boolean('is_cropped').default(false).notNull(),
+  parentId: uuid('parent_id').references((): any => mediaAssets.id, { onDelete: 'set null' }),
+  usageContext: text('usage_context'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ContractTemplate = typeof contractTemplates.$inferSelect;
+export type NewContractTemplate = typeof contractTemplates.$inferInsert;
+
+export type CapturePage = typeof capturePages.$inferSelect;
+export type NewCapturePage = typeof capturePages.$inferInsert;
+
+export type MediaAsset = typeof mediaAssets.$inferSelect;
+export type NewMediaAsset = typeof mediaAssets.$inferInsert;
+
+
 

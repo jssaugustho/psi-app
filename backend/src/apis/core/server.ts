@@ -9,6 +9,7 @@ import { authRoutes } from './routes/auth';
 import { platformRoutes } from './routes/platform';
 import { statusRoutes, startSystemStatusHeartbeats } from './routes/status';
 import { crmRoutes } from './routes/crm';
+import { captacaoRoutes } from './routes/captacao';
 import { sql } from '../../shared/db';
 
 dotenv.config();
@@ -70,6 +71,7 @@ fastify.register(authRoutes, { prefix: '/auth' });
 fastify.register(platformRoutes, { prefix: '/platform' });
 fastify.register(statusRoutes, { prefix: '/platform' });
 fastify.register(crmRoutes, { prefix: '/crm' });
+fastify.register(captacaoRoutes, { prefix: '/crm/captacao' });
 
 const start = async () => {
   try {

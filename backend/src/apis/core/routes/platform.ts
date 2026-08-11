@@ -3,10 +3,10 @@ import { resolveTxt } from 'dns/promises';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, tenants, emailLogs } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { platformSettings, tenants, emailLogs, mediaAssets, tenantMembers } from '../../../shared/schema';
+import { eq, and, desc } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
-import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Schemas Zod de Validação
@@ -286,6 +286,295 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           error: 'Erro ao gerar URL de upload',
           message: err.message || 'Não foi possível gerar a Presigned URL.',
         });
+      }
+    }
+  );
+
+  // GET /v1/platform/media
+  // Lista todos os assets não-cropped de um determinado tenant
+  fastify.get(
+    '/media',
+    {
+      schema: {
+        querystring: z.object({
+          tenantId: z.string().uuid('ID do Tenant inválido'),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const { tenantId } = request.query;
+
+        // Validar se o usuário pertence ao tenant
+        const targetTenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, tenantId),
+        });
+
+        if (!targetTenant) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        }
+
+        const isOwner = targetTenant.ownerId === decoded.sub;
+        const member = await db.query.tenantMembers.findFirst({
+          where: and(
+            eq(tenantMembers.userId, decoded.sub),
+            eq(tenantMembers.tenantId, tenantId)
+          ),
+        });
+
+        if (!isOwner && !member) {
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este tenant.' });
+        }
+
+        // Buscar assets
+        const assets = await db.query.mediaAssets.findMany({
+          where: and(
+            eq(mediaAssets.tenantId, tenantId),
+            eq(mediaAssets.isCropped, false)
+          ),
+          orderBy: desc(mediaAssets.createdAt),
+        });
+
+        return reply.send(assets);
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // POST /v1/platform/media
+  // Cadastra um novo media asset
+  fastify.post(
+    '/media',
+    {
+      schema: {
+        body: z.object({
+          tenantId: z.string().uuid('ID do Tenant inválido'),
+          name: z.string().min(1, 'Nome é obrigatório'),
+          key: z.string().min(1, 'Chave é obrigatória'),
+          url: z.string().url('URL inválida'),
+          mimeType: z.string().min(1, 'Tipo MIME é obrigatório'),
+          fileSize: z.number().int().positive(),
+          width: z.number().int().optional().nullable(),
+          height: z.number().int().optional().nullable(),
+          isCropped: z.boolean().default(false),
+          parentId: z.string().uuid().optional().nullable(),
+          usageContext: z.string().optional().nullable(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const body = request.body;
+
+        // Validar se o usuário pertence ao tenant
+        const targetTenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, body.tenantId),
+        });
+
+        if (!targetTenant) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        }
+
+        const isOwner = targetTenant.ownerId === decoded.sub;
+        const member = await db.query.tenantMembers.findFirst({
+          where: and(
+            eq(tenantMembers.userId, decoded.sub),
+            eq(tenantMembers.tenantId, body.tenantId)
+          ),
+        });
+
+        if (!isOwner && !member) {
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este tenant.' });
+        }
+
+        // Lógica de Segurança: Apenas logotipos e favicons podem ter transparência (PNG, SVG, etc.).
+        // Imagens normais devem ser JPG/WebP opacas. Se o usuário tentar burlar, bloqueamos a inserção.
+        const isLogoOrFavicon = 
+          body.usageContext === 'siteConfig.logoUrl' || 
+          body.usageContext === 'siteConfig.faviconUrl' ||
+          body.key.includes('media/logo/') ||
+          body.key.includes('media/icon/');
+
+        if (!isLogoOrFavicon) {
+          const forbiddenTypes = ['image/png', 'image/svg+xml', 'image/gif'];
+          const isForbiddenMime = forbiddenTypes.includes(body.mimeType.toLowerCase());
+          const isForbiddenExt = 
+            body.key.endsWith('.png') || 
+            body.key.endsWith('.svg') || 
+            body.key.endsWith('.gif') ||
+            body.name.endsWith('.png') || 
+            body.name.endsWith('.svg') || 
+            body.name.endsWith('.gif');
+
+          if (isForbiddenMime || isForbiddenExt) {
+            return reply.status(400).send({
+              error: 'Formato inválido',
+              message: 'Imagens gerais não podem ter fundo transparente. Apenas logotipos e favicons permitem este formato.',
+            });
+          }
+        }
+
+        // Lógica Anti-Lixo: se for cropped e tiver context, remove o crop antigo
+        if (body.isCropped && body.usageContext) {
+          const oldCrop = await db.query.mediaAssets.findFirst({
+            where: and(
+              eq(mediaAssets.tenantId, body.tenantId),
+              eq(mediaAssets.usageContext, body.usageContext)
+            ),
+          });
+
+          if (oldCrop) {
+            // 1. Excluir do Cloudflare R2
+            try {
+              const settings = await db.query.platformSettings.findFirst();
+              if (settings && settings.cloudflareAccountId && settings.r2BucketName && settings.r2AccessKeyId && settings.r2SecretAccessKey) {
+                const s3Client = new S3Client({
+                  region: 'auto',
+                  endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
+                  credentials: {
+                    accessKeyId: settings.r2AccessKeyId.trim(),
+                    secretAccessKey: settings.r2SecretAccessKey.trim(),
+                  },
+                });
+
+                await s3Client.send(
+                  new DeleteObjectCommand({
+                    Bucket: settings.r2BucketName.trim(),
+                    Key: oldCrop.key,
+                  })
+                );
+              }
+            } catch (s3Err) {
+              fastify.log.warn({ err: s3Err }, `Falha ao excluir R2 object ${oldCrop.key}`);
+            }
+
+            // 2. Remover do banco de dados
+            await db.delete(mediaAssets).where(eq(mediaAssets.id, oldCrop.id));
+          }
+        }
+
+        // Inserir novo asset
+        const [newAsset] = await db
+          .insert(mediaAssets)
+          .values({
+            tenantId: body.tenantId,
+            name: body.name,
+            key: body.key,
+            url: body.url,
+            mimeType: body.mimeType,
+            fileSize: body.fileSize,
+            width: body.width || null,
+            height: body.height || null,
+            isCropped: body.isCropped,
+            parentId: body.parentId || null,
+            usageContext: body.usageContext || null,
+          })
+          .returning();
+
+        return reply.send(newAsset);
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // DELETE /v1/platform/media/:id
+  // Exclui um asset da biblioteca e do R2
+  fastify.delete(
+    '/media/:id',
+    {
+      schema: {
+        params: z.object({
+          id: z.string().uuid('ID inválido'),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const { id } = request.params;
+
+        // Buscar asset
+        const asset = await db.query.mediaAssets.findFirst({
+          where: eq(mediaAssets.id, id),
+        });
+
+        if (!asset) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Asset não encontrado.' });
+        }
+
+        // Validar se o usuário pertence ao tenant do asset
+        const targetTenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, asset.tenantId),
+        });
+
+        if (!targetTenant) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        }
+
+        const isOwner = targetTenant.ownerId === decoded.sub;
+        const member = await db.query.tenantMembers.findFirst({
+          where: and(
+            eq(tenantMembers.userId, decoded.sub),
+            eq(tenantMembers.tenantId, asset.tenantId)
+          ),
+        });
+
+        if (!isOwner && !member) {
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para remover assets deste tenant.' });
+        }
+
+        // 1. Excluir do Cloudflare R2
+        try {
+          const settings = await db.query.platformSettings.findFirst();
+          if (settings && settings.cloudflareAccountId && settings.r2BucketName && settings.r2AccessKeyId && settings.r2SecretAccessKey) {
+            const s3Client = new S3Client({
+              region: 'auto',
+              endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
+              credentials: {
+                accessKeyId: settings.r2AccessKeyId.trim(),
+                secretAccessKey: settings.r2SecretAccessKey.trim(),
+              },
+            });
+
+            await s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: settings.r2BucketName.trim(),
+                Key: asset.key,
+              })
+            );
+          }
+        } catch (s3Err) {
+          fastify.log.warn({ err: s3Err }, `Falha ao excluir R2 object ${asset.key}`);
+        }
+
+        // 2. Remover do banco de dados
+        await db.delete(mediaAssets).where(eq(mediaAssets.id, id));
+
+        return reply.send({ message: 'Asset removido com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
   );

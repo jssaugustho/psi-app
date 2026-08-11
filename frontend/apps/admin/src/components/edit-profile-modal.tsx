@@ -116,11 +116,11 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop com desfoque */}
+      {/* Backdrop escurecido */}
       <div
-        className="absolute inset-0 backdrop-blur-sm"
+        className="absolute inset-0"
         style={{
-          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 70%, transparent)',
+          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
         }}
         onClick={onClose}
       />

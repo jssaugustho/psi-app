@@ -3,27 +3,24 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useBrand } from '@/context/BrandContext';
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const { isBootReady } = useBrand();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && isBootReady) {
       if (user) {
         router.push('/dashboard');
       } else {
         router.push('/login');
       }
     }
-  }, [loading, user, router]);
+  }, [loading, isBootReady, user, router]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-      <div className="animate-pulse flex items-center gap-2">
-        <div className="w-4 h-4 rounded-full animate-ping" style={{ backgroundColor: "var(--brand-gradient-start)" }} />
-        <span>Carregando...</span>
-      </div>
-    </div>
-  );
+  // O BrandContext já exibe o loader de tela cheia durante o boot.
+  // Retornar null evita um segundo spinner piscando sob ele.
+  return null;
 }

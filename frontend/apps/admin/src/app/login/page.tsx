@@ -9,8 +9,8 @@ import { api } from '@/lib/api';
 import { Button, Input, Card } from '@psi/ui';
 
 export default function AdminLoginPage() {
-  const { login } = useAuth();
-  const { tenant, theme, toggleTheme } = useBrand();
+  const { login, user, loading: authLoading } = useAuth();
+  const { tenant, theme, toggleTheme, isBootReady } = useBrand();
   const router = useRouter();
 
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
@@ -18,6 +18,11 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
+  if (isBootReady && !authLoading && user && user.role === 'admin') {
+    return null;
+  }
 
   useEffect(() => {
     async function checkBootstrap() {

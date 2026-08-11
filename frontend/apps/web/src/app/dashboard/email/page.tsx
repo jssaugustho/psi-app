@@ -400,9 +400,9 @@ export default function EmailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             onClick={() => setSelectedCampaign(null)}
-            className="absolute inset-0 backdrop-blur-sm"
+            className="absolute inset-0 cursor-pointer"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 75%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
             }}
           />
 
@@ -491,9 +491,9 @@ export default function EmailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             onClick={() => setIsCreateOpen(false)}
-            className="absolute inset-0 backdrop-blur-sm"
+            className="absolute inset-0 cursor-pointer"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 75%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
             }}
           />
 

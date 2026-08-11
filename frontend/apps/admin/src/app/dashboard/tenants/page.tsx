@@ -259,7 +259,7 @@ export default function TenantsPage() {
 
       {/* ── MODAL: NOVO TENANT ── */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
           <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up">
             <div className="flex justify-between items-center">
               <div>

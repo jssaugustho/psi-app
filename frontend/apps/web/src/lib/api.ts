@@ -328,6 +328,38 @@ export const api = {
     return { url: public_url, key };
   },
 
+  // --- BIBLIOTECA DE MIDIA METODOS ---
+  getMediaAssets: async (tenantId: string) => {
+    return fetchApi<any[]>(`/platform/media?tenantId=${tenantId}`, {
+      method: 'GET',
+    });
+  },
+
+  registerMediaAsset: async (body: {
+    tenantId: string;
+    name: string;
+    key: string;
+    url: string;
+    mimeType: string;
+    fileSize: number;
+    width?: number | null;
+    height?: number | null;
+    isCropped?: boolean;
+    parentId?: string | null;
+    usageContext?: string | null;
+  }) => {
+    return fetchApi<any>('/platform/media', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  deleteMediaAsset: async (id: string) => {
+    return fetchApi<{ message: string }>(`/platform/media/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // --- SUB & RBAC METODOS ---
   getTenantSubscription: async (tenantId: string) => {
     const res = await fetchApi<TenantSubscription[]>(`${PGRST_BASE_URL}/tenant_subscriptions?tenant_id=eq.${tenantId}&limit=1`);
@@ -578,5 +610,251 @@ export const api = {
     await fetchApi(`${PGRST_BASE_URL}/email_campaigns?id=eq.${id}`, {
       method: 'DELETE'
     });
+  },
+
+  // --- Captação: Capture Pages ---
+  getCapturePages: async (tenantId: string): Promise<CapturePage[]> => {
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?tenant_id=eq.${tenantId}&order=created_at.desc`);
+    return list.map(item => ({
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      customDomain: item.custom_domain,
+      seoConfig: item.seo_config,
+      siteConfig: item.site_config,
+      dictionary: item.dictionary,
+      formFlow: item.form_flow,
+      titleDraft: item.title_draft,
+      slugDraft: item.slug_draft,
+      customDomainDraft: item.custom_domain_draft,
+      seoConfigDraft: item.seo_config_draft,
+      siteConfigDraft: item.site_config_draft,
+      dictionaryDraft: item.dictionary_draft,
+      formFlowDraft: item.form_flow_draft,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
+  },
+
+  getCapturePage: async (id: string): Promise<CapturePage> => {
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
+    if (list.length === 0) throw new Error('Página não encontrada');
+    const item = list[0];
+    return {
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      customDomain: item.custom_domain,
+      seoConfig: item.seo_config,
+      siteConfig: item.site_config,
+      dictionary: item.dictionary,
+      formFlow: item.form_flow,
+      titleDraft: item.title_draft,
+      slugDraft: item.slug_draft,
+      customDomainDraft: item.custom_domain_draft,
+      seoConfigDraft: item.seo_config_draft,
+      siteConfigDraft: item.site_config_draft,
+      dictionaryDraft: item.dictionary_draft,
+      formFlowDraft: item.form_flow_draft,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  createCapturePage: async (body: {
+    title: string;
+    slug: string;
+    tenantId?: string;
+    crp?: string;
+    approach?: string;
+    address?: string;
+    titlePart1?: string;
+    titlePart2?: string;
+    description?: string;
+    whatsappMessageTemplate?: string;
+  }): Promise<{ success: boolean; page: CapturePage }> => {
+    const res = await fetchApi<{ success: boolean; page: any }>('/crm/captacao', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    return {
+      success: res.success,
+      page: {
+        id: res.page.id,
+        tenantId: res.page.tenantId || res.page.tenant_id,
+        title: res.page.title,
+        slug: res.page.slug,
+        isActive: res.page.isActive ?? res.page.is_active,
+        customDomain: res.page.customDomain ?? res.page.custom_domain,
+        seoConfig: res.page.seoConfig || res.page.seo_config,
+        siteConfig: res.page.siteConfig || res.page.site_config,
+        dictionary: res.page.dictionary,
+        formFlow: res.page.formFlow || res.page.form_flow,
+        titleDraft: res.page.title_draft,
+        slugDraft: res.page.slug_draft,
+        customDomainDraft: res.page.custom_domain_draft,
+        seoConfigDraft: res.page.seo_config_draft,
+        siteConfigDraft: res.page.site_config_draft,
+        dictionaryDraft: res.page.dictionary_draft,
+        formFlowDraft: res.page.form_flow_draft,
+        createdAt: res.page.createdAt || res.page.created_at,
+        updatedAt: res.page.updatedAt || res.page.updated_at,
+      }
+    };
+  },
+
+  updateCapturePage: async (id: string, body: Partial<CapturePage>): Promise<CapturePage> => {
+    const dbBody: Record<string, any> = {};
+    if (body.title !== undefined) dbBody.title = body.title;
+    if (body.slug !== undefined) dbBody.slug = body.slug;
+    if (body.isActive !== undefined) dbBody.is_active = body.isActive;
+    if (body.customDomain !== undefined) dbBody.custom_domain = body.customDomain;
+    if (body.seoConfig !== undefined) dbBody.seo_config = body.seoConfig;
+    if (body.siteConfig !== undefined) dbBody.site_config = body.siteConfig;
+    if (body.dictionary !== undefined) dbBody.dictionary = body.dictionary;
+    if (body.formFlow !== undefined) dbBody.form_flow = body.formFlow;
+
+    if (body.titleDraft !== undefined) dbBody.title_draft = body.titleDraft;
+    if (body.slugDraft !== undefined) dbBody.slug_draft = body.slugDraft;
+    if (body.customDomainDraft !== undefined) dbBody.custom_domain_draft = body.customDomainDraft;
+    if (body.seoConfigDraft !== undefined) dbBody.seo_config_draft = body.seoConfigDraft;
+    if (body.siteConfigDraft !== undefined) dbBody.site_config_draft = body.siteConfigDraft;
+    if (body.dictionaryDraft !== undefined) dbBody.dictionary_draft = body.dictionaryDraft;
+    if (body.formFlowDraft !== undefined) dbBody.form_flow_draft = body.formFlowDraft;
+
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+      headers: { 'Prefer': 'return=representation' }
+    });
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      customDomain: item.custom_domain,
+      seoConfig: item.seo_config,
+      siteConfig: item.site_config,
+      dictionary: item.dictionary,
+      formFlow: item.form_flow,
+      titleDraft: item.title_draft,
+      slugDraft: item.slug_draft,
+      customDomainDraft: item.custom_domain_draft,
+      seoConfigDraft: item.seo_config_draft,
+      siteConfigDraft: item.site_config_draft,
+      dictionaryDraft: item.dictionary_draft,
+      formFlowDraft: item.form_flow_draft,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  deleteCapturePage: async (id: string): Promise<void> => {
+    await fetchApi(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --- Captação: Contract Templates ---
+  getContractTemplates: async (tenantId: string): Promise<ContractTemplate[]> => {
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?tenant_id=eq.${tenantId}&order=created_at.desc`);
+    return list.map(item => ({
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      content: item.content,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
+  },
+
+  createContractTemplate: async (body: { tenant_id: string; title: string; content: string }): Promise<ContractTemplate> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Prefer': 'return=representation' }
+    });
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      content: item.content,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  updateContractTemplate: async (id: string, body: Partial<ContractTemplate>): Promise<ContractTemplate> => {
+    const dbBody: Record<string, any> = {};
+    if (body.title !== undefined) dbBody.title = body.title;
+    if (body.content !== undefined) dbBody.content = body.content;
+
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+      headers: { 'Prefer': 'return=representation' }
+    });
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.tenant_id,
+      title: item.title,
+      content: item.content,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  deleteContractTemplate: async (id: string): Promise<void> => {
+    await fetchApi(`${PGRST_BASE_URL}/contract_templates?id=eq.${id}`, {
+      method: 'DELETE'
+    });
   }
 };
+
+export interface CapturePage {
+  id: string;
+  tenantId: string;
+  title: string;
+  slug: string;
+  isActive: boolean;
+  customDomain: string | null;
+  seoConfig: {
+    metaTitle: string;
+    metaDescription: string;
+    ogImageUrl?: string;
+  };
+  siteConfig: any;
+  dictionary: any;
+  formFlow: any;
+  titleDraft?: string | null;
+  slugDraft?: string | null;
+  customDomainDraft?: string | null;
+  seoConfigDraft?: {
+    metaTitle: string;
+    metaDescription: string;
+    ogImageUrl?: string;
+  } | null;
+  siteConfigDraft?: any;
+  dictionaryDraft?: any;
+  formFlowDraft?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractTemplate {
+  id: string;
+  tenantId: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -83,7 +83,7 @@ export function SelectWithHelper({
 
   // Base classes for the trigger button
   const getTriggerClass = () => {
-    const base = "flex items-center justify-between w-full text-sm transition-colors cursor-pointer outline-none focus:outline-none";
+    const base = "flex items-center justify-between gap-2 w-full text-sm transition-colors cursor-pointer outline-none focus:outline-none";
     if (variant === 'transparent') {
       return `${base} bg-transparent border-none py-2 text-slate-800 dark:text-slate-200`;
     }

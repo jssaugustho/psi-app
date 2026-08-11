@@ -800,12 +800,12 @@ export default function CrmPage() {
 
       {/* MODAL: ADICIONAR NOVO LEAD */}
       {isAddContactOpen && renderPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
             onClick={() => setIsAddContactOpen(false)}
-            className="absolute inset-0 backdrop-blur-sm"
+            className="absolute inset-0 cursor-pointer"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 75%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
               backgroundImage: 'radial-gradient(circle at center, color-mix(in srgb, var(--brand-gradient-start) 10%, transparent) 0%, transparent 70%)'
             }}
           />
@@ -913,12 +913,12 @@ export default function CrmPage() {
 
       {/* MODAL: ADICIONAR NOVA COLUNA */}
       {isAddColumnOpen && renderPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
             onClick={() => setIsAddColumnOpen(false)}
-            className="absolute inset-0 backdrop-blur-sm"
+            className="absolute inset-0 cursor-pointer"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 75%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
               backgroundImage: 'radial-gradient(circle at center, color-mix(in srgb, var(--brand-gradient-start) 10%, transparent) 0%, transparent 70%)'
             }}
           />
@@ -970,12 +970,12 @@ export default function CrmPage() {
       )}
 
       {isSettingsOpen && renderPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
           <div
             onClick={() => setIsSettingsOpen(false)}
-            className="absolute inset-0 backdrop-blur-sm"
+            className="absolute inset-0 cursor-pointer"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 75%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
               backgroundImage: 'radial-gradient(circle at center, color-mix(in srgb, var(--brand-gradient-start) 10%, transparent) 0%, transparent 70%)'
             }}
           />
