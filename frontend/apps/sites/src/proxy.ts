@@ -17,23 +17,26 @@ export function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
   const hostname = request.headers.get('host') || '';
 
-  // Exclude local testing paths starting with /p/
-  if (url.pathname.startsWith('/p/')) {
-    return NextResponse.next();
-  }
+  const isLocal = hostname.includes('localhost');
+  const mainAppUrl = process.env.NEXT_PUBLIC_MAIN_APP_URL || 
+    (isLocal ? 'http://localhost:3000' : 'https://app.psiapp.com.br');
 
-  // Define hostnames that are treated as the main platform domains (do not rewrite)
+  // Define hostnames that are treated as the main platform domains
   const isPlatformDomain = 
     hostname.includes('localhost:') || 
     hostname.includes('sites.psiapp.com.br') || 
     hostname === 'psiapp.com.br';
 
   if (isPlatformDomain) {
-    // If it's a main domain and accesses the root, show a default welcome page
-    if (url.pathname === '/') {
+    // Protection: If user accesses the root of the sites app, redirect to the main app
+    if (url.pathname === '/' || url.pathname === '') {
+      return NextResponse.redirect(new URL(mainAppUrl), 307);
+    }
+
+    // Exclude local testing paths starting with /p/
+    if (url.pathname.startsWith('/p/')) {
       return NextResponse.next();
     }
-    return NextResponse.next();
   }
 
   // Rewrite custom domain requests to /_sites/[hostname]/[path]

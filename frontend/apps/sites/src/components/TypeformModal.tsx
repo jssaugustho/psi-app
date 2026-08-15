@@ -190,11 +190,6 @@ export function TypeformModal({
         setErrorMsg("Por favor, preencha todos os campos do contato de emergência.")
         return false
       }
-    } else if (type === "contrato") {
-      if (isRequired && !contratoAceito) {
-        setErrorMsg("Você precisa aceitar os termos do contrato para prosseguir.")
-        return false
-      }
     } else {
       // Custom generic inputs
       const answer = customAnswers[currentNode.id]
@@ -261,7 +256,6 @@ export function TypeformModal({
         relacao: emergenciaRelacao,
         telefone: emergenciaTelefone
       },
-      contrato: contratoAceito,
       ...customAnswers
     }
 
@@ -609,25 +603,7 @@ export function TypeformModal({
                   </div>
                 )}
 
-                {/* CONTRATO */}
-                {currentNode.type === "contrato" && (
-                  <div className="space-y-4">
-                    <div className="h-48 overflow-y-auto p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-muted-foreground leading-relaxed custom-scrollbar whitespace-pre-wrap select-text">
-                      {contractText}
-                    </div>
-                    <label className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/40 border border-zinc-800/80 hover:bg-zinc-900/60 transition-colors cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={contratoAceito}
-                        onChange={(e) => { setContratoAceito(e.target.checked); setErrorMsg(""); }}
-                        className="mt-1 h-4 w-4 rounded border-zinc-700 text-[#CC8667] focus:ring-0 cursor-pointer"
-                      />
-                      <span className="text-xs sm:text-sm text-foreground font-medium">
-                        Li e concordo com os Termos do Contrato Terapêutico acima descritos.
-                      </span>
-                    </label>
-                  </div>
-                )}
+
 
                 {/* CUSTOM SELECTOR (SELETOR CONDICIONAL) */}
                 {currentNode.type === "seletor" && (

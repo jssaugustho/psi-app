@@ -1,12 +1,12 @@
 import { compressImage, type UploadType } from '@psi/image-utils';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
+const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,defaultSiteAvatarUrl:default_site_avatar_url,defaultSitePrimaryColor:default_site_primary_color,defaultSiteSecondaryColor:default_site_secondary_color,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
 
 export interface User {
   id: string;
@@ -16,6 +16,11 @@ export interface User {
   email: string;
   role?: string;
   avatar_url?: string | null;
+  crp?: string | null;
+  bio?: string | null;
+  specialties?: string[] | null;
+  city_state?: string | null;
+  instagram?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -31,6 +36,9 @@ export interface Tenant {
   logoDarkUrl: string | null;
   iconLightUrl: string | null;
   iconDarkUrl: string | null;
+  defaultSiteAvatarUrl?: string | null;
+  defaultSitePrimaryColor?: string;
+  defaultSiteSecondaryColor?: string;
   gradientColorStart: string;
   gradientColorEnd: string;
   contrastColor: string;
@@ -467,11 +475,45 @@ export const api = {
     if (body.textLightColor !== undefined) dbBody.text_light_color = body.textLightColor;
     if (body.textDarkColor !== undefined) dbBody.text_dark_color = body.textDarkColor;
     if (body.emailDomain !== undefined) dbBody.email_domain = body.emailDomain;
-    // resend_api_key é uma configuração da plataforma (platformSettings), não do tenant filho.
+    if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
+    if (body.defaultSitePrimaryColor !== undefined) dbBody.default_site_primary_color = body.defaultSitePrimaryColor;
+    if (body.defaultSiteSecondaryColor !== undefined) dbBody.default_site_secondary_color = body.defaultSiteSecondaryColor;
     if (body.traffic_sources !== undefined) dbBody.traffic_sources = body.traffic_sources;
     if (body.default_traffic_source !== undefined) dbBody.default_traffic_source = body.default_traffic_source;
 
     const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?id=eq.${tenantId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
+  updateProfile: async (userId: string, body: Partial<{
+    nome: string;
+    sobrenome: string;
+    telefone: string | null;
+    avatar_url: string | null;
+    crp: string | null;
+    bio: string | null;
+    specialties: string[] | null;
+    city_state: string | null;
+    instagram: string | null;
+  }>) => {
+    const dbBody: Record<string, any> = {};
+    if (body.nome !== undefined) dbBody.first_name = body.nome;
+    if (body.sobrenome !== undefined) dbBody.last_name = body.sobrenome;
+    if (body.telefone !== undefined) dbBody.phone = body.telefone;
+    if (body.avatar_url !== undefined) dbBody.avatar_url = body.avatar_url;
+    if (body.crp !== undefined) dbBody.crp = body.crp;
+    if (body.bio !== undefined) dbBody.bio = body.bio;
+    if (body.specialties !== undefined) dbBody.specialties = body.specialties;
+    if (body.city_state !== undefined) dbBody.city_state = body.city_state;
+    if (body.instagram !== undefined) dbBody.instagram = body.instagram;
+
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/profiles?id=eq.${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(dbBody),
       headers: {

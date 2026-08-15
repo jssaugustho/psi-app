@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { api, Contact, PipelineColumn, InteractionHistory } from '@/lib/api';
 import { useRealtime } from '@/context/RealtimeContext';
 import { ContactFieldsPanel } from './ContactFieldsPanel';
-import { ContactNetworkPanel } from './ContactNetworkPanel';
 import { Clock, Tag } from 'lucide-react';
 
 interface ContactTabPanelProps {
@@ -73,18 +72,13 @@ export function ContactTabPanel({ contact, columns, sources, tenantId }: Contact
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-page-enter">
-      {/* Coluna Esquerda: Cadastro + Contatos e Prontuários (7 colunas) */}
+      {/* Coluna Esquerda: Cadastro do Lead (7 colunas) */}
       <div className="lg:col-span-7 space-y-6">
         <ContactFieldsPanel
           contact={contact}
           columns={columns}
           sources={sources}
           tenantId={tenantId}
-        />
-
-        <ContactNetworkPanel
-          contactId={contact.id}
-          patientName={contact.name}
         />
       </div>
 

@@ -5,9 +5,8 @@ import { useCrmStore } from '@/stores/crmStore';
 import { Contact, PipelineColumn } from '@/lib/api';
 import { 
   User, Phone, Mail, Globe, GitBranch, Shield, 
-  AlertTriangle, Check, FileText, StickyNote, ArrowUpRight 
+  AlertTriangle, Check, StickyNote 
 } from 'lucide-react';
-import { ContractModal } from './ContractModal';
 import { Select } from '@psi/ui';
 
 interface ContactFieldsPanelProps {
@@ -38,10 +37,8 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
   const [emergencyRelation, setEmergencyRelation] = useState(contact.emergency_contact_relation || '');
   const [emergencyPhone, setEmergencyPhone] = useState(contact.emergency_contact_phone || '');
   
-  // Maior de idade e Contrato
+  // Maior de idade
   const [isMinor, setIsMinor] = useState(contact.is_minor || false);
-  const [acceptedContract, setAcceptedContract] = useState(!!contact.accepted_contract_at);
-  const [contractModalOpen, setContractModalOpen] = useState(false);
 
   // Estados de salvamento
   const [saving, setSaving] = useState(false);
@@ -69,7 +66,6 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
     setSource(contact.source || '');
     setStatus(contact.status || '');
     setIsMinor(contact.is_minor || false);
-    setAcceptedContract(!!contact.accepted_contract_at);
   }, [contact]);
 
   // Função de persistência
@@ -123,12 +119,6 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
   const handleIsMinorChange = (minor: boolean) => {
     setIsMinor(minor);
     saveFields({ is_minor: minor });
-  };
-
-  const handleContractAcceptanceChange = (checked: boolean) => {
-    setAcceptedContract(checked);
-    const timestamp = checked ? new Date().toISOString() : null;
-    saveFields({ accepted_contract_at: timestamp });
   };
 
   return (
@@ -316,32 +306,6 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
           </div>
         </div>
 
-        {/* Contrato de Prestação de Serviços */}
-        <div className="grid grid-cols-3 items-center min-h-[44px]">
-          <div className="pl-4 text-slate-400 flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5" />
-            <span>Contrato (Aceite)</span>
-          </div>
-          <div className="col-span-2 pr-4 flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer my-2">
-              <input
-                type="checkbox"
-                checked={acceptedContract}
-                onChange={(e) => handleContractAcceptanceChange(e.target.checked)}
-                className="rounded border-[var(--surface-border)] bg-transparent text-[var(--brand-gradient-start)] focus:ring-0"
-              />
-              <span className="text-xs text-slate-300">Aceito pelo paciente</span>
-            </label>
-            <button
-              onClick={() => setContractModalOpen(true)}
-              className="text-xs text-[var(--brand-gradient-start)] hover:underline flex items-center gap-0.5 bg-transparent border-none cursor-pointer"
-            >
-              <span>Ver Contrato</span>
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
         {/* Notas de Triagem */}
         <div className="grid grid-cols-3 items-start min-h-[70px] py-2.5">
           <div className="pl-4 text-slate-400 flex items-center gap-2 mt-1">
@@ -363,13 +327,6 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
           </div>
         </div>
       </div>
-
-      {/* Modal do Contrato */}
-      <ContractModal
-        isOpen={contractModalOpen}
-        onClose={() => setContractModalOpen(false)}
-        patientName={name}
-      />
     </div>
   );
 }

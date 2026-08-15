@@ -14,7 +14,7 @@ import {
   Plus, Trash2, ExternalLink, RefreshCw, Eye, HelpCircle, Check, Play, Maximize2, Minimize2,
   Monitor, Smartphone, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Undo, Redo,
   Upload, Image as ImageIcon, Loader2, MapPin, ArrowUp, ArrowDown, GripVertical,
-  PanelLeft, PanelLeftClose
+  PanelLeft, PanelLeftClose, Sun, Moon
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -508,13 +508,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   return (
     <div 
       id={id} 
-      className={`space-y-2 border border-white/5 bg-zinc-950/20 p-3 rounded-xl transition-all duration-300 ${
-        isFocused ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''
+      className={`space-y-2 border border-[var(--surface-border)] glass-sm p-3 rounded-xl transition-all duration-300 ${
+        isFocused ? 'ring-2 ring-blue-500 border-transparent' : ''
       }`}
       onClick={() => onFocus?.()}
     >
       <div className="flex justify-between items-center">
-        <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{label}</label>
+        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">{label}</label>
         {(value || (isLogo && logoConfig?.mode === 'html')) && (
           <button
             type="button"
@@ -523,7 +523,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               onChange('');
               if (onClearLogoConfig) onClearLogoConfig();
             }}
-            className="text-[9px] text-red-400 hover:text-red-300 font-semibold transition-colors cursor-pointer"
+            className="text-[9px] text-red-500 dark:text-red-400 hover:underline font-semibold transition-colors cursor-pointer"
           >
             Remover
           </button>
@@ -532,7 +532,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       <div className="flex gap-3 items-center">
         {isLogo && logoConfig?.mode === 'html' ? (
-          <div className="h-16 px-3 bg-zinc-900 border border-white/10 rounded-lg shrink-0 flex items-center justify-center gap-2 select-none">
+          <div className="h-16 px-3 glass-sm border border-[var(--surface-border)] rounded-lg shrink-0 flex items-center justify-center gap-2 select-none">
             <div 
               className="h-7 w-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden shadow-sm"
               style={{
@@ -547,7 +547,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               )}
             </div>
             <span 
-              className="text-[10px] font-bold text-white truncate max-w-[100px]"
+              className="text-[10px] font-bold text-slate-900 dark:text-white truncate max-w-[100px]"
               style={{ fontFamily: headingFont ? `'${headingFont}', serif` : 'serif' }}
             >
               {logoConfig.text || 'Psicologia'}
@@ -555,15 +555,15 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
         ) : (
           <div 
-            className="relative bg-zinc-900 border border-white/10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-cover bg-center"
+            className="relative glass-sm border border-[var(--surface-border)] rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-cover bg-center"
             style={{ 
               width: '64px', 
               height: '64px',
               ...(allowTransparency
                 ? {
                     backgroundImage: value
-                      ? `url(${value}), repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)`
-                      : 'repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)',
+                      ? `url(${value}), repeating-conic-gradient(#a1a1aa 0% 25%, #e4e4e7 0% 50%)`
+                      : 'repeating-conic-gradient(#a1a1aa 0% 25%, #e4e4e7 0% 50%)',
                     backgroundSize: value ? `cover, 12px 12px` : '12px 12px',
                     backgroundPosition: 'center, 0 0',
                   }
@@ -572,7 +572,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                   })
             }}
           >
-            {!value && <ImageIcon className="h-5 w-5 text-slate-600" />}
+            {!value && <ImageIcon className="h-5 w-5 text-slate-400 dark:text-slate-600" />}
           </div>
         )}
 
@@ -598,7 +598,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                       e.stopPropagation();
                       setOptionModalOpen(true);
                     }}
-                    className="px-2 py-1 rounded bg-zinc-800 border border-white/10 text-slate-400 hover:text-white text-[9px] transition-all cursor-pointer"
+                    className="px-2 py-1 rounded glass-sm border border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-[9px] transition-all cursor-pointer"
                   >
                     Alternar Modo
                   </button>
@@ -611,7 +611,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                     e.stopPropagation();
                     setOptionModalOpen(true);
                   }}
-                  className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:bg-zinc-800 disabled:border-transparent disabled:text-zinc-500 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                  className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:opacity-50 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {uploading ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -629,7 +629,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                   e.stopPropagation();
                   setLibraryOpen(true);
                 }}
-                className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:bg-zinc-800 disabled:border-transparent disabled:text-zinc-500 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:opacity-50 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
               >
                 {uploading ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -651,15 +651,15 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       )}
 
       {onToggleHideOnMobile && (
-        <div className="flex items-center gap-2 pt-2 border-t border-white/5 mt-1">
+        <div className="flex items-center gap-2 pt-2 border-t border-[var(--surface-border)] mt-1">
           <input
             type="checkbox"
             id={`hideMobile-${id || label}`}
             checked={hideOnMobile ?? false}
             onChange={(e) => onToggleHideOnMobile(e.target.checked)}
-            className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+            className="rounded border-[var(--surface-border)] text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
           />
-          <label htmlFor={`hideMobile-${id || label}`} className="text-[10px] text-slate-300 font-semibold cursor-pointer select-none">
+          <label htmlFor={`hideMobile-${id || label}`} className="text-[10px] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer select-none">
             📱 Ocultar imagem no mobile
           </label>
         </div>
@@ -727,7 +727,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           {/* Workspace */}
           <div 
-            className="relative border border-white/5 rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
+            className="relative border border-[var(--surface-border)] rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
             style={{
               width: '100%',
               height: '360px',
@@ -772,7 +772,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           {/* Zoom Slider Control */}
           <div className="space-y-1">
-            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+            <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 font-medium">
               <span>Zoom</span>
               <span>{Math.round(zoom * 100)}%</span>
             </div>
@@ -783,7 +783,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               step="0.05"
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[var(--brand-gradient-start)]"
+              className="w-full h-1 bg-slate-300 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[var(--brand-gradient-start)]"
             />
           </div>
 
@@ -796,7 +796,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 setImageSrc(null);
                 setSelectedAsset(null);
               }}
-              className="text-[10px] uppercase font-bold bg-zinc-900 border border-white/5 text-slate-400 hover:text-white cursor-pointer px-4 h-8"
+              className="text-[10px] uppercase font-bold glass-sm border border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer px-4 h-8"
             >
               Cancelar
             </Button>
@@ -816,19 +816,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
 // React Flow Custom Node Components
 const CustomStartNode = ({ data }: any) => (
-  <div className="w-56 bg-[#121215] border border-emerald-500/30 rounded-xl p-3 shadow-lg relative">
-    <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
-      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+  <div className="w-56 glass-md border border-emerald-500/30 rounded-xl p-3 shadow-lg relative">
+    <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
+      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
         Início
       </span>
       <Play className="h-3.5 w-3.5 text-emerald-500" />
     </div>
-    <div className="text-xs font-semibold text-white truncate">{data.title}</div>
+    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{data.title}</div>
     <Handle
       type="source"
       position={Position.Right}
       id="source"
-      className="!bg-emerald-500 !w-3 !h-3 !border-2 !border-[#09090B]"
+      className="!bg-emerald-500 !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
     />
   </div>
 );
@@ -842,38 +842,38 @@ const CustomInputNode = ({ data }: any) => {
   
   return (
     <div 
-      className={`w-64 bg-[#121215] border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-white/10'
+      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
+        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
       />
-      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
+      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
           Etapa: {data.node.type}
         </span>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-500 hover:text-red-400 p-0.5 rounded cursor-pointer"
+          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
           title="Excluir Etapa"
         >
           <Trash2 className="h-3 w-3" />
         </button>
       </div>
-      <div className="text-xs font-semibold text-white truncate mb-1">{data.node.data.title}</div>
-      <div className="text-[10px] text-slate-400 truncate">
+      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-1">{data.node.data.title}</div>
+      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
         {isEmergency ? 'Contato emergencial' : isCpf ? 'Cadastro CPF' : isNome ? 'Nome Completo' : isCelular ? 'WhatsApp com país' : 'Campo de texto'}
       </div>
       <Handle
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
       />
     </div>
   );
@@ -883,37 +883,37 @@ const CustomContractNode = ({ data }: any) => {
   const isSelected = data.isSelected;
   return (
     <div 
-      className={`w-64 bg-[#121215] border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-white/10'
+      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
+        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
       />
-      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">
+      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400">
           Contrato Aceite
         </span>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-500 hover:text-red-400 p-0.5 rounded cursor-pointer"
+          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
         >
           <Trash2 className="h-3 w-3" />
         </button>
       </div>
-      <div className="text-xs font-semibold text-white truncate mb-1">{data.node.data.title}</div>
-      <div className="text-[9px] text-violet-400 font-medium truncate">
+      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-1">{data.node.data.title}</div>
+      <div className="text-[9px] text-violet-600 dark:text-violet-400 font-medium truncate">
         Modelo: {data.contractTitle || <span className="italic">Nenhum associado</span>}
       </div>
       <Handle
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
       />
     </div>
   );
@@ -925,39 +925,39 @@ const CustomSelectorNode = ({ data }: any) => {
 
   return (
     <div 
-      className={`w-64 bg-[#121215] border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-white/10'
+      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
+        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
       />
-      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
+      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
           Seletor Condicional
         </span>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-500 hover:text-red-400 p-0.5 rounded cursor-pointer"
+          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
         >
           <Trash2 className="h-3 w-3" />
         </button>
       </div>
-      <div className="text-xs font-semibold text-white truncate mb-2">{data.node.data.title}</div>
+      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-2">{data.node.data.title}</div>
       
       <div className="space-y-1.5">
         {options.map((opt: any, idx: number) => (
-          <div key={idx} className="relative flex items-center justify-between text-[10px] bg-zinc-900 border border-zinc-800 p-1.5 rounded text-slate-350">
+          <div key={idx} className="relative flex items-center justify-between text-[10px] glass-sm border border-[var(--surface-border)] p-1.5 rounded text-slate-700 dark:text-slate-300">
             <span className="truncate pr-4">{opt.label}</span>
             <Handle
               type="source"
               position={Position.Right}
               id={`option-${idx}`}
-              className="!bg-[var(--brand-gradient-start)] !w-2.5 !h-2.5 !border-2 !border-[#09090B]"
+              className="!bg-[var(--brand-gradient-start)] !w-2.5 !h-2.5 !border-2 !border-[var(--brand-bg-color)]"
               style={{ top: '50%', transform: 'translateY(-50%)', right: '-6px' }}
             />
           </div>
@@ -1031,17 +1031,17 @@ const SortableSectionItem = ({
     <div 
       ref={setNodeRef} 
       style={style} 
-      className={`border rounded-xl bg-zinc-900/30 overflow-hidden relative transition-all duration-200 ${
-        isDragging ? 'shadow-2xl border-[var(--brand-gradient-start)] bg-zinc-900/85 z-50' :
-        isOpen ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
+      className={`border rounded-xl glass-sm overflow-hidden relative transition-all duration-200 ${
+        isDragging ? 'shadow-2xl border-[var(--brand-gradient-start)] glass-md z-50' :
+        isOpen ? 'border-[var(--brand-gradient-start)]/20 glass-sm' : 'border-[var(--surface-border)]'
       }`}
     >
-      <div className="w-full bg-[#121215] flex items-center justify-between hover:bg-zinc-800/50 transition-colors">
+      <div className="w-full glass-sm flex items-center justify-between hover:bg-[var(--surface-hover)] transition-colors">
         <div className="flex items-center flex-1 min-w-0">
           {/* Drag Handle button */}
           <button
             type="button"
-            className="p-3 hover:text-white text-slate-400 cursor-grab active:cursor-grabbing bg-transparent border-none transition-colors shrink-0"
+            className="p-3 text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-grab active:cursor-grabbing bg-transparent border-none transition-colors shrink-0"
             title="Arrastar para Reordenar"
             {...attributes}
             {...listeners}
@@ -1054,7 +1054,7 @@ const SortableSectionItem = ({
             onClick={() => setOpenSection(isOpen ? null : section.id)}
             className="flex-1 py-3 text-left text-xs font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer truncate"
           >
-            <span className={`transition-colors ${isOpen ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
+            <span className={`transition-colors ${isOpen ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-slate-900 dark:text-white'}`}>
               {index + 2}. {name}
             </span>
           </button>
@@ -1065,7 +1065,7 @@ const SortableSectionItem = ({
           <button
             type="button"
             onClick={() => toggleSectionActive(section.id)}
-            className="p-1 hover:text-red-400 text-slate-400 cursor-pointer bg-transparent border-none transition-colors pl-2"
+            className="p-1 text-slate-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer bg-transparent border-none transition-colors pl-2"
             title="Remover Seção"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -1075,18 +1075,18 @@ const SortableSectionItem = ({
       </div>
 
       {openSection === section.id && (
-        <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
+        <div className="p-4 space-y-4 border-t border-[var(--surface-border)] animate-in fade-in duration-200">
           {/* Identificação e Navegação da Seção */}
-          <div className="bg-zinc-950/40 p-3 rounded-xl border border-white/5 space-y-3 mb-2 text-left">
+          <div className="glass-sm p-3 rounded-xl border border-[var(--surface-border)] space-y-3 mb-2 text-left">
             <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Identificação & Navegação</span>
             
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <label className="text-[9px] text-slate-400 font-semibold uppercase">Nome no Menu</label>
+                <label className="text-[9px] text-slate-600 dark:text-slate-400 font-semibold uppercase">Nome no Menu</label>
                 <Input
                   type="text"
                   id={`${section.id}.name`}
-                  className={`brand-input text-xs ${focusedField === `${section.id}.name` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === `${section.id}.name` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={section.name || ''}
                   placeholder={getSectionNameByType(section.type)}
                   onChange={(e) => updateLayoutSectionField(section.id, 'name', e.target.value)}
@@ -1094,11 +1094,11 @@ const SortableSectionItem = ({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] text-slate-400 font-semibold uppercase">Link Anchor (Slug)</label>
+                <label className="text-[9px] text-slate-600 dark:text-slate-400 font-semibold uppercase">Link Anchor (Slug)</label>
                 <Input
                   type="text"
                   id={`${section.id}.slug`}
-                  className={`brand-input text-xs ${focusedField === `${section.id}.slug` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === `${section.id}.slug` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={section.slug || ''}
                   placeholder={section.id}
                   onChange={(e) => {
@@ -1117,9 +1117,9 @@ const SortableSectionItem = ({
                   id={`showInNavbar-${section.id}`}
                   checked={section.showInNavbar ?? true}
                   onChange={(e) => updateLayoutSectionField(section.id, 'showInNavbar', e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+                  className="rounded border-[var(--surface-border)] text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
                 />
-                <label htmlFor={`showInNavbar-${section.id}`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer select-none">
+                <label htmlFor={`showInNavbar-${section.id}`} className="text-[10px] text-slate-700 dark:text-slate-300 font-semibold uppercase cursor-pointer select-none">
                   Exibir no menu
                 </label>
               </div>
@@ -1130,9 +1130,9 @@ const SortableSectionItem = ({
                   id={`hideOnMobile-${section.id}`}
                   checked={section.hideOnMobile ?? false}
                   onChange={(e) => updateLayoutSectionField(section.id, 'hideOnMobile', e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+                  className="rounded border-[var(--surface-border)] text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
                 />
-                <label htmlFor={`hideOnMobile-${section.id}`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer select-none">
+                <label htmlFor={`hideOnMobile-${section.id}`} className="text-[10px] text-slate-700 dark:text-slate-300 font-semibold uppercase cursor-pointer select-none">
                   📱 Ocultar seção no mobile
                 </label>
               </div>
@@ -1148,7 +1148,7 @@ const SortableSectionItem = ({
 
 export default function PageEditor({ params }: PageProps) {
   const { pageId } = use(params);
-  const { tenant } = useBrand();
+  const { tenant, theme, toggleTheme } = useBrand();
   const router = useRouter();
 
   const [page, setPage] = useState<CapturePage | null>(null);
@@ -1429,7 +1429,7 @@ export default function PageEditor({ params }: PageProps) {
               <Input
                 type="text"
                 id="diagnostic.badge"
-                className={`brand-input text-xs ${focusedField === 'diagnostic.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'diagnostic.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.diagnostic?.badge || ''}
                 onChange={(e) => updateDictField('diagnostic', 'badge', e.target.value)}
                 onFocus={() => setFocusedField('diagnostic.badge')}
@@ -1440,21 +1440,21 @@ export default function PageEditor({ params }: PageProps) {
               <Input
                 type="text"
                 id="diagnostic.title"
-                className={`brand-input text-xs ${focusedField === 'diagnostic.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'diagnostic.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.diagnostic?.title || ''}
                 onChange={(e) => updateDictField('diagnostic', 'title', e.target.value)}
                 onFocus={() => setFocusedField('diagnostic.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapia*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapia*</code>
               </p>
             </div>
-            <div className="space-y-1 pb-3 border-b border-white/5">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição / Subtítulo</label>
+            <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição / Subtítulo</label>
               <textarea
                 rows={2}
                 id="diagnostic.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'diagnostic.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.diagnostic?.description || ''}
                 onChange={(e) => updateDictField('diagnostic', 'description', e.target.value)}
                 onFocus={() => setFocusedField('diagnostic.description')}
@@ -1464,31 +1464,31 @@ export default function PageEditor({ params }: PageProps) {
             {/* Card 1 */}
             <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 1: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 1: Título</label>
                 <Input
                   type="text"
                   id="diagnostic.card1Title"
-                  className={`brand-input text-xs ${focusedField === 'diagnostic.card1Title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'diagnostic.card1Title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.diagnostic?.card1Title || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card1Title', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card1Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*ansiedade*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*ansiedade*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 1: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 1: Descrição</label>
                 <textarea
                   rows={2}
                   id="diagnostic.card1Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card1Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'diagnostic.card1Desc' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card1Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card1Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card1Desc')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
             </div>
@@ -1496,31 +1496,31 @@ export default function PageEditor({ params }: PageProps) {
             {/* Card 2 */}
             <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 2: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 2: Título</label>
                 <Input
                   type="text"
                   id="diagnostic.card2Title"
-                  className={`brand-input text-xs ${focusedField === 'diagnostic.card2Title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'diagnostic.card2Title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.diagnostic?.card2Title || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card2Title', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card2Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*relações*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*relações*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 2: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 2: Descrição</label>
                 <textarea
                   rows={2}
                   id="diagnostic.card2Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card2Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'diagnostic.card2Desc' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card2Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card2Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card2Desc')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
             </div>
@@ -1528,31 +1528,31 @@ export default function PageEditor({ params }: PageProps) {
             {/* Card 3 */}
             <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 3: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 3: Título</label>
                 <Input
                   type="text"
                   id="diagnostic.card3Title"
-                  className={`brand-input text-xs ${focusedField === 'diagnostic.card3Title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'diagnostic.card3Title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.diagnostic?.card3Title || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card3Title', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card3Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*pessoal*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*pessoal*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 3: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Card 3: Descrição</label>
                 <textarea
                   rows={2}
                   id="diagnostic.card3Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card3Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'diagnostic.card3Desc' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card3Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card3Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card3Desc')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
             </div>
@@ -1584,47 +1584,47 @@ export default function PageEditor({ params }: PageProps) {
               }}
             />
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
               <Input
                 type="text"
                 id="about.badge"
-                className={`brand-input text-xs ${focusedField === 'about.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'about.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.about?.badge || ''}
                 onChange={(e) => updateDictField('about', 'badge', e.target.value)}
                 onFocus={() => setFocusedField('about.badge')}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título de Apresentação</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título de Apresentação</label>
               <Input
                 type="text"
                 id="about.title"
-                className={`brand-input text-xs ${focusedField === 'about.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'about.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.about?.title || ''}
                 onChange={(e) => updateDictField('about', 'title', e.target.value)}
                 onFocus={() => setFocusedField('about.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapeuta*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapeuta*</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Parágrafo 1</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Parágrafo 1</label>
               <textarea
                 rows={3}
                 id="about.description1"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description1' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'about.description1' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.about?.description1 || ''}
                 onChange={(e) => updateDictField('about', 'description1', e.target.value)}
                 onFocus={() => setFocusedField('about.description1')}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Parágrafo 2</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Parágrafo 2</label>
               <textarea
                 rows={3}
                 id="about.description2"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description2' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'about.description2' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.about?.description2 || ''}
                 onChange={(e) => updateDictField('about', 'description2', e.target.value)}
                 onFocus={() => setFocusedField('about.description2')}
@@ -1632,14 +1632,14 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Highlights List */}
-            <div className="space-y-2.5 border-t border-white/5 pt-3">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Pontos de Destaque</label>
+            <div className="space-y-2.5 border-t border-[var(--surface-border)] pt-3">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider block">Pontos de Destaque</label>
               {(page.dictionary.about?.points || []).map((pt: string, ptIdx: number) => (
                 <div key={ptIdx} className="flex gap-2 items-center">
                   <Input
                     type="text"
                     id={`about.points.${ptIdx}`}
-                    className={`brand-input text-xs ${focusedField === `about.points.${ptIdx}` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                    className={`brand-input text-xs ${focusedField === `about.points.${ptIdx}` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                     value={pt}
                     onChange={(e) => {
                       const newPts = [...(page.dictionary.about?.points || [])];
@@ -1684,18 +1684,18 @@ export default function PageEditor({ params }: PageProps) {
                     }
                   });
                 }}
-                className="w-full text-[10px] bg-slate-900 border border-white/5 cursor-pointer text-white"
+                className="w-full text-[10px] glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] cursor-pointer text-slate-800 dark:text-white font-semibold"
               >
                 + Adicionar Destaque
               </Button>
             </div>
 
-            <div className="space-y-1 border-t border-white/5 pt-3">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto Botão (CTA)</label>
+            <div className="space-y-1 border-t border-[var(--surface-border)] pt-3">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto Botão (CTA)</label>
               <Input
                 type="text"
                 id="about.cta"
-                className={`brand-input text-xs ${focusedField === 'about.cta' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'about.cta' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.about?.cta || ''}
                 onChange={(e) => updateDictField('about', 'cta', e.target.value)}
                 onFocus={() => setFocusedField('about.cta')}
@@ -1707,81 +1707,81 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
               <Input
                 type="text"
                 id="process.badge"
-                className={`brand-input text-xs ${focusedField === 'process.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'process.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.process?.badge || ''}
                 onChange={(e) => updateDictField('process', 'badge', e.target.value)}
                 onFocus={() => setFocusedField('process.badge')}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id="process.title"
-                className={`brand-input text-xs ${focusedField === 'process.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'process.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.process?.title || ''}
                 onChange={(e) => updateDictField('process', 'title', e.target.value)}
                 onFocus={() => setFocusedField('process.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*jornada*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*jornada*</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição de Introdução</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição de Introdução</label>
               <textarea
                 rows={2}
                 id="process.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'process.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.process?.description || ''}
                 onChange={(e) => updateDictField('process', 'description', e.target.value)}
                 onFocus={() => setFocusedField('process.description')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
               </p>
             </div>
 
             {/* Step 1 */}
             <div className="border-l-2 border-emerald-500 pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Título</label>
                 <Input
                   type="text"
                   id="process.step1.title"
-                  className={`brand-input text-xs ${focusedField === 'process.step1.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'process.step1.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.process?.step1?.title || ''}
                   onChange={(e) => updateProcessStepField('step1', 'title', e.target.value)}
                   onFocus={() => setFocusedField('process.step1.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Triagem*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Triagem*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Descrição</label>
                 <textarea
                   rows={2}
                   id="process.step1.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step1.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'process.step1.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step1?.description || ''}
                   onChange={(e) => updateProcessStepField('step1', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step1.description')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Link/Texto CTA</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 1: Link/Texto CTA</label>
                 <Input
                   type="text"
                   id="process.step1.cta"
-                  className={`brand-input text-xs ${focusedField === 'process.step1.cta' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'process.step1.cta' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.process?.step1?.cta || ''}
                   onChange={(e) => updateProcessStepField('step1', 'cta', e.target.value)}
                   onFocus={() => setFocusedField('process.step1.cta')}
@@ -1792,31 +1792,31 @@ export default function PageEditor({ params }: PageProps) {
             {/* Step 2 */}
             <div className="border-l-2 border-emerald-500 pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 2: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 2: Título</label>
                 <Input
                   type="text"
                   id="process.step2.title"
-                  className={`brand-input text-xs ${focusedField === 'process.step2.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'process.step2.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.process?.step2?.title || ''}
                   onChange={(e) => updateProcessStepField('step2', 'title', e.target.value)}
                   onFocus={() => setFocusedField('process.step2.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Agendamento*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Agendamento*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 2: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 2: Descrição</label>
                 <textarea
                   rows={2}
                   id="process.step2.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step2.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'process.step2.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step2?.description || ''}
                   onChange={(e) => updateProcessStepField('step2', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step2.description')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
             </div>
@@ -1824,31 +1824,31 @@ export default function PageEditor({ params }: PageProps) {
             {/* Step 3 */}
             <div className="border-l-2 border-emerald-500 pl-3 py-1 space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 3: Título</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 3: Título</label>
                 <Input
                   type="text"
                   id="process.step3.title"
-                  className={`brand-input text-xs ${focusedField === 'process.step3.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                  className={`brand-input text-xs ${focusedField === 'process.step3.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                   value={page.dictionary.process?.step3?.title || ''}
                   onChange={(e) => updateProcessStepField('step3', 'title', e.target.value)}
                   onFocus={() => setFocusedField('process.step3.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Sessão*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Sessão*</code>
                 </p>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etapa 3: Descrição</label>
+                <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etapa 3: Descrição</label>
                 <textarea
                   rows={2}
                   id="process.step3.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step3.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                  className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'process.step3.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step3?.description || ''}
                   onChange={(e) => updateProcessStepField('step3', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step3.description')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                  💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                 </p>
               </div>
             </div>
@@ -1880,11 +1880,11 @@ export default function PageEditor({ params }: PageProps) {
               }}
             />
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">CRP da Psicóloga</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">CRP da Psicóloga</label>
               <Input
                 type="text"
                 id="professional.crp"
-                className={`brand-input text-xs ${focusedField === 'professional.crp' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'professional.crp' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.siteConfig.professional?.crp || ''}
                 onChange={(e) => {
                   const updated = { ...page.siteConfig, professional: { ...page.siteConfig.professional, crp: e.target.value } };
@@ -1894,11 +1894,11 @@ export default function PageEditor({ params }: PageProps) {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Abordagem Clínica / Especialidade</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Abordagem Clínica / Especialidade</label>
               <Input
                 type="text"
                 id="professional.approach"
-                className={`brand-input text-xs ${focusedField === 'professional.approach' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'professional.approach' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.siteConfig.professional?.approach || ''}
                 onChange={(e) => {
                   const updated = { ...page.siteConfig, professional: { ...page.siteConfig.professional, approach: e.target.value } };
@@ -1908,11 +1908,11 @@ export default function PageEditor({ params }: PageProps) {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Endereço Físico Completo</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Endereço Físico Completo</label>
               <Input
                 type="text"
                 id="professional.address"
-                className={`brand-input text-xs ${focusedField === 'professional.address' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'professional.address' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.siteConfig.professional?.address || ''}
                 onChange={(e) => {
                   const updated = { ...page.siteConfig, professional: { ...page.siteConfig.professional, address: e.target.value } };
@@ -1922,11 +1922,11 @@ export default function PageEditor({ params }: PageProps) {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Google Maps Embed URL</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Google Maps Embed URL</label>
               <Input
                 type="text"
                 id="siteConfig.professional.mapsIframeUrl"
-                className={`brand-input text-xs ${focusedField === 'siteConfig.professional.mapsIframeUrl' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'siteConfig.professional.mapsIframeUrl' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.siteConfig.professional?.mapsIframeUrl || ''}
                 onChange={(e) => {
                   const updated = { ...page.siteConfig, professional: { ...page.siteConfig.professional, mapsIframeUrl: e.target.value } };
@@ -1936,51 +1936,51 @@ export default function PageEditor({ params }: PageProps) {
               />
             </div>
 
-            <div className="space-y-1 border-t border-white/5 pt-3">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+            <div className="space-y-1 border-t border-[var(--surface-border)] pt-3">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id="space.badge"
-                className={`brand-input text-xs ${focusedField === 'space.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'space.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.space?.badge || ''}
                 onChange={(e) => updateDictField('space', 'badge', e.target.value)}
                 onFocus={() => setFocusedField('space.badge')}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id="space.title"
-                className={`brand-input text-xs ${focusedField === 'space.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'space.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.space?.title || ''}
                 onChange={(e) => updateDictField('space', 'title', e.target.value)}
                 onFocus={() => setFocusedField('space.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Acolhedor*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Acolhedor*</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição</label>
               <textarea
                 rows={2}
                 id="space.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'space.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'space.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.space?.description || ''}
                 onChange={(e) => updateDictField('space', 'description', e.target.value)}
                 onFocus={() => setFocusedField('space.description')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Negrito:</strong> Envolva o text com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta de Endereço</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta de Endereço</label>
               <Input
                 type="text"
                 id="space.addressLabel"
-                className={`brand-input text-xs ${focusedField === 'space.addressLabel' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'space.addressLabel' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.space?.addressLabel || ''}
                 onChange={(e) => updateDictField('space', 'addressLabel', e.target.value)}
                 onFocus={() => setFocusedField('space.addressLabel')}
@@ -1992,36 +1992,36 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
               <Input
                 type="text"
                 id="faq.badge"
-                className={`brand-input text-xs ${focusedField === 'faq.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'faq.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.faq?.badge || ''}
                 onChange={(e) => updateDictField('faq', 'badge', e.target.value)}
                 onFocus={() => setFocusedField('faq.badge')}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id="faq.title"
-                className={`brand-input text-xs ${focusedField === 'faq.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === 'faq.title' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={page.dictionary.faq?.title || ''}
                 onChange={(e) => updateDictField('faq', 'title', e.target.value)}
                 onFocus={() => setFocusedField('faq.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Perguntas*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Perguntas*</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição / Subtítulo</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição / Subtítulo</label>
               <textarea
                 rows={2}
                 id="faq.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'faq.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'faq.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.faq?.description || ''}
                 onChange={(e) => updateDictField('faq', 'description', e.target.value)}
                 onFocus={() => setFocusedField('faq.description')}
@@ -2029,17 +2029,17 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* FAQ Items */}
-            <div className="space-y-3 border-t border-white/5 pt-3">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Itens do FAQ</label>
+            <div className="space-y-3 border-t border-[var(--surface-border)] pt-3">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider block">Itens do FAQ</label>
               <div className="space-y-4">
                 {(page.dictionary.faq?.items || page.dictionary.faq?.faq || []).map((faqItem: { question: string; answer: string }, faqIdx: number) => (
-                  <div key={faqIdx} className="border border-white/5 p-3 rounded-lg bg-zinc-950/40 space-y-2 relative">
+                  <div key={faqIdx} className="border border-[var(--surface-border)] p-3 rounded-lg glass-sm space-y-2 relative">
                     <div className="space-y-1">
                       <label className="text-[9px] text-slate-500 font-semibold uppercase">Pergunta {faqIdx + 1}</label>
                       <Input
                         type="text"
                         id={`faq.items.${faqIdx}.question`}
-                        className={`brand-input text-xs ${focusedField === `faq.items.${faqIdx}.question` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === `faq.items.${faqIdx}.question` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={faqItem.question}
                         onChange={(e) => {
                           const listKey = page.dictionary.faq?.items ? 'items' : 'faq';
@@ -2056,7 +2056,7 @@ export default function PageEditor({ params }: PageProps) {
                         onFocus={() => setFocusedField(`faq.items.${faqIdx}.question`)}
                       />
                       <p className="text-[8px] text-slate-500 leading-relaxed font-sans mt-0.5">
-                        💡 <strong>Palavras coloridas:</strong> Envolva com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Dúvida*</code>
+                        💡 <strong>Palavras coloridas:</strong> Envolva com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Dúvida*</code>
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -2064,7 +2064,7 @@ export default function PageEditor({ params }: PageProps) {
                       <textarea
                         rows={2}
                         id={`faq.items.${faqIdx}.answer`}
-                        className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `faq.items.${faqIdx}.answer` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                        className={`w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `faq.items.${faqIdx}.answer` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={faqItem.answer}
                         onChange={(e) => {
                           const listKey = page.dictionary.faq?.items ? 'items' : 'faq';
@@ -2080,8 +2080,8 @@ export default function PageEditor({ params }: PageProps) {
                         }}
                         onFocus={() => setFocusedField(`faq.items.${faqIdx}.answer`)}
                       />
-                      <p className="text-[8px] text-slate-505 text-slate-400 leading-relaxed font-sans mt-0.5">
-                        💡 <strong>Negrito:</strong> Envolva com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                      <p className="text-[8px] text-slate-500 leading-relaxed font-sans mt-0.5">
+                        💡 <strong>Negrito:</strong> Envolva com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                       </p>
                     </div>
                     <button
@@ -2116,7 +2116,7 @@ export default function PageEditor({ params }: PageProps) {
                       }
                     });
                   }}
-                  className="w-full text-[10px] bg-slate-900 border border-white/5 cursor-pointer text-white"
+                  className="w-full text-[10px] glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] cursor-pointer text-slate-800 dark:text-white font-semibold"
                 >
                   + Adicionar FAQ Item
                 </Button>
@@ -2126,16 +2126,16 @@ export default function PageEditor({ params }: PageProps) {
               {(() => {
                 const faqSection = (page.siteConfig.sections || []).find((s: any) => s.type === 'faq') || { id: 'faq', type: 'faq', settings: {} };
                 return (
-                  <div className="border-t border-white/5 pt-3 mt-4 space-y-3">
+                  <div className="border-t border-[var(--surface-border)] pt-3 mt-4 space-y-3">
                     <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
                     
                     <div className="grid grid-cols-2 gap-2 text-left">
                       <div className="space-y-1">
-                        <label className="text-[9px] text-slate-400 uppercase font-semibold">Modo de Exibição</label>
+                        <label className="text-[9px] text-slate-500 font-semibold uppercase">Modo de Exibição</label>
                         <select
                           value={faqSection.settings?.displayMode || 'accordion'}
                           onChange={(e) => updateLayoutSectionField(faqSection.id, 'settings.displayMode', e.target.value)}
-                          className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                          className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                         >
                           <option value="accordion">Acordeão Expansível</option>
                           <option value="grid">Grid de 2 Colunas</option>
@@ -2143,12 +2143,12 @@ export default function PageEditor({ params }: PageProps) {
                       </div>
 
                       <div className="space-y-1 flex flex-col justify-end pb-2">
-                        <label className="flex items-center gap-2 cursor-pointer text-[10px] text-slate-400 font-semibold uppercase">
+                        <label className="flex items-center gap-2 cursor-pointer text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase">
                           <input
                             type="checkbox"
                             checked={faqSection.settings?.defaultOpenFirst ?? true}
                             onChange={(e) => updateLayoutSectionField(faqSection.id, 'settings.defaultOpenFirst', e.target.checked)}
-                            className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] cursor-pointer"
+                            className="rounded border-[var(--surface-border)] brand-input text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] cursor-pointer"
                           />
                           Abrir 1º Item
                         </label>
@@ -2164,36 +2164,36 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id={`${section.id}.badge`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.badge || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'badge', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.badge`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id={`${section.id}.title`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*palavra*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*palavra*</code>
               </p>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Geral</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Geral</label>
               <textarea
                 rows={2}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
@@ -2201,16 +2201,16 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Structural Layout Settings */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Colunas Desktop</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Colunas Desktop</label>
                   <select
                     value={section.settings?.columns || 3}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.columns', parseInt(e.target.value))}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value={2}>2 Colunas</option>
                     <option value={3}>3 Colunas</option>
@@ -2219,11 +2219,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Marcador do Card</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Marcador do Card</label>
                   <select
                     value={section.settings?.markerType || 'number'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.markerType', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="number">Números (01, 02)</option>
                     <option value="icon">Ícones</option>
@@ -2232,11 +2232,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Estilo do Card</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Estilo do Card</label>
                   <select
                     value={section.settings?.cardStyle || 'glass'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.cardStyle', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="glass">Cartão Elevado</option>
                     <option value="bordered">Contorno Fino</option>
@@ -2245,11 +2245,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Alinhamento Texto</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Alinhamento Texto</label>
                   <select
                     value={section.settings?.itemAlignment || 'left'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.itemAlignment', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="left">Esquerda</option>
                     <option value="center">Centralizado</option>
@@ -2259,17 +2259,17 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Loop over 3 grid items */}
-            <div className="space-y-3 border-t border-white/5 pt-3">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Itens da Grade (Cards)</label>
+            <div className="space-y-3 border-t border-[var(--surface-border)] pt-3">
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider block">Itens da Grade (Cards)</label>
               {(section.items || []).map((item: any, cardIdx: number) => (
-                <div key={cardIdx} className="border border-white/5 p-3 rounded-lg bg-zinc-950/40 space-y-2">
+                <div key={cardIdx} className="border border-[var(--surface-border)] p-3 rounded-lg glass-sm space-y-2">
                   <div className="flex gap-2">
                     <div className="w-16 space-y-1">
                       <label className="text-[8px] text-slate-500 font-semibold uppercase">Ordem</label>
                       <Input
                         type="text"
                         id={`${section.id}.items.${cardIdx}.number`}
-                        className={`brand-input text-xs ${focusedField === `${section.id}.items.${cardIdx}.number` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === `${section.id}.items.${cardIdx}.number` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={item.number || ''}
                         onChange={(e) => updateLayoutSectionField(section.id, `items.${cardIdx}.number`, e.target.value)}
                         onFocus={() => setFocusedField(`${section.id}.items.${cardIdx}.number`)}
@@ -2280,7 +2280,7 @@ export default function PageEditor({ params }: PageProps) {
                       <Input
                         type="text"
                         id={`${section.id}.items.${cardIdx}.title`}
-                        className={`brand-input text-xs ${focusedField === `${section.id}.items.${cardIdx}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === `${section.id}.items.${cardIdx}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={item.title || ''}
                         onChange={(e) => updateLayoutSectionField(section.id, `items.${cardIdx}.title`, e.target.value)}
                         onFocus={() => setFocusedField(`${section.id}.items.${cardIdx}.title`)}
@@ -2292,7 +2292,7 @@ export default function PageEditor({ params }: PageProps) {
                     <textarea
                       rows={2}
                       id={`${section.id}.items.${cardIdx}.description`}
-                      className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.items.${cardIdx}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                      className={`w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.items.${cardIdx}.description` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                       value={item.description || ''}
                       onChange={(e) => updateLayoutSectionField(section.id, `items.${cardIdx}.description`, e.target.value)}
                       onFocus={() => setFocusedField(`${section.id}.items.${cardIdx}.description`)}
@@ -2307,22 +2307,22 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id={`${section.id}.badge`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.badge || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'badge', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.badge`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id={`${section.id}.title`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
@@ -2330,16 +2330,16 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Structural Layout Settings */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Estilo das Colunas</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Estilo das Colunas</label>
                   <select
                     value={section.settings?.cardStyle || 'glass'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.cardStyle', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="glass">Cartão Elevado</option>
                     <option value="bordered">Contorno Fino</option>
@@ -2348,11 +2348,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Alinhamento do Texto</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Alinhamento do Texto</label>
                   <select
                     value={section.settings?.itemAlignment || 'left'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.itemAlignment', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="left">Esquerda</option>
                     <option value="center">Centralizado</option>
@@ -2361,26 +2361,26 @@ export default function PageEditor({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
+            <div className="grid grid-cols-2 gap-3 border-t border-[var(--surface-border)] pt-3">
               <div className="space-y-3">
                 <label className="text-[9px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Coluna Esquerda</label>
                 <div className="space-y-1">
-                  <label className="text-[8px] text-slate-400 uppercase">Título</label>
+                  <label className="text-[8px] text-slate-500 font-semibold uppercase">Título</label>
                   <Input
                     type="text"
                     id={`${section.id}.leftTitle`}
-                    className={`brand-input text-xs ${focusedField === `${section.id}.leftTitle` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                    className={`brand-input text-xs ${focusedField === `${section.id}.leftTitle` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                     value={section.leftTitle || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'leftTitle', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.leftTitle`)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] text-slate-400 uppercase">Conteúdo</label>
+                  <label className="text-[8px] text-slate-500 font-semibold uppercase">Conteúdo</label>
                   <textarea
                     rows={4}
                     id={`${section.id}.leftText`}
-                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.leftText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                    className={`w-full text-xs p-2.5 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.leftText` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                     value={section.leftText || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'leftText', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.leftText`)}
@@ -2391,22 +2391,22 @@ export default function PageEditor({ params }: PageProps) {
               <div className="space-y-3">
                 <label className="text-[9px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Coluna Direita</label>
                 <div className="space-y-1">
-                  <label className="text-[8px] text-slate-400 uppercase">Título</label>
+                  <label className="text-[8px] text-slate-500 font-semibold uppercase">Título</label>
                   <Input
                     type="text"
                     id={`${section.id}.rightTitle`}
-                    className={`brand-input text-xs ${focusedField === `${section.id}.rightTitle` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                    className={`brand-input text-xs ${focusedField === `${section.id}.rightTitle` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                     value={section.rightTitle || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'rightTitle', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.rightTitle`)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[8px] text-slate-400 uppercase">Conteúdo</label>
+                  <label className="text-[8px] text-slate-500 font-semibold uppercase">Conteúdo</label>
                   <textarea
                     rows={4}
                     id={`${section.id}.rightText`}
-                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.rightText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                    className={`w-full text-xs p-2.5 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.rightText` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                     value={section.rightText || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'rightText', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.rightText`)}
@@ -2435,19 +2435,19 @@ export default function PageEditor({ params }: PageProps) {
             />
 
             {/* Structural Layout Settings */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Ordem das Colunas</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Ordem das Colunas</label>
                   <select
                     value={section.settings?.columnOrder || (section.imagePosition === 'left' ? 'media-first' : 'text-first')}
                     onChange={(e) => {
                       updateLayoutSectionField(section.id, 'settings.columnOrder', e.target.value);
                       updateLayoutSectionField(section.id, 'imagePosition', e.target.value === 'media-first' ? 'left' : 'right');
                     }}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="text-first">Texto | Imagem</option>
                     <option value="media-first">Imagem | Texto</option>
@@ -2455,11 +2455,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Proporção da Foto</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Proporção da Foto</label>
                   <select
                     value={section.settings?.imageAspectRatio || 'square'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.imageAspectRatio', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="square">Quadrada (1:1)</option>
                     <option value="portrait">Retrato (3:4)</option>
@@ -2470,44 +2470,44 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id={`${section.id}.badge`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.badge || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'badge', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.badge`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id={`${section.id}.title`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição</label>
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto Botão CTA (Opcional)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto Botão CTA (Opcional)</label>
               <Input
                 type="text"
                 id={`${section.id}.ctaText`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.ctaText || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'ctaText', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.ctaText`)}
@@ -2520,55 +2520,55 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id={`${section.id}.badge`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.badge || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'badge', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.badge`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id={`${section.id}.title`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição / Mensagem</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição / Mensagem</label>
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão CTA (Principal)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão CTA (Principal)</label>
               <Input
                 type="text"
                 id={`${section.id}.ctaText`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.ctaText || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'ctaText', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.ctaText`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Subtexto do Botão (Garantia/Segurança)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Subtexto do Botão (Garantia/Segurança)</label>
               <Input
                 type="text"
                 id={`${section.id}.ctaSubtext`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.ctaSubtext` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.ctaSubtext` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.ctaSubtext || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'ctaSubtext', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.ctaSubtext`)}
@@ -2576,16 +2576,16 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Layout parameters */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações do CTA</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Estilo de Fundo</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Estilo de Fundo</label>
                   <select
                     value={section.settings?.bgStyle || 'gradient'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.bgStyle', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="gradient">Gradiente da Marca</option>
                     <option value="card">Card Destacado</option>
@@ -2594,11 +2594,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Alinhamento</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Alinhamento</label>
                   <select
                     value={section.settings?.alignment || 'center'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.alignment', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="center">Centralizado</option>
                     <option value="left">Esquerda</option>
@@ -2612,9 +2612,9 @@ export default function PageEditor({ params }: PageProps) {
                   id={`${section.id}.showSecondaryCta`}
                   checked={section.settings?.showSecondaryCta || false}
                   onChange={(e) => updateLayoutSectionField(section.id, 'settings.showSecondaryCta', e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+                  className="rounded border-[var(--surface-border)] brand-input text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
                 />
-                <label htmlFor={`${section.id}.showSecondaryCta`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer">
+                <label htmlFor={`${section.id}.showSecondaryCta`} className="text-[10px] text-slate-700 dark:text-slate-300 font-semibold uppercase cursor-pointer">
                   Exibir botão secundário de WhatsApp
                 </label>
               </div>
@@ -2639,55 +2639,55 @@ export default function PageEditor({ params }: PageProps) {
             />
 
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Seção (Badge)</label>
               <Input
                 type="text"
                 id={`${section.id}.badge`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.badge` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.badge || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'badge', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.badge`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
               <Input
                 type="text"
                 id={`${section.id}.title`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Explicativa</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Explicativa</label>
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão Principal (Triagem)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão Principal (Triagem)</label>
               <Input
                 type="text"
                 id={`${section.id}.ctaText`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.ctaText` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.ctaText || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'ctaText', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.ctaText`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão Secundário (WhatsApp)</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto do Botão Secundário (WhatsApp)</label>
               <Input
                 type="text"
                 id={`${section.id}.ctaSecondaryText`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.ctaSecondaryText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.ctaSecondaryText` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.ctaSecondaryText || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'ctaSecondaryText', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.ctaSecondaryText`)}
@@ -2695,16 +2695,16 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Layout parameters */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-3 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Foto Lado</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Foto Lado</label>
                   <select
                     value={section.settings?.imagePosition || 'right'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.imagePosition', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="right">Direita</option>
                     <option value="left">Esquerda</option>
@@ -2712,11 +2712,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Proporção</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Proporção</label>
                   <select
                     value={section.settings?.imageAspectRatio || 'portrait'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.imageAspectRatio', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="portrait">Retrato (3:4)</option>
                     <option value="square">Quadrada (1:1)</option>
@@ -2725,11 +2725,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Estilo Bloco</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Estilo Bloco</label>
                   <select
                     value={section.settings?.cardStyle || 'glass'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.cardStyle', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="glass">Cartão Elevado</option>
                     <option value="bordered">Contorno Fino</option>
@@ -2745,22 +2745,22 @@ export default function PageEditor({ params }: PageProps) {
         return (
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto da Citação / Frase</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto da Citação / Frase</label>
               <textarea
                 rows={4}
                 id={`${section.id}.title`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Autor da Frase</label>
+              <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Autor da Frase</label>
               <Input
                 type="text"
                 id={`${section.id}.author`}
-                className={`brand-input text-xs ${focusedField === `${section.id}.author` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                className={`brand-input text-xs ${focusedField === `${section.id}.author` ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                 value={section.author || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'author', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.author`)}
@@ -2768,16 +2768,16 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Layout parameters */}
-            <div className="border-t border-white/5 pt-3 space-y-3">
+            <div className="border-t border-[var(--surface-border)] pt-3 space-y-3">
               <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Estilo Bloco</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Estilo Bloco</label>
                   <select
                     value={section.settings?.style || 'elegant'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.style', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="elegant">Citação Clássica</option>
                     <option value="card">Card Elevado</option>
@@ -2785,11 +2785,11 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] text-slate-400 uppercase font-semibold">Alinhamento</label>
+                  <label className="text-[9px] text-slate-500 font-semibold uppercase">Alinhamento</label>
                   <select
                     value={section.settings?.alignment || 'center'}
                     onChange={(e) => updateLayoutSectionField(section.id, 'settings.alignment', e.target.value)}
-                    className="w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white cursor-pointer"
+                    className="w-full text-xs p-2 brand-input rounded-lg outline-none text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="center">Centralizado</option>
                     <option value="left">Esquerda</option>
@@ -3296,16 +3296,14 @@ export default function PageEditor({ params }: PageProps) {
   useEffect(() => {
     if (!page || !lastPublishedPage) return;
 
-    const compiledNodes = nodes.map(n => {
-      const originalNode = page.formFlow?.nodes?.find((on: any) => on.id === n.id);
+    const compiledNodes = (page.formFlow?.nodes || []).map((n: any) => {
+      const flowNode = nodes.find((fn: any) => fn.id === n.id);
       return {
-        id: n.id,
-        type: originalNode?.type || n.type || 'step',
-        position: {
-          x: Math.round(n.position?.x || 0),
-          y: Math.round(n.position?.y || 0)
-        },
-        data: originalNode?.data || n.data || { title: 'Etapa sem título', isRequired: true }
+        ...n,
+        position: flowNode ? {
+          x: Math.round(flowNode.position?.x || 0),
+          y: Math.round(flowNode.position?.y || 0)
+        } : n.position
       };
     });
 
@@ -3345,6 +3343,7 @@ export default function PageEditor({ params }: PageProps) {
     safeJsonStringify(page?.seoConfig),
     safeJsonStringify(page?.siteConfig),
     safeJsonStringify(page?.dictionary),
+    safeJsonStringify(page?.formFlow),
     nodes,
     edges,
     lastPublishedPage
@@ -3486,16 +3485,14 @@ export default function PageEditor({ params }: PageProps) {
     setSuccess('');
 
     // Reconstruct formFlow config from React Flow current nodes/edges
-    const compiledNodes = nodes.map(n => {
-      const originalNode = page.formFlow?.nodes?.find((on: any) => on.id === n.id);
+    const compiledNodes = (page.formFlow?.nodes || []).map((n: any) => {
+      const flowNode = nodes.find((fn: any) => fn.id === n.id);
       return {
-        id: n.id,
-        type: originalNode?.type || n.type || 'step',
-        position: {
-          x: Math.round(n.position?.x || 0),
-          y: Math.round(n.position?.y || 0)
-        },
-        data: originalNode?.data || n.data || { title: 'Etapa sem título', isRequired: true }
+        ...n,
+        position: flowNode ? {
+          x: Math.round(flowNode.position?.x || 0),
+          y: Math.round(flowNode.position?.y || 0)
+        } : n.position
       };
     });
 
@@ -3618,7 +3615,10 @@ export default function PageEditor({ params }: PageProps) {
   }), []);
 
   if (loading || !page) {
-    const logoUrl = tenant?.logoDarkUrl || tenant?.logoLightUrl;
+    const logoUrl =
+      theme === 'light'
+        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl)
+        : (tenant?.logoDarkUrl || tenant?.logoLightUrl);
     return (
       <div
         className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-8 select-none"
@@ -3629,13 +3629,13 @@ export default function PageEditor({ params }: PageProps) {
       >
         {error ? (
           <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6" style={{ animation: 'fadeIn 0.3s ease-out forwards' }}>
-            <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-xl">
+            <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center text-xl">
               ⚠️
             </div>
             <h3 className="text-sm font-semibold" style={{ color: 'var(--brand-text-color)' }}>Falha ao Carregar</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">{error}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{error}</p>
             <div className="flex gap-3 mt-2">
-              <Link href="/dashboard/captacao" className="px-4 h-9 bg-slate-900 border border-white/5 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center justify-center cursor-pointer transition-colors">
+              <Link href="/dashboard/captacao" className="px-4 h-9 glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white text-xs font-semibold rounded-xl flex items-center justify-center cursor-pointer transition-colors">
                 Voltar
               </Link>
               <button
@@ -3674,7 +3674,7 @@ export default function PageEditor({ params }: PageProps) {
                   borderRightColor: 'var(--brand-gradient-end, #06B6D4)',
                 }}
               />
-              <div className="absolute inset-2 rounded-full border border-white/5 bg-white/5 animate-pulse" />
+              <div className="absolute inset-2 rounded-full border border-[var(--surface-border)] bg-[var(--surface-hover)] animate-pulse" />
             </div>
           </div>
         )}
@@ -3689,17 +3689,19 @@ export default function PageEditor({ params }: PageProps) {
   }
 
   // Preview Iframe URL Resolve
+  const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || '';
+
   const previewIframeUrl = tenant 
-    ? `http://localhost:3002/p/${tenant.slug}/${page.slug}?preview=true&key=${previewKey}`
+    ? `${landingBaseUrl}/p/${tenant.slug}/${page.slug}?preview=true&key=${previewKey}`
     : '#';
 
   // External Preview URL (without preview=true)
   const externalPreviewUrl = tenant 
-    ? `http://localhost:3002/p/${tenant.slug}/${page.slug}`
+    ? `${landingBaseUrl}/p/${tenant.slug}/${page.slug}`
     : '#';
 
   return (
-    <div className={`fixed inset-0 z-[9999] bg-[#09090B] flex flex-col h-screen w-screen overflow-hidden`} style={{ animation: 'editorFadeIn 0.3s ease-out forwards' }}>
+    <div className={`fixed inset-0 z-[9999] bg-[var(--brand-bg-color)] flex flex-col h-screen w-screen overflow-hidden`} style={{ animation: 'editorFadeIn 0.3s ease-out forwards' }}>
       <style>{`
         @keyframes editorFadeIn {
           from { opacity: 0; }
@@ -3744,11 +3746,11 @@ export default function PageEditor({ params }: PageProps) {
       
       {/* Top action bar */}
       {!sidebarCollapsed && (
-        <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 shrink-0">
+        <div className="flex items-center justify-between border-b border-[var(--surface-border)] px-3 py-1.5 shrink-0 brand-toolbar">
           <div className="flex items-center gap-4">
             <a 
               href="/dashboard/captacao" 
-              className="p-1.5 rounded-lg bg-slate-900 border border-white/5 text-slate-400 hover:text-white cursor-pointer transition-colors flex items-center gap-1.5"
+              className="p-1.5 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors flex items-center gap-1.5"
               title="Sair do Editor"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -3757,19 +3759,19 @@ export default function PageEditor({ params }: PageProps) {
             <button
               type="button"
               onClick={() => setSidebarCollapsed(prev => !prev)}
-              className="p-1.5 rounded-lg bg-slate-900 border border-white/5 text-slate-400 hover:text-white cursor-pointer transition-colors flex items-center"
+              className="p-1.5 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors flex items-center"
               title={sidebarCollapsed ? 'Expandir Painel' : 'Recolher Painel'}
             >
               {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-sm font-bold text-white truncate leading-none shrink-0 max-w-[180px]">
+              <h1 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-none shrink-0 max-w-[180px]">
                 {page.title}
               </h1>
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(page.id)}
-                className="text-[9px] text-slate-500 font-mono bg-white/5 hover:bg-white/10 hover:text-slate-300 border border-white/5 rounded px-1.5 py-0.5 truncate max-w-[140px] cursor-pointer transition-colors shrink-0"
+                className="text-[9px] text-slate-600 dark:text-slate-400 font-mono glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] rounded px-1.5 py-0.5 truncate max-w-[140px] cursor-pointer transition-colors shrink-0"
                 title="Clique para copiar o ID"
               >
                 {page.id}
@@ -3778,11 +3780,11 @@ export default function PageEditor({ params }: PageProps) {
           </div>
 
           {/* Tab Buttons */}
-          <div className="flex items-center gap-0.5 bg-[#121215] border border-white/5 p-0.5 rounded-lg">
+          <div className="flex items-center gap-0.5 glass-sm border border-[var(--surface-border)] p-0.5 rounded-lg">
             <button
               onClick={() => setActiveTab('layout')}
               className={`px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-all ${
-                activeTab === 'layout' ? 'brand-accent shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'layout' ? 'brand-accent shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Layout className="h-3 w-3" />
@@ -3791,7 +3793,7 @@ export default function PageEditor({ params }: PageProps) {
             <button
               onClick={() => setActiveTab('theme')}
               className={`px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeTab === 'theme' ? 'brand-accent shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'theme' ? 'brand-accent shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Palette className="h-3 w-3" />
@@ -3800,7 +3802,7 @@ export default function PageEditor({ params }: PageProps) {
             <button
               onClick={() => setActiveTab('flow')}
               className={`px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeTab === 'flow' ? 'brand-accent shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'flow' ? 'brand-accent shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <GitBranch className="h-3 w-3" />
@@ -3809,7 +3811,7 @@ export default function PageEditor({ params }: PageProps) {
             <button
               onClick={() => setActiveTab('settings')}
               className={`px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
-                activeTab === 'settings' ? 'brand-accent shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'settings' ? 'brand-accent shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Settings className="h-3 w-3" />
@@ -3820,11 +3822,11 @@ export default function PageEditor({ params }: PageProps) {
           {/* Action button */}
           <div className="flex items-center gap-1.5">
             {/* Undo/Redo Buttons */}
-            <div className="flex items-center gap-0.5 bg-[#121215] border border-white/5 p-0.5 rounded-lg">
+            <div className="flex items-center gap-0.5 glass-sm border border-[var(--surface-border)] p-0.5 rounded-lg">
               <button
                 onClick={undo}
                 disabled={historyRef.current.past.length <= 1}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all"
+                className="p-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all"
                 title="Desfazer (Ctrl+Z)"
               >
                 <Undo className="h-3 w-3" />
@@ -3832,14 +3834,28 @@ export default function PageEditor({ params }: PageProps) {
               <button
                 onClick={redo}
                 disabled={historyRef.current.future.length === 0}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all"
+                className="p-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer transition-all"
                 title="Refazer (Ctrl+Shift+Z / Ctrl+Y)"
               >
                 <Redo className="h-3 w-3" />
               </button>
             </div>
+
+            {/* Theme Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="h-7 w-7 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-all flex items-center justify-center shrink-0"
+              title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
             {error && (
-              <div className="h-9 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-1.5 max-w-[240px] animate-fade-in" title={error}>
+              <div className="h-9 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs flex items-center gap-1.5 max-w-[240px] animate-fade-in" title={error}>
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{error}</span>
               </div>
@@ -3847,8 +3863,8 @@ export default function PageEditor({ params }: PageProps) {
             <div
               className={`h-7 px-2.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center justify-center whitespace-nowrap border transition-all ${
                 hasUnsavedChanges 
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' 
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
               }`}
             >
               {hasUnsavedChanges ? 'Pendente' : 'Salvo'}
@@ -3856,7 +3872,7 @@ export default function PageEditor({ params }: PageProps) {
             <button
               type="button"
               onClick={() => window.open(externalPreviewUrl, '_blank')}
-              className="h-7 px-2 rounded-lg bg-[#121215] border border-white/5 text-slate-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-all flex items-center justify-center gap-1.5 shrink-0"
+              className="h-7 px-2 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-all flex items-center justify-center gap-1.5 shrink-0"
               title="Abrir Preview em Nova Guia"
             >
               <ExternalLink className="h-3 w-3" />
@@ -3879,7 +3895,7 @@ export default function PageEditor({ params }: PageProps) {
         
         {/* Left Side: Parameters Editor Panel */}
         <div 
-          className={`bg-zinc-950 border-r border-white/5 flex flex-col overflow-y-auto shrink-0 min-h-0 editor-scrollbar ${
+          className={`glass-md border-r border-[var(--surface-border)] flex flex-col overflow-y-auto shrink-0 min-h-0 editor-scrollbar ${
             sidebarCollapsed ? 'p-0 w-0 overflow-hidden' : 'p-3'
           }`}
           style={{
@@ -3893,31 +3909,31 @@ export default function PageEditor({ params }: PageProps) {
             <div className="space-y-4">
               
               {/* Tip Banner */}
-              <div className="p-3 rounded-xl bg-zinc-900/50 border border-white/5 text-slate-300 text-[10px] leading-relaxed flex items-start gap-2.5 shadow-sm">
+              <div className="p-3 rounded-xl glass-sm border border-[var(--surface-border)] text-slate-700 dark:text-slate-300 text-[10px] leading-relaxed flex items-start gap-2.5 shadow-sm">
                 <Sparkles className="h-3.5 w-3.5 text-[var(--brand-gradient-start)] shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-bold text-white block mb-0.5">Dica de Design & Destaque</span>
-                  Você pode colorir palavras em qualquer <strong>Título</strong> envolvendo-as com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[9px]">*equilíbrio*</code>
+                  <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Dica de Design & Destaque</span>
+                  Você pode colorir palavras em qualquer <strong>Título</strong> envolvendo-as com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[9px]">*equilíbrio*</code>
                 </div>
               </div>
               
               {/* SECTION 1: HERO & IDENTIFICAÇÃO */}
-              <div className={`border rounded-xl bg-zinc-900/30 overflow-hidden transition-all duration-200 ${
-                openSection === 'hero' ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
+              <div className={`border rounded-xl glass-sm overflow-hidden transition-all duration-200 ${
+                openSection === 'hero' ? 'border-[var(--brand-gradient-start)]/20 shadow-md' : 'border-[var(--surface-border)]'
               }`}>
                 <button
                   type="button"
                   onClick={() => setOpenSection(openSection === 'hero' ? null : 'hero')}
-                  className="w-full px-4 py-3 bg-[#121215] flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-zinc-800/50 transition-colors bg-transparent border-none cursor-pointer"
+                  className="w-full px-4 py-3 glass-sm flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-[var(--surface-hover)] transition-colors bg-transparent border-none cursor-pointer"
                 >
-                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'hero' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
+                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'hero' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-slate-900 dark:text-white'}`}>
                     <Sparkles className="h-3.5 w-3.5 text-yellow-500/70" />
                     1. Início & Apresentação (Hero)
                   </span>
                   <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'hero' ? 'rotate-180 text-[var(--brand-gradient-start)]' : ''}`} />
                 </button>
                 {openSection === 'hero' && (
-                  <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
+                  <div className="p-4 space-y-4 border-t border-[var(--surface-border)] animate-in fade-in duration-200">
                     <ImageUploader
                       id="siteConfig.images.hero"
                       label="Foto de Destaque da Hero"
@@ -3941,11 +3957,11 @@ export default function PageEditor({ params }: PageProps) {
                       }}
                     />
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Principal (Badge)</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Principal (Badge)</label>
                       <Input
                         type="text"
                         id="hero.badge"
-                        className={`brand-input text-xs ${focusedField === 'hero.badge' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.badge' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.badge || ''}
                         onChange={(e) => updateDictField('hero', 'badge', e.target.value)}
                         onFocus={() => setFocusedField('hero.badge')}
@@ -3953,13 +3969,13 @@ export default function PageEditor({ params }: PageProps) {
                     </div>
                     <div className="space-y-1">
                       <div className="flex justify-between items-center">
-                        <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
-                        <span className="text-[8px] text-zinc-500 font-mono">hero.title</span>
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título Principal</label>
+                        <span className="text-[8px] text-slate-500 font-mono">hero.title</span>
                       </div>
                       <textarea
                         rows={2}
                         id="hero.title"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                        className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'hero.title' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={
                           page.dictionary.hero?.title !== undefined 
                             ? page.dictionary.hero.title 
@@ -3969,73 +3985,73 @@ export default function PageEditor({ params }: PageProps) {
                         onFocus={() => setFocusedField('hero.title')}
                       />
                       <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                        💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*equilíbrio interior*</code>
+                        💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*equilíbrio interior*</code>
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Principal</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Principal</label>
                       <textarea
                         rows={3}
                         id="hero.description"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                        className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'hero.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={page.dictionary.hero?.description || ''}
                         onChange={(e) => updateDictField('hero', 'description', e.target.value)}
                         onFocus={() => setFocusedField('hero.description')}
                       />
                       <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                        💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                        💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto Botão Primário (CTA)</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto Botão Primário (CTA)</label>
                       <Input
                         type="text"
                         id="hero.ctaPrimary"
-                        className={`brand-input text-xs ${focusedField === 'hero.ctaPrimary' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.ctaPrimary' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.ctaPrimary || ''}
                         onChange={(e) => updateDictField('hero', 'ctaPrimary', e.target.value)}
                         onFocus={() => setFocusedField('hero.ctaPrimary')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Texto Botão Secundário</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Texto Botão Secundário</label>
                       <Input
                         type="text"
                         id="hero.ctaSecondary"
-                        className={`brand-input text-xs ${focusedField === 'hero.ctaSecondary' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.ctaSecondary' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.ctaSecondary || ''}
                         onChange={(e) => updateDictField('hero', 'ctaSecondary', e.target.value)}
                         onFocus={() => setFocusedField('hero.ctaSecondary')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Selo CRP</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Selo CRP</label>
                       <Input
                         type="text"
                         id="hero.badgeCrp"
-                        className={`brand-input text-xs ${focusedField === 'hero.badgeCrp' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.badgeCrp' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.badgeCrp || ''}
                         onChange={(e) => updateDictField('hero', 'badgeCrp', e.target.value)}
                         onFocus={() => setFocusedField('hero.badgeCrp')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Selo Abordagem</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Selo Abordagem</label>
                       <Input
                         type="text"
                         id="hero.badgeApproach"
-                        className={`brand-input text-xs ${focusedField === 'hero.badgeApproach' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.badgeApproach' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.badgeApproach || ''}
                         onChange={(e) => updateDictField('hero', 'badgeApproach', e.target.value)}
                         onFocus={() => setFocusedField('hero.badgeApproach')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Selo Sigilo Ético</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Selo Sigilo Ético</label>
                       <Input
                         type="text"
                         id="hero.badgeEthic"
-                        className={`brand-input text-xs ${focusedField === 'hero.badgeEthic' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'hero.badgeEthic' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.hero?.badgeEthic || ''}
                         onChange={(e) => updateDictField('hero', 'badgeEthic', e.target.value)}
                         onFocus={() => setFocusedField('hero.badgeEthic')}
@@ -4081,7 +4097,7 @@ export default function PageEditor({ params }: PageProps) {
                 <Button
                   type="button"
                   onClick={() => setIsAddModalOpen(true)}
-                  className="w-full border-dashed border-white/20 hover:border-white/40 bg-zinc-900/40 hover:bg-zinc-800/40 text-slate-300 font-bold py-3 text-xs flex items-center justify-center gap-2 rounded-xl transition-all cursor-pointer h-12 text-white"
+                  className="w-full border-dashed border-[var(--surface-border)] hover:border-slate-400 glass-sm hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white font-bold py-3 text-xs flex items-center justify-center gap-2 rounded-xl transition-all cursor-pointer h-12"
                 >
                   <Plus className="h-4 w-4 text-[var(--brand-gradient-start)]" />
                   Adicionar Seção
@@ -4089,75 +4105,75 @@ export default function PageEditor({ params }: PageProps) {
               </div>
 
               {/* SECTION 7: RODAPÉ */}
-              <div className={`border rounded-xl bg-zinc-900/30 overflow-hidden transition-all duration-200 ${
-                openSection === 'footer' ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
+              <div className={`border rounded-xl glass-sm overflow-hidden transition-all duration-200 ${
+                openSection === 'footer' ? 'border-[var(--brand-gradient-start)]/20 shadow-md' : 'border-[var(--surface-border)]'
               }`}>
                 <button
                   type="button"
                   onClick={() => setOpenSection(openSection === 'footer' ? null : 'footer')}
-                  className="w-full px-4 py-3 bg-[#121215] flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-zinc-800/50 transition-colors bg-transparent border-none cursor-pointer"
+                  className="w-full px-4 py-3 glass-sm flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-[var(--surface-hover)] transition-colors bg-transparent border-none cursor-pointer"
                 >
-                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'footer' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
+                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'footer' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-slate-900 dark:text-white'}`}>
                     <Layout className="h-3.5 w-3.5 text-blue-500/70 shrink-0" />
                     7. Rodapé
                   </span>
                   <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'footer' ? 'rotate-180 text-[var(--brand-gradient-start)]' : ''}`} />
                 </button>
                 {openSection === 'footer' && (
-                  <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
+                  <div className="p-4 space-y-4 border-t border-[var(--surface-border)] animate-in fade-in duration-200">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Descrição Rodapé</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição Rodapé</label>
                       <textarea
                         rows={2}
                         id="footer.description"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'footer.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
+                        className={`w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none ${focusedField === 'footer.description' ? 'ring-2 ring-blue-500 border-transparent' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={page.dictionary.footer?.description || ''}
                         onChange={(e) => updateDictField('footer', 'description', e.target.value)}
                         onFocus={() => setFocusedField('footer.description')}
                       />
                       <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                        💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-white bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
+                        💡 <strong>Negrito:</strong> Envolva o texto com dois asteriscos. Ex: <code className="text-slate-900 dark:text-white bg-black/10 dark:bg-black/30 px-1 rounded font-bold font-mono text-[8px]">**texto**</code>
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título de Seção Navegação</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título de Seção Navegação</label>
                       <Input
                         type="text"
                         id="footer.navHeader"
-                        className={`brand-input text-xs ${focusedField === 'footer.navHeader' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'footer.navHeader' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.footer?.navHeader || ''}
                         onChange={(e) => updateDictField('footer', 'navHeader', e.target.value)}
                         onFocus={() => setFocusedField('footer.navHeader')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Título de Seção Especialidades</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título de Seção Especialidades</label>
                       <Input
                         type="text"
                         id="footer.serviceHeader"
-                        className={`brand-input text-xs ${focusedField === 'footer.serviceHeader' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'footer.serviceHeader' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.footer?.serviceHeader || ''}
                         onChange={(e) => updateDictField('footer', 'serviceHeader', e.target.value)}
                         onFocus={() => setFocusedField('footer.serviceHeader')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Selo CRP</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Selo CRP</label>
                       <Input
                         type="text"
                         id="footer.crpLabel"
-                        className={`brand-input text-xs ${focusedField === 'footer.crpLabel' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'footer.crpLabel' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.footer?.crpLabel || ''}
                         onChange={(e) => updateDictField('footer', 'crpLabel', e.target.value)}
                         onFocus={() => setFocusedField('footer.crpLabel')}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Direitos Autorais (Copyright)</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Direitos Autorais (Copyright)</label>
                       <Input
                         type="text"
                         id="footer.rights"
-                        className={`brand-input text-xs ${focusedField === 'footer.rights' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : ''}`}
+                        className={`brand-input text-xs ${focusedField === 'footer.rights' ? 'ring-2 ring-blue-500 border-transparent' : ''}`}
                         value={page.dictionary.footer?.rights || ''}
                         onChange={(e) => updateDictField('footer', 'rights', e.target.value)}
                         onFocus={() => setFocusedField('footer.rights')}
@@ -4170,18 +4186,18 @@ export default function PageEditor({ params }: PageProps) {
               {/* Section Templates Modal */}
               <BrandModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} maxWidth="max-w-md">
                 <div className="space-y-4 text-left">
-                  <div className="flex items-center gap-2 border-b border-white/5 pb-3">
+                  <div className="flex items-center gap-2 border-b border-[var(--surface-border)] pb-3">
                     <Sparkles className="h-5 w-5 text-[var(--brand-gradient-start)]" />
                     <div>
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Modelos de Seção</h3>
-                      <p className="text-[10px] text-slate-400">Adicione novos blocos de layout ou reative seções padrão do site</p>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Modelos de Seção</h3>
+                      <p className="text-[10px] text-slate-600 dark:text-slate-400">Adicione novos blocos de layout ou reative seções padrão do site</p>
                     </div>
                   </div>
                   
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                     {/* Part 1: Layouts livres */}
                     <div className="space-y-2">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block px-1">Layouts Livres</span>
+                      <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block px-1">Layouts Livres</span>
                       {[
                         {
                           type: 'grid',
@@ -4207,14 +4223,14 @@ export default function PageEditor({ params }: PageProps) {
                           <div
                             key={tmpl.type}
                             onClick={() => addSection(tmpl.type)}
-                            className="p-3 rounded-xl border border-white/5 flex gap-3 items-start transition-all cursor-pointer text-left bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-white/10 border-solid"
+                            className="p-3 rounded-xl border border-[var(--surface-border)] flex gap-3 items-start transition-all cursor-pointer text-left glass-sm hover:bg-[var(--surface-hover)] border-solid"
                           >
                             <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]">
                               <IconComp className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-xs font-bold text-white block">{tmpl.name}</span>
-                              <p className="text-[9px] text-slate-400 mt-1 leading-normal">{tmpl.desc}</p>
+                              <span className="text-xs font-bold text-slate-900 dark:text-white block">{tmpl.name}</span>
+                              <p className="text-[9px] text-slate-600 dark:text-slate-400 mt-1 leading-normal">{tmpl.desc}</p>
                             </div>
                           </div>
                         );
@@ -4222,8 +4238,8 @@ export default function PageEditor({ params }: PageProps) {
                     </div>
 
                     {/* Part 2: Chamadas & CTAs */}
-                    <div className="space-y-2 border-t border-white/5 pt-3">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block px-1">Chamadas & CTAs</span>
+                    <div className="space-y-2 border-t border-[var(--surface-border)] pt-3">
+                      <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block px-1">Chamadas & CTAs</span>
                       {[
                         {
                           type: 'cta-banner',
@@ -4249,14 +4265,14 @@ export default function PageEditor({ params }: PageProps) {
                           <div
                             key={tmpl.type}
                             onClick={() => addSection(tmpl.type)}
-                            className="p-3 rounded-xl border border-white/5 flex gap-3 items-start transition-all cursor-pointer text-left bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-white/10 border-solid"
+                            className="p-3 rounded-xl border border-[var(--surface-border)] flex gap-3 items-start transition-all cursor-pointer text-left glass-sm hover:bg-[var(--surface-hover)] border-solid"
                           >
                             <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]">
                               <IconComp className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="text-xs font-bold text-white block">{tmpl.name}</span>
-                              <p className="text-[9px] text-slate-400 mt-1 leading-normal">{tmpl.desc}</p>
+                              <span className="text-xs font-bold text-slate-900 dark:text-white block">{tmpl.name}</span>
+                              <p className="text-[9px] text-slate-600 dark:text-slate-400 mt-1 leading-normal">{tmpl.desc}</p>
                             </div>
                           </div>
                         );
@@ -4271,8 +4287,8 @@ export default function PageEditor({ params }: PageProps) {
                       if (inactiveTemplateSections.length === 0) return null;
 
                       return (
-                        <div className="space-y-2 border-t border-white/5 pt-3">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block px-1">Seções Originais Inativas (Reativar)</span>
+                        <div className="space-y-2 border-t border-[var(--surface-border)] pt-3">
+                          <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block px-1">Seções Originais Inativas (Reativar)</span>
                           {inactiveTemplateSections.map((s: any) => {
                             const iconMap: any = {
                               diagnostic: Sparkles,
@@ -4287,14 +4303,14 @@ export default function PageEditor({ params }: PageProps) {
                               <div
                                 key={s.id}
                                 onClick={() => addSection(s.type)}
-                                className="p-3 rounded-xl border border-white/5 flex gap-3 items-start transition-all cursor-pointer text-left bg-emerald-955/10 hover:bg-emerald-950/20 border-emerald-500/10 hover:border-emerald-500/20 border-solid"
+                                className="p-3 rounded-xl border border-emerald-500/20 flex gap-3 items-start transition-all cursor-pointer text-left bg-emerald-500/5 hover:bg-emerald-500/10 border-solid"
                               >
-                                <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-400">
+                                <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                                   <IconComp className="h-4 w-4" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-xs font-bold text-white block">{s.name || getSectionNameByType(s.type)}</span>
-                                  <p className="text-[9px] text-slate-400 mt-1 leading-normal">
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white block">{s.name || getSectionNameByType(s.type)}</span>
+                                  <p className="text-[9px] text-slate-600 dark:text-slate-400 mt-1 leading-normal">
                                     Reative a seção {s.name || getSectionNameByType(s.type)} original do seu template de site.
                                   </p>
                                 </div>
@@ -4306,11 +4322,11 @@ export default function PageEditor({ params }: PageProps) {
                     })()}
                   </div>
                   
-                  <div className="flex justify-end pt-2 border-t border-white/5">
+                  <div className="flex justify-end pt-2 border-t border-[var(--surface-border)]">
                     <Button
                       type="button"
                       onClick={() => setIsAddModalOpen(false)}
-                      className="bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white text-xs px-4 h-9 cursor-pointer"
+                      className="glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-800 dark:text-white text-xs px-4 h-9 cursor-pointer font-semibold"
                     >
                       Fechar
                     </Button>
@@ -4324,9 +4340,9 @@ export default function PageEditor({ params }: PageProps) {
           {/* TAB 2: TRIAGEM GRAPH FLOW EDITOR */}
           {activeTab === 'flow' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Estrutura de Etapas</h3>
-                <span className="text-[10px] bg-slate-900 border border-white/5 text-[var(--brand-gradient-start)] font-bold px-2 py-0.5 rounded-lg">
+              <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Estrutura de Etapas</h3>
+                <span className="text-[10px] glass-sm border border-[var(--surface-border)] text-[var(--brand-gradient-start)] font-bold px-2 py-0.5 rounded-lg">
                   {page.formFlow.nodes.length} blocos
                 </span>
               </div>
@@ -4337,43 +4353,36 @@ export default function PageEditor({ params }: PageProps) {
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     onClick={() => handleAddNode('texto')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
+                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
                   >
                     <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Texto Curto
                   </Button>
                   <Button
                     onClick={() => handleAddNode('paragrafo')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
+                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
                   >
                     <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Parágrafo Longo
                   </Button>
                   <Button
                     onClick={() => handleAddNode('seletor')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
+                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
                   >
                     <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Seletor Múltiplo
-                  </Button>
-                  <Button
-                    onClick={() => handleAddNode('contrato')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
-                  >
-                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
-                    Termo Legal
                   </Button>
                 </div>
               </div>
 
               {/* Selected Node Editor Form */}
               {selectedNode ? (
-                <div className="space-y-4 border-t border-white/5 pt-4 animate-in fade-in">
+                <div className="space-y-4 border-t border-[var(--surface-border)] pt-4 animate-in fade-in">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase text-white">Editar Bloco: {selectedNode.id}</span>
+                    <span className="text-xs font-bold uppercase text-slate-900 dark:text-white">Editar Bloco: {selectedNode.id}</span>
                     <button
                       onClick={() => setSelectedNodeId(null)}
-                      className="text-xs text-slate-500 hover:text-white"
+                      className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white"
                     >
                       Limpar Seleção
                     </button>
@@ -4381,7 +4390,7 @@ export default function PageEditor({ params }: PageProps) {
 
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pergunta / Título do Campo</label>
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Pergunta / Título do Campo</label>
                       <Input
                         type="text"
                         className="brand-input"
@@ -4392,7 +4401,7 @@ export default function PageEditor({ params }: PageProps) {
 
                     {selectedNode.type !== 'start' && selectedNode.type !== 'contrato' && selectedNode.type !== 'maioridade' && (
                       <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Placeholder de Escrita</label>
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Placeholder de Escrita</label>
                         <Input
                           type="text"
                           className="brand-input"
@@ -4405,11 +4414,11 @@ export default function PageEditor({ params }: PageProps) {
                     {/* Checkbox template resolver for contracts template node */}
                     {selectedNode.type === 'contrato' && (
                       <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Modelo de Contrato Clínico</label>
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Modelo de Contrato Clínico</label>
                         <select
                           value={selectedNode.data.contractTemplateId || ''}
                           onChange={(e) => updateSelectedNodeData('contractTemplateId', e.target.value || undefined)}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs outline-none focus:border-[var(--brand-gradient-start)]"
+                          className="w-full h-10 px-3 rounded-xl brand-input text-slate-900 dark:text-white text-xs outline-none focus:border-[var(--brand-gradient-start)]"
                         >
                           <option value="">-- Selecionar modelo --</option>
                           {contracts.map(c => (
@@ -4422,7 +4431,7 @@ export default function PageEditor({ params }: PageProps) {
                     {/* Options list editor for selector node */}
                     {selectedNode.type === 'seletor' && (
                       <div className="space-y-2">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Opções de Seleção</label>
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider block">Opções de Seleção</label>
                         <div className="space-y-2">
                           {(selectedNode.data.options || []).map((opt: any, idx: number) => (
                             <div key={idx} className="flex gap-2 items-center">
@@ -4442,7 +4451,7 @@ export default function PageEditor({ params }: PageProps) {
                                   const updatedOptions = (selectedNode.data.options || []).filter((_: any, oIdx: number) => oIdx !== idx);
                                   updateSelectedNodeData('options', updatedOptions);
                                 }}
-                                className="text-slate-500 hover:text-red-400 cursor-pointer"
+                                className="text-slate-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -4454,7 +4463,7 @@ export default function PageEditor({ params }: PageProps) {
                               const updatedOptions = [...(selectedNode.data.options || []), { label: `Opção ${(selectedNode.data.options || []).length + 1}`, value: `op_${Math.random().toString(36).substring(2, 5)}` }];
                               updateSelectedNodeData('options', updatedOptions);
                             }}
-                            className="w-full cursor-pointer h-7 text-[10px] bg-slate-900 border border-white/5"
+                            className="w-full cursor-pointer h-7 text-[10px] glass-sm border border-[var(--surface-border)] text-slate-800 dark:text-white"
                           >
                             + Adicionar Opção
                           </Button>
@@ -4467,16 +4476,16 @@ export default function PageEditor({ params }: PageProps) {
                         type="checkbox"
                         checked={selectedNode.data.isRequired ?? true}
                         onChange={(e) => updateSelectedNodeData('isRequired', e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-zinc-700 text-[var(--brand-gradient-start)]"
+                        className="h-3.5 w-3.5 rounded border-[var(--surface-border)] text-[var(--brand-gradient-start)]"
                       />
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Resposta Obrigatória</span>
+                      <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Resposta Obrigatória</span>
                     </label>
 
                     {selectedNode.type !== 'start' && (
                       <div className="pt-4">
                         <Button
                           onClick={() => handleDeleteNode(selectedNode.id)}
-                          className="w-full cursor-pointer h-9 text-xs font-bold uppercase bg-red-950/20 text-red-400 border border-red-500/25 hover:bg-red-950/40"
+                          className="w-full cursor-pointer h-9 text-xs font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25 hover:bg-red-500/20"
                         >
                           Excluir Etapa
                         </Button>
@@ -4485,7 +4494,7 @@ export default function PageEditor({ params }: PageProps) {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 rounded-xl bg-slate-900/50 border border-white/5 text-center text-xs text-slate-400 italic">
+                <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] text-center text-xs text-slate-600 dark:text-slate-400 italic">
                   Selecione um bloco no fluxograma ao lado para editar seus dados detalhadamente.
                 </div>
               )}
@@ -4495,9 +4504,9 @@ export default function PageEditor({ params }: PageProps) {
           {/* TAB 4: THEME, COLORS & TYPOGRAPHY */}
           {activeTab === 'theme' && (
             <div className="space-y-6">
-              <div className="border-b border-white/5 pb-2">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Cores e Estilo Visual</h3>
-                <p className="text-[10px] text-slate-500">Personalize as cores e fontes que combinam com seu estilo de atendimento.</p>
+              <div className="border-b border-[var(--surface-border)] pb-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Cores e Estilo Visual</h3>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400">Personalize as cores e fontes que combinam com seu estilo de atendimento.</p>
               </div>
 
               {/* Seção 1: Cores */}
@@ -4512,13 +4521,13 @@ export default function PageEditor({ params }: PageProps) {
                 ].map((colorOpt) => {
                   const currentValue = page.siteConfig.theme?.colors?.[colorOpt.key] || colorOpt.default;
                   return (
-                    <div key={colorOpt.key} className="space-y-1 bg-zinc-900/20 p-3 rounded-xl border border-white/5">
-                      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                    <div key={colorOpt.key} className="space-y-1 glass-sm p-3 rounded-xl border border-[var(--surface-border)]">
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">
                         {colorOpt.label}
                       </label>
                       <div className="flex items-center gap-2">
                         {/* Seletor Visual */}
-                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[var(--surface-border)] shrink-0 cursor-pointer">
                           <input
                             type="color"
                             value={currentValue}
@@ -4577,7 +4586,7 @@ export default function PageEditor({ params }: PageProps) {
               </div>
 
               {/* Seção 2: Fontes */}
-              <div className="space-y-4 border-t border-white/5 pt-4">
+              <div className="space-y-4 border-t border-[var(--surface-border)] pt-4">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-wider block">🔤 Tipografia e Fontes</span>
                   <button
@@ -4586,7 +4595,7 @@ export default function PageEditor({ params }: PageProps) {
                       setCustomFontTarget('heading');
                       setIsCustomFontModalOpen(true);
                     }}
-                    className="text-[10px] text-[var(--brand-gradient-start)] hover:text-white font-bold flex items-center gap-1 cursor-pointer transition-colors bg-zinc-900 px-2.5 py-1 rounded-lg border border-white/5"
+                    className="text-[10px] text-[var(--brand-gradient-start)] hover:text-slate-900 dark:hover:text-white font-bold flex items-center gap-1 cursor-pointer transition-colors glass-sm px-2.5 py-1 rounded-lg border border-[var(--surface-border)]"
                   >
                     <Plus className="h-3 w-3" />
                     <span>Subir Fonte (.ttf/.otf)</span>
@@ -4623,8 +4632,8 @@ export default function PageEditor({ params }: PageProps) {
                 />
 
                 {/* Heading Weight / Espessura do Texto */}
-                <div className="space-y-1 bg-zinc-900/20 p-3 rounded-xl border border-white/5">
-                  <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Espessura / Destaque dos Títulos</label>
+                <div className="space-y-1 glass-sm p-3 rounded-xl border border-[var(--surface-border)]">
+                  <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">Espessura / Destaque dos Títulos</label>
                   <select
                     value={page.siteConfig.theme?.typography?.headingWeight || '400'}
                     onChange={(e) => {
@@ -4644,7 +4653,7 @@ export default function PageEditor({ params }: PageProps) {
                       });
                       setHasUnsavedChanges(true);
                     }}
-                    className="w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors cursor-pointer"
+                    className="w-full text-xs p-2.5 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors cursor-pointer"
                   >
                     {[
                       { value: '300', label: '🪶 Fino / Delicado (Light)' },
@@ -4690,10 +4699,10 @@ export default function PageEditor({ params }: PageProps) {
 
                 {/* Custom uploaded font badges if present */}
                 {(page.siteConfig.theme?.typography?.customHeadingFontName || page.siteConfig.theme?.typography?.customBodyFontName) && (
-                  <div className="space-y-2 bg-zinc-900/30 p-3 rounded-xl border border-white/5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fontes Personalizadas Ativas</span>
+                  <div className="space-y-2 glass-sm p-3 rounded-xl border border-[var(--surface-border)]">
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">Fontes Personalizadas Ativas</span>
                     {page.siteConfig.theme?.typography?.customHeadingFontName && (
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-white/10 text-xs text-white">
+                      <div className="flex items-center justify-between p-2 rounded-lg glass-sm border border-[var(--surface-border)] text-xs text-slate-900 dark:text-white">
                         <span>📌 Títulos: <strong>{page.siteConfig.theme.typography.customHeadingFontName}</strong></span>
                         <button
                           type="button"
@@ -4707,14 +4716,14 @@ export default function PageEditor({ params }: PageProps) {
                             setPage({ ...page, siteConfig: { ...page.siteConfig, theme: { ...(page.siteConfig.theme || {}), typography: updatedTypography } } });
                             setHasUnsavedChanges(true);
                           }}
-                          className="text-[9px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                          className="text-[9px] text-red-500 dark:text-red-400 hover:underline font-semibold cursor-pointer"
                         >
                           Remover
                         </button>
                       </div>
                     )}
                     {page.siteConfig.theme?.typography?.customBodyFontName && (
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-white/10 text-xs text-white">
+                      <div className="flex items-center justify-between p-2 rounded-lg glass-sm border border-[var(--surface-border)] text-xs text-slate-900 dark:text-white">
                         <span>📄 Textos: <strong>{page.siteConfig.theme.typography.customBodyFontName}</strong></span>
                         <button
                           type="button"
@@ -4728,7 +4737,7 @@ export default function PageEditor({ params }: PageProps) {
                             setPage({ ...page, siteConfig: { ...page.siteConfig, theme: { ...(page.siteConfig.theme || {}), typography: updatedTypography } } });
                             setHasUnsavedChanges(true);
                           }}
-                          className="text-[9px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                          className="text-[9px] text-red-500 dark:text-red-400 hover:underline font-semibold cursor-pointer"
                         >
                           Remover
                         </button>
@@ -4739,14 +4748,14 @@ export default function PageEditor({ params }: PageProps) {
 
                 {/* Font Live Preview Box */}
                 <div className="space-y-2 pt-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
                     Pré-visualização do Estilo das Fontes
                   </span>
-                  <div className="p-4 rounded-xl bg-zinc-950 border border-white/10 space-y-2 select-none shadow-inner">
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-2 select-none shadow-inner">
                     <div>
                       <span className="text-[9px] text-slate-500 font-semibold block uppercase">Título Grande:</span>
                       <h4 
-                        className="text-base text-white truncate"
+                        className="text-base text-slate-900 dark:text-white truncate"
                         style={{
                           fontFamily: `'${page.siteConfig.theme?.typography?.headingFont || 'Playfair Display'}', serif`,
                           fontWeight: page.siteConfig.theme?.typography?.headingWeight || '400'
@@ -4758,7 +4767,7 @@ export default function PageEditor({ params }: PageProps) {
                     <div>
                       <span className="text-[9px] text-slate-500 font-semibold block uppercase">Parágrafo do Site:</span>
                       <p 
-                        className="text-xs text-slate-300 leading-relaxed font-light"
+                        className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-light"
                         style={{
                           fontFamily: `'${page.siteConfig.theme?.typography?.bodyFont || 'Inter'}', sans-serif`
                         }}
@@ -4771,7 +4780,7 @@ export default function PageEditor({ params }: PageProps) {
               </div>
 
                 {/* Seção 3: Identidade Visual */}
-                <div className="space-y-4 border-t border-white/5 pt-4">
+                <div className="space-y-4 border-t border-[var(--surface-border)] pt-4">
                   <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-wider block">🖼️ Identidade Visual</span>
 
                   {/* Logotipo */}
@@ -4828,21 +4837,21 @@ export default function PageEditor({ params }: PageProps) {
           {/* TAB 3: CONFIGURATIONS & SEO */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Configurações Gerais & SEO</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pb-2">Configurações Gerais & SEO</h3>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between bg-zinc-900/40 p-4 rounded-xl border border-white/5">
+                <div className="flex items-center justify-between glass-sm p-4 rounded-xl border border-[var(--surface-border)]">
                   <div>
-                    <label className="text-xs text-white font-bold uppercase tracking-wider block">Status da Página</label>
-                    <p className="text-[10px] text-slate-500">Se a página está ativa ou pausada para acesso público.</p>
+                    <label className="text-xs text-slate-900 dark:text-white font-bold uppercase tracking-wider block">Status da Página</label>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400">Se a página está ativa ou pausada para acesso público.</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setPage({ ...page, isActive: !page.isActive })}
                     className={`h-8 px-3 rounded-lg text-xs font-bold uppercase cursor-pointer transition-all ${
                       page.isActive
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'glass-sm text-slate-500 border border-[var(--surface-border)]'
                     }`}
                   >
                     {page.isActive ? 'Ativa' : 'Pausada'}
@@ -4850,7 +4859,7 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Nome da Psicóloga / Título da Página</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Nome da Psicóloga / Título da Página</label>
                   <Input
                     type="text"
                     className="brand-input"
@@ -4882,7 +4891,7 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Slug da URL</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Slug da URL</label>
                   <Input
                     type="text"
                     className="brand-input"
@@ -4896,14 +4905,14 @@ export default function PageEditor({ params }: PageProps) {
 
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Domínio de Acesso (Custom Domain)</label>
+                    <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Domínio de Acesso (Custom Domain)</label>
                     {cfStatus === 'active' && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                         🟢 SSL Válido
                       </span>
                     )}
                     {cfStatus && cfStatus !== 'active' && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
                         🟡 Pendente DNS
                       </span>
                     )}
@@ -4943,23 +4952,23 @@ export default function PageEditor({ params }: PageProps) {
                   </div>
 
                   {cfDnsRecords.length > 0 && (
-                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2 text-xs font-mono">
-                      <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400">
+                    <div className="p-3 rounded-xl glass-sm border border-[var(--surface-border)] space-y-2 text-xs font-mono">
+                      <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                         📋 Registros DNS para inclusão no seu provedor:
                       </p>
                       {cfDnsRecords.map((rec, i) => (
-                        <div key={i} className="p-2 rounded bg-zinc-900 border border-white/5 space-y-1">
-                          <div className="flex items-center justify-between text-[10px] text-slate-400">
-                            <span className="font-bold text-indigo-400">{rec.type}</span>
+                        <div key={i} className="p-2 rounded glass-sm border border-[var(--surface-border)] space-y-1">
+                          <div className="flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-400">
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{rec.type}</span>
                             <span>{rec.description}</span>
                           </div>
-                          <div className="flex items-center justify-between gap-2 text-slate-200">
+                          <div className="flex items-center justify-between gap-2 text-slate-800 dark:text-slate-200">
                             <span className="truncate"><strong>Host:</strong> {rec.name}</span>
-                            <span className="truncate text-slate-400"><strong>Valor:</strong> {rec.value}</span>
+                            <span className="truncate text-slate-500 dark:text-slate-400"><strong>Valor:</strong> {rec.value}</span>
                             <button
                               type="button"
                               onClick={() => navigator.clipboard.writeText(rec.value)}
-                              className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] text-slate-300 font-sans cursor-pointer"
+                              className="px-1.5 py-0.5 rounded glass-sm text-[9px] text-slate-700 dark:text-slate-300 font-sans cursor-pointer"
                             >
                               Copiar
                             </button>
@@ -4974,10 +4983,10 @@ export default function PageEditor({ params }: PageProps) {
                   </p>
                 </div>
 
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pt-4 pb-2">🔍 SEO & Mecanismos de Busca</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">🔍 SEO & Mecanismos de Busca</h3>
                 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Título no Google (Meta Title)</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Título no Google (Meta Title)</label>
                   <Input
                     type="text"
                     className="brand-input"
@@ -4994,10 +5003,10 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Descrição no Google (Meta Description)</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Descrição no Google (Meta Description)</label>
                   <textarea
                     rows={3}
-                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start)] outline-none text-white transition-colors resize-none"
+                    className="w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none focus:border-[var(--brand-gradient-start)]"
                     placeholder={`Agende sua consulta de psicologia com ${page.title || 'Dra. Geovanna Santos'}.`}
                     value={page.seoConfig.metaDescription || ''}
                     onChange={(e) => {
@@ -5010,13 +5019,13 @@ export default function PageEditor({ params }: PageProps) {
                   </p>
                 </div>
 
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pt-4 pb-2">Redirecionamento Pós-Triagem</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">Redirecionamento Pós-Triagem</h3>
                 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mensagem Padrão Whatsapp</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Mensagem Padrão Whatsapp</label>
                   <textarea
                     rows={3}
-                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start)] outline-none text-white transition-colors resize-none"
+                    className="w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none focus:border-[var(--brand-gradient-start)]"
                     placeholder="Olá, preenchi a triagem pelo site. Meu nome é {{nome}}."
                     value={page.formFlow.settings?.whatsappMessageTemplate || ''}
                     onChange={(e) => {
@@ -5025,7 +5034,7 @@ export default function PageEditor({ params }: PageProps) {
                     }}
                   />
                   <p className="text-[9px] text-slate-500 pt-0.5 leading-relaxed">
-                    Você pode usar o marcador <code className="text-slate-350 font-bold">{"{{nome}}"}</code> para inserir dinamicamente a resposta digitada pelo paciente.
+                    Você pode usar o marcador <code className="text-slate-600 dark:text-slate-350 font-bold">{"{{nome}}"}</code> para inserir dinamicamente a resposta digitada pelo paciente.
                   </p>
                 </div>
 
@@ -5058,17 +5067,17 @@ export default function PageEditor({ params }: PageProps) {
         {!sidebarCollapsed && (
           <div 
             onMouseDown={startResizing}
-            className="w-2 hover:w-3 cursor-col-resize bg-zinc-950 border-x border-white/[0.04] hover:border-[var(--brand-gradient-start)]/20 active:border-[var(--brand-gradient-start)]/40 transition-all self-stretch h-full shrink-0 select-none relative group flex items-center justify-center"
+            className="w-2 hover:w-3 cursor-col-resize brand-sidebar border-x border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)]/20 active:border-[var(--brand-gradient-start)]/40 transition-all self-stretch h-full shrink-0 select-none relative group flex items-center justify-center"
           >
             {/* Visual pill indicator */}
-            <div className="w-[2px] h-10 bg-white/8 group-hover:bg-[var(--brand-gradient-start)]/60 group-active:bg-[var(--brand-gradient-start)] rounded-full transition-colors" />
+            <div className="w-[2px] h-10 bg-slate-300 dark:bg-white/10 group-hover:bg-[var(--brand-gradient-start)]/60 group-active:bg-[var(--brand-gradient-start)] rounded-full transition-colors" />
           </div>
         )}
 
         {sidebarCollapsed && (
           <button
             onClick={() => setSidebarCollapsed(false)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-[#121215] border border-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-all z-50"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl glass-sm border border-[var(--surface-border)] text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center cursor-pointer shadow-lg hover:scale-105 active:scale-95 transition-all z-50"
             title="Expandir Painel"
           >
             <ChevronRight className="h-4 w-4" />
@@ -5076,7 +5085,7 @@ export default function PageEditor({ params }: PageProps) {
         )}
 
         {/* Right Side: Split Canvas workspace */}
-        <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 bg-[#09090B]">
+        <div className="flex-1 overflow-hidden relative flex flex-col min-h-0 bg-[var(--brand-bg-color)]">
           {/* Overlay to capture mouse events when dragging over iframe */}
           {isResizing && (
             <div className="absolute inset-0 z-50 cursor-col-resize bg-transparent" />
@@ -5085,14 +5094,14 @@ export default function PageEditor({ params }: PageProps) {
           {/* TAB 1 & 3: IFRAME LIVE PREVIEW PREVIEW */}
           {activeTab !== 'flow' && (
             <div className="w-full h-full flex flex-col relative">
-              <div className="h-10 border-b border-white/5 bg-[#121215] flex items-center justify-between px-4 shrink-0">
+              <div className="h-10 border-b border-[var(--surface-border)] brand-toolbar flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-700 dark:text-slate-400 font-semibold tracking-wider uppercase flex items-center gap-1.5">
                     <Eye className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Visualização
                   </span>
                   {tenant && (
-                    <span className="text-[9px] font-mono text-slate-500 hidden sm:inline border-l border-white/5 pl-2">
+                    <span className="text-[9px] font-mono text-slate-500 hidden sm:inline border-l border-[var(--surface-border)] pl-2">
                       {tenant.slug}/{page.slug}
                     </span>
                   )}
@@ -5101,13 +5110,13 @@ export default function PageEditor({ params }: PageProps) {
                 {/* Preview Actions Bar */}
                 <div className="flex items-center gap-1.5">
                   {/* Device Selector Switcher */}
-                  <div className="flex items-center gap-0.5 bg-zinc-900 border border-white/5 p-0.5 rounded-lg">
+                  <div className="flex items-center gap-0.5 glass-sm border border-[var(--surface-border)] p-0.5 rounded-lg">
                     <button
                       onClick={() => setPreviewMode('desktop')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                         previewMode === 'desktop'
-                          ? 'bg-zinc-800 text-white shadow-sm font-bold'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-slate-200 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm font-bold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                       title="Visualização Desktop"
                     >
@@ -5118,8 +5127,8 @@ export default function PageEditor({ params }: PageProps) {
                       onClick={() => setPreviewMode('mobile')}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                         previewMode === 'mobile'
-                          ? 'bg-zinc-800 text-white shadow-sm font-bold'
-                          : 'text-slate-400 hover:text-white'
+                          ? 'bg-slate-200 dark:bg-zinc-800 text-slate-900 dark:text-white shadow-sm font-bold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                       title="Visualização Mobile"
                     >
@@ -5128,12 +5137,24 @@ export default function PageEditor({ params }: PageProps) {
                     </button>
                   </div>
 
-                  {/* Expand / Collapse Actions */}
-                  <div className="flex items-center gap-0.5 bg-zinc-900 border border-white/5 p-0.5 rounded-lg">
+                  {/* Expand / Collapse Actions & Theme Toggle */}
+                  <div className="flex items-center gap-0.5 glass-sm border border-[var(--surface-border)] p-0.5 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="p-1.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[var(--surface-hover)] cursor-pointer transition-all flex items-center justify-center"
+                      title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+                    >
+                      {theme === 'dark' ? (
+                        <Sun className="h-3.5 w-3.5" />
+                      ) : (
+                        <Moon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                      className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-zinc-850 cursor-pointer transition-all flex items-center justify-center"
+                      className="p-1.5 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-[var(--surface-hover)] cursor-pointer transition-all flex items-center justify-center"
                       title={sidebarCollapsed ? "Minimizar Preview (Exibir Editor)" : "Expandir Preview (Ocultar Editor)"}
                     >
                       {sidebarCollapsed ? (
@@ -5147,9 +5168,9 @@ export default function PageEditor({ params }: PageProps) {
               </div>
 
               <div 
-                className="flex-1 w-full bg-[#050507] overflow-y-auto flex items-center justify-center p-6 relative custom-scrollbar"
+                className="flex-1 w-full bg-[var(--brand-bg-color)] overflow-y-auto flex items-center justify-center p-6 relative custom-scrollbar"
                 style={{
-                  backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
+                  backgroundImage: 'radial-gradient(var(--surface-border) 1px, transparent 1px)',
                   backgroundSize: '20px 20px',
                 }}
               >
@@ -5158,7 +5179,7 @@ export default function PageEditor({ params }: PageProps) {
                     ref={iframeRef}
                     onLoad={handleIframeLoad}
                     src={previewIframeUrl}
-                    className="w-full h-full border-0 bg-[#09090B] rounded-lg shadow-inner"
+                    className="w-full h-full border border-[var(--surface-border)] bg-white dark:bg-[#09090B] rounded-lg shadow-inner"
                     sandbox="allow-scripts allow-same-origin"
                   />
                 ) : (
@@ -5189,9 +5210,9 @@ export default function PageEditor({ params }: PageProps) {
           {/* TAB 2: REACT FLOW WORKSPACE */}
           {activeTab === 'flow' && (
             <div className="w-full h-full relative" style={{ height: '100%' }}>
-              <div className="absolute top-4 left-4 z-10 glass-md border border-white/10 rounded-xl p-3 max-w-xs space-y-1 shadow-xl">
-                <h4 className="text-[10px] font-bold text-white uppercase tracking-wider">Editor de Fluxograma</h4>
-                <p className="text-[9px] text-slate-400 leading-relaxed">
+              <div className="absolute top-4 left-4 z-10 glass-md border border-[var(--surface-border)] rounded-xl p-3 max-w-xs space-y-1 shadow-xl">
+                <h4 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">Editor de Fluxograma</h4>
+                <p className="text-[9px] text-slate-600 dark:text-slate-400 leading-relaxed">
                   Crie blocos e arraste as conexões do lado direito (Handles vermelhos) para o lado esquerdo de outros blocos para definir a ordem das perguntas.
                 </p>
               </div>
@@ -5223,19 +5244,19 @@ export default function PageEditor({ params }: PageProps) {
         maxWidth="max-w-md"
       >
         <div className="space-y-4 text-left p-1">
-          <div className="flex items-center gap-2.5 border-b border-white/5 pb-3">
+          <div className="flex items-center gap-2.5 border-b border-[var(--surface-border)] pb-3">
             <div className="p-2 rounded-lg bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)]">
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Subir Fonte Personalizada</h3>
-              <p className="text-[10px] text-slate-400">Envie arquivos de fonte própria (.ttf ou .otf) para o seu site</p>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Subir Fonte Personalizada</h3>
+              <p className="text-[10px] text-slate-600 dark:text-slate-400">Envie arquivos de fonte própria (.ttf ou .otf) para o seu site</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-300 block">
+              <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
                 Onde você deseja aplicar essa fonte?
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -5244,8 +5265,8 @@ export default function PageEditor({ params }: PageProps) {
                   onClick={() => setCustomFontTarget('heading')}
                   className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
                     customFontTarget === 'heading'
-                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-white shadow-md'
-                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:text-white'
+                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-slate-900 dark:text-white shadow-md'
+                      : 'glass-sm border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <span className="text-xs font-bold block">📌 Títulos Grandes</span>
@@ -5256,8 +5277,8 @@ export default function PageEditor({ params }: PageProps) {
                   onClick={() => setCustomFontTarget('body')}
                   className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
                     customFontTarget === 'body'
-                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-white shadow-md'
-                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:text-white'
+                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-slate-900 dark:text-white shadow-md'
+                      : 'glass-sm border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <span className="text-xs font-bold block">📄 Parágrafos e Textos</span>
@@ -5266,7 +5287,7 @@ export default function PageEditor({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-white/5">
+            <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
               <input
                 type="file"
                 id="custom-font-file-input"
@@ -5282,7 +5303,7 @@ export default function PageEditor({ params }: PageProps) {
                 type="button"
                 disabled={fontUploading}
                 onClick={() => document.getElementById('custom-font-file-input')?.click()}
-                className="w-full py-3 px-4 rounded-xl bg-zinc-900 border border-white/15 hover:border-[var(--brand-gradient-start)] text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+                className="w-full py-3 px-4 rounded-xl glass-sm border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-slate-900 dark:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
               >
                 {fontUploading ? (
                   <>
@@ -5302,7 +5323,7 @@ export default function PageEditor({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="flex justify-end pt-3 border-t border-white/5">
+          <div className="flex justify-end pt-3 border-t border-[var(--surface-border)]">
             <Button
               type="button"
               variant="secondary"

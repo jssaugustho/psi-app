@@ -1,101 +1,93 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { api, PipelineColumn } from '@/lib/api';
-import { Card, Button, Input, Select } from '@psi/ui';
+import { api, Tenant, User } from '@/lib/api';
+import { Card, Button, Input } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
-import { deriveEmailDomain } from '@/lib/email-domain';
+import { useAuth } from '@/context/AuthContext';
 import { MediaLibraryModal } from '@/components/media-library-modal';
 import {
-  Edit,
-  Trash2,
+  User as UserIcon,
+  Palette,
+  Globe,
+  Image as ImageIcon,
+  Check,
   Plus,
-  X,
-  Settings
+  Trash2,
+  Copy,
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+  AlertCircle,
+  HelpCircle,
+  Camera,
+  Lock,
+  Mail
 } from 'lucide-react';
 
-interface TrafficSourceObj {
-  id: string;
-  name: string;
-  color: string;
-  utm_source: string;
-  utm_medium: string;
-  utm_campaign: string;
+interface TenantSettingsFormProps {
+  tenant: Tenant;
+  initialUser: User;
 }
 
-const PRESETS = [
-  { name: 'Indigo', hex: '#6366F1' },
-  { name: 'Violet', hex: '#8B5CF6' },
-  { name: 'Fuchsia', hex: '#D946EF' },
-  { name: 'Pink', hex: '#EC4899' },
-  { name: 'Rose', hex: '#F43F5E' },
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Orange', hex: '#F97316' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Yellow', hex: '#EAB308' },
-  { name: 'Lime', hex: '#84CC16' },
-  { name: 'Green', hex: '#22C55E' },
-  { name: 'Emerald', hex: '#10B981' },
-  { name: 'Teal', hex: '#14B8A6' },
-  { name: 'Cyan', hex: '#06B6D4' },
-  { name: 'Sky', hex: '#0EA5E9' },
-  { name: 'Blue', hex: '#3B82F6' },
+const COLOR_PRESETS = [
+  { name: 'Terracota Nude', primary: '#CC8667', secondary: '#E6A88A', bg: '#FAFAFA', contrast: '#FFFFFF' },
+  { name: 'Azul Sereno', primary: '#4F46E5', secondary: '#06B6D4', bg: '#F8FAFC', contrast: '#FFFFFF' },
+  { name: 'Verde Botânico', primary: '#059669', secondary: '#34D399', bg: '#F0FDF4', contrast: '#FFFFFF' },
+  { name: 'Rosa Fúcsia', primary: '#E11D48', secondary: '#FB7185', bg: '#FFF1F2', contrast: '#FFFFFF' },
+  { name: 'Violeta Calmo', primary: '#7C3AED', secondary: '#A78BFA', bg: '#F5F3FF', contrast: '#FFFFFF' },
+  { name: 'Âmbar Quente', primary: '#D97706', secondary: '#FBBF24', bg: '#FFFBEB', contrast: '#FFFFFF' },
+  { name: 'Escuro Elegante', primary: '#CC8667', secondary: '#E6A88A', bg: '#09090B', contrast: '#FFFFFF' },
 ];
 
-const normalizeTrafficSources = (sources: any[] | undefined | null): TrafficSourceObj[] => {
-  if (!sources || !Array.isArray(sources)) {
-    sources = ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook'];
-  }
-  return sources.map((src, idx) => {
-    if (typeof src === 'string') {
-      const id = src.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-');
-      const colors = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#14B8A6'];
-      return {
-        id,
-        name: src,
-        color: colors[idx % colors.length] || '#6366F1',
-        utm_source: id,
-        utm_medium: '',
-        utm_campaign: '',
-      };
-    }
-    return {
-      id: src.id || src.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || `source-${idx}`,
-      name: src.name || 'Sem nome',
-      color: src.color || '#6366F1',
-      utm_source: src.utm_source || '',
-      utm_medium: src.utm_medium || '',
-      utm_campaign: src.utm_campaign || '',
-    };
-  });
-};
+const DEFAULT_SPECIALTIES_PRESETS = [
+  'Terapia Cognitivo-Comportamental (TCC)',
+  'Psicanálise',
+  'Ansiedade e Síndrome do Pânico',
+  'Depressão e Transtornos do Humor',
+  'Autoconhecimento e Autoestima',
+  'Terapia de Casal e Relacionamentos',
+  'Gestalt-Terapia',
+  'Terapia de Aceitação e Compromisso (ACT)',
+  'Terapia Comportamental Dialética (DBT)',
+  'Burnout e Estresse Profissional',
+  'Luto, Perdas e Transições de Vida',
+  'Transtorno do Espectro Autista (TEA) & TDAH',
+  'Trauma e TEPT',
+  'Transtornos Alimentares',
+  'Psicologia Perinatal e Maternidade',
+  'Orientação Profissional e Carreira',
+  'Neuropsicologia & Avaliação',
+  'Psicologia Humanista & Fenomenológica',
+];
 
-const ColorPicker = ({
+const ColorPickerField = ({
   label,
+  description,
   value,
   onChange,
 }: {
   label: string;
+  description: string;
   value: string;
   onChange: (v: string) => void;
 }) => (
-  <div className="flex items-center gap-3 py-2">
-    <div className="relative flex-shrink-0">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-8 h-8 rounded-lg border-0 cursor-pointer p-0 overflow-hidden"
-        style={{ appearance: 'none' }}
-      />
-    </div>
+  <div className="flex items-center gap-4 p-4 rounded-2xl border border-[var(--surface-border)] bg-white/[0.01]">
+    <input
+      type="color"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-10 h-10 rounded-xl border-0 cursor-pointer p-0 overflow-hidden bg-transparent shrink-0"
+    />
     <div className="flex-1 min-w-0">
-      <p className="text-xs font-semibold opacity-70 uppercase tracking-wide truncate">{label}</p>
+      <p className="text-xs font-bold text-slate-200">{label}</p>
+      <p className="text-[11px] text-slate-400 mt-0.5">{description}</p>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-0.5 w-full bg-transparent border-b border-slate-700 text-xs font-mono focus:outline-none focus:border-indigo-500 py-0.5 text-slate-200"
+        className="mt-1 w-28 bg-white/5 border border-[var(--surface-border)] rounded-lg px-2 py-0.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-[var(--brand-gradient-start)]"
       />
     </div>
   </div>
@@ -103,54 +95,58 @@ const ColorPicker = ({
 
 const UploadBox = ({
   label,
+  description,
   url,
+  bgColor,
+  tenantId,
   onChange,
   onClear,
-  tenantId,
-  previewBg,
 }: {
   label: string;
+  description: string;
   url: string;
+  bgColor?: string;
+  tenantId?: string;
   onChange: (url: string) => void;
   onClear: () => void;
-  tenantId: string;
-  previewBg: string;
 }) => {
   const [libraryOpen, setLibraryOpen] = useState(false);
 
-  const handleClick = () => {
-    setLibraryOpen(true);
-  };
-
   return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-semibold opacity-70 uppercase tracking-wide">{label}</p>
+    <div className="space-y-2">
+      <div>
+        <h4 className="text-xs font-bold text-slate-200">{label}</h4>
+        <p className="text-[11px] text-slate-400 leading-tight">{description}</p>
+      </div>
+
       <div
-        onClick={handleClick}
-        className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-slate-700/60 overflow-hidden cursor-pointer hover:border-slate-500/80 transition-all group"
-        style={{ minHeight: 90, backgroundColor: previewBg }}
+        onClick={() => setLibraryOpen(true)}
+        style={{ backgroundColor: bgColor || 'var(--brand-bg-color, transparent)' }}
+        className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--surface-border)] overflow-hidden cursor-pointer hover:border-[var(--brand-gradient-start)] transition-all group p-4 min-h-[130px]"
       >
         {url ? (
           <>
-            <img src={url} alt={label} className="max-h-16 max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
+            <img src={url} alt={label} className="max-h-24 max-w-full object-contain p-1 transition-transform duration-300 group-hover:scale-105" />
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onClear();
               }}
-              className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600 transition-colors shadow z-10 border-none cursor-pointer"
-              title="Remover"
+              className="absolute top-2 right-2 w-6 h-6 bg-red-500/90 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 transition-colors shadow z-10 border-none cursor-pointer"
+              title="Remover imagem"
             >
               ✕
             </button>
-            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 border border-white/10 text-[9px] font-bold text-white uppercase tracking-wider pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity">
-              Mudar
+            <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg bg-black/80 border border-white/10 text-[10px] font-bold text-white uppercase tracking-wider pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity">
+              Trocar Imagem
             </div>
           </>
         ) : (
-          <div className="text-xs opacity-50 hover:opacity-100 transition-opacity py-4 px-6 flex flex-col items-center gap-1 text-slate-400">
-            <span>+ Selecionar</span>
+          <div className="text-center space-y-2 py-3">
+            <Upload className="w-6 h-6 text-slate-500 mx-auto group-hover:text-[var(--brand-gradient-start)] transition-colors" />
+            <span className="text-xs text-slate-300 font-semibold block">Escolher da Galeria de Fotos</span>
+            <span className="text-[10px] text-slate-500 block">Formato recomendado: PNG transparente ou JPG</span>
           </div>
         )}
       </div>
@@ -158,1026 +154,941 @@ const UploadBox = ({
       <MediaLibraryModal
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
-        tenantId={tenantId}
-        onSelectImage={(asset) => {
-          onChange(asset.url);
-          setLibraryOpen(false);
-        }}
+        tenantId={tenantId || ''}
+        onSelectImage={(asset) => onChange(asset.url)}
       />
     </div>
   );
 };
 
-interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  domain: string | null;
-  isPrimary: boolean;
-  ownerId?: string | null;
-  logoLightUrl: string | null;
-  logoDarkUrl: string | null;
-  iconLightUrl: string | null;
-  iconDarkUrl: string | null;
-  gradientColorStart: string;
-  gradientColorEnd: string;
-  contrastColor: string;
-  bgLightColor?: string;
-  bgDarkColor?: string;
-  cardLightColor?: string;
-  cardDarkColor?: string;
-  textLightColor?: string;
-  textDarkColor?: string;
-  emailDomain?: string | null;
-  resendApiKey?: string | null;
-  trafficSources?: string[];
-  defaultTrafficSource?: string;
-}
+/* Componente Dedicado de Foto de Perfil */
+const ProfileAvatarField = ({
+  avatarUrl,
+  userInitials,
+  tenantId,
+  onChange,
+  onRemove,
+}: {
+  avatarUrl: string;
+  userInitials: string;
+  tenantId?: string;
+  onChange: (url: string) => void;
+  onRemove: () => void;
+}) => {
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
-interface TenantSettingsFormProps {
-  tenant: Tenant;
-}
+  return (
+    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 p-5 rounded-2xl border border-[var(--surface-border)] bg-white/[0.01]">
+      <div className="relative group shrink-0">
+        <div
+          onClick={() => setLibraryOpen(true)}
+          className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-[var(--brand-gradient-start)]/40 shadow-xl cursor-pointer relative bg-slate-900 flex items-center justify-center group-hover:border-[var(--brand-gradient-start)] transition-all"
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="Foto de Perfil" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: 'var(--brand-gradient)' }}>
+              {userInitials || 'P'}
+            </div>
+          )}
 
-export default function TenantSettingsForm({ tenant }: TenantSettingsFormProps) {
+          {/* Overlay de Câmera no Hover */}
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]">
+            <Camera className="w-6 h-6 mb-1 text-[var(--brand-gradient-start)]" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Alterar</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-2 text-center sm:text-left">
+        <div>
+          <h4 className="text-sm font-bold text-slate-100">Sua Foto de Perfil Profissional</h4>
+          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+            Essa foto de rosto será exibida no seu perfil do app e nos cartões 'Sobre a Profissional' nas suas landing pages.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+          <Button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            className="text-xs font-semibold px-4 py-2 cursor-pointer flex items-center gap-1.5"
+          >
+            <Camera className="w-3.5 h-3.5" /> Escolher Foto
+          </Button>
+
+          {avatarUrl && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="text-xs font-semibold px-3 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors bg-transparent border-none cursor-pointer"
+            >
+              Remover Foto
+            </button>
+          )}
+        </div>
+      </div>
+
+      <MediaLibraryModal
+        isOpen={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        tenantId={tenantId || ''}
+        onSelectImage={(asset) => onChange(asset.url)}
+      />
+    </div>
+  );
+};
+
+export default function TenantSettingsForm({ tenant, initialUser }: TenantSettingsFormProps) {
   const { reloadBrand } = useBrand();
-  
-  // State for active tab
-  const [activeTab, setActiveTab] = useState<'geral' | 'visual' | 'email' | 'crm'>('geral');
-  
-  // Form State
-  const [name, setName] = useState(tenant.name || '');
-  const [slug, setSlug] = useState(tenant.slug || '');
-  const [domain, setDomain] = useState(tenant.domain || '');
-  
-  // Cores
-  const [gradientColorStart, setGradientColorStart] = useState(tenant.gradientColorStart || '#4F46E5');
-  const [gradientColorEnd, setGradientColorEnd] = useState(tenant.gradientColorEnd || '#06B6D4');
+  const { setUser: setGlobalAuthUser } = useAuth();
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'perfil' | 'sites-branding' | 'dominios' | 'midia'>('perfil');
+
+  // 1. Perfil Profissional State
+  const [user, setUser] = useState<User>(initialUser);
+  const [nome, setNome] = useState(initialUser?.nome || '');
+  const [sobrenome, setSobrenome] = useState(initialUser?.sobrenome || '');
+  const [telefone, setTelefone] = useState(initialUser?.telefone || '');
+  const [crp, setCrp] = useState(initialUser?.crp || '');
+  const [cityState, setCityState] = useState(initialUser?.city_state || '');
+  const [instagram, setInstagram] = useState(initialUser?.instagram || '');
+  const [bio, setBio] = useState(initialUser?.bio || '');
+  const [avatarUrl, setAvatarUrl] = useState(initialUser?.avatar_url || '');
+  const [specialties, setSpecialties] = useState<string[]>(initialUser?.specialties || []);
+  const [newSpecialtyInput, setNewSpecialtyInput] = useState('');
+
+  // Seguranca e Senha
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // 2. Identidade Visual dos Sites State (Logo + Favicon + Cores + Fundo + Contraste)
+  const [logoUrl, setLogoUrl] = useState(tenant.logoDarkUrl || tenant.logoLightUrl || '');
+  const [iconUrl, setIconUrl] = useState(tenant.iconLightUrl || tenant.iconDarkUrl || '');
+  const [primaryColor, setPrimaryColor] = useState(tenant.defaultSitePrimaryColor || '#CC8667');
+  const [secondaryColor, setSecondaryColor] = useState(tenant.defaultSiteSecondaryColor || '#E6A88A');
+  const [bgColor, setBgColor] = useState(tenant.bgLightColor || '#FAFAFA');
   const [contrastColor, setContrastColor] = useState(tenant.contrastColor || '#FFFFFF');
 
+  // 3. Domínio dos Sites State
+  const [slug, setSlug] = useState(tenant.slug || '');
+  const [domain, setDomain] = useState(tenant.domain || '');
 
-  // Logos & Icons
-  const [logoLightUrl, setLogoLightUrl] = useState(tenant.logoLightUrl || '');
-  const [logoDarkUrl, setLogoDarkUrl] = useState(tenant.logoDarkUrl || '');
-  const [iconLightUrl, setIconLightUrl] = useState(tenant.iconLightUrl || '');
-  const [iconDarkUrl, setIconDarkUrl] = useState(tenant.iconDarkUrl || '');
+  // 4. Biblioteca de Mídia State
+  const [mediaAssets, setMediaAssets] = useState<any[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Email Config
-  const [emailDomain, setEmailDomain] = useState(tenant.emailDomain || '');
-
-  // Domínio de envio efetivo:
-  //   - usa emailDomain explícito se preenchido
-  //   - senão deriva no-reply.<rootDomain> do domínio principal
-  //   - o no-reply sempre fica no nível raiz, mesmo se o domínio já for um subdomínio
-  const derivedEmailDomain = React.useMemo(() => {
-    if (emailDomain.trim()) return emailDomain.trim();
-    return deriveEmailDomain(domain) ?? '';
-  }, [emailDomain, domain]);
-
-  // CRM Config
-  const [localTrafficSources, setLocalTrafficSources] = useState<TrafficSourceObj[]>(() => {
-    return normalizeTrafficSources(tenant.trafficSources);
-  });
-  const [localDefaultSource, setLocalDefaultSource] = useState(tenant.defaultTrafficSource || 'Manual');
-  const [activeCrmSubTab, setActiveCrmSubTab] = useState<'pipeline' | 'sources'>('pipeline');
-  const [columns, setColumns] = useState<PipelineColumn[]>([]);
-  const [columnsLoading, setColumnsLoading] = useState(false);
-
-  // Estados de Edição do CRM
-  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
-  const [newColumnName, setNewColumnName] = useState('');
-  const [newColumnSlug, setNewColumnSlug] = useState('');
-  const [newColumnColor, setNewColumnColor] = useState('#6366F1');
-  const [newColumnCategory, setNewColumnCategory] = useState<'pendente' | 'acolhimento' | 'paciente' | 'alta' | 'negativa'>('acolhimento');
-
-  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
-  const [newSourceName, setNewSourceName] = useState('');
-  const [newSourceColor, setNewSourceColor] = useState('#6366F1');
-  const [newSourceUtmSource, setNewSourceUtmSource] = useState('');
-  const [newSourceUtmMedium, setNewSourceUtmMedium] = useState('');
-  const [newSourceUtmCampaign, setNewSourceUtmCampaign] = useState('');
-
-  // UI States
+  // UI Status States
   const [loading, setLoading] = useState(false);
-  const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-
-
-  // Carregar colunas do CRM
-  const fetchColumns = useCallback(async () => {
-    setColumnsLoading(true);
+  // Carregar Mídia na aba de galeria
+  const fetchMedia = useCallback(async () => {
+    setMediaLoading(true);
     try {
-      const res = await api.getPipelineColumns(tenant.id);
-      setColumns(res);
+      const list = await api.getMediaAssets(tenant.id);
+      setMediaAssets(list || []);
     } catch (err) {
-      console.error('Erro ao buscar colunas do CRM:', err);
+      console.error('Erro ao carregar mídia:', err);
     } finally {
-      setColumnsLoading(false);
+      setMediaLoading(false);
     }
   }, [tenant.id]);
 
   useEffect(() => {
-    fetchColumns();
-  }, [fetchColumns]);
+    if (activeTab === 'midia') {
+      fetchMedia();
+    }
+  }, [activeTab, fetchMedia]);
 
-  // Adicionar coluna
-  const handleAddColumn = async (name: string, slug: string, color: string, category: 'pendente' | 'acolhimento' | 'paciente' | 'alta' | 'negativa') => {
-    const order = columns.length > 0 ? Math.max(...columns.map((c) => c.order)) + 1 : 1;
-    try {
-      await api.createPipelineColumn({
-        tenant_id: tenant.id,
-        name,
-        slug,
-        color,
-        category,
-        order,
-      });
-      await fetchColumns();
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao criar estágio.');
+  // Handler para Especialidades
+  const handleAddSpecialty = (item: string) => {
+    const trimmed = item.trim();
+    if (trimmed && !specialties.includes(trimmed)) {
+      setSpecialties([...specialties, trimmed]);
+      setNewSpecialtyInput('');
     }
   };
 
-  // Editar coluna
-  const handleUpdateColumn = async (id: string, updates: Partial<PipelineColumn>) => {
-    try {
-      await api.updatePipelineColumn(id, updates);
-      await fetchColumns();
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao atualizar estágio.');
-    }
+  const handleRemoveSpecialty = (item: string) => {
+    setSpecialties(specialties.filter((s) => s !== item));
   };
 
-  // Deletar coluna
-  const handleDeleteColumn = async (id: string) => {
-    try {
-      await api.deletePipelineColumn(id);
-      await fetchColumns();
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao excluir estágio.');
-    }
-  };
+  // Upload direto na galeria de fotos
+  const handleDirectMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Handle Logo/Icon Upload
-  const handleUpload = async (field: 'logoLightUrl' | 'logoDarkUrl' | 'iconLightUrl' | 'iconDarkUrl', file: File) => {
-    setUploadingField(field);
+    setLoading(true);
     setError('');
-    setSuccess('');
     try {
-      const uploadType = field.toLowerCase().includes('icon') ? 'icon' : 'logo';
-      const res = await api.uploadImage(file, uploadType);
-      if (res && res.url) {
-        if (field === 'logoLightUrl') setLogoLightUrl(res.url);
-        if (field === 'logoDarkUrl') setLogoDarkUrl(res.url);
-        if (field === 'iconLightUrl') setIconLightUrl(res.url);
-        if (field === 'iconDarkUrl') setIconDarkUrl(res.url);
-        setSuccess('Upload realizado com sucesso! Salve o formulário para persistir.');
-      } else {
-        throw new Error('Retorno inválido do servidor de upload.');
-      }
+      const { url, key } = await api.uploadImage(file, 'asset');
+      await api.registerMediaAsset({
+        tenantId: tenant.id,
+        name: file.name,
+        key,
+        url,
+        mimeType: file.type || 'image/png',
+        fileSize: file.size,
+        isCropped: false
+      });
+      setSuccess('Imagem adicionada com sucesso à sua biblioteca!');
+      await fetchMedia();
     } catch (err: any) {
-      setError(err.message || 'Erro ao realizar upload do arquivo.');
+      setError(err.message || 'Erro ao enviar foto.');
     } finally {
-      setUploadingField(null);
+      setLoading(false);
+      if (mediaFileInputRef.current) mediaFileInputRef.current.value = '';
     }
   };
 
-  // Submit Changes
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Copiar link da imagem
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(url);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
+
+  // Excluir foto
+  const handleDeleteMedia = async (id: string) => {
+    if (!confirm('Deseja excluir esta foto da sua galeria?')) return;
+    try {
+      await api.deleteMediaAsset(id);
+      setMediaAssets((prev) => prev.filter((a) => a.id !== id));
+      setSuccess('Foto removida!');
+    } catch (err) {
+      alert('Erro ao remover imagem.');
+    }
+  };
+
+  // Salvar Formulário
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setSuccess('');
 
-    const payload = {
-      name,
-      slug: slug.trim().toLowerCase(),
-      domain: domain.trim() || null,
-      gradientColorStart,
-      gradientColorEnd,
-      contrastColor,
-      logoLightUrl: logoLightUrl || null,
-      logoDarkUrl: logoDarkUrl || null,
-      iconLightUrl: iconLightUrl || null,
-      iconDarkUrl: iconDarkUrl || null,
-      emailDomain: emailDomain.trim() || null,
-      traffic_sources: localTrafficSources as any,
-      default_traffic_source: localDefaultSource
-    };
+    // Validação de Senha se preenchida
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        setError('A nova senha deve ter no mínimo 6 caracteres.');
+        setLoading(false);
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setError('A confirmação da nova senha não confere.');
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
-      await api.updateTenantBranding(tenant.id, payload);
-      setSuccess('Configurações atualizadas com sucesso!');
+      // 1. Atualizar Credenciais e Foto no Auth Me se houver alteração
+      let meUpdatedUser = null;
+      try {
+        const updateMeRes = await api.updateMe({
+          nome: nome.trim(),
+          sobrenome: sobrenome.trim(),
+          telefone: telefone.trim() || null,
+          avatarUrl: avatarUrl || null,
+          password: newPassword.trim() || null,
+        });
+        if (updateMeRes && updateMeRes.user) {
+          meUpdatedUser = updateMeRes.user;
+        }
+      } catch (errMe) {
+        console.warn('Atualização /auth/me parcial:', errMe);
+      }
+
+      // 2. Salvar Campos Estendidos do Perfil Profissional
+      const updatedUser = await api.updateProfile(user.id, {
+        nome: nome.trim(),
+        sobrenome: sobrenome.trim(),
+        telefone: telefone.trim() || null,
+        crp: crp.trim() || null,
+        bio: bio.trim() || null,
+        specialties,
+        city_state: cityState.trim() || null,
+        instagram: instagram.trim() || null,
+        avatar_url: avatarUrl || null,
+      });
+
+      const finalUser = updatedUser || meUpdatedUser || user;
+      setUser(finalUser);
+      setGlobalAuthUser(finalUser);
+
+      // Limpar campos de senha
+      setNewPassword('');
+      setConfirmPassword('');
+
+      // 3. Salvar Marca, Cores (Primária, Secundária, Fundo, Contraste) e Domínio dos Sites
+      await api.updateTenantBranding(tenant.id, {
+        name: `${nome.trim()} ${sobrenome.trim()}`.trim() || tenant.name,
+        slug: slug.trim().toLowerCase(),
+        domain: domain.trim() || null,
+        logoLightUrl: logoUrl || null,
+        logoDarkUrl: logoUrl || null,
+        iconLightUrl: iconUrl || null,
+        iconDarkUrl: iconUrl || null,
+        defaultSitePrimaryColor: primaryColor,
+        defaultSiteSecondaryColor: secondaryColor,
+        bgLightColor: bgColor,
+        bgDarkColor: bgColor,
+        contrastColor: contrastColor,
+      });
+
+      setSuccess('Suas configurações foram salvas com sucesso!');
       await reloadBrand();
     } catch (err: any) {
-      setError(err.message || 'Erro ao salvar as configurações.');
+      console.error(err);
+      setError(err.message || 'Não foi possível salvar as configurações.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper arrays for tabs
-  const tabItems = [
-    { id: 'geral', label: 'Geral & Identidade' },
-    { id: 'visual', label: 'Identidade Visual' },
-    { id: 'email', label: 'E-mail' },
-    { id: 'crm', label: 'CRM & Tráfego' },
-  ] as const;
+  const userInitials = `${nome?.[0] || ''}${sobrenome?.[0] || ''}`.toUpperCase();
 
   return (
-    <div className="space-y-6">
-      {/* Mensagens de status */}
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Menu de Abas Simplificado */}
+      <div className="flex items-center gap-2 border-b border-[var(--surface-border)] pb-2 overflow-x-auto custom-scrollbar">
+        <button
+          type="button"
+          onClick={() => setActiveTab('perfil')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+            activeTab === 'perfil'
+              ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <UserIcon className="w-4 h-4" />
+          <span>1. Seu Perfil Profissional</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('sites-branding')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+            activeTab === 'sites-branding'
+              ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <Palette className="w-4 h-4" />
+          <span>2. Visual dos Seus Sites</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('dominios')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+            activeTab === 'dominios'
+              ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>3. Endereço na Internet (Domínio)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('midia')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+            activeTab === 'midia'
+              ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        >
+          <ImageIcon className="w-4 h-4" />
+          <span>4. Sua Galeria de Fotos</span>
+        </button>
+      </div>
+
+      {/* Alertas de Status */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-4 rounded-xl text-center">
-          {error}
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-4 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm p-4 rounded-xl text-center">
-          {success}
+        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs p-4 rounded-xl flex items-center gap-2">
+          <Check className="w-4 h-4 shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
-      {/* Tabs Layout */}
-      <div className="flex border-b border-slate-800/60 overflow-x-auto whitespace-nowrap scrollbar-none gap-2">
-        {tabItems.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="px-4 py-2.5 text-sm font-semibold border-b-2 transition-all relative cursor-pointer"
-            style={{
-              borderColor: activeTab === tab.id ? 'var(--brand-gradient-start)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--brand-text-color)' : 'var(--brand-text-color)',
-              opacity: activeTab === tab.id ? 1 : 0.55
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* ABA 1: PERFIL PROFISSIONAL */}
+        {activeTab === 'perfil' && (
+          <div className="space-y-6 animate-page-enter">
+            {/* Foto de Perfil UI Dedicada */}
+            <Card>
+              <ProfileAvatarField
+                avatarUrl={avatarUrl}
+                userInitials={userInitials}
+                tenantId={tenant.id}
+                onChange={(u) => setAvatarUrl(u)}
+                onRemove={() => setAvatarUrl('')}
+              />
+            </Card>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="p-6">
-          {/* TAB 1: GERAL */}
-          {activeTab === 'geral' && (
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-slate-100 mb-2">Informações Gerais</h3>
+            {/* Informações Pessoais e Profissionais */}
+            <Card>
+              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
+                <UserIcon className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                Informações Pessoais e Profissionais
+              </h3>
+              <p className="text-xs text-slate-400 mb-5">
+                Esses dados são usados na sua identificação profissional e na criação automatizada das suas páginas de atendimento.
+              </p>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Nome da Organização *"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="Ex: Clínica Alpha"
-                />
-                <Input
-                  label="Slug do Subdomínio *"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  required
-                  placeholder="ex: clinica-alpha"
-                  pattern="^[a-z0-9\-]+$"
-                  title="Apenas letras minúsculas, números e hífens."
-                />
-                <div className="md:col-span-2">
-                  <Input
-                    label="Domínio Principal"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    placeholder="Ex: clinicaalpha.com.br"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Domínio onde os usuários acessarão o sistema. Aponte um registro <strong>CNAME</strong> no seu DNS
-                    para este servidor — o SSL é provisionado automaticamente via <strong>Cloudflare Custom Hostnames</strong>.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: IDENTIDADE VISUAL */}
-          {activeTab === 'visual' && (
-            <div className="space-y-8">
-              {/* 🖼️ Logotipos & Ícones */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold uppercase tracking-widest opacity-50">🖼️ Logotipos & Ícones (via Cloudflare R2)</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <UploadBox
-                    label="Logo (Tema Claro)"
-                    url={logoLightUrl}
-                    onChange={(url) => setLogoLightUrl(url)}
-                    onClear={() => setLogoLightUrl('')}
-                    tenantId={tenant.id}
-                    previewBg="#F8FAFC"
-                  />
-                  <UploadBox
-                    label="Logo (Tema Escuro)"
-                    url={logoDarkUrl}
-                    onChange={(url) => setLogoDarkUrl(url)}
-                    onClear={() => setLogoDarkUrl('')}
-                    tenantId={tenant.id}
-                    previewBg="#09090B"
-                  />
-                  <UploadBox
-                    label="Ícone (Tema Claro)"
-                    url={iconLightUrl}
-                    onChange={(url) => setIconLightUrl(url)}
-                    onClear={() => setIconLightUrl('')}
-                    tenantId={tenant.id}
-                    previewBg="#F8FAFC"
-                  />
-                  <UploadBox
-                    label="Ícone (Tema Escuro)"
-                    url={iconDarkUrl}
-                    onChange={(url) => setIconDarkUrl(url)}
-                    onClear={() => setIconDarkUrl('')}
-                    tenantId={tenant.id}
-                    previewBg="#09090B"
-                  />
-                </div>
-              </div>
-
-              {/* Paleta de Cores */}
-              <div className="space-y-4 pt-2">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 pb-1 border-b border-slate-800">Botões & Gradiente</p>
-                  <ColorPicker label="Cor Inicial" value={gradientColorStart} onChange={setGradientColorStart} />
-                  <ColorPicker label="Cor Final" value={gradientColorEnd} onChange={setGradientColorEnd} />
-                  <ColorPicker label="Contraste (texto em botões)" value={contrastColor} onChange={setContrastColor} />
-                </div>
-              </div>
-
-              {/* Preview ao Vivo */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-widest opacity-50">Preview ao Vivo</h3>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Como você se apresenta? (Nome Profissional)</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Exemplo: Dra. Geovanna ou Psicóloga Geovanna</p>
+                  <Input
+                    type="text"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Ex: Dra. Geovanna"
+                    required
+                  />
                 </div>
 
-                {/* Mini AppShell Preview */}
-                <div
-                  className="rounded-2xl overflow-hidden border border-slate-700/40 flex shadow-2xl transition-all duration-300"
-                  style={{
-                    height: 220,
-                    background: '#09090B',
-                    color: '#F4F4F5',
-                  }}
-                >
-                  {/* Mini Sidebar */}
-                  <div
-                    className="w-36 flex-shrink-0 p-3 flex flex-col justify-between border-r"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      backdropFilter: 'blur(6px)',
-                      WebkitBackdropFilter: 'blur(6px)',
-                      borderColor: 'rgba(255, 255, 255, 0.06)',
-                    }}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        {logoDarkUrl ? (
-                          <img src={logoDarkUrl} alt="Logo" className="max-h-6 max-w-[90px] object-contain" />
-                        ) : iconDarkUrl ? (
-                          <>
-                            <img src={iconDarkUrl} alt="Icon" className="w-5 h-5 object-contain" />
-                            <span className="text-xs font-bold truncate">{name || 'Organização'}</span>
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold"
-                              style={{
-                                background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                                color: contrastColor,
-                              }}
-                            >
-                              Ψ
-                            </div>
-                            <span className="text-xs font-bold truncate">{name || 'Organização'}</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        {['Dashboard', 'Agenda', 'CRM'].map((item, i) => (
-                          <div
-                            key={item}
-                            className="px-2 py-1 rounded text-[10px] transition-all"
-                            style={{
-                              background: i === 2 ? `color-mix(in srgb, ${gradientColorStart} 15%, transparent)` : 'transparent',
-                              color: i === 2 ? gradientColorStart : '#F4F4F5',
-                              border: i === 2 ? `1px solid color-mix(in srgb, ${gradientColorStart} 30%, transparent)` : '1px solid transparent',
-                              opacity: i === 2 ? 1 : 0.6,
-                            }}
-                          >
-                            {item}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="text-[9px] opacity-40 truncate">usuario@exemplo.com</div>
-                  </div>
-
-                  {/* Right side */}
-                  <div className="flex-1 flex flex-col min-w-0">
-                    {/* Mini Header */}
-                    <div
-                      className="h-8 shrink-0 flex items-center justify-end px-3 border-b"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                        borderColor: 'rgba(255, 255, 255, 0.06)',
-                      }}
-                    >
-                      <div
-                        className="w-4.5 h-4.5 rounded flex items-center justify-center text-[8px] opacity-75 border"
-                        style={{
-                          borderColor: 'rgba(255, 255, 255, 0.08)',
-                        }}
-                      >
-                        ☀️
-                      </div>
-                    </div>
-
-                    {/* Content area */}
-                    <div className="flex-1 p-3 space-y-2 overflow-hidden">
-                      <p className="text-xs font-bold">Configurações</p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {['Clínica', 'Agenda'].map((label) => (
-                          <div
-                            key={label}
-                            className="rounded-lg p-2 text-[9px] border"
-                            style={{
-                              backgroundColor: '#0F172A',
-                              borderColor: 'rgba(255, 255, 255, 0.06)',
-                            }}
-                          >
-                            <span className="opacity-60">{label}</span>
-                            <div className="font-bold text-[10px] mt-0.5" style={{ color: gradientColorStart }}>Ativo</div>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-1 px-3 py-1.5 rounded-lg text-[10px] font-bold border-none shadow cursor-default"
-                        style={{
-                          background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                          color: contrastColor,
-                        }}
-                      >
-                        Salvar Espaço
-                      </button>
-                    </div>
-                  </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Sobrenome</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Seu sobrenome profissional completo</p>
+                  <Input
+                    type="text"
+                    value={sobrenome}
+                    onChange={(e) => setSobrenome(e.target.value)}
+                    placeholder="Ex: Bastos"
+                    required
+                  />
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* TAB 4: EMAIL */}
-          {activeTab === 'email' && (
-            <div className="space-y-5">
-              <div>
-                <h3 className="text-base font-semibold text-slate-100 mb-1">Configurações de Envio de E-mail</h3>
-                <p className="text-xs text-slate-400">
-                  Os e-mails desta organização serão enviados a partir de um subdomínio dedicado do seu domínio principal.
-                </p>
-              </div>
-
-              {/* Domínio de envio derivado — preview ao vivo */}
-              <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-4 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Endereço remetente padrão</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500 text-sm">no-reply@</span>
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: derivedEmailDomain ? 'var(--brand-gradient-start)' : '#64748b' }}
-                  >
-                    {derivedEmailDomain || <span className="text-slate-600 font-normal italic">configure o domínio principal primeiro</span>}
-                  </span>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Número do CRP / Registro de Classe</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Exigido para exibição no rodapé dos seus sites (Ex: CRP 06/123456)</p>
+                  <Input
+                    type="text"
+                    value={crp}
+                    onChange={(e) => setCrp(e.target.value)}
+                    placeholder="Ex: CRP 06/123456"
+                  />
                 </div>
-                {derivedEmailDomain && (
-                  <p className="text-[10px] text-slate-500">
-                    Os e-mails serão enviados como <strong className="text-slate-400">no-reply@{derivedEmailDomain}</strong>.
-                    Este subdomínio é configurado automaticamente com base no domínio principal da organização.
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">WhatsApp de Atendimento aos Pacientes</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Número para onde os botões 'Agendar Consulta' vão direcionar</p>
+                  <Input
+                    type="tel"
+                    value={telefone}
+                    onChange={(e) => setTelefone(e.target.value)}
+                    placeholder="Ex: (11) 99999-9999"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Cidade e Estado de Atendimento</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Importante para pacientes da sua região (Ex: São Paulo - SP)</p>
+                  <Input
+                    type="text"
+                    value={cityState}
+                    onChange={(e) => setCityState(e.target.value)}
+                    placeholder="Ex: São Paulo - SP"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Instagram Profissional</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">Sua conta do Instagram (Ex: @geovannabastos.psi)</p>
+                  <Input
+                    type="text"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="Ex: @geovannabastos.psi"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Sobre Você e Sua Prática Clínica (Biografia)</label>
+                  <p className="text-[11px] text-slate-400 mb-1.5">
+                    Escreva uma mensagem acolhedora sobre quem você é, sua experiência e como funciona o seu atendimento. Esse texto é usado automaticamente na seção 'Sobre Mim' dos seus sites.
                   </p>
+                  <textarea
+                    rows={5}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    className="w-full glass-sm border border-[var(--surface-border)] rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-[var(--brand-gradient-start)] resize-none"
+                    placeholder="Ex: Sou psicóloga clínica especialista em Terapia Cognitivo-Comportamental. Auxilio adultos e adolescentes no manejo da ansiedade..."
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Especialidades */}
+            <Card>
+              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                Suas Especialidades e Áreas de Atuação
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Quais são as principais demandas e queixas que você atende em consultório?
+              </p>
+
+              {/* Lista de tags selecionadas */}
+              <div className="flex flex-wrap gap-2 mb-4 p-3 rounded-xl bg-white/[0.01] border border-[var(--surface-border)] min-h-[50px] items-center">
+                {specialties.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--brand-gradient-start)]/20 border border-[var(--brand-gradient-start)]/40 text-xs font-semibold text-slate-100"
+                  >
+                    {item}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSpecialty(item)}
+                      className="hover:text-red-400 bg-transparent border-none cursor-pointer text-slate-400 p-0 ml-1"
+                      title="Remover especialidade"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                {specialties.length === 0 && (
+                  <span className="text-xs text-slate-500 italic">Nenhuma especialidade selecionada. Clique nas sugestões abaixo para adicionar.</span>
                 )}
               </div>
 
-              {/* Override opcional */}
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Domínio de envio personalizado <span className="font-normal normal-case text-slate-600">(opcional)</span></p>
-                <Input
-                  label=""
-                  value={emailDomain}
-                  onChange={(e) => setEmailDomain(e.target.value)}
-                  placeholder={derivedEmailDomain || 'no-reply.suaclínica.com.br'}
-                />
-                <p className="text-[10px] text-slate-600">
-                  Deixe em branco para usar o padrão derivado do domínio principal. Preencha apenas se quiser um endereço de envio diferente.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: CRM */}
-          {activeTab === 'crm' && (
-            <div className="space-y-6">
-              {/* Alternador de Abas Interno */}
-              <div className="pt-2">
-                <div className="flex gap-1 p-1 rounded-2xl w-fit glass-sm mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setActiveCrmSubTab('pipeline')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all border-none cursor-pointer"
-                    style={
-                      activeCrmSubTab === 'pipeline'
-                        ? {
-                            background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                            color: contrastColor,
-                            boxShadow: `0 2px 12px color-mix(in srgb, ${gradientColorStart} 25%, transparent)`,
-                          }
-                        : {
-                            background: 'transparent',
-                            color: 'var(--brand-text-color)',
-                            opacity: 0.65,
-                          }
-                    }
-                  >
-                    Estágios do Funil
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveCrmSubTab('sources')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all border-none cursor-pointer"
-                    style={
-                      activeCrmSubTab === 'sources'
-                        ? {
-                            background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                            color: contrastColor,
-                            boxShadow: `0 2px 12px color-mix(in srgb, ${gradientColorStart} 25%, transparent)`,
-                          }
-                        : {
-                            background: 'transparent',
-                            color: 'var(--brand-text-color)',
-                            opacity: 0.65,
-                          }
-                    }
-                  >
-                    Fontes de Tráfego (UTMs)
-                  </button>
+              {/* Adicionar especialidade customizada */}
+              <div className="flex items-center gap-2 mb-6">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={newSpecialtyInput}
+                    onChange={(e) => setNewSpecialtyInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSpecialty(newSpecialtyInput);
+                      }
+                    }}
+                    placeholder="Escreva outra especialidade e pressione Enter (Ex: Transição de Carreira)..."
+                    className="w-full h-10 px-3.5 rounded-xl bg-white/5 border border-[var(--surface-border)] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[var(--brand-gradient-start)] transition-all"
+                  />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddSpecialty(newSpecialtyInput)}
+                  className="h-10 px-5 text-xs font-bold text-white rounded-xl bg-[var(--brand-gradient-start)] hover:brightness-110 active:scale-95 transition-all shrink-0 cursor-pointer border-none flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Adicionar
+                </button>
               </div>
 
-              {/* Sub-Aba 1: Estágios do Funil */}
-              {activeCrmSubTab === 'pipeline' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-200">Gerenciar Estágios</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Configure os estágios clínicos da pipeline do CRM com slugs para integração externa, categorias (5 grupos) e cores.
-                    </p>
-                  </div>
-
-                  {/* Listagem das colunas atuais */}
-                  {columnsLoading ? (
-                    <div className="text-xs text-slate-500 py-4 text-center">Carregando estágios...</div>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                      {columns.map((column, idx) => (
-                        <div key={column.id} className="glass-sm flex items-center justify-between p-3 rounded-xl" style={{ borderLeft: `4px solid ${column.color || '#6366F1'}` }}>
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-xs font-bold text-slate-500 font-mono">
-                              {(idx + 1).toString().padStart(2, '0')}
-                            </span>
-                            <div>
-                              <span className="text-sm font-semibold text-slate-200">{column.name}</span>
-                              <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
-                                slug: {column.slug || '-'} | grupo: {
-                                  column.category === 'pendente' ? 'Pendente' :
-                                  column.category === 'acolhimento' ? 'Em Acolhimento' :
-                                  column.category === 'paciente' ? 'Paciente' :
-                                  column.category === 'alta' ? 'Alta' :
-                                  column.category === 'negativa' ? 'Negativa' : column.category || 'Em Acolhimento'
-                                }
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingColumnId(column.id);
-                                setNewColumnName(column.name);
-                                setNewColumnSlug(column.slug || '');
-                                setNewColumnColor(column.color || '#6366F1');
-                                setNewColumnCategory(column.category || 'acolhimento');
-                              }}
-                              className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors border-none bg-transparent cursor-pointer"
-                              title="Editar Estágio"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            {columns.length > 3 && (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (confirm(`Deseja mesmo remover a coluna "${column.name}"? Contatos voltarão para o estágio inicial.`)) {
-                                    try {
-                                      await handleDeleteColumn(column.id);
-                                    } catch (err) {
-                                      alert('Falha ao remover estágio.');
-                                    }
-                                  }
-                                }}
-                                className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-white/5 transition-colors border-none bg-transparent cursor-pointer"
-                                title="Excluir Estágio"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Form de adicionar/editar coluna */}
-                  <div className="pt-4 border-t border-slate-800/60 space-y-3">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {editingColumnId ? `Editar Estágio: ${newColumnName}` : 'Criar Novo Estágio'}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">Nome do Estágio</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Primeira Consulta"
-                          value={newColumnName}
-                          onChange={(e) => {
-                            setNewColumnName(e.target.value);
-                            if (!editingColumnId) {
-                              setNewColumnSlug(e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
-                            }
-                          }}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">Integration Slug (Chave única)</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: primeira-consulta"
-                          value={newColumnSlug}
-                          onChange={(e) => setNewColumnSlug(e.target.value)}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl font-mono"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">Grupo / Categoria do Estágio</label>
-                        <Select
-                          value={newColumnCategory}
-                          onChange={(e) => setNewColumnCategory(e.target.value as any)}
-                          options={[
-                            { value: 'pendente', label: 'Pendente' },
-                            { value: 'acolhimento', label: 'Em Acolhimento' },
-                            { value: 'paciente', label: 'Paciente (Tratamento Ativo)' },
-                            { value: 'alta', label: 'Alta' },
-                            { value: 'negativa', label: 'Negativa' },
-                          ]}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Paleta de cores para Estágio */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-500 block">Cor do Estágio</label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
-                        {PRESETS.map((p) => (
-                          <button
-                            key={p.hex}
-                            type="button"
-                            onClick={() => setNewColumnColor(p.hex)}
-                            className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
-                            style={{
-                              backgroundColor: p.hex,
-                              boxShadow: newColumnColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
-                            }}
-                            title={p.name}
-                          >
-                            {newColumnColor === p.hex && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                            )}
-                          </button>
-                        ))}
-                        <input
-                          type="text"
-                          placeholder="#hex"
-                          value={newColumnColor}
-                          onChange={(e) => setNewColumnColor(e.target.value)}
-                          className="brand-input px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none font-mono ml-auto"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-1">
-                      {editingColumnId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingColumnId(null);
-                            setNewColumnName('');
-                            setNewColumnSlug('');
-                            setNewColumnColor('#6366F1');
-                            setNewColumnCategory('acolhimento');
-                          }}
-                          className="px-4 py-2 text-xs rounded-xl hover:bg-white/5 active:scale-95 transition-all bg-transparent border cursor-pointer"
-                          style={{
-                            borderColor: 'var(--surface-border)',
-                            color: 'var(--brand-text-color)',
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                      )}
+              {/* Sugestões de Especialidades */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Clique para adicionar sugestões:</span>
+                <div className="flex flex-wrap gap-2">
+                  {DEFAULT_SPECIALTIES_PRESETS.map((preset) => {
+                    const isSelected = specialties.includes(preset);
+                    return (
                       <button
+                        key={preset}
                         type="button"
-                        onClick={async () => {
-                          if (!newColumnName.trim()) return;
-                          const finalSlug = newColumnSlug.trim() || newColumnName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                          if (editingColumnId) {
-                            await handleUpdateColumn(editingColumnId, {
-                              name: newColumnName.trim(),
-                              slug: finalSlug,
-                              color: newColumnColor,
-                              category: newColumnCategory
-                            });
-                            setEditingColumnId(null);
-                          } else {
-                            await handleAddColumn(newColumnName.trim(), finalSlug, newColumnColor, newColumnCategory);
-                          }
-                          setNewColumnName('');
-                          setNewColumnSlug('');
-                          setNewColumnColor('#6366F1');
-                          setNewColumnCategory('acolhimento');
-                        }}
-                        className="px-5 py-2 text-xs font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all border-none cursor-pointer"
-                        style={{
-                          background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                          color: contrastColor,
-                        }}
+                        onClick={() => (isSelected ? handleRemoveSpecialty(preset) : handleAddSpecialty(preset))}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border-none ${
+                          isSelected
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                            : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                        }`}
                       >
-                        {editingColumnId ? 'Salvar Alterações' : 'Criar Estágio'}
+                        {isSelected ? '✓ ' : '+ '}{preset}
                       </button>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            </Card>
 
-              {/* Sub-Aba 2: Fontes de Tráfego */}
-              {activeCrmSubTab === 'sources' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-200">Fontes de Tráfego (UTMs)</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Configure os canais pelos quais os leads chegam, atribuindo regras de UTM e badges de cores.
-                    </p>
-                  </div>
+            {/* Segurança e Credenciais da Conta */}
+            <Card>
+              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                Segurança & Senha de Acesso
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Gerencie as credenciais para entrar na plataforma.
+              </p>
 
-                  {/* Configuração de Fonte Padrão */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Fonte de Tráfego Padrão</label>
-                    <Select
-                      value={localDefaultSource}
-                      onChange={(e) => setLocalDefaultSource(e.target.value)}
-                      options={localTrafficSources.map((src) => ({ value: src.name, label: src.name }))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Seu E-mail de Login</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                    <input
+                      type="email"
+                      value={initialUser.email}
+                      disabled
+                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white/5 border border-[var(--surface-border)] text-xs text-slate-400 cursor-not-allowed outline-none"
                     />
                   </div>
+                  <span className="text-[10px] text-slate-500 block mt-1">O e-mail de acesso não pode ser alterado por segurança.</span>
+                </div>
 
-                  {/* Listagem das fontes */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Canais Cadastrados</label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {localTrafficSources.map((src) => (
-                        <div key={src.id} className="glass-sm flex flex-col p-3 rounded-xl space-y-1.5" style={{ borderLeft: `4px solid ${src.color}` }}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-200">{src.name}</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingSourceId(src.id);
-                                  setNewSourceName(src.name);
-                                  setNewSourceColor(src.color || '#6366F1');
-                                  setNewSourceUtmSource(src.utm_source || '');
-                                  setNewSourceUtmMedium(src.utm_medium || '');
-                                  setNewSourceUtmCampaign(src.utm_campaign || '');
-                                }}
-                                className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors border-none bg-transparent cursor-pointer"
-                                title="Editar Canal"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              {localTrafficSources.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = localTrafficSources.filter(s => s.id !== src.id);
-                                    setLocalTrafficSources(updated);
-                                    if (localDefaultSource === src.name) {
-                                      setLocalDefaultSource(updated[0]?.name || 'Manual');
-                                    }
-                                  }}
-                                  className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-white/5 transition-colors border-none bg-transparent cursor-pointer"
-                                  title="Excluir Canal"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 font-mono">
-                            <div><span className="text-slate-600">utm_source:</span> {src.utm_source || '-'}</div>
-                            <div><span className="text-slate-600">utm_medium:</span> {src.utm_medium || '-'}</div>
-                            <div><span className="text-slate-600">utm_campaign:</span> {src.utm_campaign || '-'}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Nova Senha</label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres (ou deixe em branco)"
+                  />
+                </div>
 
-                  {/* Form de adicionar fonte */}
-                  <div className="pt-4 border-t border-slate-800/60 space-y-3">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {editingSourceId ? `Editar Canal: ${newSourceName}` : 'Criar Novo Canal'}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">Nome do Canal / Origem</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Google Ads"
-                          value={newSourceName}
-                          onChange={(e) => {
-                            setNewSourceName(e.target.value);
-                            if (!editingSourceId) {
-                              setNewSourceUtmSource(e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-'));
-                            }
-                          }}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Source</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: google"
-                          value={newSourceUtmSource}
-                          onChange={(e) => setNewSourceUtmSource(e.target.value)}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl font-mono"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Medium</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: cpc"
-                          value={newSourceUtmMedium}
-                          onChange={(e) => setNewSourceUtmMedium(e.target.value)}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl font-mono"
-                        />
-                      </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Confirmar Nova Senha</label>
+                  <Input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repita a nova senha"
+                  />
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Campaign (Opcional)</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: campanha-leads-agosto"
-                          value={newSourceUtmCampaign}
-                          onChange={(e) => setNewSourceUtmCampaign(e.target.value)}
-                          className="brand-input w-full px-3.5 py-2 text-sm rounded-xl font-mono"
-                        />
-                      </div>
-                    </div>
+        {/* ABA 2: MARCA DOS SITES */}
+        {activeTab === 'sites-branding' && (
+          <div className="space-y-6 animate-page-enter">
+            <Card>
+              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
+                <Palette className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                Visual e Marca do Seu Site
+              </h3>
+              <p className="text-xs text-slate-400 mb-6">
+                Escolha a sua logomarca e as cores que serão usadas no fundo, botões e textos das suas páginas.
+              </p>
 
-                    {/* Paleta de cores para Fonte de Tráfego */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-500 block">Cor de Identificação</label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
-                        {PRESETS.map((p) => (
-                          <button
-                            key={p.hex}
-                            type="button"
-                            onClick={() => setNewSourceColor(p.hex)}
-                            className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
-                            style={{
-                              backgroundColor: p.hex,
-                              boxShadow: newSourceColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
-                            }}
-                            title={p.name}
-                          >
-                            {newSourceColor === p.hex && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                            )}
-                          </button>
-                        ))}
-                        <input
-                          type="text"
-                          placeholder="#hex"
-                          value={newSourceColor}
-                          onChange={(e) => setNewSourceColor(e.target.value)}
-                          className="brand-input px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none font-mono ml-auto"
-                        />
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <UploadBox
+                  label="Sua Logomarca Profissional"
+                  description="Sua logo exibida no topo (cabeçalho) e no rodapé das suas páginas de atendimento."
+                  url={logoUrl}
+                  bgColor={bgColor}
+                  tenantId={tenant.id}
+                  onChange={(u) => setLogoUrl(u)}
+                  onClear={() => setLogoUrl('')}
+                />
 
-                    <div className="flex justify-end gap-2 pt-1">
-                      {editingSourceId && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingSourceId(null);
-                            setNewSourceName('');
-                            setNewSourceColor('#6366F1');
-                            setNewSourceUtmSource('');
-                            setNewSourceUtmMedium('');
-                            setNewSourceUtmCampaign('');
-                          }}
-                          className="px-4 py-2 text-xs rounded-xl hover:bg-white/5 active:scale-95 transition-all bg-transparent border cursor-pointer"
-                          style={{
-                            borderColor: 'var(--surface-border)',
-                            color: 'var(--brand-text-color)',
-                          }}
-                        >
-                          Cancelar
-                        </button>
-                      )}
+                <UploadBox
+                  label="Ícone da Aba do Navegador (Favicon)"
+                  description="Pequeno ícone exibido no topo da aba do navegador dos seus clientes ao acessar seu site."
+                  url={iconUrl}
+                  bgColor={bgColor}
+                  tenantId={tenant.id}
+                  onChange={(u) => setIconUrl(u)}
+                  onClear={() => setIconUrl('')}
+                />
+              </div>
+
+              {/* Cores Gerais dos Sites */}
+              <div className="space-y-4 pt-6 border-t border-[var(--surface-border)]">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-200">Cores Gerais e Destaques do Site</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Defina as cores principais que darão vida às suas landing pages de atendimento.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ColorPickerField
+                    label="Cor Principal dos Botões"
+                    description="Usada nos botões principais de agendamento no WhatsApp."
+                    value={primaryColor}
+                    onChange={(v) => setPrimaryColor(v)}
+                  />
+                  <ColorPickerField
+                    label="Cor Secundária de Destaque"
+                    description="Usada em ícones, bordas e detalhes visuais das suas páginas."
+                    value={secondaryColor}
+                    onChange={(v) => setSecondaryColor(v)}
+                  />
+                  <ColorPickerField
+                    label="Cor do Fundo do Site"
+                    description="Cor de fundo geral das suas páginas (Ex: #FAFAFA para claro ou #09090B para escuro)."
+                    value={bgColor}
+                    onChange={(v) => setBgColor(v)}
+                  />
+                  <ColorPickerField
+                    label="Cor de Contraste (Texto dos Botões)"
+                    description="Cor do texto e ícones sobre os botões e áreas com fundo destacado."
+                    value={contrastColor}
+                    onChange={(v) => setContrastColor(v)}
+                  />
+                </div>
+
+                {/* Paletas Prontas */}
+                <div className="space-y-2 pt-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Escolha uma combinação pronta:</span>
+                  <div className="flex flex-wrap gap-2">
+                    {COLOR_PRESETS.map((p) => (
                       <button
+                        key={p.name}
                         type="button"
                         onClick={() => {
-                          const nameVal = newSourceName.trim();
-                          if (!nameVal) return;
-                          const idVal = editingSourceId || nameVal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-');
-                          
-                          const newSource: TrafficSourceObj = {
-                            id: idVal,
-                            name: nameVal,
-                            color: newSourceColor,
-                            utm_source: newSourceUtmSource.trim() || idVal,
-                            utm_medium: newSourceUtmMedium.trim(),
-                            utm_campaign: newSourceUtmCampaign.trim()
-                          };
-
-                          if (editingSourceId) {
-                            const updated = localTrafficSources.map(s => s.id === editingSourceId ? newSource : s);
-                            setLocalTrafficSources(updated);
-                            if (localDefaultSource === localTrafficSources.find(s => s.id === editingSourceId)?.name) {
-                              setLocalDefaultSource(nameVal);
-                            }
-                            setEditingSourceId(null);
-                          } else {
-                            if (localTrafficSources.some(s => s.id === idVal)) {
-                              alert('Este canal já está cadastrado.');
-                              return;
-                            }
-                            setLocalTrafficSources([...localTrafficSources, newSource]);
-                          }
-                          
-                          // Reset form
-                          setNewSourceName('');
-                          setNewSourceColor('#6366F1');
-                          setNewSourceUtmSource('');
-                          setNewSourceUtmMedium('');
-                          setNewSourceUtmCampaign('');
+                          setPrimaryColor(p.primary);
+                          setSecondaryColor(p.secondary);
+                          setBgColor(p.bg);
+                          setContrastColor(p.contrast);
                         }}
-                        className="px-5 py-2 text-xs font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all border-none cursor-pointer"
-                        style={{
-                          background: `linear-gradient(135deg, ${gradientColorStart}, ${gradientColorEnd})`,
-                          color: contrastColor,
-                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-[var(--surface-border)] cursor-pointer text-xs font-semibold text-slate-200 transition-all"
                       >
-                        {editingSourceId ? 'Salvar Alterações' : 'Adicionar Canal'}
+                        <div className="flex items-center -space-x-1">
+                          <span className="w-3.5 h-3.5 rounded-full border border-black/10" style={{ backgroundColor: p.bg }} title="Fundo" />
+                          <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: p.primary }} title="Primária" />
+                          <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: p.secondary }} title="Secundária" />
+                        </div>
+                        <span>{p.name}</span>
                       </button>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-        </Card>
+              </div>
+            </Card>
+          </div>
+        )}
 
-        {/* Action Button */}
-        <div className="flex justify-end pt-4">
-          <Button type="submit" submitting={loading} className="w-full md:w-60">
-            Salvar Configurações
-          </Button>
-        </div>
+        {/* ABA 3: DOMÍNIOS */}
+        {activeTab === 'dominios' && (
+          <div className="space-y-6 animate-page-enter">
+            {/* Endereço Gratuito */}
+            <Card>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                  Endereço Gratuito na Internet
+                </h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Ativo e Prontinho
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 mb-4">
+                Endereço gratuito fornecido pelo nosso sistema para você divulgar suas páginas sem precisar comprar um domínio:
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Nome do Seu Endereço (Slug)</label>
+                  <div className="flex items-center">
+                    <Input
+                      type="text"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder="geovanna-bastos"
+                      className="rounded-r-none"
+                    />
+                    <span className="h-10 px-3 flex items-center glass-sm border border-l-0 border-[var(--surface-border)] rounded-r-xl text-xs font-mono font-bold text-slate-300 bg-white/5">
+                      .psi.app
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-5">
+                  <a
+                    href={`https://${slug || 'site'}.psi.app`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-gradient-start)] hover:underline"
+                  >
+                    <span>Abrir Seu Site Agora</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </Card>
+
+            {/* Domínio Próprio */}
+            <Card>
+              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                Usar Seu Domínio Próprio (Ex: www.suaclinica.com.br)
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Se você já comprou um domínio próprio (no Registro.br, GoDaddy, Hostinger, etc.), informe ele abaixo para conectar ao seu site:
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Seu Domínio Comprado</label>
+                  <Input
+                    type="text"
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value.toLowerCase())}
+                    placeholder="Ex: www.geovannabastos.com.br"
+                  />
+                </div>
+
+                {/* Passo a Passo Simples para Leigos */}
+                <div className="p-4 rounded-2xl border border-[var(--surface-border)] bg-white/[0.01] space-y-3">
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Como Conectar Seu Domínio Comprado (Passo a Passo)
+                  </h4>
+
+                  <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                    <li>Acesse o painel do site onde você comprou o seu domínio (ex: Registro.br, GoDaddy).</li>
+                    <li>Vá até a opção <strong>'Gerenciar DNS'</strong> ou <strong>'Editar Zona DNS'</strong>.</li>
+                    <li>Crie ou edite o registro com as informações da tabela abaixo:</li>
+                  </ol>
+
+                  <div className="overflow-x-auto pt-1">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-[var(--surface-border)] text-slate-400 font-bold">
+                          <th className="pb-2">Tipo de Registro</th>
+                          <th className="pb-2">Nome / Host</th>
+                          <th className="pb-2">Apontar Para (Valor)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--surface-border)] font-mono text-slate-200">
+                        <tr>
+                          <td className="py-2.5 text-emerald-400 font-bold">CNAME</td>
+                          <td className="py-2.5">www</td>
+                          <td className="py-2.5 font-bold">cname.psi.app</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2.5 text-indigo-400 font-bold">A</td>
+                          <td className="py-2.5">@ (ou em branco)</td>
+                          <td className="py-2.5 font-bold">185.199.108.153</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
+                    💡 Após salvar aqui e criar a regra na sua gerenciadora de domínio, o seu site estará funcionando com seu endereço próprio. A ativação pode levar de 15 minutos até 24 horas.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ABA 4: BIBLIOTECA DE MÍDIA */}
+        {activeTab === 'midia' && (
+          <div className="space-y-6 animate-page-enter">
+            <Card>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                    Sua Galeria de Fotos e Imagens
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Todas as fotos de perfil, fotos de consultório e logomarcas que você enviou ficam salvas aqui:
+                  </p>
+                </div>
+
+                <div>
+                  <input
+                    ref={mediaFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleDirectMediaUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => mediaFileInputRef.current?.click()}
+                    className="text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> Adicionar Nova Foto
+                  </Button>
+                </div>
+              </div>
+
+              {mediaLoading ? (
+                <div className="text-center py-12 text-xs text-slate-500 animate-pulse">
+                  Buscando suas imagens...
+                </div>
+              ) : mediaAssets.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-[var(--surface-border)] rounded-2xl space-y-2">
+                  <ImageIcon className="w-8 h-8 text-slate-600 mx-auto" />
+                  <span className="text-xs text-slate-300 font-bold block">Sua galeria está vazia no momento</span>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Clique no botão 'Adicionar Nova Foto' para subir imagens do seu consultório ou fotos profissionais para usar nas suas páginas.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {mediaAssets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      style={{ backgroundColor: bgColor || 'var(--brand-bg-color, transparent)' }}
+                      className="group relative rounded-2xl border border-[var(--surface-border)] overflow-hidden hover:border-[var(--brand-gradient-start)] transition-all flex flex-col shadow-sm"
+                    >
+                      <div className="h-32 w-full flex items-center justify-center p-2">
+                        <img
+                          src={asset.url}
+                          alt={asset.name}
+                          className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+
+                      <div className="p-2 border-t border-[var(--surface-border)] bg-black/40 flex items-center justify-between text-[11px]">
+                        <span className="truncate text-slate-300 font-medium max-w-[90px]" title={asset.name}>
+                          {asset.name}
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyUrl(asset.url)}
+                            className="p-1 text-slate-400 hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                            title="Copiar link da foto"
+                          >
+                            {copiedUrl === asset.url ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(asset.id)}
+                            className="p-1 text-slate-400 hover:text-red-400 transition-colors bg-transparent border-none cursor-pointer"
+                            title="Excluir foto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* Botão de Salvar Global */}
+        {activeTab !== 'midia' && (
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--surface-border)]">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-3 text-xs font-bold text-white rounded-xl shadow-lg bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all border-none cursor-pointer uppercase tracking-wider"
+            >
+              {loading ? 'Salvando...' : 'Salvar Minhas Configurações'}
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

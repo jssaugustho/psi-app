@@ -1,8 +1,9 @@
 import React from 'react'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getCapturePageByDomain, getContractTemplateContent } from '../../../lib/api'
+import { getCapturePageByDomain, getContractTemplateContent, getTenantByDomain, getPrimaryTenant } from '../../../lib/api'
 import { CapturePageRenderer } from '../../../components/CapturePageRenderer'
+import { NotFoundView } from '../../../components/NotFoundView'
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,15 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { domain } = await params
   const pageData = await getCapturePageByDomain(domain)
-  if (!pageData) return {}
+  if (!pageData) {
+    const tenant = await getTenantByDomain(domain);
+    const primaryTenant = tenant ? null : await getPrimaryTenant();
+    const activeTenantName = tenant?.name || primaryTenant?.name || 'Psi App';
+    return {
+      title: `Página Não Encontrada | ${activeTenantName}`,
+      description: 'A página procurada não foi encontrada.',
+    }
+  }
 
   const title = pageData.title
   const siteConfig = pageData.site_config
@@ -56,7 +65,9 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
   const pageData = await getCapturePageByDomain(domain)
 
   if (!pageData) {
-    notFound()
+    const tenant = await getTenantByDomain(domain);
+    const primaryTenant = tenant ? null : await getPrimaryTenant();
+    return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedDomain={domain} />;
   }
 
   // Resolve contract template content if associated to contract step

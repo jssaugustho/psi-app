@@ -7,6 +7,11 @@ export const profiles = pgTable('profiles', {
   phone: text('phone'),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
+  crp: text('crp'),
+  bio: text('bio'),
+  specialties: jsonb('specialties').$type<string[]>(),
+  cityState: text('city_state'),
+  instagram: text('instagram'),
   role: text('role').$type<'admin' | 'user'>().default('user').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -25,6 +30,9 @@ export const tenants = pgTable('tenants', {
   logoDarkUrl: text('logo_dark_url'),
   iconLightUrl: text('icon_light_url'),
   iconDarkUrl: text('icon_dark_url'),
+  defaultSiteAvatarUrl: text('default_site_avatar_url'),
+  defaultSitePrimaryColor: text('default_site_primary_color').default('#4F46E5'),
+  defaultSiteSecondaryColor: text('default_site_secondary_color').default('#06B6D4'),
 
   // Cores do Gradiente e Contraste
   gradientColorStart: text('gradient_color_start').default('#4F46E5').notNull(),

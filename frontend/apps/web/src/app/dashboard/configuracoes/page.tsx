@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import TenantSettingsForm from './tenant-settings-form';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
@@ -175,15 +175,15 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto animate-page-enter">
+    <div className="space-y-6 max-w-5xl mx-auto animate-page-enter">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Configurações do Espaço</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Configurações</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Customize a identidade visual, integrações de e-mail e CRM do seu espaço de trabalho.
+          Gerencie seu perfil profissional, marca padrão para os sites, domínios e biblioteca de mídia.
         </p>
       </div>
 
-      <TenantSettingsForm tenant={resolvedTenant} />
+      <TenantSettingsForm tenant={resolvedTenant} initialUser={user} />
     </div>
   );
 }

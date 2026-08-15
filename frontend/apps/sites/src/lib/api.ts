@@ -104,3 +104,141 @@ export async function getContractTemplateContent(templateId: string): Promise<st
     return null;
   }
 }
+
+export interface TenantData {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  phone: string | null;
+  gradientColorStart: string | null;
+  gradientColorEnd: string | null;
+  contrastColor: string | null;
+  bgDarkColor: string | null;
+  cardDarkColor: string | null;
+  textDarkColor: string | null;
+  logoLightUrl?: string | null;
+  logoDarkUrl?: string | null;
+}
+
+/**
+ * Fetch tenant details by slug
+ */
+export async function getTenantBySlug(slug: string): Promise<TenantData | null> {
+  const url = `${PGRST_BASE_URL}/tenants?slug=eq.${slug}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const t = data[0];
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      domain: t.domain,
+      phone: t.phone,
+      gradientColorStart: t.gradient_color_start,
+      gradientColorEnd: t.gradient_color_end,
+      contrastColor: t.contrast_color,
+      bgDarkColor: t.bg_dark_color,
+      cardDarkColor: t.card_dark_color,
+      textDarkColor: t.text_dark_color,
+      logoLightUrl: t.logo_light_url,
+      logoDarkUrl: t.logo_dark_url,
+    };
+  } catch (err) {
+    console.error('Error fetching tenant by slug:', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch tenant details by domain (directly or via page)
+ */
+export async function getTenantByDomain(domain: string): Promise<TenantData | null> {
+  // First check if tenant has this domain directly in tenants table
+  const url = `${PGRST_BASE_URL}/tenants?domain=eq.${domain}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const t = data[0];
+        return {
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          domain: t.domain,
+          phone: t.phone,
+          gradientColorStart: t.gradient_color_start,
+          gradientColorEnd: t.gradient_color_end,
+          contrastColor: t.contrast_color,
+          bgDarkColor: t.bg_dark_color,
+          cardDarkColor: t.card_dark_color,
+          textDarkColor: t.text_dark_color,
+          logoLightUrl: t.logo_light_url,
+          logoDarkUrl: t.logo_dark_url,
+        };
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching tenant by domain directly:', err);
+  }
+
+  // Second, check if a capture_page with custom_domain exists and get its tenant
+  const pageData = await getCapturePageByDomain(domain);
+  if (pageData && pageData.tenants) {
+    const t = pageData.tenants;
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      domain: t.domain,
+      phone: t.phone,
+      gradientColorStart: t.gradient_color_start,
+      gradientColorEnd: t.gradient_color_end,
+      contrastColor: t.contrast_color,
+      bgDarkColor: t.bg_dark_color,
+      cardDarkColor: t.card_dark_color,
+      textDarkColor: t.text_dark_color,
+      logoLightUrl: t.logo_light_url,
+      logoDarkUrl: t.logo_dark_url,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Fetch the primary tenant (tenant-pai da plataforma)
+ */
+export async function getPrimaryTenant(): Promise<TenantData | null> {
+  const url = `${PGRST_BASE_URL}/tenants?is_primary=eq.true&limit=1`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const t = data[0];
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      domain: t.domain,
+      phone: t.phone,
+      gradientColorStart: t.gradient_color_start,
+      gradientColorEnd: t.gradient_color_end,
+      contrastColor: t.contrast_color,
+      bgDarkColor: t.bg_dark_color,
+      cardDarkColor: t.card_dark_color,
+      textDarkColor: t.text_dark_color,
+      logoLightUrl: t.logo_light_url,
+      logoDarkUrl: t.logo_dark_url,
+    };
+  } catch (err) {
+    console.error('Error fetching primary tenant:', err);
+    return null;
+  }
+}
+

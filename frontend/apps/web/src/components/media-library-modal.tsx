@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { BrandModal, Button, ConfirmModal } from '@psi/ui';
 import { Trash2, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { useBrand } from '@/context/BrandContext';
 import { type UploadType } from '@psi/image-utils';
 
 interface MediaLibraryModalProps {
@@ -21,6 +22,9 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
   onSelectImage,
   uploadType
 }) => {
+  const { tenant: brandTenant } = useBrand();
+  const targetTenantId = (tenantId && tenantId !== 'default') ? tenantId : (brandTenant?.id || '');
+
   const [activeTab, setActiveTab] = useState<'library' | 'upload'>('library');
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,19 +34,19 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAssets = useCallback(async () => {
-    if (!tenantId) return;
+    if (!targetTenantId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getMediaAssets(tenantId);
+      const data = await api.getMediaAssets(targetTenantId);
       setAssets(data || []);
     } catch (err: any) {
       console.error(err);
-      setError('Erro ao carregar a galeria.');
+      setError(err.message || 'Erro ao carregar a galeria.');
     } finally {
       setLoading(false);
     }
-  }, [tenantId]);
+  }, [targetTenantId]);
 
   useEffect(() => {
     if (isOpen && activeTab === 'library') {
@@ -70,7 +74,7 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
       const { url, key } = await api.uploadImage(file, targetUploadType);
 
       const registered = await api.registerMediaAsset({
-        tenantId,
+        tenantId: targetTenantId,
         name: file.name,
         key,
         url,
@@ -112,19 +116,19 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
       <BrandModal isOpen={isOpen} onClose={onClose}>
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Biblioteca de Mídia</h3>
-            <p className="text-[10px] text-slate-400">Selecione uma imagem salva ou faça upload de um novo arquivo.</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Biblioteca de Mídia</h3>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">Selecione uma imagem salva ou faça upload de um novo arquivo.</p>
           </div>
 
           {/* Tab Selector */}
-          <div className="flex border-b border-white/10 text-xs font-semibold">
+          <div className="flex border-b border-[var(--surface-border)] text-xs font-semibold">
             <button
               type="button"
               onClick={() => setActiveTab('library')}
               className={`pb-2 px-4 transition-colors bg-transparent border-none cursor-pointer ${
                 activeTab === 'library'
-                  ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'text-[var(--brand-gradient-start)] border-b-2 border-[var(--brand-gradient-start)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Galeria da Conta
@@ -134,8 +138,8 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
               onClick={() => setActiveTab('upload')}
               className={`pb-2 px-4 transition-colors bg-transparent border-none cursor-pointer ${
                 activeTab === 'upload'
-                  ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'text-[var(--brand-gradient-start)] border-b-2 border-[var(--brand-gradient-start)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Enviar Arquivo
@@ -143,7 +147,7 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
           </div>
 
           {error && (
-            <div className="text-[9px] text-red-400 font-sans font-medium bg-red-400/10 p-2 rounded-lg">
+            <div className="text-[9px] text-red-500 dark:text-red-400 font-sans font-medium bg-red-500/10 p-2 rounded-lg">
               {error}
             </div>
           )}
@@ -165,11 +169,9 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                     <div
                       key={asset.id}
                       onClick={() => onSelectImage({ url: asset.url, id: asset.id, key: asset.key, name: asset.name })}
-                      className="relative aspect-square border border-white/5 rounded-lg overflow-hidden group cursor-pointer hover:border-[#CC8667]/50 transition-all bg-cover bg-center"
+                      className="relative aspect-square border border-[var(--surface-border)] rounded-lg overflow-hidden group cursor-pointer hover:border-[var(--brand-gradient-start)]/50 transition-all bg-contain bg-center bg-no-repeat bg-[var(--brand-bg-color,transparent)]"
                       style={{
-                        backgroundImage: `url(${asset.url}), repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)`,
-                        backgroundSize: 'cover, 12px 12px',
-                        backgroundPosition: 'center, 0 0'
+                        backgroundImage: `url(${asset.url})`,
                       }}
                     >
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
@@ -195,20 +197,20 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
             )}
           </div>
         ) : (
-          <div className="h-[280px] flex flex-col items-center justify-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-950/20">
+          <div className="h-[280px] flex flex-col items-center justify-center border-2 border-dashed border-[var(--surface-border)] rounded-xl glass-sm">
             {uploading ? (
               <div className="space-y-2 flex flex-col items-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[#CC8667]" />
-                <span className="text-[10px] text-slate-400">Otimizando e enviando...</span>
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-gradient-start)]" />
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">Otimizando e enviando...</span>
               </div>
             ) : (
               <div className="space-y-3 text-center p-6 flex flex-col items-center">
-                <Upload className="h-8 w-8 text-slate-600" />
+                <Upload className="h-8 w-8 text-slate-400 dark:text-slate-600" />
                 <div>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg bg-[#CC8667] text-white hover:bg-[#b07053] font-bold text-xs uppercase transition-all cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg brand-accent text-white font-bold text-xs uppercase transition-all cursor-pointer border-none shadow-md"
                   >
                     Selecionar Imagem
                   </button>
@@ -230,7 +232,7 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
           <Button
             type="button"
             onClick={onClose}
-            className="text-[10px] uppercase font-bold bg-zinc-900 border border-white/5 text-slate-400 hover:text-white px-4 h-8 cursor-pointer"
+            className="text-[10px] uppercase font-bold glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-4 h-8 cursor-pointer"
           >
             Fechar
           </Button>

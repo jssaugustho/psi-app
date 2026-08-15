@@ -164,7 +164,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const logoUrl = tenant?.logoDarkUrl || tenant?.logoLightUrl;
+    const logoUrl =
+      theme === 'light'
+        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl)
+        : (tenant?.logoDarkUrl || tenant?.logoLightUrl);
     let spinnerStartTime = Date.now();
     let doneTimer: NodeJS.Timeout;
     let remainingTimer: NodeJS.Timeout;
@@ -220,7 +223,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
             left: 0,
             width: '100vw',
             height: '100vh',
-            backgroundColor: '#000000',
+            backgroundColor: 'var(--brand-bg-color, #09090B)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -240,10 +243,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
               animation: 'fadeIn 0.5s ease-out forwards',
             }}>
               {/* Logo */}
-              {(tenant?.logoDarkUrl || tenant?.logoLightUrl) ? (
+              {(theme === 'light' ? (tenant?.logoLightUrl || tenant?.logoDarkUrl) : (tenant?.logoDarkUrl || tenant?.logoLightUrl)) ? (
                 <img 
-                  src={tenant.logoDarkUrl || tenant.logoLightUrl || ''} 
-                  alt={tenant.name} 
+                  src={theme === 'light' ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || '') : (tenant?.logoDarkUrl || tenant?.logoLightUrl || '')} 
+                  alt={tenant?.name || 'Psi App'} 
                   style={{
                     maxHeight: '64px',
                     maxWidth: '240px',
@@ -271,7 +274,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
                     fontFamily: 'serif',
                     fontSize: '18px',
                     letterSpacing: '0.05em',
-                    color: '#F4F4F5',
+                    color: 'var(--brand-text-color, #F4F4F5)',
                   }}>{tenant?.name || 'Psi App'}</span>
                 </div>
               )}
@@ -295,8 +298,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
                   position: 'absolute',
                   inset: '8px',
                   borderRadius: '50%',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: theme === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.05)',
+                  backgroundColor: theme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)',
                   animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 }} />
               </div>

@@ -102,7 +102,7 @@ export function FontPicker({
 
   return (
     <div className="space-y-1.5 relative" ref={dropdownRef}>
-      <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">
         {label}
       </label>
 
@@ -110,37 +110,37 @@ export function FontPicker({
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-full h-10 px-3 rounded-xl bg-zinc-900 border border-zinc-700 hover:border-[#CC8667] flex items-center justify-between text-xs text-white transition-all cursor-pointer shadow-sm group"
+        className="w-full h-10 px-3 rounded-xl brand-input hover:border-[var(--brand-gradient-start)] flex items-center justify-between text-xs text-slate-900 dark:text-white transition-all cursor-pointer shadow-sm group"
       >
         <div className="flex items-center gap-2 truncate">
-          <Type className="h-3.5 w-3.5 text-[#CC8667] shrink-0" />
+          <Type className="h-3.5 w-3.5 text-[var(--brand-gradient-start)] shrink-0" />
           <span 
-            className="truncate font-medium text-sm"
+            className="truncate font-medium text-sm text-slate-900 dark:text-white"
             style={{ fontFamily: `'${value}', sans-serif` }}
           >
             {value}
           </span>
           {customFontName && value === customFontName && (
-            <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono shrink-0">
+            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono shrink-0">
               Personalizada
             </span>
           )}
         </div>
-        <ChevronDown className={`h-4 w-4 text-slate-400 group-hover:text-white transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Overlay Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 p-2 space-y-2 animate-in fade-in duration-150">
+        <div className="absolute left-0 right-0 top-full mt-1 brand-popup rounded-xl shadow-2xl z-50 p-2 space-y-2 animate-in fade-in duration-150">
           {/* Search bar */}
           <div className="relative flex items-center">
-            <Search className="h-3.5 w-3.5 text-slate-500 absolute left-2.5" />
+            <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5" />
             <input
               type="text"
               placeholder="Buscar fonte..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#CC8667]"
+              className="w-full brand-input rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-[var(--brand-gradient-start)]"
             />
           </div>
 
@@ -157,8 +157,8 @@ export function FontPicker({
                   }}
                   className={`p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all ${
                     isSelected 
-                      ? 'bg-[#CC8667]/15 border border-[#CC8667]/30 text-white' 
-                      : 'hover:bg-zinc-900 text-slate-300 hover:text-white'
+                      ? 'bg-[var(--brand-gradient-start)]/15 border border-[var(--brand-gradient-start)]/30 text-slate-900 dark:text-white font-bold' 
+                      : 'hover:bg-[var(--surface-hover)] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <div className="flex flex-col">
@@ -172,7 +172,7 @@ export function FontPicker({
                       {font.isCustom ? '★ Fonte Enviada' : font.category}
                     </span>
                   </div>
-                  {isSelected && <Check className="h-4 w-4 text-[#CC8667] shrink-0" />}
+                  {isSelected && <Check className="h-4 w-4 text-[var(--brand-gradient-start)] shrink-0" />}
                 </div>
               );
             })}
@@ -185,14 +185,14 @@ export function FontPicker({
           </div>
 
           {/* Plus Button: Upload Custom Font Trigger */}
-          <div className="pt-2 border-t border-white/5">
+          <div className="pt-2 border-t border-[var(--surface-border)]">
             <button
               type="button"
               onClick={() => {
                 setIsOpen(false);
                 onOpenCustomFontModal();
               }}
-              className="w-full py-2 px-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-white/10 hover:border-[#CC8667] text-[#CC8667] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-2 px-3 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-[var(--brand-gradient-start)] hover:text-slate-900 dark:hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Subir Fonte Personalizada (.ttf / .otf)</span>

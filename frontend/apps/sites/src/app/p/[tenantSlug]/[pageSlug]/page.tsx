@@ -1,8 +1,9 @@
 import React from 'react'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getCapturePageBySlugs, getContractTemplateContent } from '../../../../lib/api'
+import { getCapturePageBySlugs, getContractTemplateContent, getTenantBySlug, getPrimaryTenant } from '../../../../lib/api'
 import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
+import { NotFoundView } from '../../../../components/NotFoundView'
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,15 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const isPreview = preview === 'true'
 
   const pageData = await getCapturePageBySlugs(tenantSlug, pageSlug, isPreview)
-  if (!pageData) return {}
+  if (!pageData) {
+    const tenant = await getTenantBySlug(tenantSlug);
+    const primaryTenant = tenant ? null : await getPrimaryTenant();
+    const activeTenantName = tenant?.name || primaryTenant?.name || 'Psi App';
+    return {
+      title: `Página Não Encontrada | ${activeTenantName}`,
+      description: 'A página que você procurou não foi encontrada.',
+    }
+  }
 
   const title = isPreview ? (pageData.title_draft || pageData.title) : pageData.title
   const siteConfig = isPreview ? (pageData.site_config_draft || pageData.site_config) : pageData.site_config
@@ -65,7 +74,9 @@ export default async function TestCapturePage({ params, searchParams }: PageProp
   const pageData = await getCapturePageBySlugs(tenantSlug, pageSlug, isPreview)
 
   if (!pageData) {
-    notFound()
+    const tenant = await getTenantBySlug(tenantSlug);
+    const primaryTenant = tenant ? null : await getPrimaryTenant();
+    return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedSlug={pageSlug} />;
   }
 
   // Resolve contract template content if associated to contract step

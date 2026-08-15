@@ -47,7 +47,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!token) return;
 
     // Extrair base URL para o WebSocket a partir do NEXT_PUBLIC_API_URL
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const socketUrl = apiUrl.replace(/\/v1\/?$/, ''); // Remove '/v1' do final para usar a porta base
 
     const newSocket = io(socketUrl, {

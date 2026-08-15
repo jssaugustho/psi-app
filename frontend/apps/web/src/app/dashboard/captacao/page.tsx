@@ -161,9 +161,10 @@ export default function CaptacaoPage() {
   // Paths resolve helpers
   const getPageLocalUrl = (slug: string) => {
     if (!tenant) return '#';
+    const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || '';
     const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
     if (isLocal) {
-      return `http://localhost:3002/p/${tenant.slug}/${slug}`;
+      return `${landingBaseUrl}/p/${tenant.slug}/${slug}`;
     }
     return `https://sites.psiapp.com.br/p/${tenant.slug}/${slug}`;
   };
@@ -196,13 +197,13 @@ export default function CaptacaoPage() {
   return (
     <div className="space-y-6 animate-page-enter">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl glass-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl glass-md border border-[var(--surface-border)]">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-[var(--brand-gradient-start)]">
             <Sparkles className="h-4 w-4" />
             <span className="text-xs font-bold uppercase tracking-wider">Marketing & Captação</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Páginas de Captação</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Páginas de Captação</h1>
         </div>
         <div className="shrink-0 flex items-center gap-3">
           <Link href="/dashboard/captacao/nova" className="no-underline">
@@ -218,7 +219,7 @@ export default function CaptacaoPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -226,13 +227,13 @@ export default function CaptacaoPage() {
 
       {/* Main Pages List */}
       {pages.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4 glass-sm border-dashed">
-          <div className="h-16 w-16 rounded-full bg-slate-900 flex items-center justify-center text-2xl text-slate-500 border border-white/5">
-            <Globe className="h-8 w-8" />
+        <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4 glass-sm border border-dashed border-[var(--surface-border)]">
+          <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-2xl text-slate-500 border border-[var(--surface-border)]">
+            <Globe className="h-8 w-8 text-slate-600 dark:text-slate-400" />
           </div>
           <div className="space-y-1.5 max-w-xs">
-            <h3 className="text-base font-bold text-white">Nenhuma Página Criada</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Nenhuma Página Criada</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Crie sua primeira landing page de captação para começar a colher respostas de triagem de pacientes.
             </p>
           </div>
@@ -251,15 +252,15 @@ export default function CaptacaoPage() {
           {pages.map((page) => (
             <Card 
               key={page.id} 
-              className={`p-5 glass-sm border hover:border-slate-800 transition-all flex flex-col justify-between min-h-[200px] ${
-                page.isActive ? 'border-white/10' : 'border-white/5 opacity-70'
+              className={`p-5 glass-sm border transition-all flex flex-col justify-between min-h-[200px] ${
+                page.isActive ? 'border-[var(--surface-border)] hover:border-slate-300 dark:hover:border-slate-700' : 'border-[var(--surface-border)] opacity-70'
               }`}
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="truncate flex-1">
-                    <h3 className="text-lg text-white font-medium truncate mb-0.5">{page.title}</h3>
-                    <span className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">/{page.slug}</span>
+                    <h3 className="text-lg text-slate-900 dark:text-white font-medium truncate mb-0.5">{page.title}</h3>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-wider uppercase">/{page.slug}</span>
                   </div>
                   {/* Status Toggle Button */}
                   <button
@@ -267,22 +268,22 @@ export default function CaptacaoPage() {
                     onClick={() => handleToggleActive(page.id, page.isActive)}
                     className={`h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all cursor-pointer ${
                       page.isActive 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                        : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300 dark:border-zinc-700/50'
                     }`}
                   >
                     {page.isActive ? 'Ativa' : 'Pausada'}
                   </button>
                 </div>
 
-                <div className="space-y-2 border-t border-white/5 pt-3">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="space-y-2 border-t border-[var(--surface-border)] pt-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                     <span>Domínio:</span>
-                    <span className="font-semibold text-white max-w-[150px] truncate">
+                    <span className="font-semibold text-slate-800 dark:text-white max-w-[150px] truncate">
                       {page.customDomain || 'Sem domínio próprio'}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                     <span>Local Teste:</span>
                     <a
                       href={getPageLocalUrl(page.slug)}
@@ -297,18 +298,18 @@ export default function CaptacaoPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-white/5">
+              <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-[var(--surface-border)]">
                 {/* Botão Excluir */}
                 <div className="relative group inline-flex items-center">
                   <button
                     type="button"
                     onClick={() => setPageToDelete({ id: page.id, title: page.title })}
-                    className="p-2.5 rounded-xl text-red-400/80 hover:text-red-400 bg-red-500/5 hover:bg-red-500/15 border border-red-500/10 hover:border-red-500/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
+                    className="p-2.5 rounded-xl text-red-500/90 dark:text-red-400/80 hover:text-red-600 dark:hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
                     aria-label="Excluir Página"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none px-2.5 py-1 bg-slate-900 text-red-300 text-[10px] font-medium rounded-lg border border-red-500/20 shadow-xl whitespace-nowrap z-30">
+                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none px-2.5 py-1 bg-slate-900 text-red-200 text-[10px] font-medium rounded-lg border border-red-500/20 shadow-xl whitespace-nowrap z-30">
                     Excluir Página
                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 border-r border-b border-red-500/20 rotate-45" />
                   </div>
@@ -321,7 +322,7 @@ export default function CaptacaoPage() {
                       type="button"
                       disabled={duplicatingId === page.id}
                       onClick={() => handleDuplicatePage(page)}
-                      className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9 disabled:opacity-50"
+                      className="p-2.5 rounded-xl text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-slate-400 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9 disabled:opacity-50"
                       aria-label="Duplicar Página"
                     >
                       {duplicatingId === page.id ? (
@@ -347,7 +348,7 @@ export default function CaptacaoPage() {
                       >
                         <button
                           type="button"
-                          className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
+                          className="p-2.5 rounded-xl text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-slate-400 dark:hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
                           aria-label="Ver Site"
                         >
                           <ExternalLink className="h-4 w-4" />

@@ -19,11 +19,6 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
-  if (isBootReady && !authLoading && user && user.role === 'admin') {
-    return null;
-  }
-
   useEffect(() => {
     async function checkBootstrap() {
       try {
@@ -38,6 +33,11 @@ export default function AdminLoginPage() {
     }
     checkBootstrap();
   }, [router]);
+
+  // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
+  if (isBootReady && !authLoading && user && user.role === 'admin') {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

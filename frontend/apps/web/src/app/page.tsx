@@ -13,7 +13,7 @@ export default function Home() {
   useEffect(() => {
     if (!loading && isBootReady) {
       if (user) {
-        router.push('/dashboard');
+        router.push('/dashboard/crm');
       } else {
         router.push('/login');
       }

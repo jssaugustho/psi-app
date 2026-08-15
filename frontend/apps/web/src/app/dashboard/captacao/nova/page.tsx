@@ -445,28 +445,28 @@ export default function NovaPaginaCaptacaoPage() {
   return (
     <div className="min-h-[85vh] space-y-6 animate-page-enter max-w-7xl mx-auto pb-12">
       {/* Top Bar / Breadcrumb Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl glass-md border border-white/10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl glass-md border border-[var(--surface-border)]">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/captacao" className="no-underline">
             <button
               type="button"
-              className="h-9 w-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all cursor-pointer"
+              className="h-9 w-9 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
           </Link>
           <div>
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>Captação</span>
-              <ChevronRight className="h-3 w-3 text-slate-600" />
+              <ChevronRight className="h-3 w-3 text-slate-400 dark:text-slate-600" />
               <span className="text-[var(--brand-gradient-start)] font-bold">Nova Página</span>
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Criar Nova Página de Captação</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Criar Nova Página de Captação</h1>
           </div>
         </div>
 
         {/* Step Progress Pill Nav */}
-        <div className="flex items-center gap-2 bg-zinc-950/80 p-1.5 rounded-xl border border-white/10">
+        <div className="flex items-center gap-2 glass-md p-1.5 rounded-xl border border-[var(--surface-border)]">
           {[
             { num: 1, title: 'Identificação' },
             { num: 2, title: 'Estilo Visual' },
@@ -488,11 +488,11 @@ export default function NovaPaginaCaptacaoPage() {
                   isActive
                     ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
                     : isDone
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <span className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-black/20">
+                <span className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-slate-200 dark:bg-black/20 text-slate-700 dark:text-slate-200">
                   {isDone ? <Check className="h-3 w-3" /> : s.num}
                 </span>
                 <span className="hidden sm:inline">{s.title}</span>
@@ -503,7 +503,7 @@ export default function NovaPaginaCaptacaoPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs flex items-center gap-2 animate-in fade-in">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -513,24 +513,24 @@ export default function NovaPaginaCaptacaoPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Form Steps Card */}
         <div className="lg:col-span-7 space-y-6">
-          <Card className="p-6 md:p-8 glass-sm border border-white/10 rounded-2xl space-y-6 shadow-xl">
+          <Card className="p-6 md:p-8 glass-md border border-[var(--surface-border)] rounded-2xl space-y-6 shadow-xl">
             {/* STEP 1: Identificação & Slug */}
             {currentStep === 1 && (
               <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="space-y-1 border-b border-white/5 pb-4">
+                <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
                     Etapa 1 de 3
                   </span>
-                  <h2 className="text-lg font-bold text-white">Configurações da Página & Endereço</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Configurações da Página & Endereço</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Defina o nome de exibição da psicóloga/clínica e o endereço (slug) de acesso exclusivo.
                   </p>
                 </div>
 
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-200 block">
-                      Nome da Página / Psicóloga <span className="text-red-400">*</span>
+                    <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                      Nome da Página / Psicóloga <span className="text-red-500">*</span>
                     </label>
                     <Input
                       type="text"
@@ -540,17 +540,17 @@ export default function NovaPaginaCaptacaoPage() {
                       onChange={handleTitleChange}
                       className="brand-input text-sm h-11"
                     />
-                    <span className="text-[11px] text-slate-500 block">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                       Este nome aparecerá em destaque no cabeçalho e títulos principais do site.
                     </span>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-200 block">
-                      Endereço do Site (Slug da URL) <span className="text-red-400">*</span>
+                    <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                      Endereço do Site (Slug da URL) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative flex items-center">
-                      <span className="absolute left-3 text-xs text-slate-500 font-mono select-none">
+                      <span className="absolute left-3 text-xs text-slate-500 dark:text-slate-400 font-mono select-none">
                         /p/{tenant?.slug || 'clínica'}/
                       </span>
                       <Input
@@ -562,7 +562,7 @@ export default function NovaPaginaCaptacaoPage() {
                         className="brand-input pl-[150px] text-sm h-11 font-mono"
                       />
                     </div>
-                    <span className="text-[11px] text-slate-500 block">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
                       Endereço amigável utilizado para divulgar em redes sociais e WhatsApp.
                     </span>
                   </div>
@@ -573,24 +573,24 @@ export default function NovaPaginaCaptacaoPage() {
             {/* STEP 2: Estilo Visual & Cores */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
                       Etapa 2 de 3
                     </span>
-                    <h2 className="text-lg font-bold text-white">Identidade Visual & Cores</h2>
-                    <p className="text-xs text-slate-400">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">Identidade Visual & Cores</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       Escolha uma paleta de cores acolhedora para transmitir a energia do seu atendimento.
                     </p>
                   </div>
 
                   {/* Mode Toggle */}
-                  <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-white/10 shrink-0">
+                  <div className="flex items-center gap-1 glass-sm p-1 rounded-lg border border-[var(--surface-border)] shrink-0">
                     <button
                       type="button"
                       onClick={() => setIsCustomColor(false)}
                       className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                        !isCustomColor ? 'bg-[var(--brand-gradient-start)] text-white shadow' : 'text-slate-400 hover:text-white'
+                        !isCustomColor ? 'bg-[var(--brand-gradient-start)] text-white shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Paletas
@@ -599,7 +599,7 @@ export default function NovaPaginaCaptacaoPage() {
                       type="button"
                       onClick={() => setIsCustomColor(true)}
                       className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                        isCustomColor ? 'bg-[var(--brand-gradient-start)] text-white shadow' : 'text-slate-400 hover:text-white'
+                        isCustomColor ? 'bg-[var(--brand-gradient-start)] text-white shadow' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       Customizado
@@ -617,12 +617,12 @@ export default function NovaPaginaCaptacaoPage() {
                           onClick={() => setSelectedPalette(palette)}
                           className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
                             isSelected
-                              ? 'bg-zinc-800/90 border-[var(--brand-gradient-start)] shadow-lg ring-1 ring-[var(--brand-gradient-start)]'
-                              : 'bg-zinc-900/60 border-white/10 hover:border-slate-700 hover:bg-zinc-900'
+                              ? 'glass-md border-[var(--brand-gradient-start)] shadow-lg ring-1 ring-[var(--brand-gradient-start)]'
+                              : 'glass-sm border-[var(--surface-border)] hover:border-slate-400 dark:hover:border-slate-700 hover:bg-[var(--surface-hover)]'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white">{palette.name}</span>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">{palette.name}</span>
                             {isSelected && (
                               <span className="text-[9px] font-bold text-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/15 px-2 py-0.5 rounded-full border border-[var(--brand-gradient-start)]/30">
                                 Selecionada
@@ -632,59 +632,59 @@ export default function NovaPaginaCaptacaoPage() {
 
                           <div className="flex items-center gap-2">
                             <div
-                              className="h-6 flex-1 rounded-lg shadow-inner border border-white/10"
+                              className="h-6 flex-1 rounded-lg shadow-inner border border-black/10 dark:border-white/10"
                               style={{ background: `linear-gradient(135deg, ${palette.primaryStart}, ${palette.primaryEnd})` }}
                             />
                             <div
-                              className="h-6 w-6 rounded-lg border border-white/20 shadow-sm"
+                              className="h-6 w-6 rounded-lg border border-black/10 dark:border-white/20 shadow-sm"
                               style={{ background: palette.contrast }}
                             />
                           </div>
-                          <span className="text-[11px] text-slate-400 font-medium">{palette.tag}</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{palette.tag}</span>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="p-5 bg-zinc-900/80 border border-white/10 rounded-xl space-y-4">
-                    <span className="text-xs font-bold text-white block">Cores Personalizadas</span>
+                  <div className="p-5 glass-sm border border-[var(--surface-border)] rounded-xl space-y-4">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white block">Cores Personalizadas</span>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 uppercase font-semibold block">Cor Primária</label>
+                        <label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Cor Primária</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={customPrimaryStart}
                             onChange={(e) => setCustomPrimaryStart(e.target.value)}
-                            className="h-10 w-12 rounded border border-white/10 bg-transparent cursor-pointer p-0"
+                            className="h-10 w-12 rounded border border-[var(--surface-border)] bg-transparent cursor-pointer p-0"
                           />
-                          <span className="text-xs font-mono text-slate-300">{customPrimaryStart}</span>
+                          <span className="text-xs font-mono text-slate-700 dark:text-slate-300">{customPrimaryStart}</span>
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 uppercase font-semibold block">Cor Secundária</label>
+                        <label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Cor Secundária</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={customPrimaryEnd}
                             onChange={(e) => setCustomPrimaryEnd(e.target.value)}
-                            className="h-10 w-12 rounded border border-white/10 bg-transparent cursor-pointer p-0"
+                            className="h-10 w-12 rounded border border-[var(--surface-border)] bg-transparent cursor-pointer p-0"
                           />
-                          <span className="text-xs font-mono text-slate-300">{customPrimaryEnd}</span>
+                          <span className="text-xs font-mono text-slate-700 dark:text-slate-300">{customPrimaryEnd}</span>
                         </div>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[10px] text-slate-400 uppercase font-semibold block">Texto/Contraste</label>
+                        <label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Texto/Contraste</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
                             value={customContrast}
                             onChange={(e) => setCustomContrast(e.target.value)}
-                            className="h-10 w-12 rounded border border-white/10 bg-transparent cursor-pointer p-0"
+                            className="h-10 w-12 rounded border border-[var(--surface-border)] bg-transparent cursor-pointer p-0"
                           />
-                          <span className="text-xs font-mono text-slate-300">{customContrast}</span>
+                          <span className="text-xs font-mono text-slate-700 dark:text-slate-300">{customContrast}</span>
                         </div>
                       </div>
                     </div>
@@ -692,21 +692,21 @@ export default function NovaPaginaCaptacaoPage() {
                 )}
 
                 {/* Logotipo opcional */}
-                <div className="space-y-2 pt-4 border-t border-white/5">
+                <div className="space-y-2 pt-4 border-t border-[var(--surface-border)]">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-white block">Logotipo em Imagem</label>
+                    <label className="text-xs font-bold text-slate-900 dark:text-white block">Logotipo em Imagem</label>
                     <span className="text-[10px] text-slate-500 font-semibold uppercase">Opcional</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Se não enviado, o sistema utilizará o Nome da Psicóloga em formato de tipografia elegante.
                   </p>
                   {newLogoUrl ? (
-                    <div className="flex items-center justify-between gap-3 p-3 bg-zinc-950 rounded-xl border border-white/10">
+                    <div className="flex items-center justify-between gap-3 p-3 glass-sm rounded-xl border border-[var(--surface-border)]">
                       <img src={newLogoUrl} alt="Logo" className="h-8 max-w-[180px] object-contain" />
                       <button
                         type="button"
                         onClick={() => setNewLogoUrl('')}
-                        className="text-xs text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                        className="text-xs text-red-500 dark:text-red-400 hover:underline font-semibold cursor-pointer"
                       >
                         Remover
                       </button>
@@ -715,7 +715,7 @@ export default function NovaPaginaCaptacaoPage() {
                     <button
                       type="button"
                       onClick={() => setLibraryOpen(true)}
-                      className="w-full py-3 px-4 rounded-xl bg-zinc-900 border border-dashed border-zinc-700 hover:border-[var(--brand-gradient-start)] text-xs text-slate-300 hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      className="w-full py-3 px-4 rounded-xl glass-sm border border-dashed border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="h-4 w-4 text-[var(--brand-gradient-start)]" />
                       <span>Selecionar Imagem de Logotipo</span>
@@ -728,12 +728,12 @@ export default function NovaPaginaCaptacaoPage() {
             {/* STEP 3: Escolha de Domínio / Publicação */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="space-y-1 border-b border-white/5 pb-4">
+                <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
                     Etapa 3 de 4
                   </span>
-                  <h2 className="text-lg font-bold text-white">Escolha de Domínio & Publicação</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Escolha de Domínio & Publicação</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Defina como seus pacientes acessarão seu site na internet.
                   </p>
                 </div>
@@ -747,11 +747,11 @@ export default function NovaPaginaCaptacaoPage() {
                     }}
                     className={`p-4 rounded-xl border cursor-pointer transition-all ${
                       domainMode === 'subdomain'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white shadow-lg'
-                        : 'border-zinc-800 bg-zinc-900/60 text-slate-400 hover:border-zinc-700'
+                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
+                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2 font-bold text-xs text-indigo-400 mb-1">
+                    <div className="flex items-center gap-2 font-bold text-xs text-indigo-600 dark:text-indigo-400 mb-1">
                       <Sparkles className="h-4 w-4" />
                       <span>Subdomínio Gratuito</span>
                     </div>
@@ -764,16 +764,16 @@ export default function NovaPaginaCaptacaoPage() {
                     onClick={() => setDomainMode('custom')}
                     className={`p-4 rounded-xl border cursor-pointer transition-all ${
                       domainMode === 'custom'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white shadow-lg'
-                        : 'border-zinc-800 bg-zinc-900/60 text-slate-400 hover:border-zinc-700'
+                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
+                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2 font-bold text-xs text-emerald-400 mb-1">
+                    <div className="flex items-center gap-2 font-bold text-xs text-emerald-600 dark:text-emerald-400 mb-1">
                       <Globe className="h-4 w-4" />
                       <span>Domínio Próprio</span>
                     </div>
                     <p className="text-[11px] leading-relaxed opacity-80">
-                      Use seu próprio endereço (ex: <code className="text-slate-300">terapia.seunome.com.br</code>) via Cloudflare.
+                      Use seu próprio endereço (ex: <code className="text-slate-700 dark:text-slate-300">terapia.seunome.com.br</code>) via Cloudflare.
                     </p>
                   </div>
 
@@ -781,11 +781,11 @@ export default function NovaPaginaCaptacaoPage() {
                     onClick={() => setDomainMode('path')}
                     className={`p-4 rounded-xl border cursor-pointer transition-all ${
                       domainMode === 'path'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white shadow-lg'
-                        : 'border-zinc-800 bg-zinc-900/60 text-slate-400 hover:border-zinc-700'
+                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
+                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2 font-bold text-xs text-slate-300 mb-1">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-700 dark:text-slate-300 mb-1">
                       <Layout className="h-4 w-4" />
                       <span>Link Padrão</span>
                     </div>
@@ -797,8 +797,8 @@ export default function NovaPaginaCaptacaoPage() {
 
                 {/* Subdomínio Gratuito Option Body */}
                 {domainMode === 'subdomain' && (
-                  <div className="p-5 rounded-2xl bg-zinc-900/80 border border-white/10 space-y-4">
-                    <label className="text-xs font-bold text-slate-200 block">
+                  <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
                       Escolha seu prefixo de subdomínio
                     </label>
                     <div className="flex items-center gap-2">
@@ -824,15 +824,15 @@ export default function NovaPaginaCaptacaoPage() {
                       </Button>
                     </div>
 
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono text-indigo-300">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-black/40 border border-[var(--surface-border)] text-xs font-mono text-indigo-600 dark:text-indigo-300">
                       <span>https://{(subdomainInput || newSlug || 'seu-nome')}.{baseDomain}</span>
                       {subdomainAvailable === true && (
-                        <span className="text-emerald-400 font-sans font-bold flex items-center gap-1">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-sans font-bold flex items-center gap-1">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Disponível!
                         </span>
                       )}
                       {subdomainAvailable === false && (
-                        <span className="text-red-400 font-sans font-bold flex items-center gap-1">
+                        <span className="text-red-500 dark:text-red-400 font-sans font-bold flex items-center gap-1">
                           <AlertCircle className="h-3.5 w-3.5" /> Indisponível
                         </span>
                       )}
@@ -842,8 +842,8 @@ export default function NovaPaginaCaptacaoPage() {
 
                 {/* Domínio Próprio Option Body */}
                 {domainMode === 'custom' && (
-                  <div className="p-5 rounded-2xl bg-zinc-900/80 border border-white/10 space-y-4">
-                    <label className="text-xs font-bold text-slate-200 block">
+                  <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
                       Seu Domínio Customizado
                     </label>
                     <div className="flex gap-2">
@@ -866,23 +866,23 @@ export default function NovaPaginaCaptacaoPage() {
 
                     {dnsRecords.length > 0 && (
                       <div className="space-y-3 pt-2">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
                           📋 Registros DNS a incluir no seu Provedor (Registro.br / Cloudflare / GoDaddy)
                         </label>
                         <div className="space-y-2">
                           {dnsRecords.map((rec, idx) => (
-                            <div key={idx} className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono space-y-1">
-                              <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                                <span className="font-bold text-indigo-400">{rec.type}</span>
+                            <div key={idx} className="p-3 rounded-xl glass-sm border border-[var(--surface-border)] text-xs font-mono space-y-1">
+                              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">{rec.type}</span>
                                 <span>{rec.description}</span>
                               </div>
-                              <div className="flex items-center justify-between gap-2 text-white">
+                              <div className="flex items-center justify-between gap-2 text-slate-900 dark:text-white">
                                 <span className="truncate"><strong>Host:</strong> {rec.name}</span>
-                                <span className="truncate text-slate-300"><strong>Valor:</strong> {rec.value}</span>
+                                <span className="truncate text-slate-600 dark:text-slate-300"><strong>Valor:</strong> {rec.value}</span>
                                 <button
                                   type="button"
                                   onClick={() => navigator.clipboard.writeText(rec.value)}
-                                  className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[10px] text-slate-200 shrink-0 font-sans cursor-pointer"
+                                  className="px-2 py-1 rounded bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-[10px] text-slate-800 dark:text-slate-200 shrink-0 font-sans cursor-pointer"
                                 >
                                   Copiar
                                 </button>
@@ -900,40 +900,40 @@ export default function NovaPaginaCaptacaoPage() {
             {/* STEP 4: Revisão & Instanciação */}
             {currentStep === 4 && (
               <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="space-y-1 border-b border-white/5 pb-4">
+                <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
                     Etapa 4 de 4
                   </span>
-                  <h2 className="text-lg font-bold text-white">Revisão & Instanciação</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Revisão & Instanciação</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Confira o resumo da sua nova página de captação antes de entrar no editor visual.
                   </p>
                 </div>
 
                 {/* General Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Nome da Página</span>
-                    <span className="text-sm font-bold text-white block truncate">
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-1">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Nome da Página</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white block truncate">
                       {newTitle || 'Sem nome'}
                     </span>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Link de Acesso (Slug)</span>
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-1">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Link de Acesso (Slug)</span>
                     <span className="text-xs font-mono text-[var(--brand-gradient-start)] block truncate">
                       /p/{tenant?.slug || 'clínica'}/{newSlug}
                     </span>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-zinc-900/80 border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Paleta de Cores</span>
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-1">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">Paleta de Cores</span>
                     <div className="flex items-center gap-2 pt-1">
                       <div
                         className="h-4 w-12 rounded shadow-inner"
                         style={{ background: `linear-gradient(135deg, ${activePrimaryStart}, ${activePrimaryEnd})` }}
                       />
-                      <span className="text-xs font-medium text-slate-300">
+                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
                         {isCustomColor ? 'Customizada' : selectedPalette.name}
                       </span>
                     </div>
@@ -941,31 +941,31 @@ export default function NovaPaginaCaptacaoPage() {
                 </div>
 
                 {/* Google SEO Card Preview */}
-                <div className="space-y-2 pt-2 border-t border-white/5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                     Pré-visualização no Busca do Google (SEO)
                   </span>
-                  <div className="p-4 rounded-xl bg-zinc-950 border border-white/10 space-y-1.5 font-sans">
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
-                      <Search className="h-3 w-3 text-slate-500 shrink-0" />
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-1.5 font-sans">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      <Search className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
                       <span>https://sites.psiapp.com.br/p/{tenant?.slug}/{newSlug}</span>
                     </div>
-                    <div className="text-sm font-semibold text-blue-400 truncate hover:underline cursor-pointer">
+                    <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate hover:underline cursor-pointer">
                       {metaTitle || `${newTitle} | Psicologia Clínica`}
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
                       {metaDescription || `Atendimento psicológico especializado com ${newTitle}. Agende sua consulta de forma segura.`}
                     </p>
                   </div>
                 </div>
 
                 {/* Template Ready Box */}
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs space-y-1">
-                  <div className="flex items-center gap-2 font-bold text-emerald-400">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-emerald-600 dark:text-emerald-400">
                     <Sparkles className="h-4 w-4 shrink-0" />
                     <span>Tudo pronto para a criação!</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-emerald-200/80">
+                  <p className="text-[11px] leading-relaxed text-emerald-800 dark:text-emerald-200/80">
                     Ao clicar no botão abaixo, sua landing page será instanciada com seções prontas (Sobre mim, Como Funciona, FAQ e Triagem). Você poderá customizar todo o conteúdo no editor.
                   </p>
                 </div>
@@ -973,13 +973,13 @@ export default function NovaPaginaCaptacaoPage() {
             )}
 
             {/* Bottom Actions Row */}
-            <div className="flex items-center justify-between pt-6 border-t border-white/10">
+            <div className="flex items-center justify-between pt-6 border-t border-[var(--surface-border)]">
               {currentStep > 1 ? (
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={prevStep}
-                  className="w-auto h-11 px-6 text-slate-300 hover:text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition-all border border-white/10"
+                  className="w-auto h-11 px-6 glass-sm hover:bg-[var(--surface-hover)] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition-all border border-[var(--surface-border)]"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Voltar
@@ -989,7 +989,7 @@ export default function NovaPaginaCaptacaoPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-auto h-11 px-6 text-slate-400 hover:text-white text-xs font-semibold rounded-xl cursor-pointer transition-all border border-white/10"
+                    className="w-auto h-11 px-6 glass-sm hover:bg-[var(--surface-hover)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold rounded-xl cursor-pointer transition-all border border-[var(--surface-border)]"
                   >
                     Cancelar
                   </Button>
@@ -1034,16 +1034,16 @@ export default function NovaPaginaCaptacaoPage() {
         {/* Right Column: Live Mockup Preview Widget */}
         <div className="lg:col-span-5 space-y-4 sticky top-6">
           <div className="flex items-center justify-between px-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-400 flex items-center gap-2">
               <Monitor className="h-4 w-4 text-[var(--brand-gradient-start)]" />
               Pré-Visualização ao Vivo
             </span>
-            <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-white/10">
+            <div className="flex items-center gap-1 glass-sm p-1 rounded-lg border border-[var(--surface-border)]">
               <button
                 type="button"
                 onClick={() => setPreviewMode('desktop')}
                 className={`p-1.5 rounded transition-all cursor-pointer ${
-                  previewMode === 'desktop' ? 'bg-zinc-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                  previewMode === 'desktop' ? 'bg-slate-200 dark:bg-zinc-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
                 }`}
                 title="Visão Desktop"
               >
@@ -1053,7 +1053,7 @@ export default function NovaPaginaCaptacaoPage() {
                 type="button"
                 onClick={() => setPreviewMode('mobile')}
                 className={`p-1.5 rounded transition-all cursor-pointer ${
-                  previewMode === 'mobile' ? 'bg-zinc-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                  previewMode === 'mobile' ? 'bg-slate-200 dark:bg-zinc-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
                 }`}
                 title="Visão Mobile"
               >
@@ -1064,18 +1064,18 @@ export default function NovaPaginaCaptacaoPage() {
 
           {/* Interactive Screen Container */}
           <div
-            className={`transition-all duration-300 mx-auto rounded-2xl border border-white/15 bg-zinc-950 shadow-2xl overflow-hidden ${
+            className={`transition-all duration-300 mx-auto rounded-2xl border border-[var(--surface-border)] bg-slate-950 shadow-2xl overflow-hidden ${
               previewMode === 'mobile' ? 'max-w-[340px] border-zinc-800' : 'w-full'
             }`}
           >
             {/* Mockup Browser/Phone Top bar */}
-            <div className="bg-zinc-900/90 border-b border-white/10 px-3 py-2 flex items-center justify-between select-none">
+            <div className="bg-slate-200 dark:bg-zinc-900/90 border-b border-[var(--surface-border)] px-3 py-2 flex items-center justify-between select-none">
               <div className="flex items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
                 <div className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
                 <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
               </div>
-              <div className="bg-zinc-950 px-3 py-0.5 rounded-md text-[10px] text-slate-400 font-mono border border-white/5 truncate max-w-[200px]">
+              <div className="bg-slate-100 dark:bg-zinc-950 px-3 py-0.5 rounded-md text-[10px] text-slate-600 dark:text-slate-400 font-mono border border-[var(--surface-border)] truncate max-w-[200px]">
                 /p/{tenant?.slug || 'clínica'}/{newSlug || 'sua-pagina'}
               </div>
               <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />

@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, User } from '../lib/api';
-import { EditProfileModal } from '../components/edit-profile-modal';
 
 interface AuthContextType {
   user: User | null;
@@ -143,14 +142,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, setUser, isProfileOpen, setIsProfileOpen }}>
       {children}
-      {user && (
-        <EditProfileModal
-          isOpen={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-          user={user}
-          onUserUpdated={(u) => setUser(u)}
-        />
-      )}
     </AuthContext.Provider>
   );
 };

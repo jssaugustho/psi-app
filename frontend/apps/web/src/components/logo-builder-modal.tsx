@@ -72,13 +72,13 @@ export function LogoBuilderModal({
       <BrandModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-lg">
         <div className="space-y-6">
           <div>
-            <span className="text-[10px] font-bold text-[#CC8667] uppercase tracking-widest block mb-1">
-              Assistente de Logotipo
+            <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-widest block mb-1">
+              Criador de Logotipo Visual
             </span>
-            <h3 className="text-lg font-bold text-white tracking-wide">
-              Criar Logotipo
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-wide">
+              Configurar Logotipo em HTML
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Personalize o nome e o ícone. O símbolo utilizará automaticamente as cores do gradiente da marca do site.
             </p>
           </div>
@@ -87,7 +87,7 @@ export function LogoBuilderModal({
           <div className="space-y-4">
             {/* Nome da Psicóloga */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                 Nome no Logotipo
               </label>
               <Input
@@ -95,13 +95,13 @@ export function LogoBuilderModal({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Ex: Geovanna Santos"
-                className="w-full bg-zinc-900 border-white/10 text-white placeholder:text-slate-600 text-sm"
+                className="brand-input text-sm"
               />
             </div>
 
             {/* Escolha do Ícone */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
                 Ícone do Quadro
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -110,8 +110,8 @@ export function LogoBuilderModal({
                   onClick={() => setIconType('psi')}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3 ${
                     iconType === 'psi'
-                      ? 'bg-[#CC8667]/10 border-[#CC8667] text-white shadow-md'
-                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:border-slate-700'
+                      ? 'bg-[var(--brand-gradient-start)]/10 border-[var(--brand-gradient-start)] text-slate-900 dark:text-white shadow-md'
+                      : 'glass-sm border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-700'
                   }`}
                 >
                   <div 
@@ -124,8 +124,8 @@ export function LogoBuilderModal({
                     Ψ
                   </div>
                   <div className="truncate">
-                    <span className="text-xs font-bold block text-white">Símbolo Ψ</span>
-                    <span className="text-[10px] text-slate-400 block">Psicologia</span>
+                    <span className="text-xs font-bold block text-slate-900 dark:text-white">Símbolo Ψ</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Psicologia</span>
                   </div>
                 </div>
 
@@ -134,8 +134,8 @@ export function LogoBuilderModal({
                   onClick={() => setIconType('custom')}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center gap-3 ${
                     iconType === 'custom'
-                      ? 'bg-[#CC8667]/10 border-[#CC8667] text-white shadow-md'
-                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:border-slate-700'
+                      ? 'bg-[var(--brand-gradient-start)]/10 border-[var(--brand-gradient-start)] text-slate-900 dark:text-white shadow-md'
+                      : 'glass-sm border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-700'
                   }`}
                 >
                   <div 
@@ -152,8 +152,8 @@ export function LogoBuilderModal({
                     )}
                   </div>
                   <div className="truncate">
-                    <span className="text-xs font-bold block text-white">Ícone Custom</span>
-                    <span className="text-[10px] text-slate-400 block truncate">
+                    <span className="text-xs font-bold block text-slate-900 dark:text-white">Ícone Custom</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
                       {customIconUrl ? 'Imagem Carregada' : 'Upload de imagem'}
                     </span>
                   </div>
@@ -164,14 +164,14 @@ export function LogoBuilderModal({
               {iconType === 'custom' && (
                 <div className="pt-2 animate-fade-in flex items-center gap-3">
                   {customIconUrl && (
-                    <div className="h-10 w-10 rounded-lg bg-zinc-900 border border-white/10 p-1 flex items-center justify-center shrink-0">
+                    <div className="h-10 w-10 rounded-lg glass-sm border border-[var(--surface-border)] p-1 flex items-center justify-center shrink-0">
                       <img src={customIconUrl} alt="Preview do Ícone" className="h-full w-full object-contain" />
                     </div>
                   )}
                   <button
                     type="button"
                     onClick={() => setIconLibraryOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-zinc-800 border border-white/10 text-slate-200 hover:bg-zinc-700 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                    className="px-3 py-2 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-800 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Upload className="h-3.5 w-3.5" />
                     {customIconUrl ? 'Alterar Ícone' : 'Selecionar Ícone/Favicon'}
@@ -182,11 +182,11 @@ export function LogoBuilderModal({
           </div>
 
           {/* Live Preview Box */}
-          <div className="space-y-2 pt-2 border-t border-white/5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+          <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
               Pré-visualização do Logotipo no Site
             </span>
-            <div className="p-5 rounded-2xl bg-zinc-950 border border-white/10 flex items-center justify-center min-h-[90px] shadow-inner">
+            <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] flex items-center justify-center min-h-[90px] shadow-inner">
               <div className="flex items-center gap-3 font-serif select-none">
                 <div 
                   className="h-9 w-9 rounded-xl flex items-center justify-center shadow-md shrink-0"
@@ -202,7 +202,7 @@ export function LogoBuilderModal({
                   )}
                 </div>
                 <span 
-                  className="text-lg tracking-wide text-white font-normal"
+                  className="text-lg tracking-wide text-slate-900 dark:text-white font-normal"
                   style={{ fontFamily: headingFont ? `'${headingFont}', serif` : 'serif' }}
                 >
                   {text.trim() || 'Nome da Psicóloga'}
@@ -212,18 +212,18 @@ export function LogoBuilderModal({
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/5">
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--surface-border)]">
             <button
               type="button"
               onClick={onClose}
-              className="py-2.5 px-4 rounded-xl bg-zinc-900 border border-white/10 hover:bg-zinc-800 text-slate-300 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center"
+              className="py-2.5 px-4 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="py-2.5 px-4 rounded-xl bg-[#CC8667] hover:bg-[#b07053] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#CC8667]/20 border-none cursor-pointer"
+              className="py-2.5 px-4 rounded-xl brand-accent text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg border-none cursor-pointer"
             >
               <Check className="h-4 w-4" />
               Salvar
