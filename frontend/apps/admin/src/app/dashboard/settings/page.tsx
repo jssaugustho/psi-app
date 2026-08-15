@@ -6,6 +6,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api, Tenant, PlatformSetupStatusResponse } from '@/lib/api';
 import { WhiteLabelSettings } from '@/components/white-label-settings';
 import { ResendSettings } from '@/components/resend-settings';
+import { CloudflareSettings } from '@/components/cloudflare-settings';
 import { BillingSettings } from '@/components/billing-settings';
 import { LoadingSpinner } from '@psi/ui';
 
@@ -139,10 +140,6 @@ export default function SettingsPage() {
   };
 
 
-  if (loadingTenant) {
-    return <LoadingSpinner message="Carregando configurações..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
         {/* Header */}
@@ -237,79 +234,10 @@ export default function SettingsPage() {
 
               {/* ── ABA: CLOUDFLARE ── */}
               {activeTab === 'cloudflare' && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-base font-bold mb-1">Cloudflare & R2</h2>
-                    <p className="text-sm" style={{ opacity: 0.6 }}>
-                      Para alterar as credenciais do Cloudflare ou do bucket R2, reconfigure-as abaixo.
-                      As credenciais atuais são armazenadas de forma criptografada.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { label: 'API Token', hint: 'Não exibido por segurança', icon: <KeyIcon /> },
-                      { label: 'Zone ID', hint: 'Identificador da zona DNS', icon: <GlobeIcon /> },
-                      { label: 'Account ID', hint: 'ID da conta Cloudflare', icon: <OfficeIcon /> },
-                      { label: 'Bucket R2', hint: 'Nome do bucket de armazenamento', icon: <BucketIcon /> },
-                      { label: 'Domínio Público R2', hint: 'URL pública de acesso aos arquivos', icon: <LinkIcon /> },
-                      { label: 'Access Key ID', hint: 'Chave de acesso ao R2', icon: <KeyIcon /> },
-                    ].map((field) => (
-                      <div
-                        key={field.label}
-                        className="glass-sm flex items-start gap-3 p-3 rounded-xl"
-                      >
-                        <span className="text-lg mt-0.5">{field.icon}</span>
-                        <div>
-                          <p className="text-xs font-semibold">{field.label}</p>
-                          <p className="text-[11px] mt-0.5" style={{ opacity: 0.5 }}>{field.hint}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Aviso — usa variável semântica de warning */}
-                  <div
-                    className="flex items-start gap-3 p-4 rounded-xl"
-                    style={{
-                      background: 'var(--status-warning-bg)',
-                      border: '1px solid var(--status-warning-border)',
-                    }}
-                  >
-                    <span className="text-xl" style={{ color: 'var(--status-warning-text)' }}>
-                      <svg className="w-5 h-5 text-amber-500 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: 'var(--status-warning-text)' }}>
-                        Atenção ao reconfigurar
-                      </p>
-                      <p className="text-xs mt-1" style={{ opacity: 0.7 }}>
-                        Alterar as credenciais do Cloudflare irá invalidar o bucket atual e pode
-                        causar indisponibilidade dos logos já hospedados. Faça a migração com cuidado.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <a
-                      href="/dashboard"
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                      style={{
-                        border: '1px solid var(--surface-border)',
-                        color: 'var(--brand-text-color)',
-                        opacity: 0.75,
-                      }}
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Reconfigurar via Wizard Inicial
-                    </a>
-                  </div>
-                </div>
+                <CloudflareSettings
+                  platformStatus={platformStatus}
+                  onSaved={loadTenant}
+                />
               )}
 
               {/* ── ABA: ASSINATURAS (BILLING) ── */}

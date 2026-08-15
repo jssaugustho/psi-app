@@ -125,6 +125,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
         if (syncedPage) {
           setPage(prev => ({
             ...prev,
+            title: syncedPage.title ?? prev.title,
             dictionary: { ...prev.dictionary, ...syncedPage.dictionary },
             siteConfig: { ...prev.siteConfig, ...syncedPage.siteConfig },
           }));
@@ -348,13 +349,12 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
       {theme?.typography?.headingFont || theme?.typography?.bodyFont ? (
         <link
           rel="stylesheet"
-          href={`https://fonts.googleapis.com/css2?family=${(theme?.typography?.headingFont || 'Playfair Display').replace(/\s+/g, '+')}:wght@300;400;500;600;700&family=${(theme?.typography?.bodyFont || 'Inter').replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`}
+          href={`https://fonts.googleapis.com/css2?family=${(theme?.typography?.headingFont || 'Playfair Display').replace(/\s+/g, '+')}:wght@300;400;500;600;700;800&family=${(theme?.typography?.bodyFont || 'Inter').replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`}
         />
       ) : (
-        // Fallback default google fonts
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Inter:wght@300;400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Italiana&family=Playfair+Display:ital,wght@0,300..800;1,300..800&family=Montserrat:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
         />
       )}
       {cfg.faviconUrl && (
@@ -362,6 +362,28 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
       )}
 
       <style>{`
+        ${theme?.typography?.customHeadingFontUrl ? `
+          @font-face {
+            font-family: "${(theme.typography.customHeadingFontName || 'CustomHeadingFont').replace(/[^a-zA-Z0-9\s\-]/g, '').trim()}";
+            src: url("${theme.typography.customHeadingFontUrl}") format("${theme.typography.customHeadingFontFormat || 'woff2'}");
+            font-display: swap;
+          }
+        ` : theme?.typography?.customFontUrl ? `
+          @font-face {
+            font-family: "${(theme.typography.customFontName || 'CustomFont').replace(/[^a-zA-Z0-9\s\-]/g, '').trim()}";
+            src: url("${theme.typography.customFontUrl}") format("${theme.typography.customFontFormat || 'woff2'}");
+            font-display: swap;
+          }
+        ` : ''}
+
+        ${theme?.typography?.customBodyFontUrl ? `
+          @font-face {
+            font-family: "${(theme.typography.customBodyFontName || 'CustomBodyFont').replace(/[^a-zA-Z0-9\s\-]/g, '').trim()}";
+            src: url("${theme.typography.customBodyFontUrl}") format("${theme.typography.customBodyFontFormat || 'woff2'}");
+            font-display: swap;
+          }
+        ` : ''}
+
         :root {
           --brand-gradient-start: ${theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'};
           --brand-gradient-end: ${theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'};
@@ -372,8 +394,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           --brand-text-muted: color-mix(in srgb, var(--brand-text-color) 65%, transparent);
           --mix-base: ${mixBaseCol};
           --brand-gradient: linear-gradient(135deg, ${theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'}, ${theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'});
-          --brand-heading-font: ${theme?.typography?.headingFont ? `'${theme.typography.headingFont}', serif` : 'var(--font-serif)'};
-          --brand-body-font: ${theme?.typography?.bodyFont ? `'${theme.typography.bodyFont}', sans-serif` : 'var(--font-sans)'};
+          --brand-heading-font: ${theme?.typography?.customHeadingFontName ? `'${theme.typography.customHeadingFontName.replace(/[^a-zA-Z0-9\s\-]/g, '')}', serif` : theme?.typography?.headingFont ? `'${(theme.typography.headingFont).replace(/[^a-zA-Z0-9\s\-]/g, '')}', serif` : 'var(--font-serif)'};
+          --brand-heading-weight: ${theme?.typography?.headingWeight || '400'};
+          --brand-body-font: ${theme?.typography?.customBodyFontName ? `'${theme.typography.customBodyFontName.replace(/[^a-zA-Z0-9\s\-]/g, '')}', sans-serif` : theme?.typography?.bodyFont ? `'${(theme.typography.bodyFont).replace(/[^a-zA-Z0-9\s\-]/g, '')}', sans-serif` : 'var(--font-sans)'};
         }
 
         * {
@@ -381,6 +404,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
         }
         h1, h2, h3, h4, h5, h6, .font-serif, .font-serif * {
           font-family: var(--brand-heading-font) !important;
+          font-weight: var(--brand-heading-weight, 400) !important;
           color: var(--brand-text-color);
         }
         .font-mono, .font-mono * {
@@ -391,6 +415,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
         }
         .text-\\[\\#A1A1AA\\], .text-zinc-400, .text-slate-400, .text-zinc-500, p {
           color: var(--brand-text-muted) !important;
+        }
+        .logo-icon-box, .logo-icon-box * {
+          color: var(--brand-contrast-color) !important;
         }
         
         .dark-theme-override {
@@ -441,21 +468,34 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           {loaderState !== 'black' && (
             <div className="relative z-10 flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-500 ease-out">
               {/* Logo/Icon */}
-              {(cfg.logoUrl || tenant.logoDarkUrl || tenant.logoLightUrl) ? (
+              {cfg.logoUrl ? (
                 <img 
-                  src={cfg.logoUrl || tenant.logoDarkUrl || tenant.logoLightUrl || ''} 
-                  alt={tenant.name} 
+                  src={cfg.logoUrl} 
+                  alt={cfg.professional?.name || 'Psicologia'} 
                   className="max-h-16 max-w-[200px] object-contain"
                   style={{ 
                     animation: 'fadeIn 0.6s ease-out forwards',
                   }}
                 />
               ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <span className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center font-bold text-white text-2xl shadow-xl shadow-[var(--brand-gradient-start)]/20">
-                    Ψ
+                <div className="flex items-center gap-3 font-serif">
+                  {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
+                    <img 
+                      src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
+                      alt="Ícone" 
+                      className="h-10 w-10 object-contain shrink-0" 
+                    />
+                  ) : (
+                    <div 
+                      className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-xl shrink-0 logo-icon-box"
+                      style={{ color: 'var(--brand-contrast-color)' }}
+                    >
+                      <span className="font-bold text-xl leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
+                    </div>
+                  )}
+                  <span className="font-serif text-xl tracking-wide text-[#F4F4F5] font-normal">
+                    {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
                   </span>
-                  <span className="font-serif text-lg tracking-wider text-[#F4F4F5]">{tenant.name}</span>
                 </div>
               )}
 
@@ -506,19 +546,32 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
               isPreview ? 'hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2 rounded-lg p-1' : ''
             }`}
           >
-            {(cfg.logoUrl || tenant.logoLightUrl || tenant.logoDarkUrl) ? (
+            {cfg.logoUrl ? (
               <img 
-                src={cfg.logoUrl || tenant.logoLightUrl || tenant.logoDarkUrl || ''} 
-                alt={tenant.name} 
+                src={cfg.logoUrl} 
+                alt={cfg.professional?.name || 'Psicologia'} 
                 className="max-h-11 max-w-[220px] object-contain"
               />
             ) : (
-              <>
-                <span className="h-9 w-9 rounded-xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center font-bold text-white shadow-md">
-                  Ψ
+              <div className="flex items-center gap-2.5 font-serif select-none">
+                {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
+                  <img 
+                    src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
+                    alt="Ícone" 
+                    className="h-8 w-8 object-contain shrink-0" 
+                  />
+                ) : (
+                  <div 
+                    className="h-9 w-9 rounded-xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-md shrink-0 logo-icon-box"
+                    style={{ color: 'var(--brand-contrast-color)' }}
+                  >
+                    <span className="font-bold text-base leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
+                  </div>
+                )}
+                <span className="font-serif text-lg tracking-wide text-[var(--brand-text-color)] font-normal">
+                  {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
                 </span>
-                <span className="font-serif text-lg tracking-wide text-[var(--brand-text-color)] font-normal">{tenant.name}</span>
-              </>
+              </div>
             )}
           </div>
 
@@ -594,14 +647,14 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
       )}
 
       {/* Hero Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-12 md:pt-24 pb-16 text-center md:text-left flex flex-col md:flex-row items-center gap-12">
-        <div className="flex-1 space-y-6">
+      <section className={`relative z-10 max-w-6xl mx-auto px-6 pt-12 md:pt-24 pb-16 text-center md:text-left flex flex-col md:flex-row items-center gap-8 md:gap-12 ${cfg.images?.hideHeroSectionOnMobile ? 'hidden md:flex' : ''}`}>
+        <div className="flex-1 space-y-5 md:space-y-6 flex flex-col items-center md:items-start w-full">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider text-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 uppercase">
             <Sparkles className="h-3.5 w-3.5" />
             <span>{renderEditableText('hero.badge', dict.hero?.badge, 'Atendimento Online & Presencial')}</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif text-white font-normal leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif text-white font-normal leading-tight">
             {renderEditableTitle(
               'hero.title',
               dict.hero?.title || (dict.hero?.titlePart1 && dict.hero?.titlePart2 ? `${dict.hero.titlePart1} *${dict.hero.titlePart2}*` : undefined),
@@ -609,28 +662,28 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             )}
           </h1>
 
-          <p className="text-[#A1A1AA] text-base sm:text-lg max-w-xl leading-relaxed font-light">
+          <p className="text-[#A1A1AA] text-sm sm:text-base max-w-xl leading-relaxed font-light">
             {renderEditableText('hero.description', dict.hero?.description, 'Cuidado clínico ético e acolhedor para ajudar você a superar desafios emocionais, desenvolver o autoconhecimento e viver com mais leveza.')}
           </p>
 
-          <div className="pt-2 flex flex-col sm:flex-row gap-4 justify-center md:justify-start items-center">
+          <div className="pt-2 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center md:justify-start w-full md:w-auto">
             <button
               onClick={() => setModalOpen(true)}
-              className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-sm"
+              className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-xs sm:text-sm uppercase tracking-wider border-none"
             >
               {renderEditableText('hero.ctaPrimary', dict.hero?.ctaPrimary, 'Agendar Consulta')}
               <ArrowRight className="h-4 w-4" />
             </button>
             <button
               onClick={() => scrollToSection('about')}
-              className="w-full sm:w-auto px-8 h-12 bg-white/5 hover:bg-white/10 text-[var(--brand-text-color)] font-semibold rounded-xl border border-white/10 flex items-center justify-center transition-all cursor-pointer text-sm"
+              className="w-full sm:w-auto px-8 h-12 bg-white/5 hover:bg-white/10 text-[var(--brand-text-color)] font-semibold rounded-xl border border-white/10 flex items-center justify-center transition-all cursor-pointer text-xs sm:text-sm uppercase tracking-wider"
             >
               {renderEditableText('hero.ctaSecondary', dict.hero?.ctaSecondary, 'Saiba Mais')}
             </button>
           </div>
 
           {/* Feature Badges */}
-          <div className="pt-6 flex flex-wrap gap-3 justify-center md:justify-start">
+          <div className="pt-2 flex flex-wrap gap-2 justify-center md:justify-start">
             <span className="px-3 py-1 rounded-lg bg-white/5 border border-white/5 text-xs text-[#A1A1AA] font-medium">
               ✓ {renderEditableText('hero.badgeCrp', dict.hero?.badgeCrp, 'CRP Ativo')}
             </span>
@@ -643,8 +696,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           </div>
         </div>
 
-        {/* Hero image frame matching Geovanna's layout */}
-        <div className="flex-1 max-w-sm md:max-w-md w-full relative">
+        {/* Hero image — shown on mobile unless explicitly toggled off */}
+        <div className={`flex-1 max-w-[280px] sm:max-w-xs md:max-w-md w-full mx-auto relative ${cfg.images?.hideHeroOnMobile ? 'hidden md:block' : ''}`}>
           <div className="absolute inset-0 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] rounded-2xl blur-xl opacity-25 z-0" />
           <div
             onClick={() => isPreview && window.parent.postMessage({ type: 'EDIT_ELEMENT', field: 'siteConfig.images.hero' }, '*')}
@@ -672,8 +725,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
         switch (section.type) {
           case 'diagnostic':
             return (
-              <section key={section.id} id={section.slug || 'services'} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5">
-                <div className="text-center space-y-4 max-w-xl mx-auto mb-16">
+              <section key={section.id} id={section.slug || 'services'} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
+                <div className="text-center space-y-4 max-w-xl mx-auto mb-12 md:mb-16">
                   <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase">
                     {renderEditableText('diagnostic.badge', dict.diagnostic?.badge, 'Especialidades')}
                   </span>
@@ -685,9 +738,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Card 1 */}
-                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4">
+                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start">
                     <div className="h-10 w-10 rounded-xl bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] flex items-center justify-center text-lg font-bold">
                       01
                     </div>
@@ -700,7 +753,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
 
                   {/* Card 2 */}
-                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4">
+                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start">
                     <div className="h-10 w-10 rounded-xl bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] flex items-center justify-center text-lg font-bold">
                       02
                     </div>
@@ -713,7 +766,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
 
                   {/* Card 3 */}
-                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4">
+                  <div className="p-6 rounded-2xl glass-sm hover:border-[var(--brand-gradient-start)]/20 transition-all duration-300 space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start">
                     <div className="h-10 w-10 rounded-xl bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] flex items-center justify-center text-lg font-bold">
                       03
                     </div>
@@ -729,8 +782,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             );
           case 'about':
             return (
-              <section key={section.id} id={section.slug || 'about'} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5 flex flex-col md:flex-row items-center gap-16">
-                <div className="flex-1 max-w-sm w-full relative">
+              <section key={section.id} id={section.slug || 'about'} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 flex flex-col md:flex-row items-center gap-10 md:gap-16 text-center md:text-left ${section.hideOnMobile ? 'hidden md:flex' : ''}`}>
+                {/* Portrait — shown on mobile unless toggled off */}
+                <div className={`flex-1 max-w-[280px] sm:max-w-xs md:max-w-sm w-full mx-auto relative ${cfg.images?.hidePortraitOnMobile ? 'hidden md:block' : ''}`}>
                   <div
                     onClick={() => isPreview && window.parent.postMessage({ type: 'EDIT_ELEMENT', field: 'siteConfig.images.portrait' }, '*')}
                     className={`aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-900 border border-white/5 shadow-xl relative ${isPreview ? 'cursor-pointer hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2' : ''}`}
@@ -747,7 +801,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
                 </div>
 
-                <div className="flex-1 space-y-6">
+                <div className="flex-1 space-y-5 flex flex-col items-center md:items-start w-full">
                   <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase">
                     {renderEditableText('about.badge', dict.about?.badge, 'Sua Psicóloga')}
                   </span>
@@ -761,9 +815,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                     {renderEditableText('about.description2', dict.about?.description2, 'Ofereço um espaço terapêutico sem julgamentos baseado no sigilo ético absoluto.')}
                   </p>
 
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-3 pt-2 w-full">
                     {(dict.about?.points || []).map((point: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-3 text-sm text-[#A1A1AA] font-light">
+                      <div key={idx} className="flex items-center gap-3 text-sm text-[#A1A1AA] font-light text-left">
                         <div className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                           <Check className="h-3 w-3" />
                         </div>
@@ -772,10 +826,10 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                     ))}
                   </div>
 
-                  <div className="pt-4">
+                  <div className="pt-4 w-full flex flex-col sm:flex-row items-center justify-center md:justify-start">
                     <button
                       onClick={() => setModalOpen(true)}
-                      className="px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-sm"
+                      className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-xs sm:text-sm uppercase tracking-wider border-none"
                     >
                       {renderEditableText('about.cta', dict.about?.cta, 'Fazer Triagem')}
                       <ArrowRight className="h-4 w-4" />
@@ -786,8 +840,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             );
           case 'process':
             return (
-              <section key={section.id} id={section.slug || 'process'} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5">
-                <div className="text-center space-y-4 max-w-xl mx-auto mb-16">
+              <section key={section.id} id={section.slug || 'process'} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
+                <div className="text-center space-y-4 max-w-xl mx-auto mb-12 md:mb-16">
                   <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase">
                     {renderEditableText('process.badge', dict.process?.badge, 'O Processo')}
                   </span>
@@ -799,12 +853,12 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 relative">
                   {/* Connector lines (Desktop) */}
                   <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-[1px] bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] opacity-20 z-0" />
 
                   {/* Step 1 */}
-                  <div className="space-y-4 text-center relative z-10">
+                  <div className="space-y-4 text-center relative z-10 flex flex-col items-center">
                     <div className="h-14 w-14 rounded-full bg-[var(--brand-card-bg-color)] border border-white/10 flex items-center justify-center text-lg font-bold text-white mx-auto shadow-md">
                       1
                     </div>
@@ -823,7 +877,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
 
                   {/* Step 2 */}
-                  <div className="space-y-4 text-center relative z-10">
+                  <div className="space-y-4 text-center relative z-10 flex flex-col items-center">
                     <div className="h-14 w-14 rounded-full bg-[var(--brand-card-bg-color)] border border-white/10 flex items-center justify-center text-lg font-bold text-white mx-auto shadow-md">
                       2
                     </div>
@@ -836,7 +890,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
 
                   {/* Step 3 */}
-                  <div className="space-y-4 text-center relative z-10">
+                  <div className="space-y-4 text-center relative z-10 flex flex-col items-center">
                     <div className="h-14 w-14 rounded-full bg-[var(--brand-card-bg-color)] border border-white/10 flex items-center justify-center text-lg font-bold text-white mx-auto shadow-md">
                       3
                     </div>
@@ -854,7 +908,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             const isFaqGridMode = section.settings?.displayMode === 'grid';
             const faqItemsList = dict.faq?.items || dict.faq?.faq || [];
             return (
-              <section key={section.id} id={section.slug || 'faq'} className={`relative z-10 mx-auto px-6 py-20 border-t border-white/5 animate-in fade-in duration-500 ${isFaqGridMode ? 'max-w-6xl' : 'max-w-3xl'}`}>
+              <section key={section.id} id={section.slug || 'faq'} className={`relative z-10 mx-auto px-6 py-16 md:py-20 border-t border-white/5 animate-in fade-in duration-500 ${isFaqGridMode ? 'max-w-6xl' : 'max-w-3xl'} ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
                 <div className="text-center space-y-4 mb-12">
                   <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase">
                     {renderEditableText('faq.badge', dict.faq?.badge, 'Dúvidas')}
@@ -869,7 +923,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   )}
                 </div>
 
-                <div className={isFaqGridMode ? "grid grid-cols-1 md:grid-cols-2 gap-6 text-left" : "space-y-4"}>
+                <div className={isFaqGridMode ? "grid grid-cols-1 sm:grid-cols-2 gap-6 text-left" : "space-y-4"}>
                   {faqItemsList.map((faq: { question: string; answer: string }, idx: number) => {
                     const shouldOpenDefault = faqOpenIndex === null && (section.settings?.defaultOpenFirst ?? true) ? idx === 0 : false;
                     const isOpen = isFaqGridMode || faqOpenIndex === idx || shouldOpenDefault;
@@ -914,8 +968,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             );
           case 'space':
             return (
-              <section key={section.id} id={section.slug || 'space'} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5 flex flex-col md:flex-row items-center gap-12">
-                <div className="flex-1 space-y-6">
+              <section key={section.id} id={section.slug || 'space'} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 flex flex-col md:flex-row items-center gap-10 md:gap-12 text-center md:text-left ${section.hideOnMobile ? 'hidden md:flex' : ''}`}>
+                <div className="flex-1 space-y-5 flex flex-col items-center md:items-start w-full">
                   <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase">
                     {renderEditableText('space.badge', dict.space?.badge, 'O Consultório')}
                   </span>
@@ -926,7 +980,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                     {renderEditableText('space.description', dict.space?.description, 'Nosso espaço físico é projetado com todo o conforto e privacidade para os seus atendimentos presenciais.')}
                   </p>
 
-                  <div className="flex items-start gap-3 text-sm text-[#E4E4E7]">
+                  <div className="flex items-start gap-3 text-sm text-[#E4E4E7] text-left">
                     <MapPin className="h-5 w-5 text-[var(--brand-gradient-start)] shrink-0 mt-0.5" />
                     <div>
                       <span className="block font-bold text-xs uppercase text-[#A1A1AA] tracking-wider mb-0.5">
@@ -939,7 +993,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
                 </div>
 
-                <div className="flex-1 w-full space-y-4">
+                <div className={`flex-1 w-full space-y-4 max-w-sm md:max-w-lg mx-auto ${cfg.images?.hideOfficeSpaceOnMobile ? 'hidden md:block' : ''}`}>
                   <div
                     onClick={() => isPreview && window.parent.postMessage({ type: 'EDIT_ELEMENT', field: 'siteConfig.images.officeSpace' }, '*')}
                     className={`aspect-video w-full rounded-2xl border border-white/5 overflow-hidden bg-zinc-900 shadow-xl relative ${isPreview ? 'cursor-pointer hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2' : ''}`}
@@ -969,9 +1023,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           case 'grid':
             const gridColsCount = Number(section.settings?.columns || 3);
             const gridColsClass = 
-              gridColsCount === 2 ? 'md:grid-cols-2' :
-              gridColsCount === 4 ? 'md:grid-cols-4' :
-              'md:grid-cols-3';
+              gridColsCount === 2 ? 'sm:grid-cols-2' :
+              gridColsCount === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' :
+              'sm:grid-cols-2 lg:grid-cols-3';
             
             const cardStyleClass = 
               section.settings?.cardStyle === 'bordered' ? 'border border-white/5 p-6 rounded-2xl bg-[var(--brand-card-bg-color)]/20' :
@@ -982,8 +1036,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             const gridWidthClass = gridColsCount === 4 ? 'max-w-7xl' : 'max-w-6xl';
 
             return (
-              <section key={section.id} id={section.slug || section.id} className={`relative z-10 mx-auto px-6 py-20 border-t border-white/5 animate-in fade-in duration-500 ${gridWidthClass}`}>
-                <div className="text-center space-y-4 max-w-xl mx-auto mb-16">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 mx-auto px-6 py-16 md:py-20 border-t border-white/5 animate-in fade-in duration-500 ${gridWidthClass} ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
+                <div className="text-center space-y-4 max-w-xl mx-auto mb-12 md:mb-16">
                   {section.badge && (
                     <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase block">
                       {renderEditableText(`${section.id}.badge`, section.badge, 'Destaques')}
@@ -1003,7 +1057,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
 
                 <div className={`grid grid-cols-1 gap-6 ${gridColsClass}`}>
                   {(section.items || []).map((item: any, idx: number) => (
-                    <div key={idx} className={`${cardStyleClass} ${alignmentClass} space-y-4`}>
+                    <div key={idx} className={`${cardStyleClass} ${alignmentClass} space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start`}>
                       {section.settings?.markerType !== 'none' && item.number && (
                         <div className="h-10 w-10 rounded-xl bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] flex items-center justify-center text-lg font-bold">
                           {section.settings?.markerType === 'icon' ? (
@@ -1037,8 +1091,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             const colAlignmentClass = section.settings?.itemAlignment === 'center' ? 'text-center flex flex-col items-center' : 'text-left';
 
             return (
-              <section key={section.id} id={section.slug || section.id} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5 animate-in fade-in duration-500">
-                <div className="text-center space-y-4 max-w-xl mx-auto mb-16">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 animate-in fade-in duration-500 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
+                <div className="text-center space-y-4 max-w-xl mx-auto mb-12 md:mb-16">
                   {section.badge && (
                     <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase block">
                       {renderEditableText(`${section.id}.badge`, section.badge, 'Abordagem')}
@@ -1051,8 +1105,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   )}
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-8 items-stretch">
-                  <div className={`flex-1 ${colStyleClass} ${colAlignmentClass} space-y-4`}>
+                <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-stretch">
+                  <div className={`flex-1 ${colStyleClass} ${colAlignmentClass} space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start`}>
                     <h3 className="text-xl font-serif text-white font-medium">
                       {renderEditableTitle(`${section.id}.leftTitle`, section.leftTitle, 'Coluna Esquerda')}
                     </h3>
@@ -1060,7 +1114,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                       {renderEditableText(`${section.id}.leftText`, section.leftText, 'Texto explicativo da coluna esquerda.')}
                     </p>
                   </div>
-                  <div className={`flex-1 ${colStyleClass} ${colAlignmentClass} space-y-4`}>
+                  <div className={`flex-1 ${colStyleClass} ${colAlignmentClass} space-y-4 text-center sm:text-left flex flex-col items-center sm:items-start`}>
                     <h3 className="text-xl font-serif text-white font-medium">
                       {renderEditableTitle(`${section.id}.rightTitle`, section.rightTitle, 'Coluna Direita')}
                     </h3>
@@ -1074,9 +1128,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           case 'text-image':
             const isImgMediaFirst = section.settings?.columnOrder ? (section.settings.columnOrder === 'media-first') : (section.imagePosition === 'left');
             return (
-              <section key={section.id} id={section.slug || section.id} className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-white/5 animate-in fade-in duration-500">
-                <div className={`flex flex-col ${isImgMediaFirst ? 'md:flex-row-reverse' : 'md:flex-row'} gap-12 items-center`}>
-                  <div className="flex-1 space-y-6 text-left">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 max-w-6xl mx-auto px-6 py-16 md:py-20 border-t border-white/5 animate-in fade-in duration-500 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
+                <div className={`flex flex-col ${isImgMediaFirst ? 'md:flex-row-reverse' : 'md:flex-row'} gap-8 md:gap-12 items-center text-center md:text-left`}>
+                  <div className="flex-1 space-y-5 md:space-y-6 flex flex-col items-center md:items-start w-full">
                     {section.badge && (
                       <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase block">
                         {renderEditableText(`${section.id}.badge`, section.badge, 'Espaço')}
@@ -1093,10 +1147,10 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                       </p>
                     )}
                     {section.ctaText && (
-                      <div className="pt-2">
+                      <div className="pt-2 w-full sm:w-auto flex justify-center md:justify-start">
                         <button
                           onClick={() => setModalOpen(true)}
-                          className="bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:from-[var(--brand-gradient-start)]/90 hover:to-[var(--brand-gradient-end)]/90 text-[var(--brand-contrast-color)] font-semibold text-xs uppercase tracking-wider py-4 px-8 rounded-full shadow-lg shadow-[var(--brand-gradient-start)]/10 hover:shadow-[var(--brand-gradient-start)]/20 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none"
+                          className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer border-none"
                         >
                           {renderEditableText(`${section.id}.ctaText`, section.ctaText, 'Fazer Agendamento')}
                         </button>
@@ -1112,7 +1166,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                       'aspect-square rounded-2xl';
                     
                     return (
-                      <div className={`flex-1 w-full max-w-lg overflow-hidden border border-white/5 shadow-2xl relative ${ratioStyleClass}`}>
+                      <div className={`flex-1 w-full max-w-xs sm:max-w-sm md:max-w-lg overflow-hidden border border-white/5 shadow-2xl relative mx-auto ${ratioStyleClass} ${section.hideImageOnMobile ? 'hidden md:block' : ''}`}>
                         {section.image ? (
                           <img 
                             src={section.image} 
@@ -1126,7 +1180,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                                 window.parent.postMessage({ type: 'EDIT_ELEMENT', field: `${section.id}.image` }, '*');
                               }
                             }}
-                            className="w-full h-full bg-gradient-to-br from-zinc-850 to-zinc-900 flex flex-col items-center justify-center gap-2 cursor-pointer group text-zinc-500 hover:text-zinc-300 transition-colors"
+                            className="w-full h-full bg-gradient-to-br from-zinc-850 to-zinc-900 flex flex-col items-center justify-center gap-2 cursor-pointer group text-zinc-500 hover:text-zinc-300 transition-colors py-16"
                           >
                             <ImageIcon className="h-8 w-8" />
                             <span className="text-[10px] uppercase font-bold tracking-wider">Adicionar Imagem</span>
@@ -1138,11 +1192,12 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                 </div>
               </section>
             );
+
           case 'text-block':
           case 'cta-banner': {
             const bgStyle = section.settings?.bgStyle || (section.type === 'text-block' ? 'minimal' : 'gradient');
             const alignment = section.settings?.alignment || 'center';
-            const alignmentClass = alignment === 'left' ? 'text-left items-start' : 'text-center items-center flex flex-col';
+            const alignmentClass = alignment === 'left' ? 'text-center sm:text-left items-center sm:items-start' : 'text-center items-center flex flex-col';
             
             let bgClass = '';
             let borderClass = 'border-t border-white/5';
@@ -1151,15 +1206,15 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             if (bgStyle === 'gradient') {
               bgClass = 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] rounded-3xl shadow-2xl';
               borderClass = 'border border-white/10';
-              containerClass = 'max-w-5xl mx-auto px-8 py-12 md:py-16 my-8';
+              containerClass = 'max-w-5xl mx-auto px-6 sm:px-8 py-10 md:py-16 my-8';
             } else if (bgStyle === 'card') {
               bgClass = 'glass-md rounded-3xl shadow-xl';
               borderClass = 'border border-white/5';
-              containerClass = 'max-w-5xl mx-auto px-8 py-12 md:py-16 my-8';
+              containerClass = 'max-w-5xl mx-auto px-6 sm:px-8 py-10 md:py-16 my-8';
             }
 
             return (
-              <section key={section.id} id={section.slug || section.id} className="relative z-10 px-6 animate-in fade-in duration-500">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 px-6 animate-in fade-in duration-500 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
                 <div className={`${bgClass} ${borderClass} ${containerClass} ${alignmentClass} ${bgStyle === 'gradient' ? 'dark-theme-override' : ''} space-y-6`}>
                   {section.badge && (
                     <span className={`text-xs font-bold tracking-wider uppercase block ${
@@ -1183,11 +1238,11 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                     </p>
                   )}
                   {(section.ctaText || section.settings?.showSecondaryCta) && (
-                    <div className="pt-4 flex flex-col sm:flex-row gap-4 justify-center items-center w-full">
+                    <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
                       {section.ctaText && (
                         <button
                           onClick={() => setModalOpen(true)}
-                          className={`font-semibold text-xs uppercase tracking-wider py-4 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none ${
+                          className={`w-full sm:w-auto px-8 h-12 font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none flex items-center justify-center gap-2 ${
                             bgStyle === 'gradient'
                               ? 'bg-white text-zinc-900 hover:bg-white/90 shadow-xl'
                               : 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] hover:opacity-90'
@@ -1201,7 +1256,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                           onClick={() => {
                             window.open(`https://wa.me/55${tenant.phone?.replace(/\D/g, '')}`, '_blank');
                           }}
-                          className={`font-semibold text-xs uppercase tracking-wider py-4 px-8 rounded-full shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border ${
+                          className={`w-full sm:w-auto px-8 h-12 font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border flex items-center justify-center gap-2 ${
                             bgStyle === 'gradient'
                               ? 'bg-transparent border-[var(--brand-contrast-color)]/20 text-[var(--brand-contrast-color)] hover:bg-[var(--brand-contrast-color)]/10'
                               : 'bg-white/5 border-white/10 text-[var(--brand-text-color)] hover:bg-white/10'
@@ -1235,11 +1290,11 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             if (cardStyle === 'glass') {
               cardClass = 'glass-md rounded-3xl shadow-xl';
               borderClass = 'border border-white/5';
-              containerClass = 'max-w-6xl mx-auto px-8 py-12 md:py-16 my-8';
+              containerClass = 'max-w-6xl mx-auto px-6 sm:px-8 py-10 md:py-16 my-8';
             } else if (cardStyle === 'bordered') {
               cardClass = 'border border-white/5 bg-[var(--brand-card-bg-color)]/20 rounded-3xl';
               borderClass = 'border border-white/5';
-              containerClass = 'max-w-6xl mx-auto px-8 py-12 md:py-16 my-8';
+              containerClass = 'max-w-6xl mx-auto px-6 sm:px-8 py-10 md:py-16 my-8';
             }
 
             const ratioClass = 
@@ -1248,12 +1303,12 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
               'aspect-square rounded-2xl';
 
             return (
-              <section key={section.id} id={section.slug || section.id} className="relative z-10 px-6 animate-in fade-in duration-500">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 px-6 animate-in fade-in duration-500 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
                 <div className={`${cardClass} ${borderClass} ${containerClass}`}>
-                  <div className={`flex flex-col ${isImgLeft ? 'md:flex-row' : 'md:flex-row-reverse'} gap-12 items-center`}>
+                  <div className={`flex flex-col ${isImgLeft ? 'md:flex-row' : 'md:flex-row-reverse'} gap-8 md:gap-12 items-center text-center md:text-left`}>
                     
                     {/* Content column */}
-                    <div className="flex-1 space-y-6 text-left">
+                    <div className="flex-1 space-y-5 md:space-y-6 flex flex-col items-center md:items-start w-full">
                       {section.badge && (
                         <span className="text-xs font-bold tracking-wider text-[var(--brand-gradient-start)] uppercase block">
                           {renderEditableText(`${section.id}.badge`, section.badge, 'Agendamento')}
@@ -1270,11 +1325,11 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                         </p>
                       )}
                       
-                      <div className="pt-4 flex flex-col sm:flex-row gap-4 items-start">
+                      <div className="pt-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center md:justify-start w-full">
                         {section.ctaText && (
                           <button
                             onClick={() => setModalOpen(true)}
-                            className="bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold text-xs uppercase tracking-wider py-4 px-8 rounded-full shadow-lg shadow-[var(--brand-gradient-start)]/10 hover:shadow-[var(--brand-gradient-start)]/20 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none"
+                            className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none flex items-center justify-center gap-2"
                           >
                             {renderEditableText(`${section.id}.ctaText`, section.ctaText, 'Iniciar Triagem')}
                           </button>
@@ -1284,7 +1339,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                             onClick={() => {
                               window.open(`https://wa.me/55${tenant.phone?.replace(/\D/g, '')}`, '_blank');
                             }}
-                            className="bg-white/5 border border-white/10 hover:bg-white/10 text-[var(--brand-text-color)] font-semibold text-xs uppercase tracking-wider py-4 px-8 rounded-full transition-all duration-300 cursor-pointer shadow-sm"
+                            className="w-full sm:w-auto px-8 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-[var(--brand-text-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all duration-300 cursor-pointer shadow-sm flex items-center justify-center gap-2"
                           >
                             {renderEditableText(`${section.id}.ctaSecondaryText`, section.ctaSecondaryText, 'Chamar no WhatsApp')}
                           </button>
@@ -1293,7 +1348,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                     </div>
 
                     {/* Image Column */}
-                    <div className={`flex-1 w-full max-w-sm overflow-hidden border border-white/5 shadow-2xl relative ${ratioClass}`}>
+                    <div className={`flex-1 w-full max-w-xs sm:max-w-sm md:max-w-md overflow-hidden border border-white/5 shadow-2xl relative mx-auto ${ratioClass} ${section.hideImageOnMobile ? 'hidden md:block' : ''}`}>
                       {section.image ? (
                         <img 
                           src={section.image} 
@@ -1307,7 +1362,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                               window.parent.postMessage({ type: 'EDIT_ELEMENT', field: `${section.id}.image` }, '*');
                             }
                           }}
-                          className="w-full h-full bg-gradient-to-br from-zinc-850 to-zinc-900 flex flex-col items-center justify-center gap-2 cursor-pointer group text-zinc-500 hover:text-zinc-300 transition-colors py-20"
+                          className="w-full h-full bg-gradient-to-br from-zinc-850 to-zinc-900 flex flex-col items-center justify-center gap-2 cursor-pointer group text-zinc-500 hover:text-zinc-300 transition-colors py-16"
                         >
                           <ImageIcon className="h-8 w-8" />
                           <span className="text-[10px] uppercase font-bold tracking-wider">Adicionar Foto</span>
@@ -1324,18 +1379,18 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           case 'quote': {
             const styleType = section.settings?.style || 'elegant';
             const alignment = section.settings?.alignment || 'center';
-            const alignClass = alignment === 'left' ? 'text-left items-start' : 'text-center items-center flex flex-col';
+            const alignClass = alignment === 'left' ? 'text-center sm:text-left items-center sm:items-start' : 'text-center items-center flex flex-col';
 
             let wrapperClass = 'max-w-4xl mx-auto px-6 py-16';
             let borderClass = 'border-t border-white/5';
             
             if (styleType === 'card') {
-              wrapperClass = 'max-w-4xl mx-auto px-8 py-12 md:py-16 my-8 glass-md rounded-3xl shadow-xl';
+              wrapperClass = 'max-w-4xl mx-auto px-6 sm:px-8 py-10 md:py-16 my-8 glass-md rounded-3xl shadow-xl';
               borderClass = 'border border-white/5';
             }
 
             return (
-              <section key={section.id} id={section.slug || section.id} className="relative z-10 px-6 animate-in fade-in duration-500">
+              <section key={section.id} id={section.slug || section.id} className={`relative z-10 px-6 animate-in fade-in duration-500 ${section.hideOnMobile ? 'hidden md:block' : ''}`}>
                 <div className={`${wrapperClass} ${borderClass} ${alignClass} space-y-4`}>
                   <span className="text-5xl sm:text-6xl font-serif text-[var(--brand-gradient-start)] opacity-40 leading-none select-none block">“</span>
                   <p className="text-lg sm:text-xl md:text-2xl font-serif text-[var(--brand-text-color)] font-light italic leading-relaxed">
@@ -1350,15 +1405,16 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
               </section>
             );
           }
+
           default:
             return null;
         }
       })}
 
       {/* Footer */}
-      <footer className="relative z-10 bg-[var(--brand-bg-color)] border-t border-white/5 py-12 text-[#A1A1AA] text-xs">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div className="space-y-4">
+      <footer className="relative z-10 bg-[var(--brand-bg-color)] border-t border-white/5 py-12 text-[#A1A1AA] text-xs text-center sm:text-left">
+        <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+          <div className="space-y-4 flex flex-col items-center md:items-start">
             <div 
               onClick={() => {
                 if (isPreview) {
@@ -1367,23 +1423,36 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
-              className={`flex items-center gap-2 cursor-pointer transition-all ${
+              className={`flex items-center justify-center md:justify-start gap-2 cursor-pointer transition-all ${
                 isPreview ? 'hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2 rounded-lg p-1' : ''
               }`}
             >
-              {(cfg.logoUrl || tenant.logoLightUrl || tenant.logoDarkUrl) ? (
+              {cfg.logoUrl ? (
                 <img 
-                  src={cfg.logoUrl || tenant.logoLightUrl || tenant.logoDarkUrl || ''} 
-                  alt={tenant.name} 
+                  src={cfg.logoUrl} 
+                  alt={cfg.professional?.name || 'Psicologia'} 
                   className="max-h-9 max-w-[180px] object-contain"
                 />
               ) : (
-                <>
-                  <span className="h-7 w-7 rounded-lg bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center font-bold text-white">
-                    Ψ
+                <div className="flex items-center gap-2.5 font-serif select-none">
+                  {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
+                    <img 
+                      src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
+                      alt="Ícone" 
+                      className="h-6 w-6 object-contain shrink-0" 
+                    />
+                  ) : (
+                    <div 
+                      className="h-7 w-7 rounded-lg bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-sm shrink-0 logo-icon-box"
+                      style={{ color: 'var(--brand-contrast-color)' }}
+                    >
+                      <span className="font-bold text-xs leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
+                    </div>
+                  )}
+                  <span className="font-serif text-base tracking-wide text-[var(--brand-text-color)] font-normal">
+                    {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
                   </span>
-                  <span className="font-serif text-base tracking-wide text-[var(--brand-text-color)] font-normal">{tenant.name}</span>
-                </>
+                </div>
               )}
             </div>
             <p className="leading-relaxed font-light">
@@ -1396,7 +1465,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             )}
           </div>
 
-          <div>
+          <div className="flex flex-col items-center md:items-start">
             <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--brand-text-color)] mb-4">
               {renderEditableText('footer.navHeader', dict.footer?.navHeader, 'Navegação')}
             </h4>
@@ -1408,7 +1477,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   <li key={s.id}>
                     <button
                       onClick={() => scrollToSection(navInfo.id)}
-                      className="hover:text-[var(--brand-text-color)] text-[var(--brand-text-muted)] cursor-pointer transition-colors bg-transparent border-none p-0 text-left"
+                      className="hover:text-[var(--brand-text-color)] text-[var(--brand-text-muted)] cursor-pointer transition-colors bg-transparent border-none p-0 text-center md:text-left"
                     >
                       {renderEditableText(
                         navInfo.labelKey,
@@ -1422,7 +1491,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             </ul>
           </div>
 
-          <div>
+          <div className="flex flex-col items-center md:items-start">
             <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--brand-text-color)] mb-4">
               {renderEditableText('footer.serviceHeader', dict.footer?.serviceHeader, 'Especialidades')}
             </h4>
@@ -1433,10 +1502,10 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
             </ul>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex flex-col items-center md:items-start w-full">
             <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--brand-text-color)] mb-4">Contato</h4>
             {tenant.phone && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center md:justify-start gap-2">
                 <Phone className="h-4 w-4 text-[var(--brand-gradient-start)]" />
                 <span className="font-medium text-[var(--brand-text-color)]">{tenant.phone}</span>
               </div>
@@ -1451,7 +1520,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-6 border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-6 border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <p className="font-light">
             © {new Date().getFullYear()} {tenant.name}. {renderEditableText('footer.rights', dict.footer?.rights, 'Todos os direitos reservados.')}
           </p>

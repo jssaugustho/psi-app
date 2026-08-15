@@ -156,12 +156,12 @@ export default function UsersListPage() {
 
 
 
-  if (loadingUsers) {
-    return <LoadingSpinner message="Carregando listagem de usuários..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-page-enter">
+      {loadingUsers ? (
+        <LoadingSpinner message="Carregando listagem de usuários..." className="min-h-[50vh]" />
+      ) : (
+        <>
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -570,6 +570,8 @@ export default function UsersListPage() {
             </div>
           </div>
         )}
+        </>
+      )}
     </div>
   );
 }

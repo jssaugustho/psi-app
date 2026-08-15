@@ -1,5 +1,6 @@
 import React from 'react'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { getCapturePageByDomain, getContractTemplateContent } from '../../../lib/api'
 import { CapturePageRenderer } from '../../../components/CapturePageRenderer'
 
@@ -9,6 +10,43 @@ interface PageProps {
   params: Promise<{
     domain: string;
   }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { domain } = await params
+  const pageData = await getCapturePageByDomain(domain)
+  if (!pageData) return {}
+
+  const title = pageData.title
+  const siteConfig = pageData.site_config
+  const seoConfig = pageData.seo_config
+
+  const metaTitle = seoConfig?.metaTitle || `${title} | Atendimento Psicológico`
+  const metaDescription = seoConfig?.metaDescription || `Agende sua consulta de psicologia com ${title}.`
+  const faviconUrl = siteConfig?.faviconUrl
+  const logoUrl = siteConfig?.logoUrl
+
+  return {
+    title: metaTitle,
+    description: metaDescription,
+    icons: faviconUrl ? {
+      icon: faviconUrl,
+      shortcut: faviconUrl,
+      apple: faviconUrl,
+    } : undefined,
+    openGraph: {
+      title: metaTitle,
+      description: metaDescription,
+      type: 'website',
+      images: logoUrl ? [{ url: logoUrl }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: metaTitle,
+      description: metaDescription,
+      images: logoUrl ? [logoUrl] : [],
+    },
+  }
 }
 
 export default async function CustomDomainCapturePage({ params }: PageProps) {

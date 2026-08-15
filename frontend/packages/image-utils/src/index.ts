@@ -8,7 +8,7 @@
  * Saída sempre em WebP (com fallback para JPEG em browsers sem suporte).
  */
 
-export type UploadType = 'avatar' | 'logo' | 'icon' | 'asset';
+export type UploadType = 'avatar' | 'logo' | 'icon' | 'asset' | 'font';
 
 interface CompressionOptions {
   maxWidth?: number;
@@ -22,7 +22,67 @@ const DEFAULTS: Record<UploadType, Required<CompressionOptions>> = {
   logo:   { maxWidth: 800,  maxHeight: 800,  quality: 0.85 },
   icon:   { maxWidth: 128,  maxHeight: 128,  quality: 0.90 },
   asset:  { maxWidth: 1920, maxHeight: 1920, quality: 0.80 },
+  font:   { maxWidth: 0,    maxHeight: 0,    quality: 1.0  },
 };
+
+/**
+ * Sanitiza o nome de uma fonte para uso seguro em CSS font-family, prevenindo CSS injection.
+ */
+export function sanitizeFontFamily(name: string): string {
+  const clean = name.replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+  return clean || 'CustomFont';
+}
+
+/**
+ * Valida o cabeçalho binário (Magic Bytes) de um arquivo de fonte (.woff2, .woff, .ttf, .otf).
+ * Impede upload de SVG, HTML ou scripts maliciosos mascarados.
+ */
+export async function validateFontFile(file: File): Promise<{
+  valid: boolean;
+  format: 'woff2' | 'woff' | 'truetype' | 'opentype';
+  error?: string;
+}> {
+  if (file.size > 5 * 1024 * 1024) {
+    return { valid: false, format: 'woff2', error: 'O arquivo de fonte deve ter no máximo 5MB.' };
+  }
+
+  const filenameLower = file.name.toLowerCase();
+  if (filenameLower.endsWith('.svg') || file.type.includes('svg') || file.type.includes('html') || file.type.includes('xml')) {
+    return { valid: false, format: 'woff2', error: 'Fontes em formato SVG/XML não são permitidas por motivos de segurança. Use apenas .woff2, .woff, .ttf ou .otf.' };
+  }
+
+  try {
+    const buffer = await file.slice(0, 4).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const magic = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const asciiMagic = String.fromCharCode(...bytes);
+
+    // WOFF2: 'wOF2' (0x77 0x4F 0x46 0x32)
+    if (asciiMagic === 'wOF2') {
+      return { valid: true, format: 'woff2' };
+    }
+    // WOFF: 'wOFF' (0x77 0x4F 0x46 0x46)
+    if (asciiMagic === 'wOFF') {
+      return { valid: true, format: 'woff' };
+    }
+    // OpenType: 'OTTO' (0x4F 0x54 0x54 0x4F)
+    if (asciiMagic === 'OTTO') {
+      return { valid: true, format: 'opentype' };
+    }
+    // TrueType: 0x00010000 ou 'true' (0x74 0x72 0x75 0x65)
+    if (magic === '00010000' || asciiMagic === 'true') {
+      return { valid: true, format: 'truetype' };
+    }
+  } catch (err) {
+    console.error('Erro na verificação de Magic Bytes da fonte:', err);
+  }
+
+  return {
+    valid: false,
+    format: 'woff2',
+    error: 'Arquivo inválido. O conteúdo binário não corresponde a uma fonte válida (.woff2, .woff, .ttf, .otf).'
+  };
+}
 
 /**
  * Comprime e redimensiona uma imagem localmente usando a Canvas API.
@@ -47,8 +107,8 @@ export async function compressImage(
     throw new Error('O arquivo excede o limite máximo permitido de 15MB.');
   }
 
-  // SVG é vetorial — não faz sentido passar pelo canvas
-  if (file.type === 'image/svg+xml') {
+  // SVG e Fontes são mantidos sem alteração de canvas
+  if (file.type === 'image/svg+xml' || type === 'font') {
     return file;
   }
 
@@ -83,9 +143,13 @@ export async function compressImage(
         }
 
         const isLogoOrIcon = type === 'logo' || type === 'icon';
+        const isTransparentFormat = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/svg+xml';
+        const shouldPreserveTransparency = isLogoOrIcon || isTransparentFormat;
 
-        if (!isLogoOrIcon) {
-          // Fundo branco apenas para avatares e assets gerais para remover a transparência
+        if (shouldPreserveTransparency) {
+          ctx.clearRect(0, 0, width, height);
+        } else {
+          // Fundo branco apenas para fotos opacas (ex: JPEG) para remover imperfeições
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, width, height);
         }
@@ -97,12 +161,12 @@ export async function compressImage(
         let outputMime: string;
         let outputExt: string;
 
-        if (isLogoOrIcon) {
-          // Logos e ícones mantêm transparência caindo para PNG se WebP não for suportado
+        if (shouldPreserveTransparency) {
+          // Mantém transparência caindo para PNG se WebP não for suportado
           outputMime = supportsWebP ? 'image/webp' : 'image/png';
           outputExt  = supportsWebP ? 'webp' : 'png';
         } else {
-          // Avatares e assets gerais caem para JPEG se WebP não for suportado
+          // Fotos opacas caem para JPEG se WebP não for suportado
           outputMime = supportsWebP ? 'image/webp' : 'image/jpeg';
           outputExt  = supportsWebP ? 'webp' : 'jpg';
         }

@@ -2,27 +2,31 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
-import { BrandModal, Button } from '@psi/ui';
+import { BrandModal, Button, ConfirmModal } from '@psi/ui';
 import { Trash2, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { type UploadType } from '@psi/image-utils';
 
 interface MediaLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
   tenantId: string;
   onSelectImage: (asset: { url: string; id: string; key: string; name: string }) => void;
+  uploadType?: UploadType;
 }
 
 export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
   isOpen,
   onClose,
   tenantId,
-  onSelectImage
+  onSelectImage,
+  uploadType
 }) => {
   const [activeTab, setActiveTab] = useState<'library' | 'upload'>('library');
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assetToDelete, setAssetToDelete] = useState<{ id: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAssets = useCallback(async () => {
@@ -60,7 +64,10 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
     setError(null);
 
     try {
-      const { url, key } = await api.uploadImage(file, 'asset');
+      const isTransparentFormat = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/svg+xml';
+      const targetUploadType = uploadType || (isTransparentFormat ? 'logo' : 'asset');
+
+      const { url, key } = await api.uploadImage(file, targetUploadType);
 
       const registered = await api.registerMediaAsset({
         tenantId,
@@ -90,87 +97,94 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    if (!confirm('Deseja excluir permanentemente esta imagem da biblioteca?')) return;
-
+  const handleDelete = async (id: string) => {
     try {
       await api.deleteMediaAsset(id);
       setAssets(prev => prev.filter(asset => asset.id !== id));
     } catch (err: any) {
       console.error(err);
-      alert('Erro ao excluir a imagem.');
+      setError('Erro ao excluir imagem da biblioteca.');
     }
   };
 
   return (
-    <BrandModal isOpen={isOpen} onClose={onClose}>
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Biblioteca de Mídia</h3>
-          <p className="text-[10px] text-slate-400">Escolha uma foto da galeria ou faça o upload de uma nova.</p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-white/5 gap-4">
-          <button
-            onClick={() => setActiveTab('library')}
-            className={`pb-2 text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-              activeTab === 'library'
-                ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Galeria
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`pb-2 text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-              activeTab === 'upload'
-                ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Enviar Arquivo
-          </button>
-        </div>
-
-        {error && (
-          <div className="text-[9px] text-red-400 font-sans font-medium bg-red-400/10 p-2 rounded-lg">
-            {error}
+    <>
+      <BrandModal isOpen={isOpen} onClose={onClose}>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Biblioteca de Mídia</h3>
+            <p className="text-[10px] text-slate-400">Selecione uma imagem salva ou faça upload de um novo arquivo.</p>
           </div>
-        )}
 
-        {activeTab === 'library' ? (
-          <div className="min-h-[280px] max-h-[360px] overflow-y-auto pr-1">
-            {loading ? (
-              <div className="h-48 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
-              </div>
-            ) : assets.length === 0 ? (
-              <div className="h-48 flex flex-col items-center justify-center text-slate-500 space-y-2">
-                <ImageIcon className="h-8 w-8 opacity-30" />
-                <span className="text-[10px]">Nenhuma imagem na biblioteca.</span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-3">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    onClick={() => onSelectImage({ url: asset.url, id: asset.id, key: asset.key, name: asset.name })}
-                    className="relative aspect-square bg-zinc-900 border border-white/5 rounded-lg overflow-hidden group cursor-pointer hover:border-[#CC8667]/50 transition-all bg-cover bg-center"
-                    style={{ backgroundImage: `url(${asset.url})` }}
-                  >
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={(e) => handleDelete(e, asset.id)}
-                          className="p-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
+          {/* Tab Selector */}
+          <div className="flex border-b border-white/10 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('library')}
+              className={`pb-2 px-4 transition-colors bg-transparent border-none cursor-pointer ${
+                activeTab === 'library'
+                  ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Galeria da Conta
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('upload')}
+              className={`pb-2 px-4 transition-colors bg-transparent border-none cursor-pointer ${
+                activeTab === 'upload'
+                  ? 'text-[#CC8667] border-b-2 border-[#CC8667]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Enviar Arquivo
+            </button>
+          </div>
+
+          {error && (
+            <div className="text-[9px] text-red-400 font-sans font-medium bg-red-400/10 p-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {activeTab === 'library' ? (
+            <div className="min-h-[280px] max-h-[360px] overflow-y-auto pr-1">
+              {loading ? (
+                <div className="h-48 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+                </div>
+              ) : assets.length === 0 ? (
+                <div className="h-48 flex flex-col items-center justify-center text-slate-500 space-y-2">
+                  <ImageIcon className="h-8 w-8 opacity-30" />
+                  <span className="text-[10px]">Nenhuma imagem na biblioteca.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-3">
+                  {assets.map((asset) => (
+                    <div
+                      key={asset.id}
+                      onClick={() => onSelectImage({ url: asset.url, id: asset.id, key: asset.key, name: asset.name })}
+                      className="relative aspect-square border border-white/5 rounded-lg overflow-hidden group cursor-pointer hover:border-[#CC8667]/50 transition-all bg-cover bg-center"
+                      style={{
+                        backgroundImage: `url(${asset.url}), repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)`,
+                        backgroundSize: 'cover, 12px 12px',
+                        backgroundPosition: 'center, 0 0'
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssetToDelete({ id: asset.id, name: asset.name });
+                            }}
+                            className="p-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
                       <span className="text-[7px] text-slate-300 truncate font-sans">
                         {asset.name}
                       </span>
@@ -223,5 +237,22 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
         </div>
       </div>
     </BrandModal>
+
+    <ConfirmModal
+      isOpen={!!assetToDelete}
+      onClose={() => setAssetToDelete(null)}
+      onConfirm={async () => {
+        if (assetToDelete) {
+          await handleDelete(assetToDelete.id);
+          setAssetToDelete(null);
+        }
+      }}
+      title="Excluir Imagem da Biblioteca"
+      description={`Deseja mesmo excluir permanentemente a imagem "${assetToDelete?.name || ''}" da biblioteca?`}
+      confirmText="Excluir"
+      cancelText="Cancelar"
+      variant="danger"
+    />
+    </>
   );
 };

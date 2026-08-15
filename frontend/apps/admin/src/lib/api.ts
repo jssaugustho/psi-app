@@ -69,6 +69,7 @@ export interface PlatformSettings {
   cloudflare_api_token: string | null;
   cloudflare_zone_id: string | null;
   cloudflare_account_id: string | null;
+  base_domain: string | null;
   r2_bucket_name: string | null;
   r2_public_domain: string | null;
   r2_access_key_id: string | null;
@@ -114,6 +115,7 @@ export interface PlatformSetupStatusResponse {
   has_resend: boolean;
   cloudflare_zone_id: string | null;
   cloudflare_account_id: string | null;
+  base_domain: string | null;
   r2_bucket_name: string | null;
   r2_public_domain: string | null;
   resend_from_domain: string | null;
@@ -315,15 +317,22 @@ export const api = {
     api_token: string;
     zone_id: string;
     account_id: string;
+    base_domain?: string;
     r2_bucket_name: string;
     r2_public_domain: string;
     r2_access_key_id: string;
     r2_secret_access_key: string;
   }) =>
-    fetchApi<{ message: string; zone_id: string; r2_bucket_name: string }>('/platform/setup/cloudflare', {
+    fetchApi<{ message: string; zone_id: string; base_domain?: string; r2_bucket_name: string }>('/platform/setup/cloudflare', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  // Listar Zones da conta Cloudflare
+  getCloudflareZones: (apiToken?: string) =>
+    fetchApi<{ success: boolean; zones: Array<{ id: string; name: string; status: string }> }>(
+      `/platform/cloudflare/zones${apiToken ? `?api_token=${encodeURIComponent(apiToken)}` : ''}`
+    ),
 
   // Pede ao backend uma Presigned URL para upload direto no Cloudflare R2
   getUploadPresignedUrl: (body: {

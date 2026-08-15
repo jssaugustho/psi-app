@@ -11,13 +11,14 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Schemas Zod de Validação
 const SaveCloudflareBodySchema = z.object({
-  api_token: z.string().min(1, 'API Token é obrigatório'),
+  api_token: z.string().optional().nullable(),
   zone_id: z.string().min(1, 'Zone ID é obrigatório'),
   account_id: z.string().min(1, 'Account ID é obrigatório'),
+  base_domain: z.string().optional().nullable(),
   r2_bucket_name: z.string().min(1, 'Nome do Bucket R2 é obrigatório'),
   r2_public_domain: z.string().min(1, 'Domínio Público do R2 é obrigatório'),
-  r2_access_key_id: z.string().min(1, 'Access Key ID do R2 é obrigatório'),
-  r2_secret_access_key: z.string().min(1, 'Secret Access Key do R2 é obrigatório'),
+  r2_access_key_id: z.string().optional().nullable(),
+  r2_secret_access_key: z.string().optional().nullable(),
 });
 
 const SetupTenantBodySchema = z.object({
@@ -74,6 +75,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         has_resend: hasResend,
         cloudflare_zone_id: settings?.cloudflareZoneId || null,
         cloudflare_account_id: settings?.cloudflareAccountId || null,
+        base_domain: settings?.baseDomain || null,
         r2_bucket_name: settings?.r2BucketName || null,
         r2_public_domain: settings?.r2PublicDomain || null,
         resend_from_domain: settings?.resendFromDomain || null,
@@ -108,24 +110,42 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           api_token,
           zone_id,
           account_id,
+          base_domain,
           r2_bucket_name,
           r2_public_domain,
           r2_access_key_id,
           r2_secret_access_key,
         } = request.body;
 
+        const existingSettings = await db.query.platformSettings.findFirst();
+
+        const effectiveApiToken = api_token?.trim() || existingSettings?.cloudflareApiToken;
+        const effectiveAccessKeyId = r2_access_key_id?.trim() || existingSettings?.r2AccessKeyId;
+        const effectiveSecretAccessKey = r2_secret_access_key?.trim() || existingSettings?.r2SecretAccessKey;
+
+        if (!effectiveApiToken) {
+          return reply.status(400).send({
+            error: 'Validação do Cloudflare Falhou',
+            message: 'Cloudflare API Token é obrigatório.',
+          });
+        }
+
         // 1. Testar permissão da Zone no Cloudflare API
         const cfResponse = await fetch(`https://api.cloudflare.com/client/v4/zones/${zone_id}`, {
           method: 'GET',
           headers: {
-            Authorization: `Bearer ${api_token}`,
+            Authorization: `Bearer ${effectiveApiToken}`,
             'Content-Type': 'application/json',
           },
         }).catch((fetchErr) => {
           throw new Error(`Falha ao conectar com o Cloudflare: ${fetchErr.message}`);
         });
 
-        if (!cfResponse.ok) {
+        let zoneName = '';
+        if (cfResponse.ok) {
+          const zoneData: any = await cfResponse.json().catch(() => ({}));
+          zoneName = zoneData?.result?.name || '';
+        } else {
           const errorData = await cfResponse.json().catch(() => ({}));
           const message = (errorData as any)?.errors?.[0]?.message || 'API Token ou Zone ID do Cloudflare inválidos.';
           return reply.status(400).send({
@@ -134,21 +154,24 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        // 2. Testar acesso direto ao R2 Bucket via S3 Client (Access Key ID + Secret Key)
-        try {
-          const s3TestClient = new S3Client({
-            region: 'auto',
-            endpoint: `https://${account_id.trim()}.r2.cloudflarestorage.com`,
-            credentials: {
-              accessKeyId: r2_access_key_id.trim(),
-              secretAccessKey: r2_secret_access_key.trim(),
-            },
-          });
+        let resolvedBaseDomain = base_domain?.trim() || zoneName || existingSettings?.baseDomain || null;
 
-          await s3TestClient.send(new HeadBucketCommand({ Bucket: r2_bucket_name.trim() }));
-        } catch (s3Err: any) {
-          fastify.log.warn(`S3 HeadBucket aviso: ${s3Err.message}`);
-          // Se HeadBucket falhar por falta de permissão explícita HeadBucket, logar aviso e aceitar se as chaves forem fornecidas
+        // 2. Testar acesso direto ao R2 Bucket via S3 Client (se chaves disponíveis)
+        if (effectiveAccessKeyId && effectiveSecretAccessKey) {
+          try {
+            const s3TestClient = new S3Client({
+              region: 'auto',
+              endpoint: `https://${account_id.trim()}.r2.cloudflarestorage.com`,
+              credentials: {
+                accessKeyId: effectiveAccessKeyId,
+                secretAccessKey: effectiveSecretAccessKey,
+              },
+            });
+
+            await s3TestClient.send(new HeadBucketCommand({ Bucket: r2_bucket_name.trim() }));
+          } catch (s3Err: any) {
+            fastify.log.warn(`S3 HeadBucket aviso: ${s3Err.message}`);
+          }
         }
 
         // Normalizar o r2PublicDomain garantindo protocolo https:// e sem barra final
@@ -161,31 +184,31 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 3. Salvar configurações na tabela platform_settings
-        const existingSettings = await db.query.platformSettings.findFirst();
-
         if (existingSettings) {
           await db
             .update(platformSettings)
             .set({
-              cloudflareApiToken: api_token.trim(),
+              cloudflareApiToken: effectiveApiToken,
               cloudflareZoneId: zone_id.trim(),
               cloudflareAccountId: account_id.trim(),
+              baseDomain: resolvedBaseDomain,
               r2BucketName: r2_bucket_name.trim(),
               r2PublicDomain: formattedDomain,
-              r2AccessKeyId: r2_access_key_id.trim(),
-              r2SecretAccessKey: r2_secret_access_key.trim(),
+              r2AccessKeyId: effectiveAccessKeyId || '',
+              r2SecretAccessKey: effectiveSecretAccessKey || '',
               updatedAt: new Date(),
             })
             .where(eq(platformSettings.id, existingSettings.id));
         } else {
           await db.insert(platformSettings).values({
-            cloudflareApiToken: api_token.trim(),
+            cloudflareApiToken: effectiveApiToken,
             cloudflareZoneId: zone_id.trim(),
             cloudflareAccountId: account_id.trim(),
+            baseDomain: resolvedBaseDomain,
             r2BucketName: r2_bucket_name.trim(),
             r2PublicDomain: formattedDomain,
-            r2AccessKeyId: r2_access_key_id.trim(),
-            r2SecretAccessKey: r2_secret_access_key.trim(),
+            r2AccessKeyId: effectiveAccessKeyId || '',
+            r2SecretAccessKey: effectiveSecretAccessKey || '',
             isConfigured: false,
           });
         }
@@ -193,6 +216,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         return reply.send({
           message: 'Credenciais do Cloudflare e Bucket R2 validadas e salvas com sucesso!',
           zone_id,
+          base_domain: resolvedBaseDomain,
           r2_bucket_name,
         });
       } catch (err: any) {
@@ -205,6 +229,56 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
+  // GET /v1/platform/cloudflare/zones
+  // Lista todas as Zones (Domínios) disponíveis na conta Cloudflare
+  fastify.get('/cloudflare/zones', async (request, reply) => {
+    try {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+      }
+      verifyUserJwt(authHeader.split(' ')[1]);
+
+      const queryApiToken = (request.query as any)?.api_token;
+      let token = queryApiToken?.trim();
+
+      if (!token) {
+        const settings = await db.query.platformSettings.findFirst();
+        token = settings?.cloudflareApiToken;
+      }
+
+      if (!token) {
+        return reply.send({ success: true, zones: [] });
+      }
+
+      const response = await fetch('https://api.cloudflare.com/client/v4/zones?per_page=50', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errData: any = await response.json().catch(() => ({}));
+        const msg = errData?.errors?.[0]?.message || 'Falha ao consultar zones do Cloudflare.';
+        return reply.status(400).send({ error: 'Erro Cloudflare API', message: msg });
+      }
+
+      const data: any = await response.json();
+      const zones = (data.result || []).map((z: any) => ({
+        id: z.id,
+        name: z.name,
+        status: z.status,
+      }));
+
+      return reply.send({ success: true, zones });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro interno', message: err.message });
+    }
+  });
+
   // POST /v1/platform/upload/presign
   // Gera uma Presigned URL para o cliente fazer upload diretamente no Cloudflare R2.
   // O arquivo NUNCA passa pela VPS — apenas a URL assinada é gerada aqui.
@@ -215,7 +289,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         body: z.object({
           filename: z.string().min(1, 'filename é obrigatório'),
           content_type: z.string().min(1, 'content_type é obrigatório'),
-          upload_type: z.enum(['avatar', 'logo', 'icon', 'asset']).default('asset'),
+          upload_type: z.enum(['avatar', 'logo', 'icon', 'asset', 'font']).default('asset'),
         }),
       },
     },
@@ -245,12 +319,56 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const { filename, content_type, upload_type } = request.body;
 
-        // 3. Sanitizar filename e montar chave única no R2
+        // 3. Enforce MIME type rules per upload_type — server-side, cannot be bypassed
+        const TRANSPARENT_MIMES = ['image/webp', 'image/png', 'image/svg+xml'];
+        const OPAQUE_SAFE_MIMES  = ['image/webp', 'image/jpeg', 'image/jpg', 'image/png'];
+        const FONT_SAFE_MIMES    = [
+          'font/woff2', 'font/woff', 'font/ttf', 'font/otf',
+          'application/font-woff', 'application/font-woff2',
+          'font/opentype', 'application/x-font-ttf', 'application/x-font-opentype'
+        ];
+
+        if ((upload_type === 'logo' || upload_type === 'icon') && !TRANSPARENT_MIMES.includes(content_type)) {
+          return reply.status(422).send({
+            error: 'Tipo de arquivo inválido',
+            message: `Logotipos e ícones devem ser enviados em formato WebP, PNG ou SVG para preservar a transparência. Tipo recebido: ${content_type}`,
+          });
+        }
+
+        if ((upload_type === 'avatar' || upload_type === 'asset') && !OPAQUE_SAFE_MIMES.includes(content_type)) {
+          return reply.status(422).send({
+            error: 'Tipo de arquivo inválido',
+            message: `Imagens do tipo "${upload_type}" devem ser WebP, JPEG ou PNG. Tipo recebido: ${content_type}`,
+          });
+        }
+
+        if (upload_type === 'font' && (!FONT_SAFE_MIMES.includes(content_type) && !filename.match(/\.(woff2|woff|ttf|otf)$/i))) {
+          return reply.status(422).send({
+            error: 'Tipo de arquivo inválido',
+            message: 'Fontes personalizadas devem ser enviadas em formato .woff2, .woff, .ttf ou .otf. Formatos SVG/XML não são permitidos.',
+          });
+        }
+
+        // 4. Derive extension from the actual content_type (not hardcoded to .webp)
+        const EXT_MAP: Record<string, string> = {
+          'image/webp':     'webp',
+          'image/png':      'png',
+          'image/jpeg':     'jpg',
+          'image/jpg':      'jpg',
+          'image/svg+xml':  'svg',
+          'font/woff2':     'woff2',
+          'font/woff':      'woff',
+          'font/ttf':       'ttf',
+          'font/otf':       'otf',
+        };
+        const ext = EXT_MAP[content_type] || (filename.split('.').pop()?.toLowerCase() ?? 'bin');
+
+        // 5. Sanitizar filename e montar chave única no R2
         const baseName = filename.split('.').slice(0, -1).join('.') || 'file';
         const cleanName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 60);
-        const fileKey = `media/${upload_type}/${cleanName}-${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+        const fileKey = `media/${upload_type}/${cleanName}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-        // 4. Criar cliente S3 apontado para o R2
+        // 6. Criar cliente S3 apontado para o R2
         const s3Client = new S3Client({
           region: 'auto',
           endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
@@ -260,7 +378,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           },
         });
 
-        // 5. Gerar a Presigned URL (PUT) — expira em 5 minutos
+        // 7. Gerar a Presigned URL (PUT) — expira em 5 minutos
         const command = new PutObjectCommand({
           Bucket: settings.r2BucketName.trim(),
           Key: fileKey,

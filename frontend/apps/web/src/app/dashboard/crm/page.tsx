@@ -6,7 +6,7 @@ import { useCrmStore } from '@/stores/crmStore';
 import { useBrand } from '@/context/BrandContext';
 import { useRealtime } from '@/context/RealtimeContext';
 import { api, Contact, InteractionHistory, PipelineColumn } from '@/lib/api';
-import { Card, Select } from '@psi/ui';
+import { Card, Select, ConfirmModal } from '@psi/ui';
 import { ContactTabPanel } from './components/ContactTabPanel';
 import { GlobalTimelinePanel } from './components/GlobalTimelinePanel';
 import {
@@ -94,6 +94,12 @@ export default function CrmPage() {
   const { tenant } = useBrand();
   const tenantId = tenant?.id;
 
+  const [confirmDelete, setConfirmDelete] = useState<{
+    type: 'column' | 'lead';
+    id: string;
+    name?: string;
+  } | null>(null);
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -117,6 +123,7 @@ export default function CrmPage() {
     addColumnOptimistic,
     updateColumnOptimistic,
     deleteColumnOptimistic,
+    reorderColumnsOptimistic,
     openContactIds,
     activeContactId,
     initTabs,
@@ -159,6 +166,88 @@ export default function CrmPage() {
   // Estados de Edição
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+
+  // Estados de Drag and Drop
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
+  const [dragOverColumnIndex, setDragOverColumnIndex] = useState<number | null>(null);
+  const [draggedSourceIndex, setDraggedSourceIndex] = useState<number | null>(null);
+  const [dragOverSourceIndex, setDragOverSourceIndex] = useState<number | null>(null);
+
+  // Handlers para Drag and Drop de Colunas (Estágios)
+  const handleColumnDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedColumnIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverColumnIndex !== index) {
+      setDragOverColumnIndex(index);
+    }
+  };
+
+  const handleColumnDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null || draggedColumnIndex === dropIndex) {
+      setDraggedColumnIndex(null);
+      setDragOverColumnIndex(null);
+      return;
+    }
+    const updated = [...columns];
+    const [moved] = updated.splice(draggedColumnIndex, 1);
+    updated.splice(dropIndex, 0, moved);
+
+    setDraggedColumnIndex(null);
+    setDragOverColumnIndex(null);
+
+    try {
+      await reorderColumnsOptimistic(updated);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao reordenar estágios.');
+    }
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+    setDragOverColumnIndex(null);
+  };
+
+  // Handlers para Drag and Drop de Fontes de Tráfego
+  const handleSourceDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedSourceIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleSourceDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSourceIndex !== index) {
+      setDragOverSourceIndex(index);
+    }
+  };
+
+  const handleSourceDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedSourceIndex === null || draggedSourceIndex === dropIndex) {
+      setDraggedSourceIndex(null);
+      setDragOverSourceIndex(null);
+      return;
+    }
+    const updated = [...localTrafficSources];
+    const [moved] = updated.splice(draggedSourceIndex, 1);
+    updated.splice(dropIndex, 0, moved);
+
+    setLocalTrafficSources(updated);
+    setDraggedSourceIndex(null);
+    setDragOverSourceIndex(null);
+  };
+
+  const handleSourceDragEnd = () => {
+    setDraggedSourceIndex(null);
+    setDragOverSourceIndex(null);
+  };
 
   useEffect(() => {
     if (tenant) {
@@ -621,12 +710,8 @@ export default function CrmPage() {
                       {/* Permitir deletar colunas não-essenciais */}
                       {columns.length > 3 && (
                         <button
-                          onClick={() => {
-                            if (confirm(`Deseja mesmo remover a coluna "${column.name}"? Contatos voltarão para o estágio inicial.`)) {
-                              deleteColumnOptimistic(column.id);
-                            }
-                          }}
-                          className="text-slate-500 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-white/5"
+                          onClick={() => setConfirmDelete({ type: 'column', id: column.id, name: column.name })}
+                          className="text-slate-500 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-white/5 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -776,12 +861,8 @@ export default function CrmPage() {
                         </td>
                         <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => {
-                              if (confirm('Deseja deletar este lead permanentemente?')) {
-                                deleteContactOptimistic(contact.id);
-                              }
-                            }}
-                            className="text-slate-500 hover:text-red-400 transition-colors p-1"
+                            onClick={() => setConfirmDelete({ type: 'lead', id: contact.id, name: contact.name })}
+                            className="text-slate-500 hover:text-red-400 transition-colors p-1 cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -980,24 +1061,24 @@ export default function CrmPage() {
             }}
           />
           
-          <div className="brand-modal w-full max-w-xl rounded-2xl shadow-2xl relative z-10 animate-modal-enter flex flex-col max-h-[90vh]">
+          <div className="brand-modal w-full max-w-5xl rounded-3xl shadow-2xl relative z-10 animate-modal-enter flex flex-col h-[85vh] max-h-[820px] overflow-hidden border border-[var(--surface-border)]">
             {/* Header */}
-            <div className="p-6 border-b border-[var(--surface-border)] bg-slate-950/5 dark:bg-slate-950/20 flex items-center justify-between rounded-t-2xl">
+            <div className="px-6 py-5 border-b border-[var(--surface-border)] bg-slate-950/20 flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-semibold tracking-wider text-[var(--brand-gradient-start)]">
-                  Triagem
+                  Triagem CRM
                 </span>
                 <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                   <Settings className="w-5 h-5 text-[var(--brand-gradient-start)]" /> Configurações do Funil
                 </h2>
               </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-white/5 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Alternador de Abas Interno */}
-            <div className="px-6 pt-4">
+            <div className="px-6 pt-4 pb-2 border-b border-white/5 bg-slate-950/10">
               <div className="flex gap-1 p-1 rounded-2xl w-fit glass-sm">
                 <button
                   type="button"
@@ -1017,7 +1098,7 @@ export default function CrmPage() {
                         }
                   }
                 >
-                  Estágios do Funil
+                  Estágios do Funil ({columns.length})
                 </button>
                 <button
                   type="button"
@@ -1037,92 +1118,127 @@ export default function CrmPage() {
                         }
                   }
                 >
-                  Fontes de Tráfego (UTMs)
+                  Fontes de Tráfego ({localTrafficSources.length})
                 </button>
               </div>
             </div>
 
-            {/* Conteúdo */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {/* Conteúdo Principal (2 Colunas) */}
+            <div className="flex-1 min-h-0 p-6 overflow-hidden">
               
               {/* ABA 1: ESTÁGIOS DO FUNIL (COLUNAS) */}
               {activeSettingsTab === 'pipeline' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-200">Gerenciar Estágios</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Configure os estágios clínicos da pipeline do CRM com slugs para integração externa, categorias (5 grupos) e cores.
-                    </p>
-                  </div>
-
-                  {/* Listagem das colunas atuais */}
-                  <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                    {columns.map((column, idx) => (
-                      <div key={column.id} className="glass-sm flex items-center justify-between p-3 rounded-xl" style={{ borderLeft: `4px solid ${column.color || '#6366F1'}` }}>
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xs font-bold text-slate-500 font-mono">
-                            {(idx + 1).toString().padStart(2, '0')}
-                          </span>
-                          <div>
-                            <span className="text-sm font-semibold text-slate-200">{column.name}</span>
-                            <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
-                              slug: {column.slug || '-'} | grupo: {
-                                column.category === 'pendente' ? 'Pendente' :
-                                column.category === 'acolhimento' ? 'Em Acolhimento' :
-                                column.category === 'paciente' ? 'Paciente' :
-                                column.category === 'alta' ? 'Alta' :
-                                column.category === 'negativa' ? 'Negativa' : column.category || 'Em Acolhimento'
-                              }
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingColumnId(column.id);
-                              setNewColumnName(column.name);
-                              setNewColumnSlug(column.slug || '');
-                              setNewColumnColor(column.color || '#6366F1');
-                              setNewColumnCategory(column.category || 'acolhimento');
-                            }}
-                            className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors"
-                            title="Editar Estágio"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          {columns.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (confirm(`Deseja mesmo remover a coluna "${column.name}"? Contatos voltarão para o estágio inicial.`)) {
-                                  try {
-                                    await deleteColumnOptimistic(column.id);
-                                  } catch (err) {
-                                    alert('Falha ao remover estágio.');
-                                  }
-                                }
-                              }}
-                              className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-white/5 transition-colors"
-                              title="Excluir Estágio"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-stretch">
+                  
+                  {/* Coluna 1 (Esquerda): Lista de Estágios Reordenável */}
+                  <div className="lg:col-span-6 flex flex-col h-full space-y-3 min-h-0">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-100">Gerenciar Estágios</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Arraste pelos três pontos para alterar a sequência do funil no CRM.
+                        </p>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Lista com Scroll Próprio */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1.5 custom-scrollbar">
+                      {columns.map((column, idx) => {
+                        const isDragging = draggedColumnIndex === idx;
+                        const isDragOver = dragOverColumnIndex === idx;
+                        return (
+                          <div
+                            key={column.id}
+                            draggable
+                            onDragStart={(e) => handleColumnDragStart(e, idx)}
+                            onDragOver={(e) => handleColumnDragOver(e, idx)}
+                            onDrop={(e) => handleColumnDrop(e, idx)}
+                            onDragEnd={handleColumnDragEnd}
+                            className={`glass-sm flex items-center justify-between p-3 rounded-2xl transition-all border ${
+                              isDragging ? 'opacity-30 scale-[0.98] border-dashed border-indigo-400' :
+                              isDragOver ? 'border-[var(--brand-gradient-start)] bg-white/10 shadow-lg scale-[1.01]' : 'border-white/5 hover:border-white/15'
+                            }`}
+                            style={{ borderLeft: `4px solid ${column.color || '#6366F1'}` }}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-200 transition-colors shrink-0">
+                                <GripVertical className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs font-bold text-slate-400 font-mono shrink-0 w-5">
+                                {(idx + 1).toString().padStart(2, '0')}
+                              </span>
+                              <div className="min-w-0">
+                                <span className="text-sm font-semibold text-slate-100 block truncate">{column.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono block truncate mt-0.5">
+                                  slug: {column.slug || '-'} | grupo: {
+                                    column.category === 'pendente' ? 'Pendente' :
+                                    column.category === 'acolhimento' ? 'Em Acolhimento' :
+                                    column.category === 'paciente' ? 'Paciente' :
+                                    column.category === 'alta' ? 'Alta' :
+                                    column.category === 'negativa' ? 'Negativa' : column.category || 'Em Acolhimento'
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingColumnId(column.id);
+                                  setNewColumnName(column.name);
+                                  setNewColumnSlug(column.slug || '');
+                                  setNewColumnColor(column.color || '#6366F1');
+                                  setNewColumnCategory(column.category || 'acolhimento');
+                                }}
+                                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                title="Editar Estágio"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              {columns.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDelete({ type: 'column', id: column.id, name: column.name })}
+                                  className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                  title="Excluir Estágio"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Form de adicionar/editar coluna */}
-                  <div className="pt-4 border-t border-[var(--surface-border)] space-y-3">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {editingColumnId ? `Editar Estágio: ${newColumnName}` : 'Criar Novo Estágio'}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-3">
+                  {/* Coluna 2 (Direita): Formulário de Criar / Editar Estágio */}
+                  <div className="lg:col-span-6 glass-sm p-5 rounded-2xl border border-white/10 flex flex-col h-full min-h-0 space-y-4 overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                      <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                        {editingColumnId ? `Editar Estágio: ${newColumnName}` : 'Criar Novo Estágio'}
+                      </h4>
+                      {editingColumnId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingColumnId(null);
+                            setNewColumnName('');
+                            setNewColumnSlug('');
+                            setNewColumnColor('#6366F1');
+                            setNewColumnCategory('acolhimento');
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-white underline"
+                        >
+                          + Novo Estágio
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3.5 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">Nome do Estágio</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Nome do Estágio</label>
                         <input
                           type="text"
                           placeholder="Ex: Primeira Consulta"
@@ -1136,8 +1252,9 @@ export default function CrmPage() {
                           className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)]"
                         />
                       </div>
+
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">Integration Slug (Chave única)</label>
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Integration Slug (Chave única)</label>
                         <input
                           type="text"
                           placeholder="Ex: primeira-consulta"
@@ -1147,8 +1264,8 @@ export default function CrmPage() {
                         />
                       </div>
                       
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">Grupo / Categoria do Estágio</label>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Grupo / Categoria do Estágio</label>
                         <Select
                           value={newColumnCategory}
                           onChange={(e) => setNewColumnCategory(e.target.value as any)}
@@ -1162,40 +1279,39 @@ export default function CrmPage() {
                           variant="glass"
                         />
                       </div>
-                    </div>
 
-                    {/* Palette de cores e seletor para Estágio */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-500 block">Cor do Estágio</label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
-                        {PRESETS.map((p) => (
-                          <button
-                            key={p.hex}
-                            type="button"
-                            onClick={() => setNewColumnColor(p.hex)}
-                            className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
-                            style={{
-                              backgroundColor: p.hex,
-                              boxShadow: newColumnColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
-                            }}
-                            title={p.name}
-                          >
-                            {newColumnColor === p.hex && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                            )}
-                          </button>
-                        ))}
-                        <input
-                          type="text"
-                          placeholder="#hex"
-                          value={newColumnColor}
-                          onChange={(e) => setNewColumnColor(e.target.value)}
-                          className="glass-sm px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none text-slate-200 font-mono ml-auto"
-                        />
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">Cor do Estágio</label>
+                        <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
+                          {PRESETS.map((p) => (
+                            <button
+                              key={p.hex}
+                              type="button"
+                              onClick={() => setNewColumnColor(p.hex)}
+                              className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
+                              style={{
+                                backgroundColor: p.hex,
+                                boxShadow: newColumnColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
+                              }}
+                              title={p.name}
+                            >
+                              {newColumnColor === p.hex && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              )}
+                            </button>
+                          ))}
+                          <input
+                            type="text"
+                            placeholder="#hex"
+                            value={newColumnColor}
+                            onChange={(e) => setNewColumnColor(e.target.value)}
+                            className="glass-sm px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none text-slate-200 font-mono ml-auto"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-1">
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/10 shrink-0">
                       {editingColumnId && (
                         <button
                           type="button"
@@ -1248,86 +1364,130 @@ export default function CrmPage() {
 
               {/* ABA 2: FONTES DE TRÁFEGO */}
               {activeSettingsTab === 'sources' && (
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-200">Fontes de Tráfego (UTMs)</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Configure os canais pelos quais os leads chegam, atribuindo regras de UTM e badges de cores.
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-stretch">
+                  
+                  {/* Coluna 1 (Esquerda): Lista de Fontes de Tráfego Reordenável */}
+                  <div className="lg:col-span-6 flex flex-col h-full space-y-3 min-h-0">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-100">Fontes de Tráfego (UTMs)</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Arraste para definir a prioridade de exibição dos canais de captação.
+                      </p>
+                    </div>
 
-                  {/* Configuração de Fonte Padrão */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Fonte de Tráfego Padrão</label>
-                    <Select
-                      value={localDefaultSource}
-                      onChange={(e) => setLocalDefaultSource(e.target.value)}
-                      options={localTrafficSources.map((src) => ({ value: src.name, label: src.name }))}
-                      variant="glass"
-                    />
-                  </div>
+                    {/* Fonte Padrão */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Fonte de Tráfego Padrão</label>
+                      <Select
+                        value={localDefaultSource}
+                        onChange={(e) => setLocalDefaultSource(e.target.value)}
+                        options={localTrafficSources.map((src) => ({ value: src.name, label: src.name }))}
+                        variant="glass"
+                      />
+                    </div>
 
-                  {/* Listagem das fontes */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Canais Cadastrados</label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                      {localTrafficSources.map((src) => (
-                        <div key={src.id} className="glass-sm flex flex-col p-3 rounded-xl space-y-1.5" style={{ borderLeft: `4px solid ${src.color}` }}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-200">{src.name}</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingSourceId(src.id);
-                                  setNewSourceName(src.name);
-                                  setNewSourceColor(src.color || '#6366F1');
-                                  setNewSourceUtmSource(src.utm_source || '');
-                                  setNewSourceUtmMedium(src.utm_medium || '');
-                                  setNewSourceUtmCampaign(src.utm_campaign || '');
-                                }}
-                                className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors"
-                                title="Editar Canal"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              {localTrafficSources.length > 1 && (
+                    {/* Lista com Scroll Próprio */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1.5 custom-scrollbar">
+                      {localTrafficSources.map((src, idx) => {
+                        const isDragging = draggedSourceIndex === idx;
+                        const isDragOver = dragOverSourceIndex === idx;
+                        return (
+                          <div
+                            key={src.id}
+                            draggable
+                            onDragStart={(e) => handleSourceDragStart(e, idx)}
+                            onDragOver={(e) => handleSourceDragOver(e, idx)}
+                            onDrop={(e) => handleSourceDrop(e, idx)}
+                            onDragEnd={handleSourceDragEnd}
+                            className={`glass-sm flex flex-col p-3 rounded-2xl transition-all border space-y-1.5 ${
+                              isDragging ? 'opacity-30 scale-[0.98] border-dashed border-indigo-400' :
+                              isDragOver ? 'border-[var(--brand-gradient-start)] bg-white/10 shadow-lg scale-[1.01]' : 'border-white/5 hover:border-white/15'
+                            }`}
+                            style={{ borderLeft: `4px solid ${src.color}` }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-200 transition-colors shrink-0">
+                                  <GripVertical className="w-4 h-4" />
+                                </div>
+                                <span className="text-xs font-bold text-slate-400 font-mono shrink-0 w-5">
+                                  {(idx + 1).toString().padStart(2, '0')}
+                                </span>
+                                <span className="text-sm font-semibold text-slate-100 truncate">{src.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const updated = localTrafficSources.filter(s => s.id !== src.id);
-                                    setLocalTrafficSources(updated);
-                                    if (localDefaultSource === src.name) {
-                                      setLocalDefaultSource(updated[0]?.name || 'Manual');
-                                    }
+                                    setEditingSourceId(src.id);
+                                    setNewSourceName(src.name);
+                                    setNewSourceColor(src.color || '#6366F1');
+                                    setNewSourceUtmSource(src.utm_source || '');
+                                    setNewSourceUtmMedium(src.utm_medium || '');
+                                    setNewSourceUtmCampaign(src.utm_campaign || '');
                                   }}
-                                  className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-white/5 transition-colors"
-                                  title="Excluir Canal"
+                                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                  title="Editar Canal"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Edit className="w-3.5 h-3.5" />
                                 </button>
-                              )}
+                                {localTrafficSources.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = localTrafficSources.filter(s => s.id !== src.id);
+                                      setLocalTrafficSources(updated);
+                                      if (localDefaultSource === src.name) {
+                                        setLocalDefaultSource(updated[0]?.name || 'Manual');
+                                      }
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                    title="Excluir Canal"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 font-mono pl-7">
+                              <div><span className="text-slate-500">utm_source:</span> {src.utm_source || '-'}</div>
+                              <div><span className="text-slate-500">utm_medium:</span> {src.utm_medium || '-'}</div>
+                              <div><span className="text-slate-500">utm_campaign:</span> {src.utm_campaign || '-'}</div>
                             </div>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 font-mono">
-                            <div><span className="text-slate-600">utm_source:</span> {src.utm_source || '-'}</div>
-                            <div><span className="text-slate-600">utm_medium:</span> {src.utm_medium || '-'}</div>
-                            <div><span className="text-slate-600">utm_campaign:</span> {src.utm_campaign || '-'}</div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Form de adicionar fonte */}
-                  <div className="pt-4 border-t border-[var(--surface-border)] space-y-3">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      {editingSourceId ? `Editar Canal: ${newSourceName}` : 'Criar Novo Canal'}
-                    </h4>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">Nome do Canal / Origem</label>
+                  {/* Coluna 2 (Direita): Formulário de Criar / Editar Canal */}
+                  <div className="lg:col-span-6 glass-sm p-5 rounded-2xl border border-white/10 flex flex-col h-full min-h-0 space-y-4 overflow-y-auto custom-scrollbar">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3 shrink-0">
+                      <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                        {editingSourceId ? `Editar Canal: ${newSourceName}` : 'Criar Novo Canal'}
+                      </h4>
+                      {editingSourceId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSourceId(null);
+                            setNewSourceName('');
+                            setNewSourceColor('#6366F1');
+                            setNewSourceUtmSource('');
+                            setNewSourceUtmMedium('');
+                            setNewSourceUtmCampaign('');
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-white underline"
+                        >
+                          + Novo Canal
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3.5 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Nome do Canal / Origem</label>
                         <input
                           type="text"
                           placeholder="Ex: Google Ads"
@@ -1341,31 +1501,33 @@ export default function CrmPage() {
                           className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)]"
                         />
                       </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Source</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: google"
-                          value={newSourceUtmSource}
-                          onChange={(e) => setNewSourceUtmSource(e.target.value)}
-                          className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono"
-                        />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Medium</label>
-                        <input
-                          type="text"
-                          placeholder="Ex: cpc"
-                          value={newSourceUtmMedium}
-                          onChange={(e) => setNewSourceUtmMedium(e.target.value)}
-                          className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono"
-                        />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">UTM Source</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: google"
+                            value={newSourceUtmSource}
+                            onChange={(e) => setNewSourceUtmSource(e.target.value)}
+                            className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">UTM Medium</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: cpc"
+                            value={newSourceUtmMedium}
+                            onChange={(e) => setNewSourceUtmMedium(e.target.value)}
+                            className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono"
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-1 col-span-2">
-                        <label className="text-[10px] font-semibold text-slate-500">UTM Campaign (Opcional)</label>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">UTM Campaign (Opcional)</label>
                         <input
                           type="text"
                           placeholder="Ex: campanha-leads-agosto"
@@ -1374,40 +1536,39 @@ export default function CrmPage() {
                           className="glass-sm w-full px-3.5 py-2 text-sm rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono"
                         />
                       </div>
-                    </div>
 
-                    {/* Palette de cores para Fonte de Tráfego */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-semibold text-slate-500 block">Cor de Identificação</label>
-                      <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
-                        {PRESETS.map((p) => (
-                          <button
-                            key={p.hex}
-                            type="button"
-                            onClick={() => setNewSourceColor(p.hex)}
-                            className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
-                            style={{
-                              backgroundColor: p.hex,
-                              boxShadow: newSourceColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
-                            }}
-                            title={p.name}
-                          >
-                            {newSourceColor === p.hex && (
-                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                            )}
-                          </button>
-                        ))}
-                        <input
-                          type="text"
-                          placeholder="#hex"
-                          value={newSourceColor}
-                          onChange={(e) => setNewSourceColor(e.target.value)}
-                          className="glass-sm px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none text-slate-200 font-mono ml-auto"
-                        />
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">Cor de Identificação</label>
+                        <div className="flex flex-wrap gap-1.5 p-2 rounded-xl glass-sm">
+                          {PRESETS.map((p) => (
+                            <button
+                              key={p.hex}
+                              type="button"
+                              onClick={() => setNewSourceColor(p.hex)}
+                              className="w-5 h-5 rounded-full transition-all border-none cursor-pointer flex items-center justify-center shrink-0 hover:scale-110 active:scale-95"
+                              style={{
+                                backgroundColor: p.hex,
+                                boxShadow: newSourceColor === p.hex ? `0 0 0 2px #ffffff, 0 0 6px ${p.hex}` : 'none'
+                              }}
+                              title={p.name}
+                            >
+                              {newSourceColor === p.hex && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              )}
+                            </button>
+                          ))}
+                          <input
+                            type="text"
+                            placeholder="#hex"
+                            value={newSourceColor}
+                            onChange={(e) => setNewSourceColor(e.target.value)}
+                            className="glass-sm px-2 py-0.5 text-[10px] w-14 rounded-lg focus:outline-none text-slate-200 font-mono ml-auto"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-1">
+                    <div className="flex justify-end gap-2 pt-3 border-t border-white/10 shrink-0">
                       {editingSourceId && (
                         <button
                           type="button"
@@ -1452,7 +1613,6 @@ export default function CrmPage() {
                             setLocalTrafficSources([...localTrafficSources, newSource]);
                           }
                           
-                          // Reset form
                           setNewSourceName('');
                           setNewSourceColor('#6366F1');
                           setNewSourceUtmSource('');
@@ -1471,7 +1631,7 @@ export default function CrmPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-6 border-t border-[var(--surface-border)] flex items-center justify-between bg-slate-950/5 dark:bg-slate-950/20">
+            <div className="px-6 py-4 border-t border-[var(--surface-border)] flex items-center justify-between bg-slate-950/20">
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
@@ -1507,6 +1667,31 @@ export default function CrmPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação */}
+      <ConfirmModal
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={async () => {
+          if (confirmDelete) {
+            if (confirmDelete.type === 'column') {
+              deleteColumnOptimistic(confirmDelete.id);
+            } else {
+              deleteContactOptimistic(confirmDelete.id);
+            }
+            setConfirmDelete(null);
+          }
+        }}
+        title={confirmDelete?.type === 'column' ? 'Remover Estágio do Funil' : 'Excluir Contato/Lead'}
+        description={
+          confirmDelete?.type === 'column'
+            ? `Deseja mesmo remover a coluna "${confirmDelete.name || ''}"? Os contatos associados retornarão para o estágio inicial.`
+            : `Deseja excluir permanentemente o contato "${confirmDelete?.name || ''}" do CRM?`
+        }
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }

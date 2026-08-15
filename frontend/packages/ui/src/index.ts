@@ -6,3 +6,4 @@ export * from './loading-spinner';
 export * from './select';
 export * from './select-with-helper';
 export * from './brand-modal';
+export * from './confirm-modal';

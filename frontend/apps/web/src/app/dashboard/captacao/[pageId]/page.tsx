@@ -4,8 +4,11 @@ import React, { useState, useEffect, useCallback, useMemo, use, useRef } from 'r
 import { useRouter } from 'next/navigation';
 import { useBrand } from '@/context/BrandContext';
 import { api, CapturePage, ContractTemplate } from '@/lib/api';
-import { Card, Button, Input, BrandModal } from '@psi/ui';
+import { Card, Button, Input, BrandModal, ConfirmModal } from '@psi/ui';
 import { MediaLibraryModal } from '@/components/media-library-modal';
+import { LogoOptionModal } from '@/components/logo-option-modal';
+import { LogoBuilderModal } from '@/components/logo-builder-modal';
+import { FontPicker } from '@/components/FontPicker';
 import {
   ArrowLeft, Save, Sparkles, AlertCircle, Layout, GitBranch, Settings, Palette,
   Plus, Trash2, ExternalLink, RefreshCw, Eye, HelpCircle, Check, Play, Maximize2, Minimize2,
@@ -160,6 +163,27 @@ interface ImageUploaderProps {
   targetWidth?: number;
   targetHeight?: number;
   allowTransparency?: boolean;
+  hideOnMobile?: boolean;
+  onToggleHideOnMobile?: (hidden: boolean) => void;
+  isLogo?: boolean;
+  logoConfig?: {
+    mode?: 'html' | 'image';
+    text?: string;
+    iconType?: 'psi' | 'custom';
+    customIconUrl?: string;
+  };
+  onLogoConfigChange?: (config: {
+    mode: 'html';
+    text: string;
+    iconType: 'psi' | 'custom';
+    customIconUrl?: string;
+  }) => void;
+  defaultLogoText?: string;
+  onClearLogoConfig?: () => void;
+  gradientStart?: string;
+  gradientEnd?: string;
+  contrastColor?: string;
+  headingFont?: string;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -173,13 +197,26 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   aspectRatio,
   targetWidth,
   targetHeight,
-  allowTransparency = false
+  allowTransparency = false,
+  hideOnMobile,
+  onToggleHideOnMobile,
+  isLogo = false,
+  logoConfig,
+  onLogoConfigChange,
+  defaultLogoText = '',
+  onClearLogoConfig,
+  gradientStart,
+  gradientEnd,
+  contrastColor,
+  headingFont,
 }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Library Modal State
+  // Library & Logo Modal States
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [optionModalOpen, setOptionModalOpen] = useState(false);
+  const [builderModalOpen, setBuilderModalOpen] = useState(false);
 
   // Crop Modal States
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -187,14 +224,43 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [selectedAsset, setSelectedAsset] = useState<{ id: string; name: string } | null>(null);
+  const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
 
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const imageElementRef = useRef<HTMLImageElement>(null);
 
   // Target frame size on screen
+  const targetAspect = aspectRatio || 1;
   const frameW = 280;
-  const frameH = aspectRatio ? frameW / aspectRatio : 280;
+  const frameH = frameW / targetAspect;
+
+  useEffect(() => {
+    if (imageSrc) {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = imageSrc;
+      img.onload = () => {
+        setImgDimensions({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+      };
+    } else {
+      setImgDimensions(null);
+    }
+  }, [imageSrc]);
+
+  let baseW = frameW;
+  let baseH = frameH;
+
+  if (imgDimensions) {
+    const imgRatio = imgDimensions.width / imgDimensions.height;
+    if (imgRatio > targetAspect) {
+      baseH = frameH;
+      baseW = frameH * imgRatio;
+    } else {
+      baseW = frameW;
+      baseH = frameW / imgRatio;
+    }
+  }
 
   const handleSelectFromLibrary = (asset: { url: string; id: string; key: string; name: string }) => {
     setLibraryOpen(false);
@@ -449,12 +515,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     >
       <div className="flex justify-between items-center">
         <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{label}</label>
-        {value && (
+        {(value || (isLogo && logoConfig?.mode === 'html')) && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onChange('');
+              if (onClearLogoConfig) onClearLogoConfig();
             }}
             className="text-[9px] text-red-400 hover:text-red-300 font-semibold transition-colors cursor-pointer"
           >
@@ -464,37 +531,116 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       </div>
 
       <div className="flex gap-3 items-center">
-        <div 
-          className="relative bg-zinc-900 border border-white/10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-cover bg-center"
-          style={{ 
-            width: '64px', 
-            height: '64px',
-            backgroundImage: value ? `url(${value})` : 'none'
-          }}
-        >
-          {!value && <ImageIcon className="h-5 w-5 text-slate-600" />}
-        </div>
+        {isLogo && logoConfig?.mode === 'html' ? (
+          <div className="h-16 px-3 bg-zinc-900 border border-white/10 rounded-lg shrink-0 flex items-center justify-center gap-2 select-none">
+            <div 
+              className="h-7 w-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden shadow-sm"
+              style={{
+                background: gradientStart && gradientEnd ? `linear-gradient(135deg, ${gradientStart}, ${gradientEnd})` : 'linear-gradient(135deg, var(--brand-gradient-start), #E5A98B)',
+                color: contrastColor || '#FFFFFF'
+              }}
+            >
+              {logoConfig.iconType === 'custom' && logoConfig.customIconUrl ? (
+                <img src={logoConfig.customIconUrl} alt="Ícone" className="h-4 w-4 object-contain" />
+              ) : (
+                <span style={{ color: contrastColor || '#FFFFFF' }}>Ψ</span>
+              )}
+            </div>
+            <span 
+              className="text-[10px] font-bold text-white truncate max-w-[100px]"
+              style={{ fontFamily: headingFont ? `'${headingFont}', serif` : 'serif' }}
+            >
+              {logoConfig.text || 'Psicologia'}
+            </span>
+          </div>
+        ) : (
+          <div 
+            className="relative bg-zinc-900 border border-white/10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-cover bg-center"
+            style={{ 
+              width: '64px', 
+              height: '64px',
+              ...(allowTransparency
+                ? {
+                    backgroundImage: value
+                      ? `url(${value}), repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)`
+                      : 'repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)',
+                    backgroundSize: value ? `cover, 12px 12px` : '12px 12px',
+                    backgroundPosition: 'center, 0 0',
+                  }
+                : {
+                    backgroundImage: value ? `url(${value})` : 'none',
+                  })
+            }}
+          >
+            {!value && <ImageIcon className="h-5 w-5 text-slate-600" />}
+          </div>
+        )}
 
         <div className="flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={(e) => {
-                e.stopPropagation();
-                setLibraryOpen(true);
-              }}
-              className="px-2.5 py-1.5 rounded bg-[#CC8667]/10 border border-[#CC8667]/20 text-[#CC8667] hover:bg-[#CC8667]/20 disabled:bg-zinc-800 disabled:border-transparent disabled:text-zinc-500 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {uploading ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+          <div className="flex flex-wrap items-center gap-2">
+            {isLogo ? (
+              logoConfig?.mode === 'html' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBuilderModalOpen(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded brand-accent text-white text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer border-none"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Editar Logotipo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOptionModalOpen(true);
+                    }}
+                    className="px-2 py-1 rounded bg-zinc-800 border border-white/10 text-slate-400 hover:text-white text-[9px] transition-all cursor-pointer"
+                  >
+                    Alternar Modo
+                  </button>
+                </>
               ) : (
-                <Upload className="h-3 w-3" />
-              )}
-              {uploading ? 'Processando...' : 'Biblioteca de Mídia'}
-            </button>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOptionModalOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:bg-zinc-800 disabled:border-transparent disabled:text-zinc-500 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  {uploading ? 'Processando...' : 'Definir Logotipo'}
+                </button>
+              )
+            ) : (
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLibraryOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] hover:bg-[var(--brand-gradient-start)]/20 disabled:bg-zinc-800 disabled:border-transparent disabled:text-zinc-500 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Upload className="h-3 w-3" />
+                )}
+                {uploading ? 'Processando...' : 'Biblioteca de Mídia'}
+              </button>
+            )}
             <span className="text-[8px] text-slate-500">
-              {targetWidth && targetHeight ? `${targetWidth}x${targetHeight}px` : 'Galeria'}
+              {isLogo && logoConfig?.mode === 'html' ? 'Personalizado' : (targetWidth && targetHeight ? `${targetWidth}x${targetHeight}px` : 'Galeria')}
             </span>
           </div>
         </div>
@@ -504,12 +650,64 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         <span className="text-[8px] text-red-400 block font-sans font-medium">{error}</span>
       )}
 
+      {onToggleHideOnMobile && (
+        <div className="flex items-center gap-2 pt-2 border-t border-white/5 mt-1">
+          <input
+            type="checkbox"
+            id={`hideMobile-${id || label}`}
+            checked={hideOnMobile ?? false}
+            onChange={(e) => onToggleHideOnMobile(e.target.checked)}
+            className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+          />
+          <label htmlFor={`hideMobile-${id || label}`} className="text-[10px] text-slate-300 font-semibold cursor-pointer select-none">
+            📱 Ocultar imagem no mobile
+          </label>
+        </div>
+      )}
+
+      {/* Logo Option Popup Modal */}
+      {isLogo && (
+        <LogoOptionModal
+          isOpen={optionModalOpen}
+          onClose={() => setOptionModalOpen(false)}
+          onSelectOption={(mode) => {
+            if (mode === 'html') {
+              setBuilderModalOpen(true);
+            } else {
+              setLibraryOpen(true);
+            }
+          }}
+        />
+      )}
+
+      {/* Logo Builder HTML Modal */}
+      {isLogo && (
+        <LogoBuilderModal
+          isOpen={builderModalOpen}
+          onClose={() => setBuilderModalOpen(false)}
+          tenantId={tenantId}
+          initialText={logoConfig?.text || defaultLogoText}
+          initialIconType={logoConfig?.iconType || 'psi'}
+          initialCustomIconUrl={logoConfig?.customIconUrl || ''}
+          gradientStart={gradientStart}
+          gradientEnd={gradientEnd}
+          contrastColor={contrastColor}
+          headingFont={headingFont}
+          onSave={(cfg) => {
+            if (onLogoConfigChange) {
+              onLogoConfigChange(cfg);
+            }
+          }}
+        />
+      )}
+
       {/* Media Library Selector Modal */}
       <MediaLibraryModal
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         tenantId={tenantId}
         onSelectImage={handleSelectFromLibrary}
+        uploadType={allowTransparency ? (id?.includes('favicon') ? 'icon' : 'logo') : 'asset'}
       />
 
       {/* Visual Crop Modal */}
@@ -529,8 +727,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
           {/* Workspace */}
           <div 
-            className="relative bg-zinc-950 border border-white/5 rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
-            style={{ width: '100%', height: '360px' }}
+            className="relative border border-white/5 rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
+            style={{
+              width: '100%',
+              height: '360px',
+              // Checkerboard for transparent images; solid bg for opaque ones
+              background: allowTransparency
+                ? 'repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)'
+                : '#09090B',
+              backgroundSize: allowTransparency ? '20px 20px' : undefined,
+            }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -539,7 +745,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             {/* Cutout Highlight Target Area */}
             {aspectRatio && (
               <div 
-                className="absolute z-20 pointer-events-none rounded-lg border border-dashed border-[#CC8667]"
+                className="absolute z-20 pointer-events-none rounded-lg border border-dashed border-[var(--brand-gradient-start)]"
                 style={{
                   width: `${frameW}px`,
                   height: `${frameH}px`,
@@ -554,13 +760,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 ref={imageElementRef}
                 src={imageSrc}
                 alt="Crop Workspace"
-                className="max-w-none origin-center pointer-events-none"
+                className="max-w-none origin-center pointer-events-none transition-transform duration-75"
                 style={{
+                  width: `${baseW}px`,
+                  height: `${baseH}px`,
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                  width: 'auto',
-                  height: 'auto',
-                  maxHeight: '100%',
-                  maxWidth: '100%'
                 }}
               />
             )}
@@ -579,7 +783,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
               step="0.05"
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#CC8667]"
+              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[var(--brand-gradient-start)]"
             />
           </div>
 
@@ -646,7 +850,7 @@ const CustomInputNode = ({ data }: any) => {
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[#CC8667] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
       />
       <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
         <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
@@ -669,7 +873,7 @@ const CustomInputNode = ({ data }: any) => {
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[#CC8667] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
       />
     </div>
   );
@@ -687,7 +891,7 @@ const CustomContractNode = ({ data }: any) => {
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[#CC8667] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
       />
       <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
         <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">
@@ -709,7 +913,7 @@ const CustomContractNode = ({ data }: any) => {
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[#CC8667] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
       />
     </div>
   );
@@ -729,7 +933,7 @@ const CustomSelectorNode = ({ data }: any) => {
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[#CC8667] !w-3 !h-3 !border-2 !border-[#09090B]"
+        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[#09090B]"
       />
       <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5">
         <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">
@@ -753,7 +957,7 @@ const CustomSelectorNode = ({ data }: any) => {
               type="source"
               position={Position.Right}
               id={`option-${idx}`}
-              className="!bg-[#CC8667] !w-2.5 !h-2.5 !border-2 !border-[#09090B]"
+              className="!bg-[var(--brand-gradient-start)] !w-2.5 !h-2.5 !border-2 !border-[#09090B]"
               style={{ top: '50%', transform: 'translateY(-50%)', right: '-6px' }}
             />
           </div>
@@ -828,8 +1032,8 @@ const SortableSectionItem = ({
       ref={setNodeRef} 
       style={style} 
       className={`border rounded-xl bg-zinc-900/30 overflow-hidden relative transition-all duration-200 ${
-        isDragging ? 'shadow-2xl border-[#CC8667] bg-zinc-900/85 z-50' :
-        isOpen ? 'border-[#CC8667]/20 bg-zinc-900/50' : 'border-white/5'
+        isDragging ? 'shadow-2xl border-[var(--brand-gradient-start)] bg-zinc-900/85 z-50' :
+        isOpen ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
       }`}
     >
       <div className="w-full bg-[#121215] flex items-center justify-between hover:bg-zinc-800/50 transition-colors">
@@ -850,7 +1054,7 @@ const SortableSectionItem = ({
             onClick={() => setOpenSection(isOpen ? null : section.id)}
             className="flex-1 py-3 text-left text-xs font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer truncate"
           >
-            <span className={`transition-colors ${isOpen ? 'text-[#CC8667] font-extrabold' : 'text-white'}`}>
+            <span className={`transition-colors ${isOpen ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
               {index + 2}. {name}
             </span>
           </button>
@@ -866,7 +1070,7 @@ const SortableSectionItem = ({
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform mr-1 shrink-0 ${isOpen ? 'rotate-180 text-[#CC8667]' : ''}`} />
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform mr-1 shrink-0 ${isOpen ? 'rotate-180 text-[var(--brand-gradient-start)]' : ''}`} />
         </div>
       </div>
 
@@ -874,7 +1078,7 @@ const SortableSectionItem = ({
         <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
           {/* Identificação e Navegação da Seção */}
           <div className="bg-zinc-950/40 p-3 rounded-xl border border-white/5 space-y-3 mb-2 text-left">
-            <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Identificação & Navegação</span>
+            <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Identificação & Navegação</span>
             
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -906,17 +1110,32 @@ const SortableSectionItem = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id={`showInNavbar-${section.id}`}
-                checked={section.showInNavbar ?? true}
-                onChange={(e) => updateLayoutSectionField(section.id, 'showInNavbar', e.target.checked)}
-                className="rounded border-zinc-700 bg-zinc-900 text-[#CC8667] focus:ring-[#CC8667] h-3.5 w-3.5 cursor-pointer"
-              />
-              <label htmlFor={`showInNavbar-${section.id}`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer select-none">
-                Exibir no menu de navegação
-              </label>
+            <div className="flex flex-wrap items-center gap-4 pt-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={`showInNavbar-${section.id}`}
+                  checked={section.showInNavbar ?? true}
+                  onChange={(e) => updateLayoutSectionField(section.id, 'showInNavbar', e.target.checked)}
+                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+                />
+                <label htmlFor={`showInNavbar-${section.id}`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer select-none">
+                  Exibir no menu
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id={`hideOnMobile-${section.id}`}
+                  checked={section.hideOnMobile ?? false}
+                  onChange={(e) => updateLayoutSectionField(section.id, 'hideOnMobile', e.target.checked)}
+                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
+                />
+                <label htmlFor={`hideOnMobile-${section.id}`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer select-none">
+                  📱 Ocultar seção no mobile
+                </label>
+              </div>
             </div>
           </div>
 
@@ -954,6 +1173,29 @@ export default function PageEditor({ params }: PageProps) {
 
   // Live preview mode state ('desktop' | 'mobile')
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  // Cloudflare Custom Hostname Verification States
+  const [cfDnsRecords, setCfDnsRecords] = useState<Array<{ type: string; name: string; value: string; description: string }>>([]);
+  const [cfStatus, setCfStatus] = useState<string | null>(null);
+  const [cfVerifying, setCfVerifying] = useState(false);
+
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteCurrentPage = async () => {
+    if (!page) return;
+    setDeleting(true);
+    try {
+      await api.deleteCapturePage(page.id);
+      router.push('/dashboard/captacao');
+    } catch (err: any) {
+      alert('Erro ao excluir página: ' + (err.message || 'Ocorreu um erro.'));
+    } finally {
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
+  };
 
   // Accordion section state for texts sidebar
   const [openSection, setOpenSection] = useState<string | null>('hero');
@@ -1204,7 +1446,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField('diagnostic.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapia*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapia*</code>
               </p>
             </div>
             <div className="space-y-1 pb-3 border-b border-white/5">
@@ -1212,7 +1454,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={2}
                 id="diagnostic.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.diagnostic?.description || ''}
                 onChange={(e) => updateDictField('diagnostic', 'description', e.target.value)}
                 onFocus={() => setFocusedField('diagnostic.description')}
@@ -1220,7 +1462,7 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Card 1 */}
-            <div className="border-l-2 border-[#CC8667] pl-3 py-1 space-y-3">
+            <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 1: Título</label>
                 <Input
@@ -1232,7 +1474,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('diagnostic.card1Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*ansiedade*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*ansiedade*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1240,7 +1482,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="diagnostic.card1Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card1Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card1Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card1Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card1Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card1Desc')}
@@ -1252,7 +1494,7 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Card 2 */}
-            <div className="border-l-2 border-[#CC8667] pl-3 py-1 space-y-3">
+            <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 2: Título</label>
                 <Input
@@ -1264,7 +1506,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('diagnostic.card2Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*relações*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*relações*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1272,7 +1514,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="diagnostic.card2Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card2Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card2Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card2Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card2Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card2Desc')}
@@ -1284,7 +1526,7 @@ export default function PageEditor({ params }: PageProps) {
             </div>
 
             {/* Card 3 */}
-            <div className="border-l-2 border-[#CC8667] pl-3 py-1 space-y-3">
+            <div className="border-l-2 border-[var(--brand-gradient-start)] pl-3 py-1 space-y-3">
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Card 3: Título</label>
                 <Input
@@ -1296,7 +1538,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('diagnostic.card3Title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*pessoal*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*pessoal*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1304,7 +1546,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="diagnostic.card3Desc"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card3Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'diagnostic.card3Desc' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.diagnostic?.card3Desc || ''}
                   onChange={(e) => updateDictField('diagnostic', 'card3Desc', e.target.value)}
                   onFocus={() => setFocusedField('diagnostic.card3Desc')}
@@ -1326,6 +1568,7 @@ export default function PageEditor({ params }: PageProps) {
               onChange={(url) => {
                 const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, portrait: url } };
                 setPage({ ...page, siteConfig: updated });
+                setHasUnsavedChanges(true);
               }}
               onFocus={() => setFocusedField('siteConfig.images.portrait')}
               isFocused={focusedField === 'siteConfig.images.portrait'}
@@ -1333,6 +1576,12 @@ export default function PageEditor({ params }: PageProps) {
               aspectRatio={3 / 4}
               targetWidth={600}
               targetHeight={800}
+              hideOnMobile={page.siteConfig.images?.hidePortraitOnMobile ?? false}
+              onToggleHideOnMobile={(hidden) => {
+                const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, hidePortraitOnMobile: hidden } };
+                setPage({ ...page, siteConfig: updated });
+                setHasUnsavedChanges(true);
+              }}
             />
             <div className="space-y-1">
               <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta (Badge)</label>
@@ -1356,7 +1605,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField('about.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapeuta*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*terapeuta*</code>
               </p>
             </div>
             <div className="space-y-1">
@@ -1364,7 +1613,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={3}
                 id="about.description1"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description1' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description1' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.about?.description1 || ''}
                 onChange={(e) => updateDictField('about', 'description1', e.target.value)}
                 onFocus={() => setFocusedField('about.description1')}
@@ -1375,7 +1624,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={3}
                 id="about.description2"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description2' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'about.description2' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.about?.description2 || ''}
                 onChange={(e) => updateDictField('about', 'description2', e.target.value)}
                 onFocus={() => setFocusedField('about.description2')}
@@ -1479,7 +1728,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField('process.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*jornada*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*jornada*</code>
               </p>
             </div>
             <div className="space-y-1">
@@ -1487,7 +1736,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={2}
                 id="process.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.process?.description || ''}
                 onChange={(e) => updateDictField('process', 'description', e.target.value)}
                 onFocus={() => setFocusedField('process.description')}
@@ -1510,7 +1759,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('process.step1.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Triagem*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Triagem*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1518,7 +1767,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="process.step1.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step1.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step1.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step1?.description || ''}
                   onChange={(e) => updateProcessStepField('step1', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step1.description')}
@@ -1553,7 +1802,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('process.step2.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Agendamento*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Agendamento*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1561,7 +1810,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="process.step2.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step2.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step2.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step2?.description || ''}
                   onChange={(e) => updateProcessStepField('step2', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step2.description')}
@@ -1585,7 +1834,7 @@ export default function PageEditor({ params }: PageProps) {
                   onFocus={() => setFocusedField('process.step3.title')}
                 />
                 <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Sessão*</code>
+                  💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Sessão*</code>
                 </p>
               </div>
               <div className="space-y-1">
@@ -1593,7 +1842,7 @@ export default function PageEditor({ params }: PageProps) {
                 <textarea
                   rows={2}
                   id="process.step3.description"
-                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step3.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                  className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'process.step3.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                   value={page.dictionary.process?.step3?.description || ''}
                   onChange={(e) => updateProcessStepField('step3', 'description', e.target.value)}
                   onFocus={() => setFocusedField('process.step3.description')}
@@ -1615,6 +1864,7 @@ export default function PageEditor({ params }: PageProps) {
               onChange={(url) => {
                 const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, officeSpace: url } };
                 setPage({ ...page, siteConfig: updated });
+                setHasUnsavedChanges(true);
               }}
               onFocus={() => setFocusedField('siteConfig.images.officeSpace')}
               isFocused={focusedField === 'siteConfig.images.officeSpace'}
@@ -1622,6 +1872,12 @@ export default function PageEditor({ params }: PageProps) {
               aspectRatio={16 / 9}
               targetWidth={960}
               targetHeight={540}
+              hideOnMobile={page.siteConfig.images?.hideOfficeSpaceOnMobile ?? false}
+              onToggleHideOnMobile={(hidden) => {
+                const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, hideOfficeSpaceOnMobile: hidden } };
+                setPage({ ...page, siteConfig: updated });
+                setHasUnsavedChanges(true);
+              }}
             />
             <div className="space-y-1">
               <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">CRP da Psicóloga</label>
@@ -1702,7 +1958,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField('space.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Acolhedor*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Acolhedor*</code>
               </p>
             </div>
             <div className="space-y-1">
@@ -1710,7 +1966,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={2}
                 id="space.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'space.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'space.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.space?.description || ''}
                 onChange={(e) => updateDictField('space', 'description', e.target.value)}
                 onFocus={() => setFocusedField('space.description')}
@@ -1757,7 +2013,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField('faq.title')}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Perguntas*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Perguntas*</code>
               </p>
             </div>
             <div className="space-y-1">
@@ -1765,7 +2021,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={2}
                 id="faq.description"
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'faq.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'faq.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={page.dictionary.faq?.description || ''}
                 onChange={(e) => updateDictField('faq', 'description', e.target.value)}
                 onFocus={() => setFocusedField('faq.description')}
@@ -1800,7 +2056,7 @@ export default function PageEditor({ params }: PageProps) {
                         onFocus={() => setFocusedField(`faq.items.${faqIdx}.question`)}
                       />
                       <p className="text-[8px] text-slate-500 leading-relaxed font-sans mt-0.5">
-                        💡 <strong>Palavras coloridas:</strong> Envolva com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Dúvida*</code>
+                        💡 <strong>Palavras coloridas:</strong> Envolva com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*Dúvida*</code>
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -1808,7 +2064,7 @@ export default function PageEditor({ params }: PageProps) {
                       <textarea
                         rows={2}
                         id={`faq.items.${faqIdx}.answer`}
-                        className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `faq.items.${faqIdx}.answer` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[#CC8667]'}`}
+                        className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `faq.items.${faqIdx}.answer` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-955/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={faqItem.answer}
                         onChange={(e) => {
                           const listKey = page.dictionary.faq?.items ? 'items' : 'faq';
@@ -1871,7 +2127,7 @@ export default function PageEditor({ params }: PageProps) {
                 const faqSection = (page.siteConfig.sections || []).find((s: any) => s.type === 'faq') || { id: 'faq', type: 'faq', settings: {} };
                 return (
                   <div className="border-t border-white/5 pt-3 mt-4 space-y-3">
-                    <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+                    <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
                     
                     <div className="grid grid-cols-2 gap-2 text-left">
                       <div className="space-y-1">
@@ -1892,7 +2148,7 @@ export default function PageEditor({ params }: PageProps) {
                             type="checkbox"
                             checked={faqSection.settings?.defaultOpenFirst ?? true}
                             onChange={(e) => updateLayoutSectionField(faqSection.id, 'settings.defaultOpenFirst', e.target.checked)}
-                            className="rounded border-zinc-700 bg-zinc-900 text-[#CC8667] focus:ring-[#CC8667] cursor-pointer"
+                            className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] cursor-pointer"
                           />
                           Abrir 1º Item
                         </label>
@@ -1929,7 +2185,7 @@ export default function PageEditor({ params }: PageProps) {
                 onFocus={() => setFocusedField(`${section.id}.title`)}
               />
               <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*palavra*</code>
+                💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*palavra*</code>
               </p>
             </div>
             <div className="space-y-1">
@@ -1937,7 +2193,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={2}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
@@ -1946,7 +2202,7 @@ export default function PageEditor({ params }: PageProps) {
 
             {/* Structural Layout Settings */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
@@ -2036,7 +2292,7 @@ export default function PageEditor({ params }: PageProps) {
                     <textarea
                       rows={2}
                       id={`${section.id}.items.${cardIdx}.description`}
-                      className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.items.${cardIdx}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                      className={`w-full text-xs p-2 bg-zinc-900 rounded-lg border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.items.${cardIdx}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                       value={item.description || ''}
                       onChange={(e) => updateLayoutSectionField(section.id, `items.${cardIdx}.description`, e.target.value)}
                       onFocus={() => setFocusedField(`${section.id}.items.${cardIdx}.description`)}
@@ -2075,7 +2331,7 @@ export default function PageEditor({ params }: PageProps) {
 
             {/* Structural Layout Settings */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
@@ -2107,7 +2363,7 @@ export default function PageEditor({ params }: PageProps) {
 
             <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
               <div className="space-y-3">
-                <label className="text-[9px] text-[#CC8667] font-bold uppercase tracking-wider block">Coluna Esquerda</label>
+                <label className="text-[9px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Coluna Esquerda</label>
                 <div className="space-y-1">
                   <label className="text-[8px] text-slate-400 uppercase">Título</label>
                   <Input
@@ -2124,7 +2380,7 @@ export default function PageEditor({ params }: PageProps) {
                   <textarea
                     rows={4}
                     id={`${section.id}.leftText`}
-                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.leftText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.leftText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                     value={section.leftText || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'leftText', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.leftText`)}
@@ -2133,7 +2389,7 @@ export default function PageEditor({ params }: PageProps) {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[9px] text-[#CC8667] font-bold uppercase tracking-wider block">Coluna Direita</label>
+                <label className="text-[9px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Coluna Direita</label>
                 <div className="space-y-1">
                   <label className="text-[8px] text-slate-400 uppercase">Título</label>
                   <Input
@@ -2150,7 +2406,7 @@ export default function PageEditor({ params }: PageProps) {
                   <textarea
                     rows={4}
                     id={`${section.id}.rightText`}
-                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.rightText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                    className={`w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.rightText` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                     value={section.rightText || ''}
                     onChange={(e) => updateLayoutSectionField(section.id, 'rightText', e.target.value)}
                     onFocus={() => setFocusedField(`${section.id}.rightText`)}
@@ -2174,11 +2430,13 @@ export default function PageEditor({ params }: PageProps) {
               aspectRatio={16 / 9}
               targetWidth={960}
               targetHeight={540}
+              hideOnMobile={section.hideImageOnMobile ?? false}
+              onToggleHideOnMobile={(hidden) => updateLayoutSectionField(section.id, 'hideImageOnMobile', hidden)}
             />
 
             {/* Structural Layout Settings */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
@@ -2238,7 +2496,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
@@ -2288,7 +2546,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
@@ -2319,7 +2577,7 @@ export default function PageEditor({ params }: PageProps) {
 
             {/* Layout parameters */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações do CTA</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações do CTA</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
@@ -2354,7 +2612,7 @@ export default function PageEditor({ params }: PageProps) {
                   id={`${section.id}.showSecondaryCta`}
                   checked={section.settings?.showSecondaryCta || false}
                   onChange={(e) => updateLayoutSectionField(section.id, 'settings.showSecondaryCta', e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-900 text-[#CC8667] focus:ring-[#CC8667] h-3.5 w-3.5 cursor-pointer"
+                  className="rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start)] focus:ring-[var(--brand-gradient-start)] h-3.5 w-3.5 cursor-pointer"
                 />
                 <label htmlFor={`${section.id}.showSecondaryCta`} className="text-[10px] text-slate-300 font-semibold uppercase cursor-pointer">
                   Exibir botão secundário de WhatsApp
@@ -2407,7 +2665,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={3}
                 id={`${section.id}.description`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.description` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.description || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'description', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.description`)}
@@ -2438,7 +2696,7 @@ export default function PageEditor({ params }: PageProps) {
 
             {/* Layout parameters */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-3 gap-2 text-left">
                 <div className="space-y-1">
@@ -2491,7 +2749,7 @@ export default function PageEditor({ params }: PageProps) {
               <textarea
                 rows={4}
                 id={`${section.id}.title`}
-                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === `${section.id}.title` ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                 value={section.title || ''}
                 onChange={(e) => updateLayoutSectionField(section.id, 'title', e.target.value)}
                 onFocus={() => setFocusedField(`${section.id}.title`)}
@@ -2511,7 +2769,7 @@ export default function PageEditor({ params }: PageProps) {
 
             {/* Layout parameters */}
             <div className="border-t border-white/5 pt-3 space-y-3">
-              <span className="text-[10px] text-[#CC8667] font-bold uppercase tracking-wider block">Configurações de Layout</span>
+              <span className="text-[10px] text-[var(--brand-gradient-start)] font-bold uppercase tracking-wider block">Configurações de Layout</span>
               
               <div className="grid grid-cols-2 gap-2 text-left">
                 <div className="space-y-1">
@@ -2556,6 +2814,73 @@ export default function PageEditor({ params }: PageProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(400);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Custom font upload modal states
+  const [isCustomFontModalOpen, setIsCustomFontModalOpen] = useState(false);
+  const [customFontTarget, setCustomFontTarget] = useState<'heading' | 'body'>('heading');
+  const [fontUploading, setFontUploading] = useState(false);
+
+  const handleUploadCustomFont = async (file: File) => {
+    if (!page || !file) return;
+    setFontUploading(true);
+    try {
+      const { validateFontFile, sanitizeFontFamily } = await import('@psi/image-utils');
+      const validation = await validateFontFile(file);
+      if (!validation.valid) {
+        alert(validation.error || 'Arquivo de fonte inválido.');
+        setFontUploading(false);
+        return;
+      }
+
+      const { url } = await api.uploadImage(file, 'font');
+      const cleanFontName = sanitizeFontFamily(file.name.split('.')[0] || 'CustomFont');
+
+      if (customFontTarget === 'heading') {
+        const updatedTypography = {
+          ...(page.siteConfig?.theme?.typography || {}),
+          customHeadingFontUrl: url,
+          customHeadingFontName: cleanFontName,
+          customHeadingFontFormat: validation.format,
+          headingFont: cleanFontName,
+        };
+        setPage({
+          ...page,
+          siteConfig: {
+            ...page.siteConfig,
+            theme: {
+              ...(page.siteConfig?.theme || {}),
+              typography: updatedTypography
+            }
+          }
+        });
+      } else {
+        const updatedTypography = {
+          ...(page.siteConfig?.theme?.typography || {}),
+          customBodyFontUrl: url,
+          customBodyFontName: cleanFontName,
+          customBodyFontFormat: validation.format,
+          bodyFont: cleanFontName,
+        };
+        setPage({
+          ...page,
+          siteConfig: {
+            ...page.siteConfig,
+            theme: {
+              ...(page.siteConfig?.theme || {}),
+              typography: updatedTypography
+            }
+          }
+        });
+      }
+
+      setHasUnsavedChanges(true);
+      setIsCustomFontModalOpen(false);
+    } catch (err: any) {
+      alert('Erro ao enviar fonte: ' + (err.message || 'Falha no servidor.'));
+    } finally {
+      setFontUploading(false);
+    }
+  };
 
   const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
     mouseDownEvent.preventDefault();
@@ -2958,13 +3283,14 @@ export default function PageEditor({ params }: PageProps) {
       iframeRef.current.contentWindow.postMessage({
         type: 'SYNC_DATA',
         page: {
+          title: page.title,
           dictionary: page.dictionary,
           siteConfig: page.siteConfig,
         },
         tenant
       }, '*');
     }
-  }, [page?.dictionary, page?.siteConfig, tenant]);
+  }, [page?.title, page?.dictionary, page?.siteConfig, tenant]);
 
   // Monitor real differences to set hasUnsavedChanges state
   useEffect(() => {
@@ -2974,18 +3300,26 @@ export default function PageEditor({ params }: PageProps) {
       const originalNode = page.formFlow?.nodes?.find((on: any) => on.id === n.id);
       return {
         id: n.id,
-        type: originalNode?.type || n.type || 'texto',
-        position: n.position,
-        data: originalNode?.data || { title: 'Etapa sem título', isRequired: true }
+        type: originalNode?.type || n.type || 'step',
+        position: {
+          x: Math.round(n.position?.x || 0),
+          y: Math.round(n.position?.y || 0)
+        },
+        data: originalNode?.data || n.data || { title: 'Etapa sem título', isRequired: true }
       };
     });
 
-    const compiledEdges = edges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle || undefined
-    }));
+    const compiledEdges = edges.map(e => {
+      const item: any = {
+        id: e.id,
+        source: e.source,
+        target: e.target
+      };
+      if (e.sourceHandle) {
+        item.sourceHandle = e.sourceHandle;
+      }
+      return item;
+    });
 
     const originalNodes = lastPublishedPage.formFlow?.nodes || [];
     const originalEdges = lastPublishedPage.formFlow?.edges || [];
@@ -3021,6 +3355,7 @@ export default function PageEditor({ params }: PageProps) {
       iframeRef.current.contentWindow.postMessage({
         type: 'SYNC_DATA',
         page: {
+          title: page.title,
           dictionary: page.dictionary,
           siteConfig: page.siteConfig,
         },
@@ -3118,7 +3453,7 @@ export default function PageEditor({ params }: PageProps) {
       sourceHandle: edge.sourceHandle || 'source',
       targetHandle: 'target',
       type: 'default',
-      style: { stroke: '#CC8667', strokeWidth: 2 }
+      style: { stroke: 'var(--brand-gradient-start)', strokeWidth: 2 }
     }));
 
     setNodes(flowNodes);
@@ -3129,7 +3464,7 @@ export default function PageEditor({ params }: PageProps) {
   const onConnect = useCallback((params: Connection) => {
     setEdges((eds) => addEdge({
       ...params,
-      style: { stroke: '#CC8667', strokeWidth: 2 }
+      style: { stroke: 'var(--brand-gradient-start)', strokeWidth: 2 }
     }, eds));
   }, [setEdges]);
 
@@ -3152,21 +3487,29 @@ export default function PageEditor({ params }: PageProps) {
 
     // Reconstruct formFlow config from React Flow current nodes/edges
     const compiledNodes = nodes.map(n => {
-      const originalNode = page.formFlow.nodes.find((on: any) => on.id === n.id);
+      const originalNode = page.formFlow?.nodes?.find((on: any) => on.id === n.id);
       return {
         id: n.id,
-        type: originalNode?.type || n.type || 'texto',
-        position: n.position,
-        data: originalNode?.data || { title: 'Etapa sem título', isRequired: true }
+        type: originalNode?.type || n.type || 'step',
+        position: {
+          x: Math.round(n.position?.x || 0),
+          y: Math.round(n.position?.y || 0)
+        },
+        data: originalNode?.data || n.data || { title: 'Etapa sem título', isRequired: true }
       };
     });
 
-    const compiledEdges = edges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle || undefined
-    }));
+    const compiledEdges = edges.map(e => {
+      const item: any = {
+        id: e.id,
+        source: e.source,
+        target: e.target
+      };
+      if (e.sourceHandle) {
+        item.sourceHandle = e.sourceHandle;
+      }
+      return item;
+    });
 
     const updatedFlow = {
       ...page.formFlow,
@@ -3363,39 +3706,39 @@ export default function PageEditor({ params }: PageProps) {
           to { opacity: 1; }
         }
         /* Override hardcoded brand accent to adapt to tenant primary color */
-        .text-\\[\\#CC8667\\] {
-          color: var(--brand-gradient-start, #CC8667) !important;
+        .text-\\[\\var(--brand-gradient-start)\\] {
+          color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
         }
-        .bg-\\[\\#CC8667\\] {
-          background-color: var(--brand-gradient-start, #CC8667) !important;
+        .bg-\\[\\var(--brand-gradient-start)\\] {
+          background-color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
         }
-        .border-\\[\\#CC8667\\] {
-          border-color: var(--brand-gradient-start, #CC8667) !important;
+        .border-\\[\\var(--brand-gradient-start)\\] {
+          border-color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
         }
-        .bg-\\[\\#CC8667\\]\\/10 {
-          background-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 10%, transparent) !important;
+        .bg-\\[\\var(--brand-gradient-start)\\]\\/10 {
+          background-color: color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 10%, transparent) !important;
         }
-        .bg-\\[\\#CC8667\\]\\/20 {
-          background-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 20%, transparent) !important;
+        .bg-\\[\\var(--brand-gradient-start)\\]\\/20 {
+          background-color: color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 20%, transparent) !important;
         }
-        .bg-\\[\\#CC8667\\]\\/40 {
-          background-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 40%, transparent) !important;
+        .bg-\\[\\var(--brand-gradient-start)\\]\\/40 {
+          background-color: color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 40%, transparent) !important;
         }
-        .border-\\[\\#CC8667\\]\\/20 {
-          border-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 20%, transparent) !important;
+        .border-\\[\\var(--brand-gradient-start)\\]\\/20 {
+          border-color: color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 20%, transparent) !important;
         }
-        .border-\\[\\#CC8667\\]\\/30 {
-          border-color: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 30%, transparent) !important;
+        .border-\\[\\var(--brand-gradient-start)\\]\\/30 {
+          border-color: color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 30%, transparent) !important;
         }
-        .accent-\\[\\#CC8667\\] {
-          accent-color: var(--brand-gradient-start, #CC8667) !important;
+        .accent-\\[\\var(--brand-gradient-start)\\] {
+          accent-color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
         }
-        .focus\\:border-\\[\\#CC8667\\]:focus {
-          border-color: var(--brand-gradient-start, #CC8667) !important;
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-gradient-start, #CC8667) 20%, transparent) !important;
+        .focus\\:border-\\[\\var(--brand-gradient-start)\\]:focus {
+          border-color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-gradient-start, var(--brand-gradient-start)) 20%, transparent) !important;
         }
-        .focus\\:ring-\\[\\#CC8667\\]:focus {
-          --tw-ring-color: var(--brand-gradient-start, #CC8667) !important;
+        .focus\\:ring-\\[\\var(--brand-gradient-start)\\]:focus {
+          --tw-ring-color: var(--brand-gradient-start, var(--brand-gradient-start)) !important;
         }
       `}</style>
       
@@ -3443,7 +3786,7 @@ export default function PageEditor({ params }: PageProps) {
               }`}
             >
               <Layout className="h-3 w-3" />
-              Design & Textos
+              Conteúdo e Seções
             </button>
             <button
               onClick={() => setActiveTab('theme')}
@@ -3452,7 +3795,7 @@ export default function PageEditor({ params }: PageProps) {
               }`}
             >
               <Palette className="h-3 w-3" />
-              Tema & Cores
+              Cores e Estilo
             </button>
             <button
               onClick={() => setActiveTab('flow')}
@@ -3461,7 +3804,7 @@ export default function PageEditor({ params }: PageProps) {
               }`}
             >
               <GitBranch className="h-3 w-3" />
-              Fluxo Triagem
+              Perguntas da Triagem
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -3551,27 +3894,27 @@ export default function PageEditor({ params }: PageProps) {
               
               {/* Tip Banner */}
               <div className="p-3 rounded-xl bg-zinc-900/50 border border-white/5 text-slate-300 text-[10px] leading-relaxed flex items-start gap-2.5 shadow-sm">
-                <Sparkles className="h-3.5 w-3.5 text-[#CC8667] shrink-0 mt-0.5" />
+                <Sparkles className="h-3.5 w-3.5 text-[var(--brand-gradient-start)] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-white block mb-0.5">Dica de Design & Destaque</span>
-                  Você pode colorir palavras em qualquer <strong>Título</strong> envolvendo-as com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[9px]">*equilíbrio*</code>
+                  Você pode colorir palavras em qualquer <strong>Título</strong> envolvendo-as com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[9px]">*equilíbrio*</code>
                 </div>
               </div>
               
               {/* SECTION 1: HERO & IDENTIFICAÇÃO */}
               <div className={`border rounded-xl bg-zinc-900/30 overflow-hidden transition-all duration-200 ${
-                openSection === 'hero' ? 'border-[#CC8667]/20 bg-zinc-900/50' : 'border-white/5'
+                openSection === 'hero' ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
               }`}>
                 <button
                   type="button"
                   onClick={() => setOpenSection(openSection === 'hero' ? null : 'hero')}
                   className="w-full px-4 py-3 bg-[#121215] flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-zinc-800/50 transition-colors bg-transparent border-none cursor-pointer"
                 >
-                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'hero' ? 'text-[#CC8667] font-extrabold' : 'text-white'}`}>
+                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'hero' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
                     <Sparkles className="h-3.5 w-3.5 text-yellow-500/70" />
                     1. Início & Apresentação (Hero)
                   </span>
-                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'hero' ? 'rotate-180 text-[#CC8667]' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'hero' ? 'rotate-180 text-[var(--brand-gradient-start)]' : ''}`} />
                 </button>
                 {openSection === 'hero' && (
                   <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
@@ -3582,6 +3925,7 @@ export default function PageEditor({ params }: PageProps) {
                       onChange={(url) => {
                         const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, hero: url } };
                         setPage({ ...page, siteConfig: updated });
+                        setHasUnsavedChanges(true);
                       }}
                       onFocus={() => setFocusedField('siteConfig.images.hero')}
                       isFocused={focusedField === 'siteConfig.images.hero'}
@@ -3589,6 +3933,12 @@ export default function PageEditor({ params }: PageProps) {
                       aspectRatio={3 / 4}
                       targetWidth={600}
                       targetHeight={800}
+                      hideOnMobile={page.siteConfig.images?.hideHeroOnMobile ?? false}
+                      onToggleHideOnMobile={(hidden) => {
+                        const updated = { ...page.siteConfig, images: { ...page.siteConfig.images, hideHeroOnMobile: hidden } };
+                        setPage({ ...page, siteConfig: updated });
+                        setHasUnsavedChanges(true);
+                      }}
                     />
                     <div className="space-y-1">
                       <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Etiqueta Principal (Badge)</label>
@@ -3609,7 +3959,7 @@ export default function PageEditor({ params }: PageProps) {
                       <textarea
                         rows={2}
                         id="hero.title"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.title' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={
                           page.dictionary.hero?.title !== undefined 
                             ? page.dictionary.hero.title 
@@ -3619,7 +3969,7 @@ export default function PageEditor({ params }: PageProps) {
                         onFocus={() => setFocusedField('hero.title')}
                       />
                       <p className="text-[9px] text-slate-500 leading-relaxed font-sans mt-1">
-                        💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[#CC8667] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*equilíbrio interior*</code>
+                        💡 <strong>Palavras coloridas:</strong> Envolva as palavras com asteriscos. Ex: <code className="text-[var(--brand-gradient-start)] bg-black/30 px-1 rounded font-bold font-mono text-[8px]">*equilíbrio interior*</code>
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -3627,7 +3977,7 @@ export default function PageEditor({ params }: PageProps) {
                       <textarea
                         rows={3}
                         id="hero.description"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'hero.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={page.dictionary.hero?.description || ''}
                         onChange={(e) => updateDictField('hero', 'description', e.target.value)}
                         onFocus={() => setFocusedField('hero.description')}
@@ -3733,25 +4083,25 @@ export default function PageEditor({ params }: PageProps) {
                   onClick={() => setIsAddModalOpen(true)}
                   className="w-full border-dashed border-white/20 hover:border-white/40 bg-zinc-900/40 hover:bg-zinc-800/40 text-slate-300 font-bold py-3 text-xs flex items-center justify-center gap-2 rounded-xl transition-all cursor-pointer h-12 text-white"
                 >
-                  <Plus className="h-4 w-4 text-[#CC8667]" />
+                  <Plus className="h-4 w-4 text-[var(--brand-gradient-start)]" />
                   Adicionar Seção
                 </Button>
               </div>
 
               {/* SECTION 7: RODAPÉ */}
               <div className={`border rounded-xl bg-zinc-900/30 overflow-hidden transition-all duration-200 ${
-                openSection === 'footer' ? 'border-[#CC8667]/20 bg-zinc-900/50' : 'border-white/5'
+                openSection === 'footer' ? 'border-[var(--brand-gradient-start)]/20 bg-zinc-900/50' : 'border-white/5'
               }`}>
                 <button
                   type="button"
                   onClick={() => setOpenSection(openSection === 'footer' ? null : 'footer')}
                   className="w-full px-4 py-3 bg-[#121215] flex items-center justify-between text-left text-xs font-bold uppercase tracking-wider hover:bg-zinc-800/50 transition-colors bg-transparent border-none cursor-pointer"
                 >
-                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'footer' ? 'text-[#CC8667] font-extrabold' : 'text-white'}`}>
+                  <span className={`flex items-center gap-2 transition-colors ${openSection === 'footer' ? 'text-[var(--brand-gradient-start)] font-extrabold' : 'text-white'}`}>
                     <Layout className="h-3.5 w-3.5 text-blue-500/70 shrink-0" />
                     7. Rodapé
                   </span>
-                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'footer' ? 'rotate-180 text-[#CC8667]' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${openSection === 'footer' ? 'rotate-180 text-[var(--brand-gradient-start)]' : ''}`} />
                 </button>
                 {openSection === 'footer' && (
                   <div className="p-4 space-y-4 border-t border-white/5 animate-in fade-in duration-200">
@@ -3760,7 +4110,7 @@ export default function PageEditor({ params }: PageProps) {
                       <textarea
                         rows={2}
                         id="footer.description"
-                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'footer.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[#CC8667]'}`}
+                        className={`w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors resize-none ${focusedField === 'footer.description' ? 'ring-2 ring-blue-500 border-transparent bg-zinc-950/40' : 'focus:border-[var(--brand-gradient-start)]'}`}
                         value={page.dictionary.footer?.description || ''}
                         onChange={(e) => updateDictField('footer', 'description', e.target.value)}
                         onFocus={() => setFocusedField('footer.description')}
@@ -3821,7 +4171,7 @@ export default function PageEditor({ params }: PageProps) {
               <BrandModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} maxWidth="max-w-md">
                 <div className="space-y-4 text-left">
                   <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                    <Sparkles className="h-5 w-5 text-[#CC8667]" />
+                    <Sparkles className="h-5 w-5 text-[var(--brand-gradient-start)]" />
                     <div>
                       <h3 className="text-sm font-bold text-white uppercase tracking-wider">Modelos de Seção</h3>
                       <p className="text-[10px] text-slate-400">Adicione novos blocos de layout ou reative seções padrão do site</p>
@@ -3859,7 +4209,7 @@ export default function PageEditor({ params }: PageProps) {
                             onClick={() => addSection(tmpl.type)}
                             className="p-3 rounded-xl border border-white/5 flex gap-3 items-start transition-all cursor-pointer text-left bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-white/10 border-solid"
                           >
-                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[#CC8667]/10 text-[#CC8667]">
+                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]">
                               <IconComp className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -3901,7 +4251,7 @@ export default function PageEditor({ params }: PageProps) {
                             onClick={() => addSection(tmpl.type)}
                             className="p-3 rounded-xl border border-white/5 flex gap-3 items-start transition-all cursor-pointer text-left bg-zinc-900/40 hover:bg-zinc-800/40 hover:border-white/10 border-solid"
                           >
-                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[#CC8667]/10 text-[#CC8667]">
+                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]">
                               <IconComp className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -3976,7 +4326,7 @@ export default function PageEditor({ params }: PageProps) {
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Estrutura de Etapas</h3>
-                <span className="text-[10px] bg-slate-900 border border-white/5 text-[#CC8667] font-bold px-2 py-0.5 rounded-lg">
+                <span className="text-[10px] bg-slate-900 border border-white/5 text-[var(--brand-gradient-start)] font-bold px-2 py-0.5 rounded-lg">
                   {page.formFlow.nodes.length} blocos
                 </span>
               </div>
@@ -3989,28 +4339,28 @@ export default function PageEditor({ params }: PageProps) {
                     onClick={() => handleAddNode('texto')}
                     className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
                   >
-                    <Plus className="h-3 w-3 text-[#CC8667]" />
+                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Texto Curto
                   </Button>
                   <Button
                     onClick={() => handleAddNode('paragrafo')}
                     className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
                   >
-                    <Plus className="h-3 w-3 text-[#CC8667]" />
+                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Parágrafo Longo
                   </Button>
                   <Button
                     onClick={() => handleAddNode('seletor')}
                     className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
                   >
-                    <Plus className="h-3 w-3 text-[#CC8667]" />
+                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Seletor Múltiplo
                   </Button>
                   <Button
                     onClick={() => handleAddNode('contrato')}
                     className="cursor-pointer h-9 text-[10px] font-semibold bg-zinc-900 border border-white/5 hover:bg-zinc-800 text-white flex items-center justify-start gap-1"
                   >
-                    <Plus className="h-3 w-3 text-[#CC8667]" />
+                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Termo Legal
                   </Button>
                 </div>
@@ -4059,7 +4409,7 @@ export default function PageEditor({ params }: PageProps) {
                         <select
                           value={selectedNode.data.contractTemplateId || ''}
                           onChange={(e) => updateSelectedNodeData('contractTemplateId', e.target.value || undefined)}
-                          className="w-full h-10 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs outline-none focus:border-[#CC8667]"
+                          className="w-full h-10 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs outline-none focus:border-[var(--brand-gradient-start)]"
                         >
                           <option value="">-- Selecionar modelo --</option>
                           {contracts.map(c => (
@@ -4117,7 +4467,7 @@ export default function PageEditor({ params }: PageProps) {
                         type="checkbox"
                         checked={selectedNode.data.isRequired ?? true}
                         onChange={(e) => updateSelectedNodeData('isRequired', e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-zinc-700 text-[#CC8667]"
+                        className="h-3.5 w-3.5 rounded border-zinc-700 text-[var(--brand-gradient-start)]"
                       />
                       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Resposta Obrigatória</span>
                     </label>
@@ -4146,19 +4496,19 @@ export default function PageEditor({ params }: PageProps) {
           {activeTab === 'theme' && (
             <div className="space-y-6">
               <div className="border-b border-white/5 pb-2">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Aparência Global</h3>
-                <p className="text-[10px] text-slate-500">Defina a paleta de cores e tipografia da marca do site.</p>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Cores e Estilo Visual</h3>
+                <p className="text-[10px] text-slate-500">Personalize as cores e fontes que combinam com seu estilo de atendimento.</p>
               </div>
 
               {/* Seção 1: Cores */}
               <div className="space-y-4">
-                <span className="text-[10px] font-bold text-[#CC8667] uppercase tracking-wider block">🎨 Paleta de Cores</span>
+                <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-wider block">🎨 Paleta de Cores</span>
                 {[
-                  { key: 'primaryStart', label: 'Primária (Gradiente Início)', default: '#CC8667' },
-                  { key: 'primaryEnd', label: 'Secundária (Gradiente Fim)', default: '#AA5533' },
-                  { key: 'contrast', label: 'Destaque / Botão CTA', default: '#FFFFFF' },
-                  { key: 'bgDark', label: 'Cor de Fundo do Site', default: '#09090B' },
-                  { key: 'textDark', label: 'Cor do Texto / Leitura', default: '#F4F4F5' },
+                  { key: 'primaryStart', label: 'Cor Principal (Início do Gradiente)', default: 'var(--brand-gradient-start)' },
+                  { key: 'primaryEnd', label: 'Cor Secundária (Fim do Gradiente)', default: '#AA5533' },
+                  { key: 'contrast', label: 'Cor dos Botões de Agendamento', default: '#FFFFFF' },
+                  { key: 'bgDark', label: 'Cor de Fundo da Página', default: '#09090B' },
+                  { key: 'textDark', label: 'Cor dos Textos Gerais', default: '#F4F4F5' },
                 ].map((colorOpt) => {
                   const currentValue = page.siteConfig.theme?.colors?.[colorOpt.key] || colorOpt.default;
                   return (
@@ -4228,17 +4578,59 @@ export default function PageEditor({ params }: PageProps) {
 
               {/* Seção 2: Fontes */}
               <div className="space-y-4 border-t border-white/5 pt-4">
-                <span className="text-[10px] font-bold text-[#CC8667] uppercase tracking-wider block">🔤 Fontes Globais (Google Fonts)</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-wider block">🔤 Tipografia e Fontes</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomFontTarget('heading');
+                      setIsCustomFontModalOpen(true);
+                    }}
+                    className="text-[10px] text-[var(--brand-gradient-start)] hover:text-white font-bold flex items-center gap-1 cursor-pointer transition-colors bg-zinc-900 px-2.5 py-1 rounded-lg border border-white/5"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Subir Fonte (.ttf/.otf)</span>
+                  </button>
+                </div>
 
-                {/* Heading Font */}
+                {/* FontPicker Títulos Grandes */}
+                <FontPicker
+                  label="Fonte dos Títulos Grandes"
+                  value={page.siteConfig.theme?.typography?.headingFont || 'Playfair Display'}
+                  type="heading"
+                  customFontName={page.siteConfig.theme?.typography?.customHeadingFontName}
+                  onChange={(fontName) => {
+                    const updatedTypography = {
+                      ...(page.siteConfig.theme?.typography || {}),
+                      headingFont: fontName
+                    };
+                    setPage({
+                      ...page,
+                      siteConfig: {
+                        ...page.siteConfig,
+                        theme: {
+                          ...(page.siteConfig.theme || {}),
+                          typography: updatedTypography
+                        }
+                      }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
+                  onOpenCustomFontModal={() => {
+                    setCustomFontTarget('heading');
+                    setIsCustomFontModalOpen(true);
+                  }}
+                />
+
+                {/* Heading Weight / Espessura do Texto */}
                 <div className="space-y-1 bg-zinc-900/20 p-3 rounded-xl border border-white/5">
-                  <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Fonte dos Títulos (Headings)</label>
+                  <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Espessura / Destaque dos Títulos</label>
                   <select
-                    value={page.siteConfig.theme?.typography?.headingFont || 'Playfair Display'}
+                    value={page.siteConfig.theme?.typography?.headingWeight || '400'}
                     onChange={(e) => {
                       const updatedTypography = {
                         ...(page.siteConfig.theme?.typography || {}),
-                        headingFont: e.target.value
+                        headingWeight: e.target.value
                       };
                       setPage({
                         ...page,
@@ -4255,57 +4647,132 @@ export default function PageEditor({ params }: PageProps) {
                     className="w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors cursor-pointer"
                   >
                     {[
-                      'Playfair Display',
-                      'Cormorant Garamond',
-                      'Lora',
-                      'Outfit',
-                      'Plus Jakarta Sans',
-                      'Montserrat'
-                    ].map(font => (
-                      <option key={font} value={font}>{font}</option>
+                      { value: '300', label: '🪶 Fino / Delicado (Light)' },
+                      { value: '400', label: '📄 Normal / Elegante (Regular - Padrão)' },
+                      { value: '500', label: '📝 Médio (Medium)' },
+                      { value: '600', label: '🖊️ Semi-Negrito (Semi-Bold)' },
+                      { value: '700', label: '🖋️ Negrito Marcante (Bold)' },
+                      { value: '800', label: '💥 Extra-Negrito (Extra Bold)' }
+                    ].map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Body Font */}
-                <div className="space-y-1 bg-zinc-900/20 p-3 rounded-xl border border-white/5">
-                  <label className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">Fonte dos Textos / Parágrafos (Body)</label>
-                  <select
-                    value={page.siteConfig.theme?.typography?.bodyFont || 'Inter'}
-                    onChange={(e) => {
-                      const updatedTypography = {
-                        ...(page.siteConfig.theme?.typography || {}),
-                        bodyFont: e.target.value
-                      };
-                      setPage({
-                        ...page,
-                        siteConfig: {
-                          ...page.siteConfig,
-                          theme: {
-                            ...(page.siteConfig.theme || {}),
-                            typography: updatedTypography
-                          }
+                {/* FontPicker Parágrafos e Textos */}
+                <FontPicker
+                  label="Fonte dos Parágrafos e Textos"
+                  value={page.siteConfig.theme?.typography?.bodyFont || 'Inter'}
+                  type="body"
+                  customFontName={page.siteConfig.theme?.typography?.customBodyFontName}
+                  onChange={(fontName) => {
+                    const updatedTypography = {
+                      ...(page.siteConfig.theme?.typography || {}),
+                      bodyFont: fontName
+                    };
+                    setPage({
+                      ...page,
+                      siteConfig: {
+                        ...page.siteConfig,
+                        theme: {
+                          ...(page.siteConfig.theme || {}),
+                          typography: updatedTypography
                         }
-                      });
-                      setHasUnsavedChanges(true);
-                    }}
-                    className="w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-700 outline-none text-white transition-colors cursor-pointer"
-                  >
-                    {[
-                      'Inter',
-                      'Roboto',
-                      'Plus Jakarta Sans',
-                      'Open Sans',
-                      'Lora'
-                    ].map(font => (
-                      <option key={font} value={font}>{font}</option>
-                    ))}
-                  </select>
-                </div>
+                      }
+                    });
+                    setHasUnsavedChanges(true);
+                  }}
+                  onOpenCustomFontModal={() => {
+                    setCustomFontTarget('body');
+                    setIsCustomFontModalOpen(true);
+                  }}
+                />
 
-                {/* Seção 3: Logotipo e Favicon */}
+                {/* Custom uploaded font badges if present */}
+                {(page.siteConfig.theme?.typography?.customHeadingFontName || page.siteConfig.theme?.typography?.customBodyFontName) && (
+                  <div className="space-y-2 bg-zinc-900/30 p-3 rounded-xl border border-white/5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fontes Personalizadas Ativas</span>
+                    {page.siteConfig.theme?.typography?.customHeadingFontName && (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-white/10 text-xs text-white">
+                        <span>📌 Títulos: <strong>{page.siteConfig.theme.typography.customHeadingFontName}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedTypography = {
+                              ...(page.siteConfig.theme?.typography || {}),
+                              customHeadingFontUrl: undefined,
+                              customHeadingFontName: undefined,
+                              headingFont: 'Playfair Display'
+                            };
+                            setPage({ ...page, siteConfig: { ...page.siteConfig, theme: { ...(page.siteConfig.theme || {}), typography: updatedTypography } } });
+                            setHasUnsavedChanges(true);
+                          }}
+                          className="text-[9px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    )}
+                    {page.siteConfig.theme?.typography?.customBodyFontName && (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900 border border-white/10 text-xs text-white">
+                        <span>📄 Textos: <strong>{page.siteConfig.theme.typography.customBodyFontName}</strong></span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedTypography = {
+                              ...(page.siteConfig.theme?.typography || {}),
+                              customBodyFontUrl: undefined,
+                              customBodyFontName: undefined,
+                              bodyFont: 'Inter'
+                            };
+                            setPage({ ...page, siteConfig: { ...page.siteConfig, theme: { ...(page.siteConfig.theme || {}), typography: updatedTypography } } });
+                            setHasUnsavedChanges(true);
+                          }}
+                          className="text-[9px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Font Live Preview Box */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Pré-visualização do Estilo das Fontes
+                  </span>
+                  <div className="p-4 rounded-xl bg-zinc-950 border border-white/10 space-y-2 select-none shadow-inner">
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Título Grande:</span>
+                      <h4 
+                        className="text-base text-white truncate"
+                        style={{
+                          fontFamily: `'${page.siteConfig.theme?.typography?.headingFont || 'Playfair Display'}', serif`,
+                          fontWeight: page.siteConfig.theme?.typography?.headingWeight || '400'
+                        }}
+                      >
+                        {page.title || 'Dra. Geovanna Santos'}
+                      </h4>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-slate-500 font-semibold block uppercase">Parágrafo do Site:</span>
+                      <p 
+                        className="text-xs text-slate-300 leading-relaxed font-light"
+                        style={{
+                          fontFamily: `'${page.siteConfig.theme?.typography?.bodyFont || 'Inter'}', sans-serif`
+                        }}
+                      >
+                        Um espaço acolhedor e ético focado no seu bem-estar emocional.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+                {/* Seção 3: Identidade Visual */}
                 <div className="space-y-4 border-t border-white/5 pt-4">
-                  <span className="text-[10px] font-bold text-[#CC8667] uppercase tracking-wider block">🖼️ Identidade Visual</span>
+                  <span className="text-[10px] font-bold text-[var(--brand-gradient-start)] uppercase tracking-wider block">🖼️ Identidade Visual</span>
 
                   {/* Logotipo */}
                   <ImageUploader
@@ -4317,7 +4784,7 @@ export default function PageEditor({ params }: PageProps) {
                         ...page,
                         siteConfig: {
                           ...page.siteConfig,
-                          logoUrl: url
+                          logoUrl: url,
                         }
                       });
                       setHasUnsavedChanges(true);
@@ -4341,7 +4808,7 @@ export default function PageEditor({ params }: PageProps) {
                         ...page,
                         siteConfig: {
                           ...page.siteConfig,
-                          faviconUrl: url
+                          faviconUrl: url,
                         }
                       });
                       setHasUnsavedChanges(true);
@@ -4355,14 +4822,13 @@ export default function PageEditor({ params }: PageProps) {
                     allowTransparency={true}
                   />
                 </div>
-              </div>
             </div>
           )}
 
           {/* TAB 3: CONFIGURATIONS & SEO */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Configurações Gerais</h3>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pb-2">Configurações Gerais & SEO</h3>
               
               <div className="space-y-4">
                 <div className="flex items-center justify-between bg-zinc-900/40 p-4 rounded-xl border border-white/5">
@@ -4384,56 +4850,164 @@ export default function PageEditor({ params }: PageProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Título de Visualização</label>
+                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Nome da Psicóloga / Título da Página</label>
                   <Input
                     type="text"
                     className="brand-input"
+                    placeholder="Ex: Dra. Geovanna Santos"
                     value={page.title}
-                    onChange={(e) => setPage({ ...page, title: e.target.value })}
+                    onChange={(e) => {
+                      const newTitle = e.target.value;
+                      setPage({
+                        ...page,
+                        title: newTitle,
+                        siteConfig: {
+                          ...page.siteConfig,
+                          professional: {
+                            ...page.siteConfig.professional,
+                            name: newTitle,
+                          },
+                          logoConfig: {
+                            ...page.siteConfig.logoConfig,
+                            text: newTitle,
+                          }
+                        }
+                      });
+                      setHasUnsavedChanges(true);
+                    }}
                   />
+                  <p className="text-[10px] text-slate-500">
+                    O nome definido aqui é exibido nos títulos do site, no logotipo e na aba do navegador.
+                  </p>
                 </div>
+
                 <div className="space-y-1">
                   <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Slug da URL</label>
                   <Input
                     type="text"
                     className="brand-input"
                     value={page.slug}
-                    onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    onChange={(e) => {
+                      setPage({ ...page, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
+                      setHasUnsavedChanges(true);
+                    }}
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Domínio de Acesso (Custom Domain)</label>
-                  <Input
-                    type="text"
-                    className="brand-input text-xs"
-                    placeholder="terapia.geovannabastos.com.br"
-                    value={page.customDomain || ''}
-                    onChange={(e) => setPage({ ...page, customDomain: e.target.value || null })}
-                  />
-                  <p className="text-[10px] text-slate-500 pt-0.5 leading-relaxed">
-                    Aponte o registro CNAME deste domínio para <code className="font-mono text-slate-300">custom.psiapp.com.br</code> no seu provedor de DNS.
+
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Domínio de Acesso (Custom Domain)</label>
+                    {cfStatus === 'active' && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                        🟢 SSL Válido
+                      </span>
+                    )}
+                    {cfStatus && cfStatus !== 'active' && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                        🟡 Pendente DNS
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      className="brand-input text-xs font-mono"
+                      placeholder="terapia.geovannabastos.com.br"
+                      value={page.customDomain || ''}
+                      onChange={(e) => {
+                        setPage({ ...page, customDomain: e.target.value || null });
+                        setHasUnsavedChanges(true);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={cfVerifying || !page.customDomain}
+                      onClick={async () => {
+                        if (!page.customDomain) return;
+                        setCfVerifying(true);
+                        try {
+                          const res = await api.registerCustomHostname(page.id, page.customDomain);
+                          if (res.dnsRecords) setCfDnsRecords(res.dnsRecords);
+                          if (res.status) setCfStatus(res.status);
+                        } catch (err: any) {
+                          alert(err.message || 'Erro ao registrar domínio no Cloudflare.');
+                        } finally {
+                          setCfVerifying(false);
+                        }
+                      }}
+                      className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors disabled:opacity-50"
+                    >
+                      {cfVerifying ? 'Verificando...' : 'Verificar DNS'}
+                    </button>
+                  </div>
+
+                  {cfDnsRecords.length > 0 && (
+                    <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2 text-xs font-mono">
+                      <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400">
+                        📋 Registros DNS para inclusão no seu provedor:
+                      </p>
+                      {cfDnsRecords.map((rec, i) => (
+                        <div key={i} className="p-2 rounded bg-zinc-900 border border-white/5 space-y-1">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span className="font-bold text-indigo-400">{rec.type}</span>
+                            <span>{rec.description}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-slate-200">
+                            <span className="truncate"><strong>Host:</strong> {rec.name}</span>
+                            <span className="truncate text-slate-400"><strong>Valor:</strong> {rec.value}</span>
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard.writeText(rec.value)}
+                              className="px-1.5 py-0.5 rounded bg-zinc-800 text-[9px] text-slate-300 font-sans cursor-pointer"
+                            >
+                              Copiar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Ao utilizar um domínio próprio, o certificado SSL de alta segurança é provisionado automaticamente pela infraestrutura de borda do Cloudflare.
                   </p>
                 </div>
 
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pt-4 pb-2">SEO & Metadados</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pt-4 pb-2">🔍 SEO & Mecanismos de Busca</h3>
                 
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Meta Title</label>
+                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Título no Google (Meta Title)</label>
                   <Input
                     type="text"
                     className="brand-input"
+                    placeholder={`${page.title || 'Dra. Geovanna Santos'} | Atendimento Psicológico`}
                     value={page.seoConfig.metaTitle || ''}
-                    onChange={(e) => setPage({ ...page, seoConfig: { ...page.seoConfig, metaTitle: e.target.value } })}
+                    onChange={(e) => {
+                      setPage({ ...page, seoConfig: { ...page.seoConfig, metaTitle: e.target.value } });
+                      setHasUnsavedChanges(true);
+                    }}
                   />
+                  <p className="text-[10px] text-slate-500">
+                    Título que aparece nos resultados de busca do Google e ao compartilhar o link no WhatsApp.
+                  </p>
                 </div>
+
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Meta Description</label>
+                  <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Descrição no Google (Meta Description)</label>
                   <textarea
                     rows={3}
-                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[#CC8667] outline-none text-white transition-colors resize-none"
+                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start)] outline-none text-white transition-colors resize-none"
+                    placeholder={`Agende sua consulta de psicologia com ${page.title || 'Dra. Geovanna Santos'}.`}
                     value={page.seoConfig.metaDescription || ''}
-                    onChange={(e) => setPage({ ...page, seoConfig: { ...page.seoConfig, metaDescription: e.target.value } })}
+                    onChange={(e) => {
+                      setPage({ ...page, seoConfig: { ...page.seoConfig, metaDescription: e.target.value } });
+                      setHasUnsavedChanges(true);
+                    }}
                   />
+                  <p className="text-[10px] text-slate-500">
+                    Resumo do site exibido logo abaixo do título nas pesquisas do Google.
+                  </p>
                 </div>
 
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/5 pt-4 pb-2">Redirecionamento Pós-Triagem</h3>
@@ -4442,7 +5016,7 @@ export default function PageEditor({ params }: PageProps) {
                   <label className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mensagem Padrão Whatsapp</label>
                   <textarea
                     rows={3}
-                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[#CC8667] outline-none text-white transition-colors resize-none"
+                    className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start)] outline-none text-white transition-colors resize-none"
                     placeholder="Olá, preenchi a triagem pelo site. Meu nome é {{nome}}."
                     value={page.formFlow.settings?.whatsappMessageTemplate || ''}
                     onChange={(e) => {
@@ -4454,6 +5028,27 @@ export default function PageEditor({ params }: PageProps) {
                     Você pode usar o marcador <code className="text-slate-350 font-bold">{"{{nome}}"}</code> para inserir dinamicamente a resposta digitada pelo paciente.
                   </p>
                 </div>
+
+                {/* Danger Zone: Delete Page */}
+                <div className="pt-6 border-t border-red-500/20 space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir esta Página
+                    </span>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Esta ação exclui permanentemente esta página de captação e todas as suas configurações de forma irreversível.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModalOpen(true)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 text-red-400 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Excluir Página Definitivamente</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -4463,10 +5058,10 @@ export default function PageEditor({ params }: PageProps) {
         {!sidebarCollapsed && (
           <div 
             onMouseDown={startResizing}
-            className="w-2 hover:w-3 cursor-col-resize bg-zinc-950 border-x border-white/[0.04] hover:border-[#CC8667]/20 active:border-[#CC8667]/40 transition-all self-stretch h-full shrink-0 select-none relative group flex items-center justify-center"
+            className="w-2 hover:w-3 cursor-col-resize bg-zinc-950 border-x border-white/[0.04] hover:border-[var(--brand-gradient-start)]/20 active:border-[var(--brand-gradient-start)]/40 transition-all self-stretch h-full shrink-0 select-none relative group flex items-center justify-center"
           >
             {/* Visual pill indicator */}
-            <div className="w-[2px] h-10 bg-white/8 group-hover:bg-[#CC8667]/60 group-active:bg-[#CC8667] rounded-full transition-colors" />
+            <div className="w-[2px] h-10 bg-white/8 group-hover:bg-[var(--brand-gradient-start)]/60 group-active:bg-[var(--brand-gradient-start)] rounded-full transition-colors" />
           </div>
         )}
 
@@ -4493,7 +5088,7 @@ export default function PageEditor({ params }: PageProps) {
               <div className="h-10 border-b border-white/5 bg-[#121215] flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase flex items-center gap-1.5">
-                    <Eye className="h-3 w-3 text-[#CC8667]" />
+                    <Eye className="h-3 w-3 text-[var(--brand-gradient-start)]" />
                     Visualização
                   </span>
                   {tenant && (
@@ -4619,14 +5214,124 @@ export default function PageEditor({ params }: PageProps) {
             </div>
           )}
         </div>
-        
-
       </div>
+
+      {/* Custom Font Upload Modal Popup */}
+      <BrandModal
+        isOpen={isCustomFontModalOpen}
+        onClose={() => setIsCustomFontModalOpen(false)}
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4 text-left p-1">
+          <div className="flex items-center gap-2.5 border-b border-white/5 pb-3">
+            <div className="p-2 rounded-lg bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)]">
+              <Upload className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Subir Fonte Personalizada</h3>
+              <p className="text-[10px] text-slate-400">Envie arquivos de fonte própria (.ttf ou .otf) para o seu site</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-300 block">
+                Onde você deseja aplicar essa fonte?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomFontTarget('heading')}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                    customFontTarget === 'heading'
+                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-white shadow-md'
+                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xs font-bold block">📌 Títulos Grandes</span>
+                  <span className="text-[10px] leading-tight opacity-80">Aplica nos títulos e cabeçalhos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomFontTarget('body')}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                    customFontTarget === 'body'
+                      ? 'bg-[var(--brand-gradient-start)]/15 border-[var(--brand-gradient-start)] text-white shadow-md'
+                      : 'bg-zinc-900 border-white/10 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xs font-bold block">📄 Parágrafos e Textos</span>
+                  <span className="text-[10px] leading-tight opacity-80">Aplica nos textos e descrições</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/5">
+              <input
+                type="file"
+                id="custom-font-file-input"
+                className="hidden"
+                accept=".woff2,.woff,.ttf,.otf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadCustomFont(file);
+                }}
+              />
+
+              <button
+                type="button"
+                disabled={fontUploading}
+                onClick={() => document.getElementById('custom-font-file-input')?.click()}
+                className="w-full py-3 px-4 rounded-xl bg-zinc-900 border border-white/15 hover:border-[var(--brand-gradient-start)] text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+              >
+                {fontUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-[var(--brand-gradient-start)]" />
+                    <span>Validando e enviando arquivo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 text-[var(--brand-gradient-start)]" />
+                    <span>Selecionar Arquivo de Fonte (.ttf / .otf)</span>
+                  </>
+                )}
+              </button>
+              <p className="text-[10px] text-slate-500 text-center">
+                Formatos aceitos: TrueType (.ttf), OpenType (.otf), WOFF e WOFF2 (Máximo 5MB).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-3 border-t border-white/5">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsCustomFontModalOpen(false)}
+              className="text-xs h-9 px-4 cursor-pointer"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </BrandModal>
+
+      {/* Delete Page Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDeleteCurrentPage}
+        title="Excluir Página de Captação"
+        description={`Tem certeza que deseja excluir permanentemente a página "${page?.title || ''}"? Esta ação é irreversível.`}
+        confirmText={deleting ? "Excluindo..." : "Excluir Definitivamente"}
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
     </div>
   );
 }
 
 // Simple fallback spinner for component loader since loading states are handled cleanly
 const LoadingSpinner = () => (
-  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#CC8667]" />
+  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--brand-gradient-start)]" />
 );

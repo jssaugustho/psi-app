@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api, Tenant, TenantMember } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, Select, SelectWithHelper } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, Select, SelectWithHelper, ConfirmModal } from '@psi/ui';
 import { Mail, Shield, User, X, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function MembrosPage() {
@@ -113,9 +113,10 @@ export default function MembrosPage() {
     }
   };
 
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name?: string } | null>(null);
+
   // Remove member
   const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Deseja realmente remover este membro do tenant?')) return;
     setError('');
     setSuccess('');
     try {
@@ -501,20 +502,12 @@ export default function MembrosPage() {
               </Button>
               
               <button
-                onClick={async () => {
-                  const isPending = selectedMember.profile?.nome === 'Colaborador' && !selectedMember.profile?.sobrenome;
-                  const confirmText = isPending
-                    ? 'Deseja realmente cancelar este convite? O acesso do colaborador será revogado.'
-                    : 'Deseja realmente remover o acesso deste colaborador?';
-                  if (!confirm(confirmText)) return;
-                  
-                  try {
-                    await api.removeTenantMember(selectedMember.id);
-                    setSuccess(isPending ? 'Convite cancelado com sucesso!' : 'Membro removido da equipe!');
-                    setSelectedMember(null);
-                    await loadMembers();
-                  } catch (err: any) {
-                    setError(err.message || 'Erro ao remover colaborador da equipe.');
+                onClick={() => {
+                  if (selectedMember) {
+                    setMemberToRemove({
+                      id: selectedMember.id,
+                      name: `${selectedMember.profile?.nome || ''} ${selectedMember.profile?.sobrenome || ''}`.trim()
+                    });
                   }
                 }}
                 className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold h-10 px-4 rounded-xl border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer flex items-center justify-center font-sans"
@@ -527,6 +520,23 @@ export default function MembrosPage() {
           </Card>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!memberToRemove}
+        onClose={() => setMemberToRemove(null)}
+        onConfirm={async () => {
+          if (memberToRemove) {
+            await handleRemoveMember(memberToRemove.id);
+            setSelectedMember(null);
+            setMemberToRemove(null);
+          }
+        }}
+        title="Remover Membro da Equipe"
+        description={`Deseja realmente remover o acesso de "${memberToRemove?.name || 'este membro'}" do tenant?`}
+        confirmText="Remover"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -56,6 +56,7 @@ export const platformSettings = pgTable('platform_settings', {
   cloudflareApiToken: text('cloudflare_api_token'),
   cloudflareZoneId: text('cloudflare_zone_id'),
   cloudflareAccountId: text('cloudflare_account_id'),
+  baseDomain: text('base_domain'),
   r2BucketName: text('r2_bucket_name'),
   r2PublicDomain: text('r2_public_domain'),
   r2AccessKeyId: text('r2_access_key_id'),

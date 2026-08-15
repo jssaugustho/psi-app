@@ -33,6 +33,7 @@ interface CrmState {
   addColumnOptimistic: (name: string, tenantId: string, slug?: string, color?: string, category?: 'pendente' | 'acolhimento' | 'paciente' | 'alta' | 'negativa') => Promise<void>;
   updateColumnOptimistic: (id: string, updates: Partial<PipelineColumn>) => Promise<void>;
   deleteColumnOptimistic: (id: string) => Promise<void>;
+  reorderColumnsOptimistic: (reorderedColumns: PipelineColumn[]) => Promise<void>;
 
   // Actions das abas
   initTabs: (tenantId: string) => void;
@@ -317,6 +318,25 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     try {
       await api.deletePipelineColumn(id);
     } catch (err) {
+      set({ columns: prevColumns });
+      throw err;
+    }
+  },
+
+  reorderColumnsOptimistic: async (reorderedColumns) => {
+    const prevColumns = get().columns;
+    const updatedColumns = reorderedColumns.map((col, idx) => ({
+      ...col,
+      order: idx + 1,
+    }));
+    set({ columns: updatedColumns });
+
+    try {
+      await Promise.all(
+        updatedColumns.map((col) => api.updatePipelineColumn(col.id, { order: col.order }))
+      );
+    } catch (err) {
+      console.error('Erro ao reordenar estágios:', err);
       set({ columns: prevColumns });
       throw err;
     }

@@ -224,14 +224,9 @@ export default function StatusPage() {
 
 
 
-  if (loadingData) {
-    return <LoadingSpinner message="Carregando dados de status..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-page-enter">
-        
-        {/* Cabeçalho */}
+      {/* Cabeçalho */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold">Status da Infraestrutura</h1>
@@ -315,14 +310,12 @@ export default function StatusPage() {
 
         {/* Lista de Serviços */}
         <div className="space-y-6">
-          {loadingData && !data ? (
-            // Skeleton de Carregamento
-            [1, 2, 3, 4].map(i => (
-              <div key={i} className="h-28 rounded-2xl animate-pulse" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }} />
-            ))
-          ) : (
-            data?.currentStatus.map((service) => {
-              const history = data.history[service.serviceName] || [];
+          {loadingData && !data
+            ? [1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-28 rounded-2xl animate-pulse" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }} />
+              ))
+            : (data?.currentStatus || []).map((service) => {
+                const history = data?.history?.[service.serviceName] || [];
               const uptimePercent = history.length > 0
                 ? Math.round((history.filter(h => h.status === 'operational').length / history.length) * 100)
                 : 100;
@@ -417,9 +410,8 @@ export default function StatusPage() {
                   </div>
                 </Card>
               );
-            })
-          )}
-        </div>
-      </div>
+            })}
+          </div>
+    </div>
   );
 }

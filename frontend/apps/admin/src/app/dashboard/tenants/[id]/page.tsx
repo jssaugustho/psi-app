@@ -386,12 +386,12 @@ export default function TenantBrandingPage() {
 
 
 
-  if (loading) {
-    return <LoadingSpinner message="Carregando dados do tenant..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
+      {loading ? (
+        <LoadingSpinner message="Carregando dados do tenant..." className="min-h-[50vh]" />
+      ) : (
+        <>
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link
@@ -868,6 +868,8 @@ export default function TenantBrandingPage() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

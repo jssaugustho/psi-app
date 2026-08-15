@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBrand } from '@/context/BrandContext';
 import { api, EmailCampaign } from '@/lib/api';
-import { Card } from '@psi/ui';
+import { Card, ConfirmModal } from '@psi/ui';
 import {
   Send,
   Plus,
@@ -125,12 +125,14 @@ export default function EmailPage() {
     }
   };
 
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'send' | 'delete';
+    campaign: EmailCampaign;
+  } | null>(null);
+
   // Enviar campanha
   const handleSendCampaign = async (campaign: EmailCampaign) => {
-    if (!confirm('Deseja enviar esta campanha agora para todos os contatos do CRM?')) return;
-
     try {
-      // 1. Atualiza localmente
       setCampaigns((prev) =>
         prev.map((c) => (c.id === campaign.id ? { ...c, status: 'sent', sent_at: new Date().toISOString() } : c))
       );
@@ -138,29 +140,23 @@ export default function EmailPage() {
         setSelectedCampaign({ ...selectedCampaign, status: 'sent', sent_at: new Date().toISOString() });
       }
 
-      // 2. Salva status de envio no banco
       await api.updateEmailCampaign(campaign.id, {
         status: 'sent',
         sent_at: new Date().toISOString(),
       });
-
-      alert('Campanha enviada com sucesso para a fila de e-mails!');
     } catch (err) {
-      alert('Erro ao enviar campanha.');
-      loadCampaigns(); // recarrega em caso de erro
+      loadCampaigns();
     }
   };
 
   // Deletar campanha
   const handleDeleteCampaign = async (id: string) => {
-    if (!confirm('Deseja excluir esta campanha permanentemente?')) return;
-
     try {
       await api.deleteEmailCampaign(id);
       setCampaigns((prev) => prev.filter((c) => c.id !== id));
       setSelectedCampaign(null);
     } catch (err) {
-      alert('Erro ao deletar campanha.');
+      console.error(err);
     }
   };
 
@@ -459,8 +455,8 @@ export default function EmailPage() {
             {/* Footer */}
             <div className="p-6 border-t border-[var(--surface-border)] flex items-center justify-between bg-slate-950/5 dark:bg-slate-950/20">
               <button
-                onClick={() => handleDeleteCampaign(selectedCampaign.id)}
-                className="text-xs text-red-500 hover:text-red-400 transition-colors flex items-center gap-1"
+                onClick={() => setConfirmAction({ type: 'delete', campaign: selectedCampaign })}
+                className="text-xs text-red-500 hover:text-red-400 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Excluir Rascunho
               </button>
@@ -468,14 +464,14 @@ export default function EmailPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedCampaign(null)}
-                  className="glass-sm px-4 py-2 text-xs text-slate-300 rounded-xl hover:bg-white/5 active:scale-95 transition-all"
+                  className="glass-sm px-4 py-2 text-xs text-slate-300 rounded-xl hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
                 >
                   Fechar
                 </button>
                 {selectedCampaign.status === 'draft' && (
                   <button
-                    onClick={() => handleSendCampaign(selectedCampaign)}
-                    className="px-4 py-2 text-xs font-bold text-white rounded-xl shadow-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all flex items-center gap-1"
+                    onClick={() => setConfirmAction({ type: 'send', campaign: selectedCampaign })}
+                    className="px-4 py-2 text-xs font-bold text-white rounded-xl shadow-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
                   >
                     <Send className="w-3.5 h-3.5" /> Disparar E-mails
                   </button>
@@ -566,6 +562,31 @@ export default function EmailPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação */}
+      <ConfirmModal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={async () => {
+          if (confirmAction) {
+            if (confirmAction.type === 'send') {
+              await handleSendCampaign(confirmAction.campaign);
+            } else {
+              await handleDeleteCampaign(confirmAction.campaign.id);
+            }
+            setConfirmAction(null);
+          }
+        }}
+        title={confirmAction?.type === 'send' ? 'Enviar Campanha' : 'Excluir Campanha'}
+        description={
+          confirmAction?.type === 'send'
+            ? `Deseja enviar a campanha "${confirmAction.campaign.title}" agora para todos os contatos do CRM?`
+            : `Deseja excluir a campanha "${confirmAction?.campaign.title || ''}" permanentemente?`
+        }
+        confirmText={confirmAction?.type === 'send' ? 'Enviar Agora' : 'Excluir'}
+        cancelText="Cancelar"
+        variant={confirmAction?.type === 'send' ? 'info' : 'danger'}
+      />
     </div>
   );
 }

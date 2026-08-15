@@ -29,11 +29,11 @@ export default function AdminDashboardPage() {
     loadPlatformStatus();
   }, [loadPlatformStatus]);
 
+  const primaryTenant = brandTenant || platformStatus?.primary_tenant;
+
   if (loadingStatus || !platformStatus) {
     return <LoadingSpinner message="Carregando dados do painel..." className="min-h-[50vh]" />;
   }
-
-  const primaryTenant = brandTenant || platformStatus?.primary_tenant;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-page-enter">

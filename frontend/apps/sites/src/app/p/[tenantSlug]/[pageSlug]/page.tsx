@@ -1,5 +1,6 @@
 import React from 'react'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import { getCapturePageBySlugs, getContractTemplateContent } from '../../../../lib/api'
 import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
 
@@ -13,6 +14,46 @@ interface PageProps {
   searchParams: Promise<{
     preview?: string;
   }>;
+}
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const { tenantSlug, pageSlug } = await params
+  const { preview } = await searchParams
+  const isPreview = preview === 'true'
+
+  const pageData = await getCapturePageBySlugs(tenantSlug, pageSlug, isPreview)
+  if (!pageData) return {}
+
+  const title = isPreview ? (pageData.title_draft || pageData.title) : pageData.title
+  const siteConfig = isPreview ? (pageData.site_config_draft || pageData.site_config) : pageData.site_config
+  const seoConfig = isPreview ? (pageData.seo_config_draft || pageData.seo_config) : pageData.seo_config
+
+  const metaTitle = seoConfig?.metaTitle || `${title} | Atendimento Psicológico`
+  const metaDescription = seoConfig?.metaDescription || `Agende sua consulta de psicologia com ${title}.`
+  const faviconUrl = siteConfig?.faviconUrl
+  const logoUrl = siteConfig?.logoUrl
+
+  return {
+    title: metaTitle,
+    description: metaDescription,
+    icons: faviconUrl ? {
+      icon: faviconUrl,
+      shortcut: faviconUrl,
+      apple: faviconUrl,
+    } : undefined,
+    openGraph: {
+      title: metaTitle,
+      description: metaDescription,
+      type: 'website',
+      images: logoUrl ? [{ url: logoUrl }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: metaTitle,
+      description: metaDescription,
+      images: logoUrl ? [logoUrl] : [],
+    },
+  }
 }
 
 export default async function TestCapturePage({ params, searchParams }: PageProps) {

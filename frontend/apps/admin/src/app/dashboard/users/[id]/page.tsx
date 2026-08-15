@@ -320,12 +320,12 @@ export default function UserDetailPage({ params }: PageProps) {
 
 
 
-  if (loadingProfile) {
-    return <LoadingSpinner message="Carregando dados do usuário..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-page-enter">
+      {loadingProfile ? (
+        <LoadingSpinner message="Carregando dados do usuário..." className="min-h-[50vh]" />
+      ) : (
+        <>
         {/* Back and Page Header */}
         <div className="space-y-4">
           <Link
@@ -611,6 +611,8 @@ export default function UserDetailPage({ params }: PageProps) {
           onClose={() => setSelectedLog(null)}
           onResendSuccess={handleResendSuccessInPreview}
         />
+      )}
+      </>
       )}
     </div>
   );

@@ -224,7 +224,6 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
       await doRefresh();
       return fetchApi<T>(endpoint, options, true); // retry com novo token
     } catch {
-      // Refresh falhou → dispara evento de logout para o AuthProvider
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('auth:logout'));
       }
@@ -232,7 +231,17 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     }
   }
 
-  const data = await response.json();
+  // Handle empty response body (204 No Content or 0-byte content length)
+  const contentType = response.headers.get('content-type');
+  const text = await response.text();
+  let data: any = {};
+  if (text) {
+    try {
+      data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+    } catch {
+      data = { message: text };
+    }
+  }
 
   if (!response.ok) {
     throw new Error(data.message || data.error || 'Erro na requisição');
@@ -669,6 +678,7 @@ export const api = {
     title: string;
     slug: string;
     tenantId?: string;
+    customDomain?: string;
     crp?: string;
     approach?: string;
     address?: string;
@@ -676,6 +686,16 @@ export const api = {
     titlePart2?: string;
     description?: string;
     whatsappMessageTemplate?: string;
+    logoText?: string;
+    primaryStart?: string;
+    primaryEnd?: string;
+    contrast?: string;
+    logoUrl?: string;
+    faviconUrl?: string;
+    seoConfig?: { metaTitle?: string; metaDescription?: string; keywords?: string };
+    siteConfig?: any;
+    dictionary?: any;
+    formFlow?: any;
   }): Promise<{ success: boolean; page: CapturePage }> => {
     const res = await fetchApi<{ success: boolean; page: any }>('/crm/captacao', {
       method: 'POST',
@@ -816,6 +836,45 @@ export const api = {
     await fetchApi(`${PGRST_BASE_URL}/contract_templates?id=eq.${id}`, {
       method: 'DELETE'
     });
+  },
+
+  getPlatformSetupStatus: async (): Promise<{ base_domain: string | null }> => {
+    return fetchApi<{ base_domain: string | null }>('/platform/setup/status');
+  },
+
+  checkSubdomainAvailability: async (slug: string): Promise<{ available: boolean; slug: string; fullUrl: string; reason: string }> => {
+    return fetchApi<{ available: boolean; slug: string; fullUrl: string; reason: string }>(
+      `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}`
+    );
+  },
+
+  registerCustomHostname: async (pageId: string | null, domain: string): Promise<{
+    success: boolean;
+    status: string;
+    hostname: string;
+    hostnameId?: string;
+    cnameTarget: string;
+    dnsRecords: Array<{ type: string; name: string; value: string; description: string }>;
+  }> => {
+    return fetchApi('/crm/captacao/custom-hostname/register', {
+      method: 'POST',
+      body: JSON.stringify({ pageId, domain }),
+    });
+  },
+
+  verifyCustomHostname: async (domain: string, hostnameId?: string): Promise<{
+    success: boolean;
+    status: string;
+    sslStatus?: string;
+    sslActive: boolean;
+    hostname: string;
+    hostnameId?: string;
+    cnameTarget: string;
+  }> => {
+    return fetchApi('/crm/captacao/custom-hostname/verify', {
+      method: 'POST',
+      body: JSON.stringify({ domain, hostnameId }),
+    });
   }
 };
 
@@ -826,6 +885,13 @@ export interface CapturePage {
   slug: string;
   isActive: boolean;
   customDomain: string | null;
+  crp?: string;
+  logoText?: string;
+  primaryStart?: string;
+  primaryEnd?: string;
+  contrast?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
   seoConfig: {
     metaTitle: string;
     metaDescription: string;

@@ -18,6 +18,10 @@ const CreatePageBodySchema = z.object({
   titlePart2: z.string().optional(),
   description: z.string().optional(),
   whatsappMessageTemplate: z.string().optional(),
+  logoText: z.string().optional(),
+  primaryStart: z.string().optional(),
+  primaryEnd: z.string().optional(),
+  contrast: z.string().optional(),
 });
 
 const SubmitFormBodySchema = z.object({
@@ -226,7 +230,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
       try {
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-        const { title, slug, tenantId, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate } = request.body;
+        const { title, slug, tenantId, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast } = request.body;
 
         // 1. Resolver tenant e verificar permissão
         const targetTenant = await db.query.tenants.findFirst({
@@ -275,8 +279,21 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
         const customSiteConfig = {
           ...defaultSiteConfig,
+          theme: {
+            colors: {
+              primaryStart: primaryStart || '#CC8667',
+              primaryEnd: primaryEnd || '#AA5533',
+              contrast: contrast || '#FFFFFF',
+            },
+          },
+          logoConfig: {
+            mode: 'html',
+            text: logoText || targetTenant.name || title,
+            iconType: 'psi',
+          },
           professional: {
             ...defaultSiteConfig.professional,
+            name: logoText || targetTenant.name || title,
             crp: crp || defaultSiteConfig.professional.crp,
             approach: approach || defaultSiteConfig.professional.approach,
             address: address || defaultSiteConfig.professional.address,
@@ -427,6 +444,287 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           error: 'Erro interno',
           message: err.message || 'Falha ao processar o envio da triagem.',
         });
+      }
+    }
+  );
+
+  // GET /v1/crm/captacao/check-subdomain?slug=...
+  // Verifica se um subdomínio (slug) está livre para uso
+  fastify.get(
+    '/check-subdomain',
+    async (request, reply) => {
+      try {
+        const querySlug = (request.query as any)?.slug;
+        if (!querySlug || typeof querySlug !== 'string') {
+          return reply.status(400).send({ error: 'Bad Request', message: 'Slug é obrigatório.' });
+        }
+
+        const normalizedSlug = querySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+        if (normalizedSlug.length < 2) {
+          return reply.send({ available: false, reason: 'Slug muito curto (mínimo 2 caracteres).' });
+        }
+
+        // 1. Checar se já existe em algum tenant
+        const existingTenant = await db.query.tenants.findFirst({
+          where: eq(tenants.slug, normalizedSlug),
+        });
+
+        // 2. Checar se já existe em alguma página de captação
+        const existingPage = await db.query.capturePages.findFirst({
+          where: eq(capturePages.slug, normalizedSlug),
+        });
+
+        const isAvailable = !existingTenant && !existingPage;
+
+        const platformSet = await db.query.platformSettings.findFirst();
+        const baseDomain = platformSet?.baseDomain || 'psiapp.com.br';
+
+        return reply.send({
+          available: isAvailable,
+          slug: normalizedSlug,
+          fullUrl: `https://${normalizedSlug}.${baseDomain}`,
+          reason: isAvailable ? 'Subdomínio disponível!' : 'Subdomínio já em uso por outro usuário.',
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // POST /v1/crm/captacao/custom-hostname/register
+  // Registra um domínio próprio no Cloudflare Custom Hostnames
+  fastify.post(
+    '/custom-hostname/register',
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        verifyUserJwt(authHeader.split(' ')[1]);
+
+        const body: any = request.body || {};
+        const { pageId, domain } = body;
+
+        if (!domain || typeof domain !== 'string') {
+          return reply.status(400).send({ error: 'Bad Request', message: 'Domínio é obrigatório.' });
+        }
+
+        const cleanDomain = domain
+          .trim()
+          .toLowerCase()
+          .replace(/^https?:\/\//, '')
+          .replace(/\/.*$/, '');
+
+        const settings = await db.query.platformSettings.findFirst();
+        const baseDomain = settings?.baseDomain || 'psiapp.com.br';
+        const cnameTarget = `custom.${baseDomain}`;
+
+        // Atualizar rascunho da página se pageId fornecido
+        if (pageId) {
+          await db
+            .update(capturePages)
+            .set({ customDomainDraft: cleanDomain, updatedAt: new Date() })
+            .where(eq(capturePages.id, pageId));
+        }
+
+        // Se não houver credenciais do Cloudflare configuradas no admin, retornar instruções estáticas de CNAME
+        if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
+          return reply.send({
+            success: true,
+            status: 'pending_validation',
+            hostname: cleanDomain,
+            cnameTarget,
+            dnsRecords: [
+              {
+                type: 'CNAME',
+                name: cleanDomain.includes('.') ? cleanDomain.split('.')[0] : '@',
+                value: cnameTarget,
+                description: 'Apontamento principal do seu domínio no seu provedor de DNS',
+              },
+            ],
+            message: 'Domínio salvo! Complete o apontamento CNAME no seu provedor de DNS.',
+          });
+        }
+
+        const token = settings.cloudflareApiToken;
+        const zoneId = settings.cloudflareZoneId;
+
+        // 1. Tentar criar o Custom Hostname no Cloudflare API
+        let cfResult: any = null;
+        let cfStatus = 'pending_validation';
+        let hostnameId = null;
+
+        const createRes = await fetch(
+          `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              hostname: cleanDomain,
+              ssl: {
+                method: 'http',
+                type: 'dv',
+              },
+            }),
+          }
+        );
+
+        const createData: any = await createRes.json().catch(() => ({}));
+
+        if (createRes.ok && createData.result) {
+          cfResult = createData.result;
+        } else {
+          // Se já existe ou deu erro 1406, buscar o Custom Hostname existente por hostname
+          const listRes = await fetch(
+            `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${cleanDomain}`,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          const listData: any = await listRes.json().catch(() => ({}));
+          if (listData.result && listData.result.length > 0) {
+            cfResult = listData.result[0];
+          }
+        }
+
+        const dnsRecords: Array<{ type: string; name: string; value: string; description: string }> = [
+          {
+            type: 'CNAME',
+            name: cleanDomain.includes('.') ? cleanDomain.split('.')[0] : '@',
+            value: cnameTarget,
+            description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma',
+          },
+        ];
+
+        if (cfResult) {
+          hostnameId = cfResult.id;
+          cfStatus = cfResult.status || 'pending_validation';
+
+          // Registro de propriedade (Ownership Verification)
+          if (cfResult.ownership_verification) {
+            dnsRecords.push({
+              type: (cfResult.ownership_verification.type || 'TXT').toUpperCase(),
+              name: cfResult.ownership_verification.name || `_cf-custom-hostname.${cleanDomain}`,
+              value: cfResult.ownership_verification.value,
+              description: 'Validação de propriedade do domínio junto ao Cloudflare',
+            });
+          }
+
+          // Registros de Validação SSL (DCV)
+          if (cfResult.ssl && cfResult.ssl.validation_records && Array.isArray(cfResult.ssl.validation_records)) {
+            cfResult.ssl.validation_records.forEach((rec: any) => {
+              if (rec.txt_name && rec.txt_value) {
+                dnsRecords.push({
+                  type: 'TXT',
+                  name: rec.txt_name,
+                  value: rec.txt_value,
+                  description: 'Validação de emissão do certificado SSL de segurança',
+                });
+              }
+            });
+          }
+        }
+
+        return reply.send({
+          success: true,
+          status: cfStatus,
+          hostname: cleanDomain,
+          hostnameId,
+          cnameTarget,
+          dnsRecords,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // POST /v1/crm/captacao/custom-hostname/verify
+  // Revalida o status do Custom Hostname no Cloudflare
+  fastify.post(
+    '/custom-hostname/verify',
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        verifyUserJwt(authHeader.split(' ')[1]);
+
+        const body: any = request.body || {};
+        const { domain } = body;
+
+        if (!domain || typeof domain !== 'string') {
+          return reply.status(400).send({ error: 'Bad Request', message: 'Domínio é obrigatório.' });
+        }
+
+        const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        const settings = await db.query.platformSettings.findFirst();
+        const baseDomain = settings?.baseDomain || 'psiapp.com.br';
+        const cnameTarget = `custom.${baseDomain}`;
+
+        if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
+          return reply.send({
+            success: true,
+            status: 'pending_validation',
+            hostname: cleanDomain,
+            cnameTarget,
+            sslActive: false,
+            message: 'Cloudflare não configurado no painel admin. Verificação concluída manualmente.',
+          });
+        }
+
+        const token = settings.cloudflareApiToken;
+        const zoneId = settings.cloudflareZoneId;
+
+        const listRes = await fetch(
+          `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${cleanDomain}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const listData: any = await listRes.json().catch(() => ({}));
+        const cfResult = listData.result && listData.result.length > 0 ? listData.result[0] : null;
+
+        if (!cfResult) {
+          return reply.send({
+            success: true,
+            status: 'not_found',
+            hostname: cleanDomain,
+            cnameTarget,
+            sslActive: false,
+          });
+        }
+
+        const sslActive = cfResult.ssl?.status === 'active' || cfResult.status === 'active';
+
+        return reply.send({
+          success: true,
+          status: cfResult.status,
+          sslStatus: cfResult.ssl?.status,
+          sslActive,
+          hostname: cleanDomain,
+          hostnameId: cfResult.id,
+          cnameTarget,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
   );

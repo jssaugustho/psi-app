@@ -37,11 +37,40 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [selectedAsset, setSelectedAsset] = useState<{ id: string; name: string } | null>(null);
 
+  const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
+
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   const frameW = 280;
   const frameH = 280; // 1:1 Ratio for profile avatar
+
+  useEffect(() => {
+    if (cropImageSrc) {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.src = cropImageSrc;
+      img.onload = () => {
+        setImgDimensions({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+      };
+    } else {
+      setImgDimensions(null);
+    }
+  }, [cropImageSrc]);
+
+  let baseW = frameW;
+  let baseH = frameH;
+
+  if (imgDimensions) {
+    const imgRatio = imgDimensions.width / imgDimensions.height;
+    if (imgRatio > 1) {
+      baseH = frameH;
+      baseW = frameH * imgRatio;
+    } else {
+      baseW = frameW;
+      baseH = frameW / imgRatio;
+    }
+  }
 
   // Inicializar formulário com dados do usuário
   useEffect(() => {
@@ -494,13 +523,11 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
               <img
                 src={cropImageSrc}
                 alt="Crop Workspace"
-                className="max-w-none origin-center pointer-events-none"
+                className="max-w-none origin-center pointer-events-none transition-transform duration-75"
                 style={{
+                  width: `${baseW}px`,
+                  height: `${baseH}px`,
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                  width: 'auto',
-                  height: 'auto',
-                  maxHeight: '100%',
-                  maxWidth: '100%'
                 }}
               />
             )}

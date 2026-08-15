@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, ContractTemplate } from '@/lib/api';
-import { Card, Button, Input, BrandModal } from '@psi/ui';
+import { Card, Button, Input, BrandModal, ConfirmModal } from '@psi/ui';
 import { FileText, Plus, Trash2, Edit, ArrowLeft, AlertCircle, Save } from 'lucide-react';
 import Link from 'next/link';
 
@@ -85,16 +85,14 @@ export default function ContratosPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o modelo de contrato "${name}"?`)) {
-      return;
-    }
+  const [templateToDelete, setTemplateToDelete] = useState<{ id: string; title: string } | null>(null);
 
+  const handleDelete = async (id: string) => {
     try {
       await api.deleteContractTemplate(id);
       setTemplates(prev => prev.filter(t => t.id !== id));
     } catch (err: any) {
-      alert('Erro ao excluir contrato: ' + err.message);
+      setError('Erro ao excluir contrato: ' + err.message);
     }
   };
 
@@ -181,7 +179,7 @@ export default function ContratosPage() {
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/5 mt-4">
                 <button
-                  onClick={() => handleDelete(tpl.id, tpl.title)}
+                  onClick={() => setTemplateToDelete({ id: tpl.id, title: tpl.title })}
                   className="p-2 rounded-xl text-red-400/70 hover:text-red-400 hover:bg-red-500/5 transition-colors cursor-pointer"
                   title="Excluir Contrato"
                 >
@@ -266,6 +264,22 @@ export default function ContratosPage() {
               </div>
             </form>
       </BrandModal>
+
+      <ConfirmModal
+        isOpen={!!templateToDelete}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={async () => {
+          if (templateToDelete) {
+            await handleDelete(templateToDelete.id);
+            setTemplateToDelete(null);
+          }
+        }}
+        title="Excluir Modelo de Contrato"
+        description={`Tem certeza que deseja excluir o modelo de contrato "${templateToDelete?.title || ''}"?`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }

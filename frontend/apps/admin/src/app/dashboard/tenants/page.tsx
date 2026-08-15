@@ -125,12 +125,12 @@ export default function TenantsPage() {
 
 
 
-  if (loadingTenants) {
-    return <LoadingSpinner message="Carregando tenants..." className="min-h-[50vh]" />;
-  }
-
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
+      {loadingTenants ? (
+        <LoadingSpinner message="Carregando tenants..." className="min-h-[50vh]" />
+      ) : (
+        <>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -348,6 +348,8 @@ export default function TenantsPage() {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

@@ -1,36 +1,23 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, CapturePage } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, BrandModal } from '@psi/ui';
-import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, X } from 'lucide-react';
+import { Card, Button, LoadingSpinner, ConfirmModal } from '@psi/ui';
+import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, Copy, Loader2 } from 'lucide-react';
 import { Link } from '@/components/Link';
 
 export default function CaptacaoPage() {
-  const { user } = useAuth();
   const { tenant } = useBrand();
   const router = useRouter();
 
   const [pages, setPages] = useState<CapturePage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Modal states for creating a new page (Step-by-step)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [newTitle, setNewTitle] = useState('');
-  const [newSlug, setNewSlug] = useState('');
-  const [newCrp, setNewCrp] = useState('');
-  const [newApproach, setNewApproach] = useState('Psicoterapia');
-  const [newAddress, setNewAddress] = useState('Atendimento Online');
-  const [newTitlePart1, setNewTitlePart1] = useState('Terapia para recuperar o seu ');
-  const [newTitlePart2, setNewTitlePart2] = useState('equilíbrio interior');
-  const [newDescription, setNewDescription] = useState('Cuidado clínico ético e acolhedor para ajudar você a superar desafios emocionais, desenvolver o autoconhecimento e viver com mais leveza.');
-  const [newWhatsappMessageTemplate, setNewWhatsappMessageTemplate] = useState('Olá, acabei de enviar minha triagem inicial no seu site. Meu nome é {{nome}}.');
-  const [submitting, setSubmitting] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [pageToDelete, setPageToDelete] = useState<{ id: string; title: string } | null>(null);
   const [verifiedDomains, setVerifiedDomains] = useState<Record<string, boolean>>({});
   const [isTenantDomainActive, setIsTenantDomainActive] = useState(false);
 
@@ -54,15 +41,14 @@ export default function CaptacaoPage() {
     }
   }, [tenant, loadPages]);
 
-  // Helper to check if a domain is active/reachable in background
+  // Helper to check if a domain is active/reachable via Cloudflare backend API
   const checkDomainActive = useCallback(async (domain: string): Promise<boolean> => {
     try {
+      const res = await api.verifyCustomHostname(domain);
+      if (res.sslActive || res.status === 'active') return true;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5s timeout
-      await fetch(`https://${domain}`, {
-        mode: 'no-cors',
-        signal: controller.signal,
-      });
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      await fetch(`https://${domain}`, { mode: 'no-cors', signal: controller.signal });
       clearTimeout(timeoutId);
       return true;
     } catch {
@@ -98,69 +84,51 @@ export default function CaptacaoPage() {
     }
   }, [pages, checkDomainActive]);
 
-  const handleOpenModal = () => {
-    setCurrentStep(1);
-    setNewTitle('');
-    setNewSlug('');
-    setNewCrp('');
-    setNewApproach('Psicoterapia');
-    setNewAddress('Atendimento Online');
-    setNewTitlePart1('Terapia para recuperar o seu ');
-    setNewTitlePart2('equilíbrio interior');
-    setNewDescription('Cuidado clínico ético e acolhedor para ajudar você a superar desafios emocionais, desenvolver o autoconhecimento e viver com mais leveza.');
-    setNewWhatsappMessageTemplate('Olá, acabei de enviar minha triagem inicial no seu site. Meu nome é {{nome}}.');
-    setError('');
-    setIsModalOpen(true);
-  };
-
-  // Auto-generate slug from title
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setNewTitle(val);
-    const slugified = val
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // remove accents
-      .replace(/[^a-z0-9\s-]/g, '')    // remove special chars
-      .replace(/\s+/g, '-')            // spaces to hyphens
-      .replace(/-+/g, '-')             // remove consecutive hyphens
-      .trim();
-    setNewSlug(slugified);
-  };
-
-  const handleCreatePage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newSlug.trim()) {
-      setError('Por favor, preencha todos os campos do Passo 1.');
-      setCurrentStep(1);
-      return;
-    }
-
-    setSubmitting(true);
+  // Explicit Duplicate Page Action (carries over EVERYTHING including photos, sections, texts)
+  const handleDuplicatePage = async (sourcePage: CapturePage) => {
+    setDuplicatingId(sourcePage.id);
     setError('');
     try {
+      const newTitle = `${sourcePage.title} (Cópia)`;
+      const baseSlug = `${sourcePage.slug}-copia`;
+      const uniqueSlug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+
       const res = await api.createCapturePage({
-        title: newTitle.trim(),
-        slug: newSlug.trim(),
+        title: newTitle,
+        slug: uniqueSlug,
         tenantId: tenant?.id,
-        crp: newCrp.trim() || undefined,
-        approach: newApproach.trim() || undefined,
-        address: newAddress.trim() || undefined,
-        titlePart1: newTitlePart1.trim() || undefined,
-        titlePart2: newTitlePart2.trim() || undefined,
-        description: newDescription.trim() || undefined,
-        whatsappMessageTemplate: newWhatsappMessageTemplate.trim() || undefined,
+        crp: sourcePage.crp || sourcePage.siteConfig?.professional?.crp || undefined,
+        logoText: sourcePage.logoText || sourcePage.siteConfig?.logoConfig?.text || newTitle,
+        primaryStart: sourcePage.primaryStart || sourcePage.siteConfig?.theme?.colors?.primaryStart || '#CC8667',
+        primaryEnd: sourcePage.primaryEnd || sourcePage.siteConfig?.theme?.colors?.primaryEnd || '#AA5533',
+        contrast: sourcePage.contrast || sourcePage.siteConfig?.theme?.colors?.contrast || '#FFFFFF',
+        logoUrl: sourcePage.logoUrl || sourcePage.siteConfig?.logoUrl || undefined,
+        faviconUrl: sourcePage.faviconUrl || sourcePage.siteConfig?.faviconUrl || undefined,
+        seoConfig: sourcePage.seoConfig,
+        siteConfig: sourcePage.siteConfig,
+        dictionary: sourcePage.dictionary,
+        formFlow: sourcePage.formFlow,
       });
 
-      if (res.success) {
-        setIsModalOpen(false);
-        // Redirect directly to the newly created page editor
+      if (res.success && res.page?.id) {
+        await api.updateCapturePage(res.page.id, {
+          siteConfig: sourcePage.siteConfig,
+          siteConfigDraft: sourcePage.siteConfig,
+          dictionary: sourcePage.dictionary,
+          dictionaryDraft: sourcePage.dictionary,
+          formFlow: sourcePage.formFlow,
+          formFlowDraft: sourcePage.formFlow,
+          seoConfig: sourcePage.seoConfig,
+          seoConfigDraft: sourcePage.seoConfig,
+        });
+
+        // Redirect directly to duplicated page in editor
         router.push(`/dashboard/captacao/${res.page.id}`);
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao instanciar nova página. Verifique se o slug já está em uso.');
+      alert('Erro ao duplicar página: ' + (err.message || 'Falha ao duplicar página.'));
     } finally {
-      setSubmitting(false);
+      setDuplicatingId(null);
     }
   };
 
@@ -173,16 +141,12 @@ export default function CaptacaoPage() {
     }
   };
 
-  const handleDeletePage = async (id: string, title: string) => {
-    if (!confirm(`Tem certeza que deseja excluir permanentemente a página "${title}"? Todas as respostas e configurações serão perdidas.`)) {
-      return;
-    }
-
+  const handleDeletePage = async (id: string) => {
     try {
       await api.deleteCapturePage(id);
       setPages(prev => prev.filter(p => p.id !== id));
     } catch (err: any) {
-      alert('Erro ao excluir página: ' + err.message);
+      setError('Erro ao excluir página: ' + err.message);
     }
   };
 
@@ -241,13 +205,15 @@ export default function CaptacaoPage() {
           <h1 className="text-2xl font-bold text-white">Páginas de Captação</h1>
         </div>
         <div className="shrink-0 flex items-center gap-3">
-          <Button
-            onClick={handleOpenModal}
-            className="brand-accent text-xs font-bold uppercase h-10 px-4 flex items-center gap-2 cursor-pointer border-none"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Página
-          </Button>
+          <Link href="/dashboard/captacao/nova" className="no-underline">
+            <Button
+              type="button"
+              className="brand-accent text-xs font-bold uppercase h-10 px-4 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Página
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -270,6 +236,15 @@ export default function CaptacaoPage() {
               Crie sua primeira landing page de captação para começar a colher respostas de triagem de pacientes.
             </p>
           </div>
+          <Link href="/dashboard/captacao/nova" className="no-underline pt-2">
+            <Button
+              type="button"
+              className="brand-accent text-xs font-bold uppercase h-10 px-5 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Criar Primeira Página
+            </Button>
+          </Link>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -288,6 +263,7 @@ export default function CaptacaoPage() {
                   </div>
                   {/* Status Toggle Button */}
                   <button
+                    type="button"
                     onClick={() => handleToggleActive(page.id, page.isActive)}
                     className={`h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all cursor-pointer ${
                       page.isActive 
@@ -321,34 +297,79 @@ export default function CaptacaoPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-4 mt-4 border-t border-white/5">
-                <button
-                  onClick={() => handleDeletePage(page.id, page.title)}
-                  className="p-2 rounded-xl text-red-400/70 hover:text-red-400 hover:bg-red-500/5 transition-colors cursor-pointer"
-                  title="Excluir Página"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-white/5">
+                {/* Botão Excluir */}
+                <div className="relative group inline-flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setPageToDelete({ id: page.id, title: page.title })}
+                    className="p-2.5 rounded-xl text-red-400/80 hover:text-red-400 bg-red-500/5 hover:bg-red-500/15 border border-red-500/10 hover:border-red-500/30 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
+                    aria-label="Excluir Página"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none px-2.5 py-1 bg-slate-900 text-red-300 text-[10px] font-medium rounded-lg border border-red-500/20 shadow-xl whitespace-nowrap z-30">
+                    Excluir Página
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 border-r border-b border-red-500/20 rotate-45" />
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <Link href={`/dashboard/captacao/${page.id}`}>
-                    <Button variant="secondary" className="cursor-pointer text-xs h-9 px-3 flex items-center gap-1.5">
-                      <Edit className="h-3.5 w-3.5" />
-                      Editar
-                    </Button>
-                  </Link>
-                  {page.isActive && (
-                    <a
-                      href={getVerSiteUrl(page)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="no-underline"
+                  {/* Botão Duplicar */}
+                  <div className="relative group inline-flex items-center">
+                    <button
+                      type="button"
+                      disabled={duplicatingId === page.id}
+                      onClick={() => handleDuplicatePage(page)}
+                      className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9 disabled:opacity-50"
+                      aria-label="Duplicar Página"
                     >
-                      <Button className="brand-accent cursor-pointer text-xs h-9 px-3 flex items-center gap-1.5 border-none">
-                        <ExternalLink className="h-3.5 w-3.5" />
+                      {duplicatingId === page.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-[var(--brand-gradient-start)]" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none px-2.5 py-1 bg-slate-900 text-slate-200 text-[10px] font-medium rounded-lg border border-white/10 shadow-xl whitespace-nowrap z-30">
+                      {duplicatingId === page.id ? 'Duplicando...' : 'Duplicar Página'}
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 border-r border-b border-white/10 rotate-45" />
+                    </div>
+                  </div>
+
+                  {/* Botão Ver Site */}
+                  {page.isActive && (
+                    <div className="relative group inline-flex items-center">
+                      <a
+                        href={getVerSiteUrl(page)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="no-underline"
+                      >
+                        <button
+                          type="button"
+                          className="p-2.5 rounded-xl text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
+                          aria-label="Ver Site"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
+                      </a>
+                      <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none px-2.5 py-1 bg-slate-900 text-slate-200 text-[10px] font-medium rounded-lg border border-white/10 shadow-xl whitespace-nowrap z-30">
                         Ver Site
-                      </Button>
-                    </a>
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 border-r border-b border-white/10 rotate-45" />
+                      </div>
+                    </div>
                   )}
+
+                  {/* Botão Editar */}
+                  <Link href={`/dashboard/captacao/${page.id}`} className="no-underline">
+                    <button
+                      type="button"
+                      className="brand-accent cursor-pointer text-xs font-bold h-9 px-4 flex items-center gap-1.5 whitespace-nowrap rounded-xl border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      <span>Editar Página</span>
+                    </button>
+                  </Link>
                 </div>
               </div>
             </Card>
@@ -356,228 +377,21 @@ export default function CaptacaoPage() {
         </div>
       )}
 
-      {/* Create Modal Dialog (Step-by-step Wizard) */}
-      <BrandModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setError(''); }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-slate-100">Nova Página de Captação</h3>
-                <span className="text-[10px] text-slate-450 uppercase tracking-wider font-semibold">Passo {currentStep} de 4</span>
-              </div>
-              {/* Progress dots */}
-              <div className="flex items-center gap-1.5">
-                {[1, 2, 3, 4].map((step) => (
-                  <div
-                    key={step}
-                    className={`h-1.5 w-6 rounded-full transition-all ${
-                      step === currentStep 
-                        ? 'bg-[var(--brand-gradient-start)]' 
-                        : step < currentStep 
-                        ? 'bg-emerald-500/60' 
-                        : 'bg-zinc-800'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={currentStep === 4 ? handleCreatePage : (e) => e.preventDefault()} className="space-y-4">
-              {/* STEP 1: Basic Info */}
-              {currentStep === 1 && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Defina o título identificador e o caminho de URL da sua landing page.
-                  </p>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Título da Página</label>
-                    <Input
-                      type="text"
-                      required
-                      placeholder="Ex: Terapia de Ansiedade Adulto"
-                      value={newTitle}
-                      onChange={handleTitleChange}
-                      className="brand-input"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Slug da URL</label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-xs text-slate-500 font-mono">/p/{tenant?.slug}/</span>
-                      <Input
-                        type="text"
-                        required
-                        placeholder="terapia-ansiedade"
-                        value={newSlug}
-                        onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                        className="brand-input pl-[150px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2: Professional profile */}
-              {currentStep === 2 && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Insira seus dados profissionais de registro e atendimento para exibição.
-                  </p>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">CRP</label>
-                    <Input
-                      type="text"
-                      placeholder="Ex: 06/123456"
-                      value={newCrp}
-                      onChange={(e) => setNewCrp(e.target.value)}
-                      className="brand-input"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Abordagem Clínica / Especialidade</label>
-                    <Input
-                      type="text"
-                      placeholder="Ex: Terapia Cognitivo-Comportamental"
-                      value={newApproach}
-                      onChange={(e) => setNewApproach(e.target.value)}
-                      className="brand-input"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Endereço de Atendimento</label>
-                    <Input
-                      type="text"
-                      placeholder="Ex: Atendimento Online & Presencial em São Paulo"
-                      value={newAddress}
-                      onChange={(e) => setNewAddress(e.target.value)}
-                      className="brand-input"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: Copywriting */}
-              {currentStep === 3 && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Redija o título chamativo e a descrição que os seus pacientes visualizarão no topo do site.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Título (Foco)</label>
-                      <Input
-                        type="text"
-                        placeholder="Ex: Terapia para recuperar o seu "
-                        value={newTitlePart1}
-                        onChange={(e) => setNewTitlePart1(e.target.value)}
-                        className="brand-input"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Título (Colorido)</label>
-                      <Input
-                        type="text"
-                        placeholder="Ex: equilíbrio interior"
-                        value={newTitlePart2}
-                        onChange={(e) => setNewTitlePart2(e.target.value)}
-                        className="brand-input"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Descrição Resumida</label>
-                    <textarea
-                      rows={3}
-                      className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[#CC8667] outline-none text-white transition-colors resize-none"
-                      placeholder="Escreva a descrição do seu serviço..."
-                      value={newDescription}
-                      onChange={(e) => setNewDescription(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 4: Success & WhatsApp settings */}
-              {currentStep === 4 && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Defina o template da mensagem enviada no WhatsApp após o paciente finalizar a triagem.
-                  </p>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Mensagem Whatsapp</label>
-                    <textarea
-                      rows={4}
-                      className="w-full text-xs p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[#CC8667] outline-none text-white transition-colors resize-none"
-                      placeholder="Olá, preenchi a triagem pelo site. Meu nome é {{nome}}."
-                      value={newWhatsappMessageTemplate}
-                      onChange={(e) => setNewWhatsappMessageTemplate(e.target.value)}
-                    />
-                    <p className="text-[9px] text-slate-500 pt-0.5 leading-relaxed">
-                      Marcadores como <code className="text-slate-350 font-bold">{"{{nome}}"}</code> serão substituídos pelas respostas reais enviadas pelo paciente.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Footer buttons */}
-              <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/5 mt-4">
-                {currentStep > 1 ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => { setCurrentStep(prev => prev - 1); setError(''); }}
-                    className="cursor-pointer text-xs h-10 px-4"
-                  >
-                    Voltar
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => { setIsModalOpen(false); setError(''); }}
-                    className="cursor-pointer text-xs h-10 px-4"
-                  >
-                    Cancelar
-                  </Button>
-                )}
-
-                {currentStep < 4 ? (
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (currentStep === 1 && (!newTitle.trim() || !newSlug.trim())) {
-                        setError('Título e Slug são obrigatórios.');
-                        return;
-                      }
-                      setError('');
-                      setCurrentStep(prev => prev + 1);
-                    }}
-                    className="brand-accent text-xs font-semibold h-10 px-5 cursor-pointer border-none"
-                  >
-                    Avançar
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    onClick={handleCreatePage}
-                    disabled={submitting}
-                    className="brand-accent text-xs font-semibold h-10 px-5 cursor-pointer border-none"
-                  >
-                    {submitting ? 'Criando Página...' : 'Criar Página'}
-                  </Button>
-                )}
-              </div>
-            </form>
-      </BrandModal>
+      <ConfirmModal
+        isOpen={!!pageToDelete}
+        onClose={() => setPageToDelete(null)}
+        onConfirm={async () => {
+          if (pageToDelete) {
+            await handleDeletePage(pageToDelete.id);
+            setPageToDelete(null);
+          }
+        }}
+        title="Excluir Página de Captação"
+        description={`Tem certeza que deseja excluir permanentemente a página "${pageToDelete?.title || ''}"? Todas as respostas e configurações serão perdidas.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }
