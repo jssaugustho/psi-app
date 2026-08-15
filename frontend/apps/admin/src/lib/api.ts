@@ -241,8 +241,25 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     throw new Error('Servidor de API temporariamente indisponível.');
   }
 
-  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez
-  if (response.status === 401 && !_isRetry) {
+  // Tratar resposta vazia (204 No Content ou corpo sem texto)
+  const contentType = response.headers.get('content-type');
+  const text = await response.text();
+  let data: any = {};
+  if (text) {
+    try {
+      data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+    } catch {
+      data = { message: text };
+    }
+  }
+
+  const isAuthEndpoint = endpoint.includes('/auth/login') ||
+                         endpoint.includes('/auth/register') ||
+                         endpoint.includes('/auth/bootstrap') ||
+                         endpoint.includes('/auth/refresh');
+
+  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez (apenas para rotas protegidas)
+  if (response.status === 401 && !_isRetry && !isAuthEndpoint) {
     try {
       await doRefresh();
       return fetchApi<T>(endpoint, options, true); // retry com novo token
@@ -254,8 +271,6 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
       throw new Error('Sessão expirada. Faça login novamente.');
     }
   }
-
-  const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.message || data.error || 'Erro na requisição');

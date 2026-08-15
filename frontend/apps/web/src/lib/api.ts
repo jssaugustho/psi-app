@@ -218,20 +218,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     throw new Error('Servidor de API temporariamente indisponível.');
   }
 
-  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez
-  if (response.status === 401 && !_isRetry) {
-    try {
-      await doRefresh();
-      return fetchApi<T>(endpoint, options, true); // retry com novo token
-    } catch {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('auth:logout'));
-      }
-      throw new Error('Sessão expirada. Faça login novamente.');
-    }
-  }
-
-  // Handle empty response body (204 No Content or 0-byte content length)
+  // Tratar resposta vazia (204 No Content ou corpo sem texto)
   const contentType = response.headers.get('content-type');
   const text = await response.text();
   let data: any = {};
@@ -240,6 +227,24 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
       data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
     } catch {
       data = { message: text };
+    }
+  }
+
+  const isAuthEndpoint = endpoint.includes('/auth/login') ||
+                         endpoint.includes('/auth/register') ||
+                         endpoint.includes('/auth/bootstrap') ||
+                         endpoint.includes('/auth/refresh');
+
+  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez (apenas para rotas protegidas)
+  if (response.status === 401 && !_isRetry && !isAuthEndpoint) {
+    try {
+      await doRefresh();
+      return fetchApi<T>(endpoint, options, true); // retry com novo token
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:logout'));
+      }
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
   }
 
