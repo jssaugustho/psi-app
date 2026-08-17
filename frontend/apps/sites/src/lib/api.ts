@@ -54,13 +54,24 @@ export async function getCapturePageBySlugs(tenantSlug: string, pageSlug: string
     ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&tenants.slug=eq.${tenantSlug}`
     : `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&is_active=eq.true&tenants.slug=eq.${tenantSlug}`;
   try {
-    const res = await fetch(url, {
-      cache: 'no-store',
-    });
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-    return data[0] as CapturePageData;
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0] as CapturePageData;
+    }
+    // Fallback: se isPreview for falso mas a página ainda estiver pendente, busca sem a trava is_active
+    if (!isPreview) {
+      const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&tenants.slug=eq.${tenantSlug}`;
+      const fallbackRes = await fetch(fallbackUrl, { cache: 'no-store' });
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+          return fallbackData[0] as CapturePageData;
+        }
+      }
+    }
+    return null;
   } catch (err) {
     console.error('Error fetching capture page by slugs:', err);
     return null;
@@ -68,20 +79,56 @@ export async function getCapturePageBySlugs(tenantSlug: string, pageSlug: string
 }
 
 /**
- * Fetch capture page and tenant details by custom domain name
+ * Fetch capture page and tenant details by domain name or subdomain (e.g. thera-os.ajstrategy.digital)
  */
 export async function getCapturePageByDomain(domainName: string): Promise<CapturePageData | null> {
-  const url = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&custom_domain=eq.${domainName}&is_active=eq.true`;
+  const cleanDomain = domainName.split(':')[0].toLowerCase();
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital';
+
+  // 1. Verificar se é um subdomínio da plataforma (ex: thera-os.ajstrategy.digital ou thera-os)
+  let tenantSlug: string | null = null;
+  if (cleanDomain.endsWith(`.${baseDomain}`)) {
+    const parts = cleanDomain.replace(`.${baseDomain}`, '').split('.');
+    tenantSlug = parts[parts.length - 1];
+  } else if (!cleanDomain.includes('.')) {
+    tenantSlug = cleanDomain;
+  }
+
+  if (tenantSlug && tenantSlug !== 'www' && tenantSlug !== 'app' && tenantSlug !== 'sites') {
+    // Busca a página de captura do tenant por slug
+    const url = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenants.slug=eq.${tenantSlug}&is_active=eq.true&order=created_at.desc&limit=1`;
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data[0] as CapturePageData;
+        }
+      }
+      // Fallback: se não encontrou com is_active=true, busca a página criada mais recente do tenant
+      const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenants.slug=eq.${tenantSlug}&order=created_at.desc&limit=1`;
+      const fallbackRes = await fetch(fallbackUrl, { cache: 'no-store' });
+      if (fallbackRes.ok) {
+        const fallbackData = await fallbackRes.json();
+        if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+          return fallbackData[0] as CapturePageData;
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching capture page by tenant subdomain:', err);
+    }
+  }
+
+  // 2. Busca por domínio próprio customizado (ex: www.geovannabastos.com.br)
+  const url = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&custom_domain=eq.${cleanDomain}&is_active=eq.true&limit=1`;
   try {
-    const res = await fetch(url, {
-      cache: 'no-store',
-    });
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) return null;
     return data[0] as CapturePageData;
   } catch (err) {
-    console.error('Error fetching capture page by domain:', err);
+    console.error('Error fetching capture page by custom domain:', err);
     return null;
   }
 }
