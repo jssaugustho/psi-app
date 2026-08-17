@@ -6,7 +6,8 @@ import { useBrand } from '@/context/BrandContext';
 import { api, Tenant, PlatformSetupStatusResponse } from '@/lib/api';
 import { WhiteLabelSettings } from '@/components/white-label-settings';
 import { ResendSettings } from '@/components/resend-settings';
-import { CloudflareSettings } from '@/components/cloudflare-settings';
+import { CloudflareDomainsSettings } from '@/components/cloudflare-domains-settings';
+import { R2StorageSettings } from '@/components/r2-storage-settings';
 import { BillingSettings } from '@/components/billing-settings';
 import { LoadingSpinner } from '@psi/ui';
 
@@ -15,8 +16,6 @@ const BillingIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
   </svg>
 );
-
-
 
 const PaletteIcon = () => (
   <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -30,9 +29,15 @@ const MailIcon = () => (
   </svg>
 );
 
-const CloudIcon = () => (
+const GlobeIcon = () => (
   <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+  </svg>
+);
+
+const BucketIcon = () => (
+  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
   </svg>
 );
 
@@ -42,44 +47,13 @@ const UserIcon = () => (
   </svg>
 );
 
-const OfficeIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-  </svg>
-);
-
-const KeyIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m-2-2a2 2 0 00-2 2m2-2a2 2 0 002 2m0 0v12a2 2 0 01-2 2h-2a2 2 0 01-2-2V9a2 2 0 002-2h2z" />
-  </svg>
-);
-
-const GlobeIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-  </svg>
-);
-
-
-
-const BucketIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-  </svg>
-);
-
-const LinkIcon = () => (
-  <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-  </svg>
-);
-
-type Tab = 'white-label' | 'email' | 'cloudflare' | 'billing' | 'conta';
+type Tab = 'white-label' | 'domains' | 'storage' | 'email' | 'billing' | 'conta';
 
 const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'white-label', label: 'White-Label', icon: <PaletteIcon /> },
+  { id: 'domains', label: 'Domínios', icon: <GlobeIcon /> },
+  { id: 'storage', label: 'Armazenamento', icon: <BucketIcon /> },
   { id: 'email', label: 'E-mail', icon: <MailIcon /> },
-  { id: 'cloudflare', label: 'Cloudflare & R2', icon: <CloudIcon /> },
   { id: 'billing', label: 'Assinaturas', icon: <BillingIcon /> },
   { id: 'conta', label: 'Minha Conta', icon: <UserIcon /> },
 ];
@@ -223,19 +197,27 @@ export default function SettingsPage() {
                 </>
               )}
 
+              {/* ── ABA: DOMÍNIOS (CLOUDFLARE) ── */}
+              {activeTab === 'domains' && (
+                <CloudflareDomainsSettings
+                  platformStatus={platformStatus}
+                  onSaved={loadTenant}
+                />
+              )}
+
+              {/* ── ABA: ARMAZENAMENTO (R2 BUCKETS) ── */}
+              {activeTab === 'storage' && (
+                <R2StorageSettings
+                  platformStatus={platformStatus}
+                  onSaved={loadTenant}
+                />
+              )}
+
               {/* ── ABA: E-MAIL (RESEND) ── */}
               {activeTab === 'email' && (
                 <ResendSettings
                   currentFromDomain={platformStatus?.resend_from_domain ?? null}
                   hasResend={platformStatus?.has_resend ?? false}
-                  onSaved={loadTenant}
-                />
-              )}
-
-              {/* ── ABA: CLOUDFLARE ── */}
-              {activeTab === 'cloudflare' && (
-                <CloudflareSettings
-                  platformStatus={platformStatus}
                   onSaved={loadTenant}
                 />
               )}

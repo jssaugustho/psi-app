@@ -6,7 +6,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,defaultSiteAvatarUrl:default_site_avatar_url,defaultSitePrimaryColor:default_site_primary_color,defaultSiteSecondaryColor:default_site_secondary_color,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
+const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,defaultSiteAvatarUrl:default_site_avatar_url,defaultSiteLogoUrl:default_site_logo_url,defaultSiteFaviconUrl:default_site_favicon_url,defaultSiteLogoConfig:default_site_logo_config,defaultSitePrimaryColor:default_site_primary_color,defaultSiteSecondaryColor:default_site_secondary_color,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
 
 export interface User {
   id: string;
@@ -37,6 +37,14 @@ export interface Tenant {
   iconLightUrl: string | null;
   iconDarkUrl: string | null;
   defaultSiteAvatarUrl?: string | null;
+  defaultSiteLogoUrl?: string | null;
+  defaultSiteFaviconUrl?: string | null;
+  defaultSiteLogoConfig?: {
+    mode: 'html' | 'image';
+    text?: string;
+    iconType?: 'psi' | 'custom';
+    customIconUrl?: string;
+  } | null;
   defaultSitePrimaryColor?: string;
   defaultSiteSecondaryColor?: string;
   gradientColorStart: string;
@@ -232,7 +240,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   let data: any = {};
   if (text) {
     try {
-      data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+      data = contentType?.includes('json') ? JSON.parse(text) : { message: text };
     } catch {
       data = { message: text };
     }
@@ -320,10 +328,10 @@ export const api = {
    * Retorna a URL pública permanente do arquivo.
    */
   uploadImage: async (file: File, type: UploadType): Promise<{ url: string; key: string }> => {
-    // 1. Comprimir client-side
+    // 1. Comprimir client-side com Canvas API (@psi/image-utils)
     const compressed = await compressImage(file, type);
 
-    // 2. Pedir Presigned URL diretamente via fetchApi
+    // 2. Pedir Presigned URL diretamente ao backend
     const { upload_url, public_url, key } = await fetchApi<{ upload_url: string; public_url: string; key: string }>(
       '/platform/upload/presign',
       {
@@ -336,7 +344,7 @@ export const api = {
       }
     );
 
-    // 3. PUT direto no R2 — a VPS nunca toca no arquivo
+    // 3. PUT direto no Cloudflare R2 (sem passar pela VPS)
     const uploadRes = await fetch(upload_url, {
       method: 'PUT',
       body: compressed,
@@ -344,7 +352,11 @@ export const api = {
     });
 
     if (!uploadRes.ok) {
-      throw new Error(`Falha ao enviar arquivo para o R2: ${uploadRes.statusText}`);
+      const errText = await uploadRes.text().catch(() => '');
+      if (errText.includes('AccessDenied') || uploadRes.status === 403) {
+        throw new Error('Acesso Negado pelo Cloudflare R2. Verifique se a R2 Secret Access Key salva em Configurações > Cloudflare & R2 está correta.');
+      }
+      throw new Error(`Falha ao enviar arquivo para o R2: ${uploadRes.statusText || uploadRes.status}`);
     }
 
     return { url: public_url, key };
@@ -476,6 +488,9 @@ export const api = {
     if (body.textDarkColor !== undefined) dbBody.text_dark_color = body.textDarkColor;
     if (body.emailDomain !== undefined) dbBody.email_domain = body.emailDomain;
     if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
+    if (body.defaultSiteLogoUrl !== undefined) dbBody.default_site_logo_url = body.defaultSiteLogoUrl;
+    if (body.defaultSiteFaviconUrl !== undefined) dbBody.default_site_favicon_url = body.defaultSiteFaviconUrl;
+    if (body.defaultSiteLogoConfig !== undefined) dbBody.default_site_logo_config = body.defaultSiteLogoConfig;
     if (body.defaultSitePrimaryColor !== undefined) dbBody.default_site_primary_color = body.defaultSitePrimaryColor;
     if (body.defaultSiteSecondaryColor !== undefined) dbBody.default_site_secondary_color = body.defaultSiteSecondaryColor;
     if (body.traffic_sources !== undefined) dbBody.traffic_sources = body.traffic_sources;

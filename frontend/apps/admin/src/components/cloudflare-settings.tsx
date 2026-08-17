@@ -63,6 +63,16 @@ export function CloudflareSettings({ platformStatus, onSaved }: CloudflareSettin
     }
   }, [platformStatus?.has_cloudflare]);
 
+  useEffect(() => {
+    if (platformStatus) {
+      if (platformStatus.cloudflare_zone_id) setZoneId(platformStatus.cloudflare_zone_id);
+      if (platformStatus.cloudflare_account_id) setAccountId(platformStatus.cloudflare_account_id);
+      if (platformStatus.base_domain) setBaseDomain(platformStatus.base_domain);
+      if (platformStatus.r2_bucket_name) setR2BucketName(platformStatus.r2_bucket_name);
+      if (platformStatus.r2_public_domain) setR2PublicDomain(platformStatus.r2_public_domain);
+    }
+  }, [platformStatus]);
+
   const handleZoneSelect = (selectedZoneId: string) => {
     setZoneId(selectedZoneId);
     const found = zones.find((z) => z.id === selectedZoneId);

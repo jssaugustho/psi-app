@@ -1,5 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { resolveTxt } from 'dns/promises';
+import fs from 'fs';
+import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
@@ -19,6 +21,30 @@ const SaveCloudflareBodySchema = z.object({
   r2_public_domain: z.string().min(1, 'Domínio Público do R2 é obrigatório'),
   r2_access_key_id: z.string().optional().nullable(),
   r2_secret_access_key: z.string().optional().nullable(),
+});
+
+const SaveDomainsBodySchema = z.object({
+  api_token: z.string().optional().nullable(),
+  zone_id: z.string().min(1, 'Zone ID é obrigatório'),
+  account_id: z.string().min(1, 'Account ID é obrigatório'),
+  base_domain: z.string().optional().nullable(),
+});
+
+const BackupBucketSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Nome do bucket é obrigatório'),
+  publicDomain: z.string().min(1, 'Domínio público é obrigatório'),
+  accessKeyId: z.string().min(1, 'Access Key ID é obrigatório'),
+  secretAccessKey: z.string().min(1, 'Secret Access Key é obrigatória'),
+  isBackup: z.boolean().optional(),
+});
+
+const SaveStorageBodySchema = z.object({
+  r2_bucket_name: z.string().min(1, 'Nome do Bucket R2 é obrigatório'),
+  r2_public_domain: z.string().min(1, 'Domínio Público do R2 é obrigatório'),
+  r2_access_key_id: z.string().optional().nullable(),
+  r2_secret_access_key: z.string().optional().nullable(),
+  backup_r2_buckets: z.array(BackupBucketSchema).optional().default([]),
 });
 
 const SetupTenantBodySchema = z.object({
@@ -229,6 +255,158 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
+  // POST /v1/platform/cloudflare/domains (Salva exclusivamente credenciais de DNS/Zone/Account ID)
+  fastify.post(
+    '/cloudflare/domains',
+    {
+      schema: {
+        body: SaveDomainsBodySchema,
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        verifyUserJwt(authHeader.split(' ')[1]);
+
+        const { api_token, zone_id, account_id, base_domain } = request.body;
+        const existingSettings = await db.query.platformSettings.findFirst();
+        const effectiveApiToken = api_token?.trim() || existingSettings?.cloudflareApiToken || '';
+
+        if (!effectiveApiToken) {
+          return reply.status(400).send({
+            error: 'Token do Cloudflare ausente',
+            message: 'Informe o Cloudflare API Token para validar o domínio.',
+          });
+        }
+
+        // Validação da Zone na API do Cloudflare
+        const zoneRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zone_id.trim()}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${effectiveApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!zoneRes.ok) {
+          const errData: any = await zoneRes.json().catch(() => ({}));
+          const cloudflareMsg = errData?.errors?.[0]?.message || zoneRes.statusText;
+          return reply.status(400).send({
+            error: 'Zone ID Inválido',
+            message: `Não foi possível acessar a Zone no Cloudflare: ${cloudflareMsg}`,
+          });
+        }
+
+        const zoneData: any = await zoneRes.json();
+        const resolvedBaseDomain = zoneData.result?.name || base_domain?.trim() || '';
+
+        if (existingSettings) {
+          await db
+            .update(platformSettings)
+            .set({
+              cloudflareApiToken: effectiveApiToken,
+              cloudflareZoneId: zone_id.trim(),
+              cloudflareAccountId: account_id.trim(),
+              baseDomain: resolvedBaseDomain,
+              updatedAt: new Date(),
+            })
+            .where(eq(platformSettings.id, existingSettings.id));
+        } else {
+          await db.insert(platformSettings).values({
+            cloudflareApiToken: effectiveApiToken,
+            cloudflareZoneId: zone_id.trim(),
+            cloudflareAccountId: account_id.trim(),
+            baseDomain: resolvedBaseDomain,
+            isConfigured: false,
+          });
+        }
+
+        return reply.send({
+          message: 'Configurações de Domínio do Cloudflare salvas com sucesso!',
+          zone_id,
+          base_domain: resolvedBaseDomain,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(400).send({
+          error: 'Erro na configuração de domínios',
+          message: err.message || 'Não foi possível salvar os domínios do Cloudflare.',
+        });
+      }
+    }
+  );
+
+  // POST /v1/platform/cloudflare/storage (Salva Bucket Principal R2 + Array de Buckets de Reserva)
+  fastify.post(
+    '/cloudflare/storage',
+    {
+      schema: {
+        body: SaveStorageBodySchema,
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        verifyUserJwt(authHeader.split(' ')[1]);
+
+        const { r2_bucket_name, r2_public_domain, r2_access_key_id, r2_secret_access_key, backup_r2_buckets } = request.body;
+        const existingSettings = await db.query.platformSettings.findFirst();
+
+        const effectiveAccessKeyId = r2_access_key_id?.trim() || existingSettings?.r2AccessKeyId || '';
+        const effectiveSecretAccessKey = r2_secret_access_key?.trim() || existingSettings?.r2SecretAccessKey || '';
+
+        let formattedDomain = r2_public_domain.trim();
+        if (!formattedDomain.startsWith('http://') && !formattedDomain.startsWith('https://')) {
+          formattedDomain = `https://${formattedDomain}`;
+        }
+        if (formattedDomain.endsWith('/')) {
+          formattedDomain = formattedDomain.slice(0, -1);
+        }
+
+        if (existingSettings) {
+          await db
+            .update(platformSettings)
+            .set({
+              r2BucketName: r2_bucket_name.trim(),
+              r2PublicDomain: formattedDomain,
+              r2AccessKeyId: effectiveAccessKeyId,
+              r2SecretAccessKey: effectiveSecretAccessKey,
+              backupR2Buckets: backup_r2_buckets || [],
+              updatedAt: new Date(),
+            })
+            .where(eq(platformSettings.id, existingSettings.id));
+        } else {
+          await db.insert(platformSettings).values({
+            r2BucketName: r2_bucket_name.trim(),
+            r2PublicDomain: formattedDomain,
+            r2AccessKeyId: effectiveAccessKeyId,
+            r2SecretAccessKey: effectiveSecretAccessKey,
+            backupR2Buckets: backup_r2_buckets || [],
+            isConfigured: false,
+          });
+        }
+
+        return reply.send({
+          message: 'Configurações de Armazenamento R2 salvas com sucesso!',
+          r2_bucket_name,
+          backup_buckets_count: (backup_r2_buckets || []).length,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(400).send({
+          error: 'Erro na configuração de armazenamento R2',
+          message: err.message || 'Não foi possível salvar o armazenamento R2.',
+        });
+      }
+    }
+  );
+
   // GET /v1/platform/cloudflare/zones
   // Lista todas as Zones (Domínios) disponíveis na conta Cloudflare
   fastify.get('/cloudflare/zones', async (request, reply) => {
@@ -279,6 +457,86 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   });
 
+  // POST /v1/platform/cloudflare/test-permissions
+  // Testa a conexão do Token da API do Cloudflare, valida a Zone e verifica as permissões.
+  fastify.post('/cloudflare/test-permissions', async (request, reply) => {
+    try {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+      }
+      verifyUserJwt(authHeader.split(' ')[1]);
+
+      const body: any = request.body || {};
+      const existingSettings = await db.query.platformSettings.findFirst();
+      const token = body.api_token?.trim() || existingSettings?.cloudflareApiToken || '';
+      const zoneId = body.zone_id?.trim() || existingSettings?.cloudflareZoneId || '';
+
+      if (!token) {
+        return reply.status(400).send({ error: 'Token Ausente', message: 'Informe o Cloudflare API Token.' });
+      }
+
+      // 1. Verificar Token e Zone na API do Cloudflare
+      let zoneName = existingSettings?.baseDomain || '';
+      let zoneActive = false;
+      let sslStatus = 'active';
+      let tokenValid = false;
+
+      if (zoneId) {
+        const zoneRes = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (zoneRes.ok) {
+          const zoneData: any = await zoneRes.json();
+          if (zoneData.success && zoneData.result) {
+            tokenValid = true;
+            zoneName = zoneData.result.name;
+            zoneActive = zoneData.result.status === 'active';
+            sslStatus = zoneData.result.ssl?.status || 'active';
+          }
+        }
+      }
+
+      if (!tokenValid) {
+        const verifyRes = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (verifyRes.ok) {
+          const verifyData: any = await verifyRes.json().catch(() => ({}));
+          tokenValid = verifyData.success === true;
+        }
+      }
+
+      return reply.send({
+        success: true,
+        tokenValid,
+        zoneActive,
+        zoneName,
+        sslStatus,
+        permissions: [
+          {
+            name: 'Autenticação API Token',
+            status: tokenValid ? 'ok' : 'error',
+            detail: tokenValid ? 'Token ativo e autenticado com sucesso.' : 'Token inválido ou expirado.',
+          },
+          {
+            name: 'Status do Domínio (Zone)',
+            status: zoneActive ? 'ok' : 'warning',
+            detail: zoneActive ? `Domínio ${zoneName} ativo no Cloudflare.` : `Zone ID ${zoneId || 'não configurado'} pendente.`,
+          },
+          {
+            name: 'Certificados SSL / TLS',
+            status: sslStatus === 'active' || sslStatus === 'ok' ? 'ok' : 'warning',
+            detail: `Status SSL: ${sslStatus}.`,
+          },
+        ],
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro de teste', message: err.message || 'Falha ao testar permissões.' });
+    }
+  });
+
   // POST /v1/platform/upload/presign
   // Gera uma Presigned URL para o cliente fazer upload diretamente no Cloudflare R2.
   // O arquivo NUNCA passa pela VPS — apenas a URL assinada é gerada aqui.
@@ -320,25 +578,17 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const { filename, content_type, upload_type } = request.body;
 
         // 3. Enforce MIME type rules per upload_type — server-side, cannot be bypassed
-        const TRANSPARENT_MIMES = ['image/webp', 'image/png', 'image/svg+xml'];
-        const OPAQUE_SAFE_MIMES  = ['image/webp', 'image/jpeg', 'image/jpg', 'image/png'];
-        const FONT_SAFE_MIMES    = [
+        const ALL_IMAGE_MIMES  = ['image/webp', 'image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
+        const FONT_SAFE_MIMES   = [
           'font/woff2', 'font/woff', 'font/ttf', 'font/otf',
           'application/font-woff', 'application/font-woff2',
           'font/opentype', 'application/x-font-ttf', 'application/x-font-opentype'
         ];
 
-        if ((upload_type === 'logo' || upload_type === 'icon') && !TRANSPARENT_MIMES.includes(content_type)) {
+        if ((upload_type === 'logo' || upload_type === 'icon' || upload_type === 'avatar' || upload_type === 'asset') && !ALL_IMAGE_MIMES.includes(content_type)) {
           return reply.status(422).send({
             error: 'Tipo de arquivo inválido',
-            message: `Logotipos e ícones devem ser enviados em formato WebP, PNG ou SVG para preservar a transparência. Tipo recebido: ${content_type}`,
-          });
-        }
-
-        if ((upload_type === 'avatar' || upload_type === 'asset') && !OPAQUE_SAFE_MIMES.includes(content_type)) {
-          return reply.status(422).send({
-            error: 'Tipo de arquivo inválido',
-            message: `Imagens do tipo "${upload_type}" devem ser WebP, JPEG ou PNG. Tipo recebido: ${content_type}`,
+            message: `Imagens devem ser enviadas nos formatos WebP, PNG, JPEG ou SVG. Tipo recebido: ${content_type}`,
           });
         }
 
@@ -407,6 +657,124 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // POST /v1/platform/upload/direct (Fallback de upload multipart via API backend)
+  fastify.post('/upload/direct', async (request, reply) => {
+    try {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+      }
+      verifyUserJwt(authHeader.split(' ')[1]);
+
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({ error: 'Upload Falhou', message: 'Nenhum arquivo foi enviado.' });
+      }
+
+      const buffer = await data.toBuffer();
+      const filename = data.filename || 'upload.png';
+      const mimetype = data.mimetype || 'image/png';
+
+      const fields: any = data.fields;
+      const uploadType = fields?.upload_type?.value || 'asset';
+
+      const settings = await db.query.platformSettings.findFirst();
+      if (
+        !settings ||
+        !settings.cloudflareAccountId ||
+        !settings.r2BucketName ||
+        !settings.r2AccessKeyId ||
+        !settings.r2SecretAccessKey
+      ) {
+        return reply.status(400).send({
+          error: 'R2 Não Configurado',
+          message: 'As credenciais do Cloudflare R2 não estão configuradas.',
+        });
+      }
+
+      const ext = mimetype.split('/')[1] || 'png';
+      const cleanName = filename.split('.')[0].replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 60);
+      const uniqueFileName = `${cleanName}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+      const fileKey = `media/${uploadType}/${uniqueFileName}`;
+
+      try {
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
+          credentials: {
+            accessKeyId: settings.r2AccessKeyId.trim(),
+            secretAccessKey: settings.r2SecretAccessKey.trim(),
+          },
+        });
+
+        await s3Client.send(
+          new PutObjectCommand({
+            Bucket: settings.r2BucketName.trim(),
+            Key: fileKey,
+            Body: buffer,
+            ContentType: mimetype,
+          })
+        );
+
+        const publicDomain = settings.r2PublicDomain
+          ? settings.r2PublicDomain.replace(/\/$/, '')
+          : `https://${settings.r2BucketName}.${settings.cloudflareAccountId}.r2.cloudflarestorage.com`;
+
+        const publicUrl = `${publicDomain}/${fileKey}`;
+
+        return reply.send({
+          url: publicUrl,
+          public_url: publicUrl,
+          key: fileKey,
+        });
+      } catch (s3Err: any) {
+        fastify.log.warn(`S3 PutObject no Cloudflare R2 falhou (${s3Err.message}). Utilizando fallback de storage local.`);
+        const localDir = path.join(process.cwd(), 'uploads', uploadType);
+        if (!fs.existsSync(localDir)) {
+          fs.mkdirSync(localDir, { recursive: true });
+        }
+        const localFilePath = path.join(localDir, uniqueFileName);
+        fs.writeFileSync(localFilePath, buffer);
+
+        const protocol = request.protocol || 'http';
+        const host = request.headers.host || `localhost:${process.env.PORT || 5000}`;
+        const localUrl = `${protocol}://${host}/v1/platform/files/${uploadType}/${uniqueFileName}`;
+
+        return reply.send({
+          url: localUrl,
+          public_url: localUrl,
+          key: fileKey,
+        });
+      }
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({
+        error: 'Erro no Upload Direto',
+        message: err.message || 'Falha ao processar upload direto.',
+      });
+    }
+  });
+
+  // GET /v1/platform/files/:type/:filename (Servidor de arquivos locais de fallback)
+  fastify.get('/files/:type/:filename', async (request, reply) => {
+    const { type, filename } = request.params as { type: string; filename: string };
+    const filePath = path.join(process.cwd(), 'uploads', type, filename);
+    if (!fs.existsSync(filePath)) {
+      return reply.status(404).send({ error: 'Arquivo não encontrado' });
+    }
+    const buffer = fs.readFileSync(filePath);
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = {
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+    };
+    reply.type(mimeMap[ext || ''] || 'application/octet-stream');
+    return reply.send(buffer);
+  });
 
   // GET /v1/platform/media
   // Lista todos os assets não-cropped de um determinado tenant

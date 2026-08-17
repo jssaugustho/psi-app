@@ -207,13 +207,13 @@ export default function NovaPaginaCaptacaoPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newSlug, setNewSlug] = useState('');
   
-  // Visual & Brand states
+  // Visual & Brand states initialized from psychologist's site default branding
   const [selectedPalette, setSelectedPalette] = useState(COLOR_PALETTES[0]);
-  const [isCustomColor, setIsCustomColor] = useState(false);
-  const [customPrimaryStart, setCustomPrimaryStart] = useState('#458270');
-  const [customPrimaryEnd, setCustomPrimaryEnd] = useState('#A64E2B');
-  const [customContrast, setCustomContrast] = useState('#FFFFFF');
-  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [isCustomColor, setIsCustomColor] = useState(Boolean(tenant?.defaultSitePrimaryColor));
+  const [customPrimaryStart, setCustomPrimaryStart] = useState(tenant?.defaultSitePrimaryColor || '#CC8667');
+  const [customPrimaryEnd, setCustomPrimaryEnd] = useState(tenant?.defaultSiteSecondaryColor || '#E6A88A');
+  const [customContrast, setCustomContrast] = useState(tenant?.contrastColor || '#FFFFFF');
+  const [newLogoUrl, setNewLogoUrl] = useState(tenant?.defaultSiteLogoUrl || '');
 
   // SEO states (auto-computed)
   const [metaTitle, setMetaTitle] = useState('');
@@ -230,7 +230,25 @@ export default function NovaPaginaCaptacaoPage() {
     return `${parts[0]} ${parts[1]}`;
   };
 
-  // Inherit psychologist's user name automatically (first 2 words, no prefix)
+  // Inherit psychologist default site branding & user name automatically
+  useEffect(() => {
+    if (tenant) {
+      if (tenant.defaultSitePrimaryColor) {
+        setCustomPrimaryStart(tenant.defaultSitePrimaryColor);
+        setIsCustomColor(true);
+      }
+      if (tenant.defaultSiteSecondaryColor) {
+        setCustomPrimaryEnd(tenant.defaultSiteSecondaryColor);
+      }
+      if (tenant.contrastColor) {
+        setCustomContrast(tenant.contrastColor);
+      }
+      if (tenant.defaultSiteLogoUrl && !newLogoUrl) {
+        setNewLogoUrl(tenant.defaultSiteLogoUrl);
+      }
+    }
+  }, [tenant]);
+
   useEffect(() => {
     if (newTitle) return; // Only set initial value once if empty
 
@@ -301,10 +319,12 @@ export default function NovaPaginaCaptacaoPage() {
       let baseDictionary = JSON.parse(JSON.stringify(templateModel.dictionary));
       let baseFormFlow = JSON.parse(JSON.stringify(templateModel.formFlow));
 
-      // Inject custom CRP if provided
+      // Inject custom site defaults if provided
       baseSiteConfig = {
         ...baseSiteConfig,
-        logoUrl: newLogoUrl.trim() || undefined,
+        logoUrl: newLogoUrl.trim() || tenant?.defaultSiteLogoUrl || undefined,
+        logoConfig: tenant?.defaultSiteLogoConfig || { mode: 'html', text: newTitle.trim(), iconType: 'psi' },
+        faviconUrl: tenant?.defaultSiteFaviconUrl || undefined,
         images: {
           hero: '',
           portrait: '',
@@ -318,7 +338,7 @@ export default function NovaPaginaCaptacaoPage() {
             primaryStart: activePrimaryStart,
             primaryEnd: activePrimaryEnd,
             contrast: activeContrast,
-            bgDark: '#FAFAFA',
+            bgDark: tenant?.bgLightColor || '#FAFAFA',
             textDark: '#18181B',
           }
         }

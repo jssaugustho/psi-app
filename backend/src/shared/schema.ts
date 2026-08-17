@@ -31,6 +31,9 @@ export const tenants = pgTable('tenants', {
   iconLightUrl: text('icon_light_url'),
   iconDarkUrl: text('icon_dark_url'),
   defaultSiteAvatarUrl: text('default_site_avatar_url'),
+  defaultSiteLogoUrl: text('default_site_logo_url'),
+  defaultSiteFaviconUrl: text('default_site_favicon_url'),
+  defaultSiteLogoConfig: jsonb('default_site_logo_config').$type<{ mode: 'html' | 'image'; text?: string; iconType?: 'psi' | 'custom'; customIconUrl?: string }>(),
   defaultSitePrimaryColor: text('default_site_primary_color').default('#4F46E5'),
   defaultSiteSecondaryColor: text('default_site_secondary_color').default('#06B6D4'),
 
@@ -69,6 +72,7 @@ export const platformSettings = pgTable('platform_settings', {
   r2PublicDomain: text('r2_public_domain'),
   r2AccessKeyId: text('r2_access_key_id'),
   r2SecretAccessKey: text('r2_secret_access_key'),
+  backupR2Buckets: jsonb('backup_r2_buckets').default([]).notNull(),
   // Resend — envio de e-mails transacionais
   resendApiKey: text('resend_api_key'),
   resendFromDomain: text('resend_from_domain'),

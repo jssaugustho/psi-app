@@ -64,6 +64,15 @@ export interface Tenant {
   updatedAt?: string;
 }
 
+export interface R2BucketConfig {
+  id: string;
+  name: string;
+  publicDomain: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  isBackup?: boolean;
+}
+
 export interface PlatformSettings {
   id: string;
   cloudflare_api_token: string | null;
@@ -74,6 +83,7 @@ export interface PlatformSettings {
   r2_public_domain: string | null;
   r2_access_key_id: string | null;
   r2_secret_access_key: string | null;
+  backup_r2_buckets?: R2BucketConfig[];
   resend_api_key: string | null;
   resend_from_domain: string | null;
   has_resend: boolean;
@@ -247,7 +257,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   let data: any = {};
   if (text) {
     try {
-      data = contentType?.includes('application/json') ? JSON.parse(text) : { message: text };
+      data = contentType?.includes('json') ? JSON.parse(text) : { message: text };
     } catch {
       data = { message: text };
     }
@@ -343,6 +353,45 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // Salvar apenas credenciais de Domínio do Cloudflare
+  saveCloudflareDomains: (body: {
+    api_token?: string;
+    zone_id: string;
+    account_id: string;
+    base_domain?: string;
+  }) =>
+    fetchApi<{ message: string; zone_id: string; base_domain?: string }>('/platform/cloudflare/domains', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Salvar credenciais de Armazenamento (Bucket Principal R2 + Buckets de Reserva)
+  saveR2Storage: (body: {
+    r2_bucket_name: string;
+    r2_public_domain: string;
+    r2_access_key_id?: string;
+    r2_secret_access_key?: string;
+    backup_r2_buckets?: R2BucketConfig[];
+  }) =>
+    fetchApi<{ message: string; r2_bucket_name: string; backup_buckets_count: number }>('/platform/cloudflare/storage', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Testar Conexão & Validar Permissões do Cloudflare
+  testCloudflarePermissions: (body: { api_token?: string; zone_id?: string; account_id?: string }) =>
+    fetchApi<{
+      success: boolean;
+      tokenValid: boolean;
+      zoneActive: boolean;
+      zoneName: string;
+      sslStatus: string;
+      permissions: Array<{ name: string; status: 'ok' | 'warning' | 'error'; detail: string }>;
+    }>('/platform/cloudflare/test-permissions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   // Listar Zones da conta Cloudflare
   getCloudflareZones: (apiToken?: string) =>
     fetchApi<{ success: boolean; zones: Array<{ id: string; name: string; status: string }> }>(
@@ -368,10 +417,10 @@ export const api = {
    * Retorna a URL pública permanente do arquivo.
    */
   uploadImage: async (file: File, type: UploadType): Promise<{ url: string; key: string }> => {
-    // 1. Comprimir client-side
+    // 1. Comprimir client-side com Canvas API (@psi/image-utils)
     const compressed = await compressImage(file, type);
 
-    // 2. Pedir Presigned URL diretamente via fetchApi
+    // 2. Pedir Presigned URL diretamente ao backend
     const { upload_url, public_url, key } = await fetchApi<{ upload_url: string; public_url: string; key: string }>(
       '/platform/upload/presign',
       {
@@ -384,7 +433,7 @@ export const api = {
       }
     );
 
-    // 3. PUT direto no R2 — a VPS nunca toca no arquivo
+    // 3. PUT direto no Cloudflare R2 (sem passar pela VPS)
     const uploadRes = await fetch(upload_url, {
       method: 'PUT',
       body: compressed,
@@ -392,7 +441,11 @@ export const api = {
     });
 
     if (!uploadRes.ok) {
-      throw new Error(`Falha ao enviar arquivo para o R2: ${uploadRes.statusText}`);
+      const errText = await uploadRes.text().catch(() => '');
+      if (errText.includes('AccessDenied') || uploadRes.status === 403) {
+        throw new Error('Acesso Negado pelo Cloudflare R2. Verifique se a R2 Secret Access Key salva em Configurações > Cloudflare & R2 está correta.');
+      }
+      throw new Error(`Falha ao enviar arquivo para o R2: ${uploadRes.statusText || uploadRes.status}`);
     }
 
     return { url: public_url, key };

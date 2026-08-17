@@ -74,6 +74,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         router.push('/login');
       } else if (user.role === 'admin') {
         loadPlatformStatus();
+      } else {
+        setCheckingPlatform(false);
       }
     }
   }, [loading, user, router, loadPlatformStatus]);

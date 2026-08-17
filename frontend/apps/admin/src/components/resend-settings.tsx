@@ -59,6 +59,12 @@ export function ResendSettings({ currentFromDomain, hasResend, onSaved }: Resend
     }
   }, [hasResend, currentFromDomain, loadDns]);
 
+  useEffect(() => {
+    if (currentFromDomain) {
+      setFromDomain(currentFromDomain);
+    }
+  }, [currentFromDomain]);
+
   // Salvar apenas a API Key
   const handleSaveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();

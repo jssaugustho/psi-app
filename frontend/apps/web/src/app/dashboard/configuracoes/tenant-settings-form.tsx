@@ -6,6 +6,8 @@ import { Card, Button, Input } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
 import { useAuth } from '@/context/AuthContext';
 import { MediaLibraryModal } from '@/components/media-library-modal';
+import { LogoOptionModal } from '@/components/logo-option-modal';
+import { LogoBuilderModal } from '@/components/logo-builder-modal';
 import {
   User as UserIcon,
   Palette,
@@ -23,7 +25,8 @@ import {
   HelpCircle,
   Camera,
   Lock,
-  Mail
+  Mail,
+  Edit3
 } from 'lucide-react';
 
 interface TenantSettingsFormProps {
@@ -161,6 +164,135 @@ const UploadBox = ({
   );
 };
 
+/* Componente Dedicado de Logotipo Padrão dos Sites (HTML ou Imagem) */
+const SiteLogoField = ({
+  logoConfig,
+  logoUrl,
+  bgColor,
+  primaryColor,
+  secondaryColor,
+  contrastColor,
+  onOpenOptions,
+  onOpenBuilder,
+  onOpenLibrary,
+  onRemoveLogo,
+}: {
+  logoConfig: { mode: 'html' | 'image'; text?: string; iconType?: 'psi' | 'custom'; customIconUrl?: string };
+  logoUrl: string;
+  bgColor: string;
+  primaryColor: string;
+  secondaryColor: string;
+  contrastColor: string;
+  onOpenOptions: () => void;
+  onOpenBuilder: () => void;
+  onOpenLibrary: () => void;
+  onRemoveLogo: () => void;
+}) => {
+  const isHtmlMode = logoConfig?.mode === 'html';
+  const hasLogo = isHtmlMode ? Boolean(logoConfig?.text) : Boolean(logoUrl);
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <h4 className="text-xs font-bold text-slate-200">Logotipo Padrão dos Seus Sites</h4>
+        <p className="text-[11px] text-slate-400 leading-tight">
+          Exibido no topo (cabeçalho) e rodapé dos novos sites que você criar. Você pode usar uma imagem pronta ou criar um logotipo em HTML.
+        </p>
+      </div>
+
+      <div
+        style={{ backgroundColor: bgColor || '#09090B' }}
+        className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[var(--surface-border)] overflow-hidden p-6 min-h-[140px] group transition-all"
+      >
+        {hasLogo ? (
+          <div className="flex flex-col items-center justify-center space-y-3 w-full">
+            {/* Preview do Logotipo */}
+            {isHtmlMode ? (
+              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-black/30 border border-white/10 shadow-sm">
+                <div
+                  style={{
+                    background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                    color: contrastColor,
+                  }}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow shrink-0"
+                >
+                  {logoConfig.iconType === 'custom' && logoConfig.customIconUrl ? (
+                    <img src={logoConfig.customIconUrl} alt="Ícone" className="h-5 w-5 object-contain" />
+                  ) : (
+                    'Ψ'
+                  )}
+                </div>
+                <span className="text-sm font-bold text-slate-100 tracking-wide font-serif">
+                  {logoConfig.text || 'Psicologia'}
+                </span>
+              </div>
+            ) : (
+              <img src={logoUrl} alt="Logotipo Padrão" className="max-h-20 max-w-full object-contain p-1" />
+            )}
+
+            {/* Badges e Ações */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/10 text-slate-300 border border-white/10">
+                {isHtmlMode ? '✨ Logotipo em HTML' : '🖼️ Imagem Enviada'}
+              </span>
+
+              {isHtmlMode ? (
+                <button
+                  type="button"
+                  onClick={onOpenBuilder}
+                  className="text-xs font-semibold px-3 py-1 bg-[var(--brand-gradient-start)] text-white rounded-lg hover:brightness-110 transition-all border-none cursor-pointer flex items-center gap-1"
+                >
+                  <Edit3 className="w-3 h-3" /> Editar Texto & Ícone
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenLibrary}
+                  className="text-xs font-semibold px-3 py-1 bg-white/10 text-slate-200 rounded-lg hover:bg-white/20 transition-all border-none cursor-pointer"
+                >
+                  Trocar Imagem
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onOpenOptions}
+                className="text-xs font-semibold px-3 py-1 bg-white/10 text-slate-300 rounded-lg hover:bg-white/20 transition-all border-none cursor-pointer"
+              >
+                Alterar Estilo
+              </button>
+
+              <button
+                type="button"
+                onClick={onRemoveLogo}
+                className="text-xs font-semibold px-2 py-1 text-red-400 hover:text-red-300 transition-colors bg-transparent border-none cursor-pointer"
+                title="Remover logotipo"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center space-y-3 py-2">
+            <Sparkles className="w-7 h-7 text-slate-500 mx-auto" />
+            <div>
+              <span className="text-xs text-slate-300 font-bold block mb-1">Nenhum logotipo padrão definido</span>
+              <span className="text-[11px] text-slate-500 block">Crie um logotipo visual em HTML ou suba uma imagem pronta.</span>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenOptions}
+              className="px-4 py-2 text-xs font-bold text-white rounded-xl bg-[var(--brand-gradient-start)] hover:brightness-110 transition-all border-none cursor-pointer shadow"
+            >
+              Definir Logotipo Padrão
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* Componente Dedicado de Foto de Perfil */
 const ProfileAvatarField = ({
   avatarUrl,
@@ -263,9 +395,28 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // 2. Identidade Visual dos Sites State (Logo + Favicon + Cores + Fundo + Contraste)
-  const [logoUrl, setLogoUrl] = useState(tenant.logoDarkUrl || tenant.logoLightUrl || '');
-  const [iconUrl, setIconUrl] = useState(tenant.iconLightUrl || tenant.iconDarkUrl || '');
+  // 2. Marca Padrão dos Sites State (Independente do White-Label do SaaS)
+  const [logoUrl, setLogoUrl] = useState<string>(tenant.defaultSiteLogoUrl || '');
+  const [faviconUrl, setFaviconUrl] = useState<string>(tenant.defaultSiteFaviconUrl || tenant.iconLightUrl || tenant.iconDarkUrl || '');
+  const [logoConfig, setLogoConfig] = useState<{
+    mode: 'html' | 'image';
+    text?: string;
+    iconType?: 'psi' | 'custom';
+    customIconUrl?: string;
+  }>(
+    tenant.defaultSiteLogoConfig || {
+      mode: logoUrl ? 'image' : 'html',
+      text: `${initialUser?.nome || 'Psicóloga'} ${initialUser?.sobrenome || ''}`.trim(),
+      iconType: 'psi',
+    }
+  );
+
+  // Modais do Criador de Logo dos Sites
+  const [logoOptionModalOpen, setLogoOptionModalOpen] = useState(false);
+  const [logoBuilderModalOpen, setLogoBuilderModalOpen] = useState(false);
+  const [siteLogoLibraryOpen, setSiteLogoLibraryOpen] = useState(false);
+
+  // Cores dos Sites
   const [primaryColor, setPrimaryColor] = useState(tenant.defaultSitePrimaryColor || '#CC8667');
   const [secondaryColor, setSecondaryColor] = useState(tenant.defaultSiteSecondaryColor || '#E6A88A');
   const [bgColor, setBgColor] = useState(tenant.bgLightColor || '#FAFAFA');
@@ -425,15 +576,13 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
       setNewPassword('');
       setConfirmPassword('');
 
-      // 3. Salvar Marca, Cores (Primária, Secundária, Fundo, Contraste) e Domínio dos Sites
+      // 3. Salvar Marca Padrão dos Sites (NÃO altera o nome do Tenant ou marca da Plataforma)
       await api.updateTenantBranding(tenant.id, {
-        name: `${nome.trim()} ${sobrenome.trim()}`.trim() || tenant.name,
         slug: slug.trim().toLowerCase(),
         domain: domain.trim() || null,
-        logoLightUrl: logoUrl || null,
-        logoDarkUrl: logoUrl || null,
-        iconLightUrl: iconUrl || null,
-        iconDarkUrl: iconUrl || null,
+        defaultSiteLogoUrl: logoUrl || null,
+        defaultSiteFaviconUrl: faviconUrl || null,
+        defaultSiteLogoConfig: logoConfig,
         defaultSitePrimaryColor: primaryColor,
         defaultSiteSecondaryColor: secondaryColor,
         bgLightColor: bgColor,
@@ -442,7 +591,6 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
       });
 
       setSuccess('Suas configurações foram salvas com sucesso!');
-      await reloadBrand();
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Não foi possível salvar as configurações.');
@@ -776,28 +924,36 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
                 Visual e Marca do Seu Site
               </h3>
               <p className="text-xs text-slate-400 mb-6">
-                Escolha a sua logomarca e as cores que serão usadas no fundo, botões e textos das suas páginas.
+                Escolha a sua logomarca e as cores que serão usadas no fundo, botões e textos das suas páginas de atendimento.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <UploadBox
-                  label="Sua Logomarca Profissional"
-                  description="Sua logo exibida no topo (cabeçalho) e no rodapé das suas páginas de atendimento."
-                  url={logoUrl}
+                {/* Campo de Logotipo Padrão dos Sites */}
+                <SiteLogoField
+                  logoConfig={logoConfig}
+                  logoUrl={logoUrl}
                   bgColor={bgColor}
-                  tenantId={tenant.id}
-                  onChange={(u) => setLogoUrl(u)}
-                  onClear={() => setLogoUrl('')}
+                  primaryColor={primaryColor}
+                  secondaryColor={secondaryColor}
+                  contrastColor={contrastColor}
+                  onOpenOptions={() => setLogoOptionModalOpen(true)}
+                  onOpenBuilder={() => setLogoBuilderModalOpen(true)}
+                  onOpenLibrary={() => setSiteLogoLibraryOpen(true)}
+                  onRemoveLogo={() => {
+                    setLogoUrl('');
+                    setLogoConfig({ mode: 'html', text: '', iconType: 'psi' });
+                  }}
                 />
 
+                {/* Favicon da Aba do Navegador */}
                 <UploadBox
                   label="Ícone da Aba do Navegador (Favicon)"
                   description="Pequeno ícone exibido no topo da aba do navegador dos seus clientes ao acessar seu site."
-                  url={iconUrl}
+                  url={faviconUrl}
                   bgColor={bgColor}
                   tenantId={tenant.id}
-                  onChange={(u) => setIconUrl(u)}
-                  onClear={() => setIconUrl('')}
+                  onChange={(u) => setFaviconUrl(u)}
+                  onClear={() => setFaviconUrl('')}
                 />
               </div>
 
@@ -865,6 +1021,51 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
                 </div>
               </div>
             </Card>
+
+            {/* Modais de Escolha e Criação de Logo dos Sites */}
+            <LogoOptionModal
+              isOpen={logoOptionModalOpen}
+              onClose={() => setLogoOptionModalOpen(false)}
+              onSelectOption={(mode) => {
+                if (mode === 'html') {
+                  setLogoConfig({
+                    mode: 'html',
+                    text: logoConfig?.text || `${nome || 'Psicóloga'} ${sobrenome || ''}`.trim(),
+                    iconType: logoConfig?.iconType || 'psi',
+                  });
+                  setLogoBuilderModalOpen(true);
+                } else {
+                  setSiteLogoLibraryOpen(true);
+                }
+              }}
+            />
+
+            <LogoBuilderModal
+              isOpen={logoBuilderModalOpen}
+              onClose={() => setLogoBuilderModalOpen(false)}
+              tenantId={tenant.id}
+              initialText={logoConfig?.text || `${nome || 'Psicóloga'} ${sobrenome || ''}`.trim()}
+              initialIconType={logoConfig?.iconType || 'psi'}
+              initialCustomIconUrl={logoConfig?.customIconUrl || ''}
+              gradientStart={primaryColor}
+              gradientEnd={secondaryColor}
+              contrastColor={contrastColor}
+              onSave={(cfg) => {
+                setLogoConfig(cfg);
+                setLogoUrl('');
+              }}
+            />
+
+            <MediaLibraryModal
+              isOpen={siteLogoLibraryOpen}
+              onClose={() => setSiteLogoLibraryOpen(false)}
+              tenantId={tenant.id}
+              uploadType="logo"
+              onSelectImage={(asset) => {
+                setLogoUrl(asset.url);
+                setLogoConfig({ mode: 'image' });
+              }}
+            />
           </div>
         )}
 

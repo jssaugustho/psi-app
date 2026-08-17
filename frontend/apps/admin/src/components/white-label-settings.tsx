@@ -71,10 +71,28 @@ const UploadBox = ({
   previewBg: string;
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
     if (uploading) return;
     inputRef.current?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!uploading) setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (uploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) onUpload(file);
   };
 
   return (
@@ -82,10 +100,23 @@ const UploadBox = ({
       <p className="text-xs font-semibold opacity-70 uppercase tracking-wide">{label}</p>
       <div
         onClick={handleClick}
-        className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-slate-700/60 overflow-hidden cursor-pointer hover:border-slate-500/80 transition-all group"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`relative flex items-center justify-center rounded-xl border-2 border-dashed overflow-hidden cursor-pointer transition-all group ${
+          dragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-700/60 hover:border-slate-500/80'
+        }`}
         style={{ minHeight: 90, backgroundColor: previewBg }}
       >
-        {url ? (
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2 py-4 px-6 text-xs text-indigo-400">
+            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className="font-medium animate-pulse">Otimizando e Enviando…</span>
+          </div>
+        ) : url ? (
           <>
             <img src={url} alt={label} className="max-h-16 max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
             
@@ -109,7 +140,8 @@ const UploadBox = ({
           </>
         ) : (
           <div className="text-xs opacity-50 hover:opacity-100 transition-opacity py-4 px-6 flex flex-col items-center gap-1">
-            <span>{uploading ? '⏳ Enviando…' : '+ Adicionar'}</span>
+            <span>+ Adicionar</span>
+            <span className="text-[10px] opacity-60">Arraste ou clique para selecionar</span>
           </div>
         )}
       </div>
@@ -120,7 +152,10 @@ const UploadBox = ({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) onUpload(file);
+          if (file) {
+            onUpload(file);
+            e.target.value = '';
+          }
         }}
       />
     </div>
@@ -140,6 +175,23 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
     gradient_color_end: tenant.gradientColorEnd ?? '#06B6D4',
     contrast_color: tenant.contrastColor ?? '#FFFFFF',
   });
+
+  useEffect(() => {
+    if (tenant) {
+      setForm({
+        name: tenant.name ?? '',
+        slug: tenant.slug ?? '',
+        domain: tenant.domain ?? '',
+        logo_light_url: tenant.logoLightUrl ?? '',
+        logo_dark_url: tenant.logoDarkUrl ?? '',
+        icon_light_url: tenant.iconLightUrl ?? '',
+        icon_dark_url: tenant.iconDarkUrl ?? '',
+        gradient_color_start: tenant.gradientColorStart ?? '#4F46E5',
+        gradient_color_end: tenant.gradientColorEnd ?? '#06B6D4',
+        contrast_color: tenant.contrastColor ?? '#FFFFFF',
+      });
+    }
+  }, [tenant]);
 
 
   const [saving, setSaving] = useState(false);
