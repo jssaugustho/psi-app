@@ -46,10 +46,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const applyBrandStyles = useCallback((pTenant: Tenant | null, uTenant: Tenant | null, currentTheme: ThemeMode) => {
     const root = document.documentElement;
 
-    const brandForAppShell = pTenant || uTenant;
-    const start = brandForAppShell?.gradientColorStart || '#4F46E5';
-    const end = brandForAppShell?.gradientColorEnd || '#06B6D4';
-    const contrast = brandForAppShell?.contrastColor || '#FFFFFF';
+    const activeTenant = uTenant || pTenant;
+    const start = uTenant?.gradientColorStart || pTenant?.gradientColorStart || '#4F46E5';
+    const end = uTenant?.gradientColorEnd || pTenant?.gradientColorEnd || '#06B6D4';
+    const contrast = uTenant?.contrastColor || pTenant?.contrastColor || '#FFFFFF';
 
     root.style.setProperty('--brand-gradient-start', start);
     root.style.setProperty('--brand-gradient-end', end);
@@ -70,11 +70,11 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--brand-text-color', '#F4F4F5');     // zinc-100
     }
 
-    // Favicon e Título usam SEMPRE a identidade do Tenant-Pai da Plataforma
+    // Favicon e Ícone: Tenant ativo -> Fallback Tenant-Pai
     const iconUrl =
       currentTheme === 'light'
-        ? brandForAppShell?.iconLightUrl || brandForAppShell?.iconDarkUrl
-        : brandForAppShell?.iconDarkUrl || brandForAppShell?.iconLightUrl;
+        ? (uTenant?.iconLightUrl || uTenant?.iconDarkUrl || uTenant?.logoLightUrl || uTenant?.logoDarkUrl || pTenant?.iconLightUrl || pTenant?.iconDarkUrl || pTenant?.logoLightUrl || pTenant?.logoDarkUrl)
+        : (uTenant?.iconDarkUrl || uTenant?.iconLightUrl || uTenant?.logoDarkUrl || uTenant?.logoLightUrl || pTenant?.iconDarkUrl || pTenant?.iconLightUrl || pTenant?.logoDarkUrl || pTenant?.logoLightUrl);
 
     if (iconUrl) {
       const existingIcons = document.querySelectorAll("link[rel*='icon']");
@@ -91,8 +91,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (brandForAppShell?.name) {
-      document.title = brandForAppShell.name;
+    if (activeTenant?.name) {
+      document.title = activeTenant.name;
     }
   }, []);
 
@@ -173,8 +173,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
     const logoUrl =
       theme === 'light'
-        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl)
-        : (tenant?.logoDarkUrl || tenant?.logoLightUrl);
+        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+        : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
     let spinnerStartTime = Date.now();
     let doneTimer: NodeJS.Timeout;
     let remainingTimer: NodeJS.Timeout;
@@ -216,10 +216,14 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       if (doneTimer) clearTimeout(doneTimer);
       if (remainingTimer) clearTimeout(remainingTimer);
     };
-  }, [loading, tenant]);
+  }, [loading, tenant, primaryTenant, theme]);
 
   const isBootReady = loaderState === 'done';
-  const bootBrand = primaryTenant || tenant;
+  const bootLogoUrl =
+    theme === 'light'
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
+  const bootBrandName = tenant?.name || primaryTenant?.name || 'Psi App';
 
   return (
     <BrandContext.Provider value={{ tenant, primaryTenant, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
@@ -250,11 +254,11 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
               gap: '32px',
               animation: 'fadeIn 0.5s ease-out forwards',
             }}>
-              {/* Logo da Plataforma (Tenant-Pai) */}
-              {(theme === 'light' ? (bootBrand?.logoLightUrl || bootBrand?.logoDarkUrl) : (bootBrand?.logoDarkUrl || bootBrand?.logoLightUrl)) ? (
+              {/* Logo (Tenant -> Fallback Tenant-Pai) */}
+              {bootLogoUrl ? (
                 <img 
-                  src={theme === 'light' ? (bootBrand?.logoLightUrl || bootBrand?.logoDarkUrl || '') : (bootBrand?.logoDarkUrl || bootBrand?.logoLightUrl || '')} 
-                  alt={bootBrand?.name || 'Psi App'} 
+                  src={bootLogoUrl} 
+                  alt={bootBrandName} 
                   style={{
                     maxHeight: '64px',
                     maxWidth: '240px',

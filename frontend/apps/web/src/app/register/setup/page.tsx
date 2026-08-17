@@ -10,7 +10,7 @@ import { Card, Input, Button } from '@psi/ui';
 export default function RegisterSetupPage() {
   const router = useRouter();
   const { user, setUser, loading: authLoading } = useAuth();
-  const { tenant, theme, toggleTheme } = useBrand();
+  const { tenant, primaryTenant, theme, toggleTheme } = useBrand();
   
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
@@ -82,8 +82,8 @@ export default function RegisterSetupPage() {
 
   const logoUrl =
     theme === 'light'
-      ? tenant?.logoLightUrl || tenant?.logoDarkUrl
-      : tenant?.logoDarkUrl || tenant?.logoLightUrl;
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
   if (authLoading || !user) {
     return (

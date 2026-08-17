@@ -8,7 +8,7 @@ import { Button, Input, Card } from '@psi/ui';
 
 export default function RegisterPage() {
   const { register } = useAuth();
-  const { tenant, theme, toggleTheme } = useBrand();
+  const { tenant, primaryTenant, theme, toggleTheme } = useBrand();
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -33,8 +33,8 @@ export default function RegisterPage() {
 
   const logoUrl =
     theme === 'light'
-      ? tenant?.logoLightUrl || tenant?.logoDarkUrl
-      : tenant?.logoDarkUrl || tenant?.logoLightUrl;
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">

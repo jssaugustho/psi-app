@@ -23,7 +23,7 @@ export function NotFoundView({ tenant, primaryTenant, requestedSlug, requestedDo
   const cardDark = activeTenant?.cardDarkColor || '#18181B';
   const textDark = activeTenant?.textDarkColor || '#FFFFFF';
 
-  const tenantLogo = activeTenant?.logoDarkUrl || activeTenant?.logoLightUrl;
+  const tenantLogo = tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl;
 
   const handleGoBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {

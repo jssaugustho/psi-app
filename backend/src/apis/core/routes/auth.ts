@@ -272,20 +272,22 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           // Resolve o tenant a partir do origin/referer da requisição para envio white-label correto
           let matchedTenant = await resolveTenantFromRequest(request);
 
-          // Se não encontrou pelo cabeçalho da requisição, busca o tenant primário como fallback
+          let primaryTenant = null;
+          const settings = await db.query.platformSettings.findFirst();
+          if (settings?.primaryTenantId) {
+            primaryTenant = await db.query.tenants.findFirst({
+              where: eq(tenants.id, settings.primaryTenantId),
+            }) ?? null;
+          }
+
           if (!matchedTenant) {
-            const settings = await db.query.platformSettings.findFirst();
-            if (settings?.primaryTenantId) {
-              matchedTenant = await db.query.tenants.findFirst({
-                where: eq(tenants.id, settings.primaryTenantId),
-              }) ?? null;
-            }
+            matchedTenant = primaryTenant;
           }
 
           const brandName = matchedTenant?.name ?? 'Plataforma';
           const gradientStart = matchedTenant?.gradientColorStart ?? '#4F46E5';
           const gradientEnd = matchedTenant?.gradientColorEnd ?? '#06B6D4';
-          const logoUrl = matchedTenant ? (matchedTenant.logoDarkUrl || matchedTenant.logoLightUrl || null) : null;
+          const logoUrl = matchedTenant?.logoDarkUrl || matchedTenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl || null;
 
           // Gerar assunto de e-mail dinâmico e personalizado para evitar agrupamento no Gmail
           const now = new Date();
@@ -666,11 +668,19 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        // 4. Disparar e-mail com a identidade visual do consultório
         const brandName = invitingTenant.name ?? 'Psi App';
         const gradientStart = invitingTenant.gradientColorStart ?? '#4F46E5';
         const gradientEnd = invitingTenant.gradientColorEnd ?? '#06B6D4';
-        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || null;
+        let primaryTenant = null;
+        if (!invitingTenant.logoDarkUrl && !invitingTenant.logoLightUrl) {
+          const settings = await db.query.platformSettings.findFirst();
+          if (settings?.primaryTenantId) {
+            primaryTenant = await db.query.tenants.findFirst({
+              where: eq(tenants.id, settings.primaryTenantId),
+            }) ?? null;
+          }
+        }
+        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl || null;
 
         // Converter role técnica para nome legível em português
         const roleLabels: Record<string, string> = {
@@ -812,7 +822,16 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         const brandName = invitingTenant.name ?? 'Psi App';
         const gradientStart = invitingTenant.gradientColorStart ?? '#4F46E5';
         const gradientEnd = invitingTenant.gradientColorEnd ?? '#06B6D4';
-        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || null;
+        let primaryTenantResend = null;
+        if (!invitingTenant.logoDarkUrl && !invitingTenant.logoLightUrl) {
+          const settings = await db.query.platformSettings.findFirst();
+          if (settings?.primaryTenantId) {
+            primaryTenantResend = await db.query.tenants.findFirst({
+              where: eq(tenants.id, settings.primaryTenantId),
+            }) ?? null;
+          }
+        }
+        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || primaryTenantResend?.logoDarkUrl || primaryTenantResend?.logoLightUrl || null;
 
         const roleLabels: Record<string, string> = {
           admin: 'Administrador',

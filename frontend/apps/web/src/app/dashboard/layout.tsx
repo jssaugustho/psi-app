@@ -320,18 +320,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     { label: 'Configurações', href: '/dashboard/configuracoes', icon: <SettingsIcon />, active: pathname === '/dashboard/configuracoes' },
   ];
 
-  const brandForAppShell = primaryTenant || tenant;
-  const appName = brandForAppShell?.name || 'Psi App';
+  const appName = tenant?.name || primaryTenant?.name || 'Psi App';
 
   const logoUrl =
     theme === 'light'
-      ? brandForAppShell?.logoLightUrl || brandForAppShell?.logoDarkUrl
-      : brandForAppShell?.logoDarkUrl || brandForAppShell?.logoLightUrl;
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
   const iconUrl =
     theme === 'light'
-      ? brandForAppShell?.iconLightUrl || brandForAppShell?.iconDarkUrl
-      : brandForAppShell?.iconDarkUrl || brandForAppShell?.iconLightUrl;
+      ? (tenant?.iconLightUrl || tenant?.iconDarkUrl || tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.iconLightUrl || primaryTenant?.iconDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.iconDarkUrl || tenant?.iconLightUrl || tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.iconDarkUrl || primaryTenant?.iconLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
   return (
     <AppShell

@@ -8,7 +8,7 @@ import { Button, Input, Card } from '@psi/ui';
 
 export default function LoginPage() {
   const { login, user, loading: authLoading } = useAuth();
-  const { tenant, theme, toggleTheme, isBootReady } = useBrand();
+  const { tenant, primaryTenant, theme, toggleTheme, isBootReady } = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);

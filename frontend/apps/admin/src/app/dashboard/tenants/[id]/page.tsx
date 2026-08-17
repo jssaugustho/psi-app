@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
@@ -485,7 +486,17 @@ export default function TenantBrandingPage() {
           {/* SEÇÃO 2: White-Label (Logos, Ícones e Tema) */}
           <Card>
             <div className="space-y-6">
-              <h3 className="text-base font-bold text-slate-200 pb-2 border-b border-slate-800/60 font-semibold">Identidade Visual (White-Label)</h3>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800/60 flex-wrap gap-2">
+                <h3 className="text-base font-bold text-slate-200">Identidade Visual & Branding do Site</h3>
+                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                  {form.isPrimary ? '🌟 Marca Oficial da Plataforma (App Shell)' : '🌐 Personalização dos Sites de Captação'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {form.isPrimary 
+                  ? 'Estes logotipos e cores definem o visual global do sistema (App Shell, barra lateral, tela de login e favicon do painel).' 
+                  : 'Logotipos e paleta padrão para os sites e páginas de captação gerados por este consultório.'}
+              </p>
               
               {/* Uploads (R2) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -768,9 +779,9 @@ export default function TenantBrandingPage() {
         </Card>
 
       {/* ── MODAL: CONFIRMAR EXCLUSÃO DEFINITIVA ── */}
-      {isDeleteModalOpen && tenant && (
-        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
-          <div className="glass-lg w-full max-w-md rounded-2xl border border-red-500/20 p-6 space-y-6 animate-scale-up">
+      {isDeleteModalOpen && tenant && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="glass-lg w-full max-w-md rounded-2xl border border-red-500/20 p-6 space-y-6 animate-scale-up shadow-2xl">
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-red-400">Confirmar Exclusão</h3>
@@ -785,12 +796,12 @@ export default function TenantBrandingPage() {
             </div>
 
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg leading-relaxed">
-              ⚠️��� **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste tenant após esta operação.
+              ⚠️ **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste tenant após esta operação.
             </div>
 
             <div className="space-y-3">
               <p className="text-xs text-slate-300 leading-normal">
-                Para confirmar a exclusãoo definitiva, digite o nome exato do tenant <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
+                Para confirmar a exclusão definitiva, digite o nome exato do tenant <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
               </p>
               <input
                 type="text"
@@ -822,13 +833,14 @@ export default function TenantBrandingPage() {
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── MODAL: CONFIRMAR ALTERAÇÃO DE TENANT PRINCIPAL ── */}
-      {isConfirmPrimaryModalOpen && (
-        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
-          <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up">
+      {isConfirmPrimaryModalOpen && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up shadow-2xl">
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-slate-100">Alterar Tenant Principal</h3>
@@ -867,7 +879,8 @@ export default function TenantBrandingPage() {
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       </>
       )}

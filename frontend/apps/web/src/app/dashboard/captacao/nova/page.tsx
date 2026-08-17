@@ -196,7 +196,7 @@ const DEFAULT_TEMPLATE_MODEL = {
 export default function NovaPaginaCaptacaoPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { tenant } = useBrand();
+  const { tenant, primaryTenant } = useBrand();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -209,11 +209,11 @@ export default function NovaPaginaCaptacaoPage() {
   
   // Visual & Brand states initialized from psychologist's site default branding
   const [selectedPalette, setSelectedPalette] = useState(COLOR_PALETTES[0]);
-  const [isCustomColor, setIsCustomColor] = useState(Boolean(tenant?.defaultSitePrimaryColor));
-  const [customPrimaryStart, setCustomPrimaryStart] = useState(tenant?.defaultSitePrimaryColor || '#CC8667');
-  const [customPrimaryEnd, setCustomPrimaryEnd] = useState(tenant?.defaultSiteSecondaryColor || '#E6A88A');
-  const [customContrast, setCustomContrast] = useState(tenant?.contrastColor || '#FFFFFF');
-  const [newLogoUrl, setNewLogoUrl] = useState(tenant?.defaultSiteLogoUrl || '');
+  const [isCustomColor, setIsCustomColor] = useState(Boolean(tenant?.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor));
+  const [customPrimaryStart, setCustomPrimaryStart] = useState(tenant?.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor || '#CC8667');
+  const [customPrimaryEnd, setCustomPrimaryEnd] = useState(tenant?.defaultSiteSecondaryColor || primaryTenant?.defaultSiteSecondaryColor || '#E6A88A');
+  const [customContrast, setCustomContrast] = useState(tenant?.contrastColor || primaryTenant?.contrastColor || '#FFFFFF');
+  const [newLogoUrl, setNewLogoUrl] = useState(tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || '');
 
   // SEO states (auto-computed)
   const [metaTitle, setMetaTitle] = useState('');
@@ -232,22 +232,25 @@ export default function NovaPaginaCaptacaoPage() {
 
   // Inherit psychologist default site branding & user name automatically
   useEffect(() => {
-    if (tenant) {
-      if (tenant.defaultSitePrimaryColor) {
-        setCustomPrimaryStart(tenant.defaultSitePrimaryColor);
-        setIsCustomColor(true);
-      }
-      if (tenant.defaultSiteSecondaryColor) {
-        setCustomPrimaryEnd(tenant.defaultSiteSecondaryColor);
-      }
-      if (tenant.contrastColor) {
-        setCustomContrast(tenant.contrastColor);
-      }
-      if (tenant.defaultSiteLogoUrl && !newLogoUrl) {
-        setNewLogoUrl(tenant.defaultSiteLogoUrl);
-      }
+    const activeSiteLogo = tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl;
+    const activePrimaryColor = tenant?.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor;
+    const activeSecondaryColor = tenant?.defaultSiteSecondaryColor || primaryTenant?.defaultSiteSecondaryColor;
+    const activeContrastColor = tenant?.contrastColor || primaryTenant?.contrastColor;
+
+    if (activePrimaryColor) {
+      setCustomPrimaryStart(activePrimaryColor);
+      setIsCustomColor(true);
     }
-  }, [tenant]);
+    if (activeSecondaryColor) {
+      setCustomPrimaryEnd(activeSecondaryColor);
+    }
+    if (activeContrastColor) {
+      setCustomContrast(activeContrastColor);
+    }
+    if (activeSiteLogo && !newLogoUrl) {
+      setNewLogoUrl(activeSiteLogo);
+    }
+  }, [tenant, primaryTenant]);
 
   useEffect(() => {
     if (newTitle) return; // Only set initial value once if empty
@@ -322,9 +325,9 @@ export default function NovaPaginaCaptacaoPage() {
       // Inject custom site defaults if provided
       baseSiteConfig = {
         ...baseSiteConfig,
-        logoUrl: newLogoUrl.trim() || tenant?.defaultSiteLogoUrl || undefined,
-        logoConfig: tenant?.defaultSiteLogoConfig || { mode: 'html', text: newTitle.trim(), iconType: 'psi' },
-        faviconUrl: tenant?.defaultSiteFaviconUrl || undefined,
+        logoUrl: newLogoUrl.trim() || tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || undefined,
+        logoConfig: tenant?.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || { mode: 'html', text: newTitle.trim(), iconType: 'psi' },
+        faviconUrl: tenant?.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || undefined,
         images: {
           hero: '',
           portrait: '',
@@ -350,14 +353,12 @@ export default function NovaPaginaCaptacaoPage() {
         keywords: 'psicologia, terapia, consulta psicologica, atendimento online'
       };
 
-      const effectiveSlug = (domainMode === 'subdomain' && subdomainInput.trim()) ? subdomainInput.trim() : newSlug.trim();
-      const effectiveCustomDomain = (domainMode === 'custom' && customDomainInput.trim()) ? customDomainInput.trim() : undefined;
+      const effectiveSlug = newSlug.trim().toLowerCase().replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/g, '');
 
       const res = await api.createCapturePage({
         title: newTitle.trim(),
         slug: effectiveSlug,
         tenantId: tenant?.id,
-        customDomain: effectiveCustomDomain,
         logoText: newTitle.trim(),
         primaryStart: activePrimaryStart,
         primaryEnd: activePrimaryEnd,
@@ -373,8 +374,6 @@ export default function NovaPaginaCaptacaoPage() {
         await api.updateCapturePage(res.page.id, {
           slug: effectiveSlug,
           slugDraft: effectiveSlug,
-          customDomain: effectiveCustomDomain,
-          customDomainDraft: effectiveCustomDomain,
           siteConfig: baseSiteConfig,
           siteConfigDraft: baseSiteConfig,
           dictionary: baseDictionary,
@@ -745,175 +744,68 @@ export default function NovaPaginaCaptacaoPage() {
               </div>
             )}
 
-            {/* STEP 3: Escolha de Domínio / Publicação */}
+            {/* STEP 3: Endereço da Página & Publicação */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
                     Etapa 3 de 4
                   </span>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Escolha de Domínio & Publicação</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Endereço da Página & Publicação</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Defina como seus pacientes acessarão seu site na internet.
+                    Defina como os pacientes acessarão esta página no seu site.
                   </p>
                 </div>
 
-                {/* Domínio Mode Tabs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div
-                    onClick={() => {
-                      setDomainMode('subdomain');
-                      if (!subdomainInput) setSubdomainInput(newSlug);
-                    }}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      domainMode === 'subdomain'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
-                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 font-bold text-xs text-indigo-600 dark:text-indigo-400 mb-1">
-                      <Sparkles className="h-4 w-4" />
-                      <span>Subdomínio Gratuito</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed opacity-80">
-                      Endereço exclusivo no app com SSL automático ativado na hora.
-                    </p>
+                <div className="p-6 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block uppercase tracking-wider">
+                    Endereço da Página no seu site
+                  </label>
+
+                  <div className="flex items-center">
+                    <span className="h-10 px-3 flex items-center glass-sm border border-r-0 border-[var(--surface-border)] rounded-l-xl text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-white/5 truncate max-w-[280px]">
+                      https://{tenant?.domain || `${tenant?.slug || 'site'}.${baseDomain}`}/
+                    </span>
+                    <Input
+                      type="text"
+                      value={newSlug}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setNewSlug(val);
+                        setSubdomainAvailable(null);
+                      }}
+                      placeholder="ex: terapia (ou deixe em branco)"
+                      className="brand-input rounded-l-none font-mono text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => checkSubdomain(newSlug)}
+                      disabled={checkingSubdomain}
+                      className="shrink-0 text-xs ml-2"
+                    >
+                      {checkingSubdomain ? 'Verificando...' : 'Verificar'}
+                    </Button>
                   </div>
 
-                  <div
-                    onClick={() => setDomainMode('custom')}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      domainMode === 'custom'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
-                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 font-bold text-xs text-emerald-600 dark:text-emerald-400 mb-1">
-                      <Globe className="h-4 w-4" />
-                      <span>Domínio Próprio</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed opacity-80">
-                      Use seu próprio endereço (ex: <code className="text-slate-700 dark:text-slate-300">terapia.seunome.com.br</code>) via Cloudflare.
-                    </p>
-                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                    💡 <strong>Deixe em branco</strong> para que esta seja a <strong>Página Principal (Home)</strong> do seu site, ou digite o nome da página (ex: terapia, consultas).
+                  </p>
 
-                  <div
-                    onClick={() => setDomainMode('path')}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                      domainMode === 'path'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-slate-900 dark:text-white shadow-lg'
-                        : 'border-[var(--surface-border)] glass-sm text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 font-bold text-xs text-slate-700 dark:text-slate-300 mb-1">
-                      <Layout className="h-4 w-4" />
-                      <span>Link Padrão</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed opacity-80">
-                      Link direto sob o caminho padrão da clínica.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Subdomínio Gratuito Option Body */}
-                {domainMode === 'subdomain' && (
-                  <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Escolha seu prefixo de subdomínio
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="text"
-                        value={subdomainInput || newSlug}
-                        onChange={(e) => {
-                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                          setSubdomainInput(val);
-                          setSubdomainAvailable(null);
-                        }}
-                        placeholder="dra-geovanna"
-                        className="brand-input font-mono text-xs"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => checkSubdomain(subdomainInput || newSlug)}
-                        disabled={checkingSubdomain}
-                        className="shrink-0 text-xs"
-                      >
-                        {checkingSubdomain ? 'Verificando...' : 'Verificar'}
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-black/40 border border-[var(--surface-border)] text-xs font-mono text-indigo-600 dark:text-indigo-300">
-                      <span>https://{(subdomainInput || newSlug || 'seu-nome')}.{baseDomain}</span>
-                      {subdomainAvailable === true && (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-sans font-bold flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Disponível!
-                        </span>
-                      )}
-                      {subdomainAvailable === false && (
-                        <span className="text-red-500 dark:text-red-400 font-sans font-bold flex items-center gap-1">
-                          <AlertCircle className="h-3.5 w-3.5" /> Indisponível
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Domínio Próprio Option Body */}
-                {domainMode === 'custom' && (
-                  <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
-                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Seu Domínio Customizado
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="text"
-                        value={customDomainInput}
-                        onChange={(e) => setCustomDomainInput(e.target.value)}
-                        placeholder="consulta.psicologageovanna.com.br"
-                        className="brand-input font-mono text-xs"
-                      />
-                      <Button
-                        type="button"
-                        onClick={handleRegisterCustomDomain}
-                        disabled={registeringCustom || !customDomainInput.trim()}
-                        className="shrink-0 text-xs"
-                      >
-                        {registeringCustom ? 'Gerando DNS...' : 'Gerar Registros DNS'}
-                      </Button>
-                    </div>
-
-                    {dnsRecords.length > 0 && (
-                      <div className="space-y-3 pt-2">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                          📋 Registros DNS a incluir no seu Provedor (Registro.br / Cloudflare / GoDaddy)
-                        </label>
-                        <div className="space-y-2">
-                          {dnsRecords.map((rec, idx) => (
-                            <div key={idx} className="p-3 rounded-xl glass-sm border border-[var(--surface-border)] text-xs font-mono space-y-1">
-                              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">
-                                <span className="font-bold text-indigo-600 dark:text-indigo-400">{rec.type}</span>
-                                <span>{rec.description}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-2 text-slate-900 dark:text-white">
-                                <span className="truncate"><strong>Host:</strong> {rec.name}</span>
-                                <span className="truncate text-slate-600 dark:text-slate-300"><strong>Valor:</strong> {rec.value}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => navigator.clipboard.writeText(rec.value)}
-                                  className="px-2 py-1 rounded bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-[10px] text-slate-800 dark:text-slate-200 shrink-0 font-sans cursor-pointer"
-                                >
-                                  Copiar
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-black/40 border border-[var(--surface-border)] text-xs font-mono text-indigo-600 dark:text-indigo-300">
+                    <span>https://{tenant?.domain || `${tenant?.slug || 'site'}.${baseDomain}`}/{newSlug}</span>
+                    {subdomainAvailable === true && (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-sans font-bold flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Disponível!
+                      </span>
+                    )}
+                    {subdomainAvailable === false && (
+                      <span className="text-red-500 dark:text-red-400 font-sans font-bold flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" /> Indisponível
+                      </span>
                     )}
                   </div>
-                )}
+                </div>
               </div>
             )}
 

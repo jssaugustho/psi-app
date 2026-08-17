@@ -3691,13 +3691,15 @@ export default function PageEditor({ params }: PageProps) {
   // Preview Iframe URL Resolve
   const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || '';
 
+  const pageSlugForPreview = page.slug || '_root_';
+
   const previewIframeUrl = tenant 
-    ? `${landingBaseUrl}/p/${tenant.slug}/${page.slug}?preview=true&key=${previewKey}`
+    ? `${landingBaseUrl}/p/${tenant.slug}/${pageSlugForPreview}?preview=true&key=${previewKey}`
     : '#';
 
   // External Preview URL (without preview=true)
   const externalPreviewUrl = tenant 
-    ? `${landingBaseUrl}/p/${tenant.slug}/${page.slug}`
+    ? `${landingBaseUrl}/p/${tenant.slug}/${pageSlugForPreview}`
     : '#';
 
   return (
@@ -4890,96 +4892,30 @@ export default function PageEditor({ params }: PageProps) {
                   </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Slug da URL</label>
-                  <Input
-                    type="text"
-                    className="brand-input"
-                    value={page.slug}
-                    onChange={(e) => {
-                      setPage({ ...page, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') });
-                      setHasUnsavedChanges(true);
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Domínio de Acesso (Custom Domain)</label>
-                    {cfStatus === 'active' && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
-                        🟢 SSL Válido
-                      </span>
-                    )}
-                    {cfStatus && cfStatus !== 'active' && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
-                        🟡 Pendente DNS
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2">
+                <div className="space-y-2 pt-2">
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">
+                    Endereço da Página no seu site
+                  </label>
+                  
+                  <div className="flex items-center">
+                    <span className="h-10 px-3 flex items-center glass-sm border border-r-0 border-[var(--surface-border)] rounded-l-xl text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-white/5 truncate max-w-[240px]">
+                      https://{tenant?.domain || `${tenant?.slug || 'site'}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}`}/
+                    </span>
                     <Input
                       type="text"
-                      className="brand-input text-xs font-mono"
-                      placeholder="terapia.geovannabastos.com.br"
-                      value={page.customDomain || ''}
+                      className="brand-input rounded-l-none text-xs font-mono"
+                      placeholder="ex: terapia (ou deixe em branco)"
+                      value={page.slug || ''}
                       onChange={(e) => {
-                        setPage({ ...page, customDomain: e.target.value || null });
+                        const cleanVal = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setPage({ ...page, slug: cleanVal });
                         setHasUnsavedChanges(true);
                       }}
                     />
-                    <button
-                      type="button"
-                      disabled={cfVerifying || !page.customDomain}
-                      onClick={async () => {
-                        if (!page.customDomain) return;
-                        setCfVerifying(true);
-                        try {
-                          const res = await api.registerCustomHostname(page.id, page.customDomain);
-                          if (res.dnsRecords) setCfDnsRecords(res.dnsRecords);
-                          if (res.status) setCfStatus(res.status);
-                        } catch (err: any) {
-                          alert(err.message || 'Erro ao registrar domínio no Cloudflare.');
-                        } finally {
-                          setCfVerifying(false);
-                        }
-                      }}
-                      className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors disabled:opacity-50"
-                    >
-                      {cfVerifying ? 'Verificando...' : 'Verificar DNS'}
-                    </button>
                   </div>
 
-                  {cfDnsRecords.length > 0 && (
-                    <div className="p-3 rounded-xl glass-sm border border-[var(--surface-border)] space-y-2 text-xs font-mono">
-                      <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                        📋 Registros DNS para inclusão no seu provedor:
-                      </p>
-                      {cfDnsRecords.map((rec, i) => (
-                        <div key={i} className="p-2 rounded glass-sm border border-[var(--surface-border)] space-y-1">
-                          <div className="flex items-center justify-between text-[10px] text-slate-600 dark:text-slate-400">
-                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{rec.type}</span>
-                            <span>{rec.description}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-slate-800 dark:text-slate-200">
-                            <span className="truncate"><strong>Host:</strong> {rec.name}</span>
-                            <span className="truncate text-slate-500 dark:text-slate-400"><strong>Valor:</strong> {rec.value}</span>
-                            <button
-                              type="button"
-                              onClick={() => navigator.clipboard.writeText(rec.value)}
-                              className="px-1.5 py-0.5 rounded glass-sm text-[9px] text-slate-700 dark:text-slate-300 font-sans cursor-pointer"
-                            >
-                              Copiar
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    Ao utilizar um domínio próprio, o certificado SSL de alta segurança é provisionado automaticamente pela infraestrutura de borda do Cloudflare.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                    💡 <strong>Deixe em branco</strong> para que esta seja a <strong>Página Principal (Home)</strong> do seu site, ou digite o nome que deseja usar no endereço (ex: terapia, consultas).
                   </p>
                 </div>
 

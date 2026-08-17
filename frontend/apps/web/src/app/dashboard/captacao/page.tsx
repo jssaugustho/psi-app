@@ -162,25 +162,11 @@ export default function CaptacaoPage() {
   const getPageProductionUrl = (page: CapturePage) => {
     if (!tenant) return '#';
 
-    // 1. If page custom domain is set and active, use it
-    if (page.customDomain && verifiedDomains[page.customDomain]) {
-      return `https://${page.customDomain}`;
-    }
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app';
+    const domainHost = tenant.domain ? tenant.domain : `${tenant.slug}.${baseDomain}`;
+    const pagePath = page.slug ? `/${page.slug}` : '/';
 
-    // 2. If tenant domain is set and active, use it
-    if (tenant.domain && isTenantDomainActive) {
-      return `https://${tenant.domain}/p/${tenant.slug}/${page.slug}`;
-    }
-
-    // 3. Dynamic subdomain based on NEXT_PUBLIC_BASE_DOMAIN
-    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital';
-    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    if (isLocal) {
-      const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || 'http://localhost:3000';
-      return `${landingBaseUrl}/p/${tenant.slug}/${page.slug}`;
-    }
-
-    return `https://${tenant.slug}.${baseDomain}`;
+    return `https://${domainHost}${pagePath}`;
   };
 
   const getVerSiteUrl = (page: CapturePage) => {
@@ -268,23 +254,22 @@ export default function CaptacaoPage() {
                     {page.isActive ? 'Ativa' : 'Pausada'}
                   </button>
                 </div>
-
-                <div className="space-y-2 border-t border-[var(--surface-border)] pt-3">
+                <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>Domínio:</span>
-                    <span className="font-semibold text-slate-800 dark:text-white max-w-[150px] truncate">
-                      {page.customDomain || 'Sem domínio próprio'}
+                    <span>Tipo de Página:</span>
+                    <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${!page.slug ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
+                      {!page.slug ? 'Página Principal (Home)' : `/${page.slug}`}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>Link Direto:</span>
+                    <span>Link do Site:</span>
                     <a
                       href={getPageProductionUrl(page)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[10px] truncate max-w-[180px]"
+                      className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
                     >
-                      /p/{tenant?.slug}/{page.slug}
+                      {getPageProductionUrl(page).replace(/^https?:\/\//, '')}
                       <ExternalLink className="h-3 w-3 shrink-0" />
                     </a>
                   </div>

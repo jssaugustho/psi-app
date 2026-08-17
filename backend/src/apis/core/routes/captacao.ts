@@ -9,7 +9,7 @@ import { verifyUserJwt } from '../../../shared/auth';
 // Validation Schemas
 const CreatePageBodySchema = z.object({
   title: z.string().min(1, 'O título é obrigatório'),
-  slug: z.string().min(1, 'O slug é obrigatório').regex(/^[a-z0-9-]+$/, 'Slug deve conter apenas letras minúsculas, números e hífens'),
+  slug: z.string().optional().default(''),
   tenantId: z.string().uuid('ID do Tenant inválido'),
   crp: z.string().optional(),
   approach: z.string().optional(),
@@ -22,6 +22,7 @@ const CreatePageBodySchema = z.object({
   primaryStart: z.string().optional(),
   primaryEnd: z.string().optional(),
   contrast: z.string().optional(),
+  logoUrl: z.string().optional(),
 });
 
 const SubmitFormBodySchema = z.object({
@@ -230,7 +231,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
       try {
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-        const { title, slug, tenantId, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast } = request.body;
+        const { title, slug, tenantId, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl } = request.body;
 
         // 1. Resolver tenant e verificar permissão
         const targetTenant = await db.query.tenants.findFirst({
@@ -263,33 +264,53 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 2. Verificar duplicidade de slug no mesmo tenant
+        const normalizedSlug = (slug || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/g, '');
+
         const duplicate = await db.query.capturePages.findFirst({
           where: and(
             eq(capturePages.tenantId, tenantId),
-            eq(capturePages.slug, slug)
+            eq(capturePages.slug, normalizedSlug)
           ),
         });
 
         if (duplicate) {
           return reply.status(409).send({
             error: 'Conflito',
-            message: 'Já existe uma página de captação com este slug neste tenant.',
+            message: normalizedSlug === ''
+              ? 'Já existe uma Página Principal (Home) cadastrada para o seu site.'
+              : 'Já existe uma página com este endereço neste tenant.',
           });
         }
 
+        let primaryTenant = null;
+        if (!targetTenant.defaultSiteLogoUrl && !targetTenant.defaultSiteFaviconUrl && !targetTenant.defaultSiteLogoConfig) {
+          const settings = await db.query.platformSettings.findFirst();
+          if (settings?.primaryTenantId) {
+            primaryTenant = await db.query.tenants.findFirst({
+              where: eq(tenants.id, settings.primaryTenantId),
+            }) ?? null;
+          }
+        }
+
+        const activeLogoUrl = logoUrl || targetTenant.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || undefined;
+        const activeFaviconUrl = targetTenant.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || undefined;
+        const activeLogoConfig = targetTenant.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || {
+          mode: 'html',
+          text: logoText || targetTenant.name || title,
+          iconType: 'psi',
+        };
+
         const customSiteConfig = {
           ...defaultSiteConfig,
+          logoUrl: activeLogoUrl,
+          faviconUrl: activeFaviconUrl,
+          logoConfig: activeLogoConfig,
           theme: {
             colors: {
-              primaryStart: primaryStart || '#CC8667',
-              primaryEnd: primaryEnd || '#AA5533',
-              contrast: contrast || '#FFFFFF',
+              primaryStart: primaryStart || targetTenant.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor || '#CC8667',
+              primaryEnd: primaryEnd || targetTenant.defaultSiteSecondaryColor || primaryTenant?.defaultSiteSecondaryColor || '#AA5533',
+              contrast: contrast || targetTenant.contrastColor || primaryTenant?.contrastColor || '#FFFFFF',
             },
-          },
-          logoConfig: {
-            mode: 'html',
-            text: logoText || targetTenant.name || title,
-            iconType: 'psi',
           },
           professional: {
             ...defaultSiteConfig.professional,
@@ -324,7 +345,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           .values({
             tenantId,
             title,
-            slug,
+            slug: normalizedSlug,
             isActive: true,
             seoConfig: {
               metaTitle: `${title} | Consultório de Psicologia`,

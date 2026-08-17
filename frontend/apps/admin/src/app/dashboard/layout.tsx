@@ -120,18 +120,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { label: 'Configurações', href: '/dashboard/settings', icon: <SettingsIcon />, active: pathname === '/dashboard/settings' },
   ];
 
-  const primaryTenant = brandTenant || platformStatus?.primary_tenant;
-  const appName = primaryTenant?.name || 'Psi Backoffice';
+  const activeTenant = brandTenant;
+  const fallbackTenant = platformStatus?.primary_tenant;
+  const appName = activeTenant?.name || fallbackTenant?.name || 'Psi Backoffice';
 
   const logoUrl =
     theme === 'light'
-      ? primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl
-      : primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl;
+      ? (activeTenant?.logoLightUrl || activeTenant?.logoDarkUrl || fallbackTenant?.logoLightUrl || fallbackTenant?.logoDarkUrl)
+      : (activeTenant?.logoDarkUrl || activeTenant?.logoLightUrl || fallbackTenant?.logoDarkUrl || fallbackTenant?.logoLightUrl);
 
   const iconUrl =
     theme === 'light'
-      ? primaryTenant?.iconLightUrl || primaryTenant?.iconDarkUrl
-      : primaryTenant?.iconDarkUrl || primaryTenant?.iconLightUrl;
+      ? (activeTenant?.iconLightUrl || activeTenant?.iconDarkUrl || activeTenant?.logoLightUrl || activeTenant?.logoDarkUrl || fallbackTenant?.iconLightUrl || fallbackTenant?.iconDarkUrl || fallbackTenant?.logoLightUrl || fallbackTenant?.logoDarkUrl)
+      : (activeTenant?.iconDarkUrl || activeTenant?.iconLightUrl || activeTenant?.logoDarkUrl || activeTenant?.logoLightUrl || fallbackTenant?.iconDarkUrl || fallbackTenant?.iconLightUrl || fallbackTenant?.logoDarkUrl || fallbackTenant?.logoLightUrl);
 
   return (
     <AppShell

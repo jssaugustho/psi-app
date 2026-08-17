@@ -1090,24 +1090,24 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Nome do Seu Endereço (Slug)</label>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">Nome do Seu Endereço Gratuito</label>
                   <div className="flex items-center">
                     <Input
                       type="text"
                       value={slug}
                       onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                      placeholder="geovanna-bastos"
+                      placeholder="minha-clinica"
                       className="rounded-r-none"
                     />
                     <span className="h-10 px-3 flex items-center glass-sm border border-l-0 border-[var(--surface-border)] rounded-r-xl text-xs font-mono font-bold text-slate-300 bg-white/5">
-                      .psi.app
+                      .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}
                     </span>
                   </div>
                 </div>
 
                 <div className="pt-5">
                   <a
-                    href={`https://${slug || 'site'}.psi.app`}
+                    href={`https://${slug || 'site'}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-gradient-start)] hover:underline"
@@ -1165,7 +1165,7 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
                         <tr>
                           <td className="py-2.5 text-emerald-400 font-bold">CNAME</td>
                           <td className="py-2.5">www</td>
-                          <td className="py-2.5 font-bold">cname.psi.app</td>
+                          <td className="py-2.5 font-bold">cname.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}</td>
                         </tr>
                         <tr>
                           <td className="py-2.5 text-indigo-400 font-bold">A</td>

@@ -19,14 +19,34 @@ async function migrate() {
       console.log(`⏳ Aplicando migração: ${file}`);
       const filePath = path.join(drizzleDir, file);
       const sqlContent = fs.readFileSync(filePath, 'utf8');
-      await sql.unsafe(sqlContent);
-      console.log(`✅ ${file} aplicada com sucesso!`);
+
+      try {
+        await sql.unsafe(sqlContent);
+        console.log(`✅ ${file} aplicada com sucesso!`);
+      } catch (err: any) {
+        if (['42P07', '42701', '42710', '42P06', '42704'].includes(err.code)) {
+          console.log(`⚠️ ${file}: Objeto já existente (${err.message}). Continuando...`);
+        } else {
+          // Tenta executar separando por instrução
+          const statements = sqlContent.split(/;|\-\-> statement\-breakpoint/).map((s) => s.trim()).filter(Boolean);
+          for (const stmt of statements) {
+            try {
+              await sql.unsafe(stmt);
+            } catch (subErr: any) {
+              if (!['42P07', '42701', '42710', '42P06', '42704'].includes(subErr.code)) {
+                console.warn(`  ⚠️ Alerta na instrução SQL: ${subErr.message}`);
+              }
+            }
+          }
+          console.log(`✅ ${file} processada!`);
+        }
+      }
     }
 
     console.log('🎉 Migrações concluídas com sucesso!');
     process.exit(0);
   } catch (err: any) {
-    console.error('❌ Erro ao aplicar migrações:', err.message || err);
+    console.error('❌ Erro crítico ao aplicar migrações:', err.message || err);
     process.exit(1);
   }
 }

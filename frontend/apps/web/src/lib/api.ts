@@ -473,10 +473,6 @@ export const api = {
     if (body.name !== undefined) dbBody.name = body.name;
     if (body.slug !== undefined) dbBody.slug = body.slug;
     if (body.domain !== undefined) dbBody.domain = body.domain;
-    if (body.logoLightUrl !== undefined) dbBody.logo_light_url = body.logoLightUrl;
-    if (body.logoDarkUrl !== undefined) dbBody.logo_dark_url = body.logoDarkUrl;
-    if (body.iconLightUrl !== undefined) dbBody.icon_light_url = body.iconLightUrl;
-    if (body.iconDarkUrl !== undefined) dbBody.icon_dark_url = body.iconDarkUrl;
     if (body.gradientColorStart !== undefined) dbBody.gradient_color_start = body.gradientColorStart;
     if (body.gradientColorEnd !== undefined) dbBody.gradient_color_end = body.gradientColorEnd;
     if (body.contrastColor !== undefined) dbBody.contrast_color = body.contrastColor;

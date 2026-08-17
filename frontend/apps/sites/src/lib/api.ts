@@ -50,9 +50,10 @@ export interface CapturePageData {
 }
 
 export async function getCapturePageBySlugs(tenantSlug: string, pageSlug: string, isPreview?: boolean): Promise<CapturePageData | null> {
+  const targetSlug = (pageSlug === '_root_' || pageSlug === 'root') ? '' : (pageSlug || '');
   const url = isPreview
-    ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&tenants.slug=eq.${tenantSlug}`
-    : `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&is_active=eq.true&tenants.slug=eq.${tenantSlug}`;
+    ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${targetSlug}&tenants.slug=eq.${tenantSlug}`
+    : `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${targetSlug}&is_active=eq.true&tenants.slug=eq.${tenantSlug}`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
@@ -62,12 +63,23 @@ export async function getCapturePageBySlugs(tenantSlug: string, pageSlug: string
     }
     // Fallback: se isPreview for falso mas a página ainda estiver pendente, busca sem a trava is_active
     if (!isPreview) {
-      const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${pageSlug}&tenants.slug=eq.${tenantSlug}`;
+      const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&slug=eq.${targetSlug}&tenants.slug=eq.${tenantSlug}`;
       const fallbackRes = await fetch(fallbackUrl, { cache: 'no-store' });
       if (fallbackRes.ok) {
         const fallbackData = await fallbackRes.json();
         if (Array.isArray(fallbackData) && fallbackData.length > 0) {
           return fallbackData[0] as CapturePageData;
+        }
+      }
+      // Se buscando a página raiz e não encontrada com slug="", busca a página mais recente do tenant
+      if (targetSlug === '') {
+        const rootFallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenants.slug=eq.${tenantSlug}&order=created_at.desc&limit=1`;
+        const rootFallbackRes = await fetch(rootFallbackUrl, { cache: 'no-store' });
+        if (rootFallbackRes.ok) {
+          const rootFallbackData = await rootFallbackRes.json();
+          if (Array.isArray(rootFallbackData) && rootFallbackData.length > 0) {
+            return rootFallbackData[0] as CapturePageData;
+          }
         }
       }
     }
@@ -79,58 +91,71 @@ export async function getCapturePageBySlugs(tenantSlug: string, pageSlug: string
 }
 
 /**
- * Fetch capture page and tenant details by domain name or subdomain (e.g. thera-os.ajstrategy.digital)
+ * Fetch capture page and tenant details by domain name or subdomain (e.g. geovanna.theraos.app or geovannabastos.com.br)
+ * and optional page path slug (e.g. "" for root or "terapia")
  */
-export async function getCapturePageByDomain(domainName: string): Promise<CapturePageData | null> {
+export async function getCapturePageByDomain(domainName: string, pathSlug: string = ''): Promise<CapturePageData | null> {
   const cleanDomain = domainName.split(':')[0].toLowerCase();
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital';
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app';
+  const cleanPathSlug = (pathSlug === '_root_' || pathSlug === 'root') ? '' : pathSlug.trim().toLowerCase();
 
-  // 1. Verificar se é um subdomínio da plataforma (ex: thera-os.ajstrategy.digital ou thera-os)
-  let tenantSlug: string | null = null;
+  // 1. Identificar o tenant (pelo subdomínio gratuito ou domínio próprio registrado no tenant)
+  let tenantData: TenantData | null = null;
+
   if (cleanDomain.endsWith(`.${baseDomain}`)) {
     const parts = cleanDomain.replace(`.${baseDomain}`, '').split('.');
-    tenantSlug = parts[parts.length - 1];
+    const tenantSlug = parts[parts.length - 1];
+    if (tenantSlug && tenantSlug !== 'www' && tenantSlug !== 'app' && tenantSlug !== 'sites') {
+      tenantData = await getTenantBySlug(tenantSlug);
+    }
   } else if (!cleanDomain.includes('.')) {
-    tenantSlug = cleanDomain;
+    tenantData = await getTenantBySlug(cleanDomain);
   }
 
-  if (tenantSlug && tenantSlug !== 'www' && tenantSlug !== 'app' && tenantSlug !== 'sites') {
-    // Busca a página de captura do tenant por slug
-    const url = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenants.slug=eq.${tenantSlug}&is_active=eq.true&order=created_at.desc&limit=1`;
+  if (!tenantData) {
+    tenantData = await getTenantByDomain(cleanDomain);
+  }
+
+  if (tenantData) {
+    const pageUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenant_id=eq.${tenantData.id}&slug=eq.${cleanPathSlug}&is_active=eq.true&limit=1`;
     try {
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(pageUrl, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           return data[0] as CapturePageData;
         }
       }
-      // Fallback: se não encontrou com is_active=true, busca a página criada mais recente do tenant
-      const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenants.slug=eq.${tenantSlug}&order=created_at.desc&limit=1`;
-      const fallbackRes = await fetch(fallbackUrl, { cache: 'no-store' });
-      if (fallbackRes.ok) {
-        const fallbackData = await fallbackRes.json();
-        if (Array.isArray(fallbackData) && fallbackData.length > 0) {
-          return fallbackData[0] as CapturePageData;
+      if (cleanPathSlug === '') {
+        const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&tenant_id=eq.${tenantData.id}&is_active=eq.true&order=created_at.desc&limit=1`;
+        const fallbackRes = await fetch(fallbackUrl, { cache: 'no-store' });
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+            return fallbackData[0] as CapturePageData;
+          }
         }
       }
     } catch (err) {
-      console.error('Error fetching capture page by tenant subdomain:', err);
+      console.error('Error fetching capture page by tenant and path:', err);
     }
   }
 
-  // 2. Busca por domínio próprio customizado (ex: www.geovannabastos.com.br)
-  const url = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&custom_domain=eq.${cleanDomain}&is_active=eq.true&limit=1`;
+  // Fallback legado por custom_domain em capture_pages
+  const legacyUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants!inner(*)&custom_domain=eq.${cleanDomain}&is_active=eq.true&limit=1`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-    return data[0] as CapturePageData;
+    const res = await fetch(legacyUrl, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0] as CapturePageData;
+      }
+    }
   } catch (err) {
-    console.error('Error fetching capture page by custom domain:', err);
-    return null;
+    console.error('Error fetching capture page by legacy custom domain:', err);
   }
+
+  return null;
 }
 
 /**
