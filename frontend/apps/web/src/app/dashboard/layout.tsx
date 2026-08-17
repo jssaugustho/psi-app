@@ -172,7 +172,7 @@ function TenantSwitcher({ myTenants, activeTenantId }: { myTenants: any[], activ
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { user, loading, logout, setIsProfileOpen } = useAuth();
-  const { tenant, theme, toggleTheme, reloadBrand } = useBrand();
+  const { tenant, primaryTenant, theme, toggleTheme, reloadBrand } = useBrand();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -320,17 +320,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     { label: 'Configurações', href: '/dashboard/configuracoes', icon: <SettingsIcon />, active: pathname === '/dashboard/configuracoes' },
   ];
 
-  const appName = tenant?.name || 'Psi App';
+  const brandForAppShell = primaryTenant || tenant;
+  const appName = brandForAppShell?.name || 'Psi App';
 
   const logoUrl =
     theme === 'light'
-      ? tenant?.logoLightUrl || tenant?.logoDarkUrl
-      : tenant?.logoDarkUrl || tenant?.logoLightUrl;
+      ? brandForAppShell?.logoLightUrl || brandForAppShell?.logoDarkUrl
+      : brandForAppShell?.logoDarkUrl || brandForAppShell?.logoLightUrl;
 
   const iconUrl =
     theme === 'light'
-      ? tenant?.iconLightUrl || tenant?.iconDarkUrl
-      : tenant?.iconDarkUrl || tenant?.iconLightUrl;
+      ? brandForAppShell?.iconLightUrl || brandForAppShell?.iconDarkUrl
+      : brandForAppShell?.iconDarkUrl || brandForAppShell?.iconLightUrl;
 
   return (
     <AppShell

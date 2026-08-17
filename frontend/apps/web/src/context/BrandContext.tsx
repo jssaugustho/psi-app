@@ -7,6 +7,7 @@ export type ThemeMode = 'light' | 'dark';
 
 export interface BrandContextType {
   tenant: Tenant | null;
+  primaryTenant: Tenant | null;
   theme: ThemeMode;
   loading: boolean;
   /** true quando o loader de boot global sumiu — seguro para renderizar conteúdo */
@@ -17,6 +18,7 @@ export interface BrandContextType {
 
 const BrandContext = createContext<BrandContextType>({
   tenant: null,
+  primaryTenant: null,
   theme: 'dark',
   loading: true,
   isBootReady: false,
@@ -26,6 +28,7 @@ const BrandContext = createContext<BrandContextType>({
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [primaryTenant, setPrimaryTenant] = useState<Tenant | null>(null);
   const [theme, setTheme] = useState<ThemeMode>('dark');
   const [loading, setLoading] = useState(true);
 
@@ -40,12 +43,13 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const applyBrandStyles = useCallback((t: Tenant | null, currentTheme: ThemeMode) => {
+  const applyBrandStyles = useCallback((pTenant: Tenant | null, uTenant: Tenant | null, currentTheme: ThemeMode) => {
     const root = document.documentElement;
 
-    const start = t?.gradientColorStart || '#4F46E5';
-    const end = t?.gradientColorEnd || '#06B6D4';
-    const contrast = t?.contrastColor || '#FFFFFF';
+    const brandForAppShell = pTenant || uTenant;
+    const start = brandForAppShell?.gradientColorStart || '#4F46E5';
+    const end = brandForAppShell?.gradientColorEnd || '#06B6D4';
+    const contrast = brandForAppShell?.contrastColor || '#FFFFFF';
 
     root.style.setProperty('--brand-gradient-start', start);
     root.style.setProperty('--brand-gradient-end', end);
@@ -66,11 +70,11 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       root.style.setProperty('--brand-text-color', '#F4F4F5');     // zinc-100
     }
 
-    // Favicon e Título
+    // Favicon e Título usam SEMPRE a identidade do Tenant-Pai da Plataforma
     const iconUrl =
       currentTheme === 'light'
-        ? t?.iconLightUrl || t?.iconDarkUrl
-        : t?.iconDarkUrl || t?.iconLightUrl;
+        ? brandForAppShell?.iconLightUrl || brandForAppShell?.iconDarkUrl
+        : brandForAppShell?.iconDarkUrl || brandForAppShell?.iconLightUrl;
 
     if (iconUrl) {
       const existingIcons = document.querySelectorAll("link[rel*='icon']");
@@ -87,8 +91,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (t?.name) {
-      document.title = t.name;
+    if (brandForAppShell?.name) {
+      document.title = brandForAppShell.name;
     }
   }, []);
 
@@ -96,50 +100,53 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
     localStorage.setItem('theme', nextTheme);
-    applyBrandStyles(tenant, nextTheme);
+    applyBrandStyles(primaryTenant, tenant, nextTheme);
   };
 
   const loadBrand = useCallback(async () => {
     try {
       const host = typeof window !== 'undefined' ? window.location.hostname : '';
-      let resolvedTenant: Tenant | null = null;
+      let resolvedPrimary: Tenant | null = null;
+      let resolvedUserTenant: Tenant | null = null;
 
-      // 0. Tentar resolver pelo active_tenant_id do sessionStorage
+      // 1. Sempre buscar o Tenant-Pai (Plataforma White-Label Principal)
+      try {
+        const primaryRes = await api.getPrimaryTenant();
+        if (primaryRes?.tenant) {
+          resolvedPrimary = primaryRes.tenant;
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar tenant principal:', err);
+      }
+      setPrimaryTenant(resolvedPrimary);
+
+      // 2. Resolver o tenant ativo do usuário (sessionStorage ou id)
       const activeTenantId = typeof window !== 'undefined' ? sessionStorage.getItem('active_tenant_id') : null;
       if (activeTenantId) {
         try {
-          resolvedTenant = await api.getTenantById(activeTenantId);
+          resolvedUserTenant = await api.getTenantById(activeTenantId);
         } catch (err) {
           console.warn('Erro ao carregar tenant do sessionStorage:', err);
         }
       }
 
-      // 1. Tentar resolver por domínio customizado ou por subdomínio (slug) se não encontrado no sessionStorage
-      if (!resolvedTenant && host && host !== 'localhost' && host !== '127.0.0.1') {
-        resolvedTenant = await api.getTenantByDomain(host);
+      if (!resolvedUserTenant && host && host !== 'localhost' && host !== '127.0.0.1') {
+        resolvedUserTenant = await api.getTenantByDomain(host);
         
-        if (!resolvedTenant) {
+        if (!resolvedUserTenant) {
           const parts = host.split('.');
           if (parts.length > 2) {
             const slugCandidate = parts[0];
-            resolvedTenant = await api.getTenantBySlug(slugCandidate);
+            resolvedUserTenant = await api.getTenantBySlug(slugCandidate);
           }
         }
       }
 
-      // 2. Fallback para o tenant principal caso não tenha encontrado por domínio
-      if (!resolvedTenant) {
-        const primaryRes = await api.getPrimaryTenant();
-        if (primaryRes?.tenant) {
-          resolvedTenant = primaryRes.tenant;
-        }
+      if (!resolvedUserTenant && resolvedPrimary) {
+        resolvedUserTenant = resolvedPrimary;
       }
 
-      if (resolvedTenant) {
-        setTenant((prev) => (prev?.id === resolvedTenant?.id ? prev : resolvedTenant));
-      } else {
-        setTenant(null);
-      }
+      setTenant(resolvedUserTenant);
     } catch (err) {
       console.error('Erro ao resolver branding:', err);
     } finally {
@@ -154,8 +161,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   }, [loadBrand]);
 
   useEffect(() => {
-    applyBrandStyles(tenant, theme);
-  }, [tenant, theme, applyBrandStyles]);
+    applyBrandStyles(primaryTenant, tenant, theme);
+  }, [primaryTenant, tenant, theme, applyBrandStyles]);
 
   // Handle two-stage premium brand loader (black screen -> spinner + logo (min 1s) -> fade out)
   useEffect(() => {
@@ -212,9 +219,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   }, [loading, tenant]);
 
   const isBootReady = loaderState === 'done';
+  const bootBrand = primaryTenant || tenant;
 
   return (
-    <BrandContext.Provider value={{ tenant, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
+    <BrandContext.Provider value={{ tenant, primaryTenant, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
       {loaderState !== 'done' && (
         <div 
           style={{
@@ -242,11 +250,11 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
               gap: '32px',
               animation: 'fadeIn 0.5s ease-out forwards',
             }}>
-              {/* Logo */}
-              {(theme === 'light' ? (tenant?.logoLightUrl || tenant?.logoDarkUrl) : (tenant?.logoDarkUrl || tenant?.logoLightUrl)) ? (
+              {/* Logo da Plataforma (Tenant-Pai) */}
+              {(theme === 'light' ? (bootBrand?.logoLightUrl || bootBrand?.logoDarkUrl) : (bootBrand?.logoDarkUrl || bootBrand?.logoLightUrl)) ? (
                 <img 
-                  src={theme === 'light' ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || '') : (tenant?.logoDarkUrl || tenant?.logoLightUrl || '')} 
-                  alt={tenant?.name || 'Psi App'} 
+                  src={theme === 'light' ? (bootBrand?.logoLightUrl || bootBrand?.logoDarkUrl || '') : (bootBrand?.logoDarkUrl || bootBrand?.logoLightUrl || '')} 
+                  alt={bootBrand?.name || 'Psi App'} 
                   style={{
                     maxHeight: '64px',
                     maxWidth: '240px',
