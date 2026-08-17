@@ -159,16 +159,6 @@ export default function CaptacaoPage() {
   }
 
   // Paths resolve helpers
-  const getPageLocalUrl = (slug: string) => {
-    if (!tenant) return '#';
-    const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || '';
-    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    if (isLocal) {
-      return `${landingBaseUrl}/p/${tenant.slug}/${slug}`;
-    }
-    return `https://sites.psiapp.com.br/p/${tenant.slug}/${slug}`;
-  };
-
   const getPageProductionUrl = (page: CapturePage) => {
     if (!tenant) return '#';
 
@@ -182,16 +172,19 @@ export default function CaptacaoPage() {
       return `https://${tenant.domain}/p/${tenant.slug}/${page.slug}`;
     }
 
-    // 3. Fallback to platform default domain
-    return `https://sites.psiapp.com.br/p/${tenant.slug}/${page.slug}`;
+    // 3. Dynamic subdomain based on NEXT_PUBLIC_BASE_DOMAIN
+    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital';
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    if (isLocal) {
+      const landingBaseUrl = process.env.NEXT_PUBLIC_LANDING_BASE_URL || 'http://localhost:3000';
+      return `${landingBaseUrl}/p/${tenant.slug}/${page.slug}`;
+    }
+
+    return `https://${tenant.slug}.${baseDomain}`;
   };
 
   const getVerSiteUrl = (page: CapturePage) => {
-    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-    if (isLocal) {
-      return getPageLocalUrl(page.slug);
-    }
-    return page.customDomain ? getPageProductionUrl(page) : getPageLocalUrl(page.slug);
+    return getPageProductionUrl(page);
   };
 
   return (
@@ -284,9 +277,9 @@ export default function CaptacaoPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>Local Teste:</span>
+                    <span>Link Direto:</span>
                     <a
-                      href={getPageLocalUrl(page.slug)}
+                      href={getPageProductionUrl(page)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[10px] truncate max-w-[180px]"

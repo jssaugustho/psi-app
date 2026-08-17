@@ -402,7 +402,7 @@ export default function NovaPaginaCaptacaoPage() {
   const [checkingSubdomain, setCheckingSubdomain] = useState(false);
   const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; value: string; description: string }>>([]);
   const [registeringCustom, setRegisteringCustom] = useState(false);
-  const [baseDomain, setBaseDomain] = useState('psiapp.com.br');
+  const [baseDomain, setBaseDomain] = useState(process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital');
 
   useEffect(() => {
     api.getPlatformSetupStatus()
@@ -968,7 +968,7 @@ export default function NovaPaginaCaptacaoPage() {
                   <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-1.5 font-sans">
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
                       <Search className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
-                      <span>https://sites.psiapp.com.br/p/{tenant?.slug}/{newSlug}</span>
+                      <span>https://{tenant?.slug || 'subdomain'}.{baseDomain}/{newSlug}</span>
                     </div>
                     <div className="text-sm font-semibold text-blue-600 dark:text-blue-400 truncate hover:underline cursor-pointer">
                       {metaTitle || `${newTitle} | Psicologia Clínica`}
