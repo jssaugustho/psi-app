@@ -2,6 +2,12 @@
 
 Este blueprint descreve a experiência do usuário (UX), a interface (UI) e o design do produto para a funcionalidade de **Páginas de Captação Personalizáveis** no Psi App.
 
+> **Notas de Arquitetura & Diretrizes de UI:**
+> - **Wizard de Criação & Rascunhos:** [`site_creation_wizard_architecture.md`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_creation_wizard_architecture.md)
+> - **Regras de Tema Claro / Escuro:** [`theme_and_ui_components_rules.md`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/theme_and_ui_components_rules.md)
+> - **Isolamento de Cores & Base64:** [`brand_colors_rules.md`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/brand_colors_rules.md)
+> - **Guia de Modais com React Portals:** [`modal_guidelines.md`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/modal_guidelines.md)
+
 ---
 
 ## 1. Arquitetura Multitenant de Frontends Separados

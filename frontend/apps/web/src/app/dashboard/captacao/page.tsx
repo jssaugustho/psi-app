@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, CapturePage } from '@/lib/api';
 import { Card, Button, LoadingSpinner, ConfirmModal } from '@psi/ui';
-import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, Copy, Loader2 } from 'lucide-react';
+import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, Copy, Loader2, Clock, ArrowRight, Edit3, X, ChevronRight } from 'lucide-react';
 import { Link } from '@/components/Link';
 
 export default function CaptacaoPage() {
@@ -20,6 +20,118 @@ export default function CaptacaoPage() {
   const [pageToDelete, setPageToDelete] = useState<{ id: string; title: string } | null>(null);
   const [verifiedDomains, setVerifiedDomains] = useState<Record<string, boolean>>({});
   const [isTenantDomainActive, setIsTenantDomainActive] = useState(false);
+  const [drafts, setDrafts] = useState<any[]>([]);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+
+  // Load all drafts from localStorage with legacy key migration
+  const loadDrafts = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const tenantId = tenant?.id;
+    const draftsStorageKey = tenantId ? `psi_page_drafts_${tenantId}` : 'psi_page_drafts_global';
+    const legacyKey = tenantId ? `psi_page_creation_draft_${tenantId}` : 'psi_page_creation_draft_global';
+
+    let draftsList: any[] = [];
+
+    // 1. Read multi-draft key
+    try {
+      const raw = localStorage.getItem(draftsStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          draftsList = parsed;
+        }
+      }
+    } catch {}
+
+    // 2. Check legacy key for existing tenant
+    try {
+      const legacyRaw = localStorage.getItem(legacyKey);
+      if (legacyRaw) {
+        const legacyParsed = JSON.parse(legacyRaw);
+        if (legacyParsed && typeof legacyParsed === 'object') {
+          const legacyId = legacyParsed.id || 'draft_legacy';
+          if (!draftsList.some((d) => d.id === legacyId)) {
+            const legacyDraft = {
+              id: legacyId,
+              tenantId: tenantId,
+              updatedAt: legacyParsed.updatedAt || new Date().toISOString(),
+              currentStep: legacyParsed.currentStep || 1,
+              newTitle: legacyParsed.newTitle || 'Rascunho de Página',
+              newLogoUrl: legacyParsed.newLogoUrl,
+              newFaviconUrl: legacyParsed.newFaviconUrl,
+              isCustomColor: legacyParsed.isCustomColor,
+              selectedPaletteId: legacyParsed.selectedPaletteId,
+              customPrimaryStart: legacyParsed.customPrimaryStart,
+              customPrimaryEnd: legacyParsed.customPrimaryEnd,
+              customContrast: legacyParsed.customContrast,
+              fontHeading: legacyParsed.fontHeading,
+              fontBody: legacyParsed.fontBody,
+              domainMode: legacyParsed.domainMode,
+              subdomainInput: legacyParsed.subdomainInput,
+              customDomainInput: legacyParsed.customDomainInput,
+              newSlug: legacyParsed.newSlug,
+            };
+            draftsList.unshift(legacyDraft);
+            localStorage.setItem(draftsStorageKey, JSON.stringify(draftsList));
+          }
+        }
+      }
+    } catch {}
+
+    // 3. Also check global legacy key
+    try {
+      const globalLegacy = localStorage.getItem('psi_page_creation_draft_global');
+      if (globalLegacy) {
+        const globalParsed = JSON.parse(globalLegacy);
+        if (globalParsed && typeof globalParsed === 'object' && (globalParsed.newTitle || globalParsed.currentStep)) {
+          const globalId = globalParsed.id || 'draft_legacy_global';
+          if (!draftsList.some((d) => d.id === globalId)) {
+            draftsList.unshift({
+              ...globalParsed,
+              id: globalId,
+              updatedAt: globalParsed.updatedAt || new Date().toISOString(),
+            });
+            localStorage.setItem(draftsStorageKey, JSON.stringify(draftsList));
+          }
+        }
+      }
+    } catch {}
+
+    setDrafts(draftsList);
+  }, [tenant?.id]);
+
+  useEffect(() => {
+    loadDrafts();
+  }, [loadDrafts]);
+
+  const handleDeleteDraft = (draftId: string) => {
+    if (typeof window === 'undefined') return;
+    const tenantId = tenant?.id;
+    const draftsStorageKey = tenantId ? `psi_page_drafts_${tenantId}` : 'psi_page_drafts_global';
+    const legacyKey = tenantId ? `psi_page_creation_draft_${tenantId}` : 'psi_page_creation_draft_global';
+
+    try {
+      localStorage.removeItem(legacyKey);
+      localStorage.removeItem('psi_page_creation_draft_global');
+
+      const raw = localStorage.getItem(draftsStorageKey);
+      let list: any[] = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(list)) {
+        list = list.filter((d) => d.id !== draftId);
+        localStorage.setItem(draftsStorageKey, JSON.stringify(list));
+        setDrafts(list);
+      }
+    } catch {}
+  };
+
+  const handleNewPageClick = () => {
+    if (drafts.length > 0) {
+      setShowDraftModal(true);
+    } else {
+      router.push('/dashboard/captacao/nova?fresh=true');
+    }
+  };
 
   const loadPages = useCallback(async () => {
     if (!tenant) return;
@@ -185,15 +297,14 @@ export default function CaptacaoPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Páginas de Captação</h1>
         </div>
         <div className="shrink-0 flex items-center gap-3">
-          <Link href="/dashboard/captacao/nova" className="no-underline">
-            <Button
-              type="button"
-              className="brand-accent text-xs font-bold uppercase h-10 px-4 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              Nova Página
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            onClick={handleNewPageClick}
+            className="brand-accent text-xs font-bold uppercase h-10 px-4 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
+          >
+            <Plus className="h-4 w-4" />
+            Nova Página
+          </Button>
         </div>
       </div>
 
@@ -204,8 +315,8 @@ export default function CaptacaoPage() {
         </div>
       )}
 
-      {/* Main Pages List */}
-      {pages.length === 0 ? (
+      {/* Main Pages & Drafts List */}
+      {pages.length === 0 && drafts.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4 glass-sm border border-dashed border-[var(--surface-border)]">
           <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-2xl text-slate-500 border border-[var(--surface-border)]">
             <Globe className="h-8 w-8 text-slate-600 dark:text-slate-400" />
@@ -216,18 +327,96 @@ export default function CaptacaoPage() {
               Crie sua primeira landing page de captação para começar a colher respostas de triagem de pacientes.
             </p>
           </div>
-          <Link href="/dashboard/captacao/nova" className="no-underline pt-2">
-            <Button
-              type="button"
-              className="brand-accent text-xs font-bold uppercase h-10 px-5 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              Criar Primeira Página
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            onClick={handleNewPageClick}
+            className="brand-accent text-xs font-bold uppercase h-10 px-5 flex items-center gap-2 cursor-pointer border-none shadow-md hover:brightness-110 active:scale-95 transition-all mt-2"
+          >
+            <Plus className="h-4 w-4" />
+            Criar Primeira Página
+          </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Rascunhos Exibidos no Mesmo Grid */}
+          {drafts.map((draft) => (
+            <Card
+              key={draft.id}
+              className="p-5 glass-sm border border-amber-500/30 bg-amber-500/5 transition-all flex flex-col justify-between min-h-[200px] shadow-sm hover:shadow-md"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="truncate flex-1">
+                    <h3 className="text-lg text-slate-900 dark:text-white font-bold truncate mb-0.5">
+                      {draft.newTitle?.trim() || 'Página Sem Título'}
+                    </h3>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-wider">
+                      {draft.updatedAt ? `Salvo às ${new Date(draft.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Rascunho Em Andamento'}
+                    </span>
+                  </div>
+
+                  {/* Status Badge: RASCUNHO */}
+                  <span className="h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all flex items-center justify-center bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                    Rascunho
+                  </span>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>Progresso:</span>
+                    <span className="font-bold text-[var(--brand-gradient-start)]">
+                      Etapa {draft.currentStep || 1} de 4
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>Tipografia:</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
+                      {draft.fontHeading || 'Playfair Display'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>Cores Definidas:</span>
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="w-4 h-4 rounded-full border border-black/20 shadow-xs"
+                        style={{ backgroundColor: draft.customPrimaryStart || '#CC8667' }}
+                      />
+                      <div
+                        className="w-4 h-4 rounded-full border border-black/20 shadow-xs"
+                        style={{ backgroundColor: draft.customPrimaryEnd || '#E6A88A' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-[var(--surface-border)]">
+                {/* Botão Excluir Rascunho */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteDraft(draft.id)}
+                  className="p-2.5 rounded-xl text-red-500/90 dark:text-red-400/80 hover:text-red-600 dark:hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer active:scale-95 flex items-center justify-center h-9 w-9"
+                  aria-label="Excluir Rascunho"
+                  title="Excluir Rascunho"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+
+                {/* Botão Continuar Rascunho */}
+                <Link href={`/dashboard/captacao/nova?draftId=${draft.id}`} className="no-underline">
+                  <button
+                    type="button"
+                    className="brand-accent cursor-pointer text-xs font-bold h-9 px-4 flex items-center gap-1.5 whitespace-nowrap rounded-xl border-none shadow-md hover:brightness-110 active:scale-95 transition-all"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    <span>Continuar Rascunho</span>
+                  </button>
+                </Link>
+              </div>
+            </Card>
+          ))}
           {pages.map((page) => (
             <Card 
               key={page.id} 
@@ -261,18 +450,34 @@ export default function CaptacaoPage() {
                       {!page.slug ? 'Página Principal (Home)' : `/${page.slug}`}
                     </span>
                   </div>
+
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>Link do Site:</span>
+                    <span>Endereço Gratuito:</span>
                     <a
-                      href={getPageProductionUrl(page)}
+                      href={`https://${tenant?.slug}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}${page.slug ? `/${page.slug}` : '/'}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
                     >
-                      {getPageProductionUrl(page).replace(/^https?:\/\//, '')}
+                      {tenant?.slug}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}{page.slug ? `/${page.slug}` : '/'}
                       <ExternalLink className="h-3 w-3 shrink-0" />
                     </a>
                   </div>
+
+                  {tenant?.domain && (
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>Domínio Próprio:</span>
+                      <a
+                        href={`https://${tenant.domain}${page.slug ? `/${page.slug}` : '/'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-500 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
+                      >
+                        {tenant.domain}{page.slug ? `/${page.slug}` : '/'}
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -371,6 +576,101 @@ export default function CaptacaoPage() {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Modal de Escolha / Lista de Rascunhos */}
+      {showDraftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-[var(--surface-border)] rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl text-white animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Nova Página de Captação</h3>
+                  <p className="text-xs text-slate-400">Escolha um rascunho salvo ou comece do zero.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDraftModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Ação: Criar Nova do Zero */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowDraftModal(false);
+                router.push('/dashboard/captacao/nova?fresh=true');
+              }}
+              className="w-full p-4 rounded-xl border border-dashed border-emerald-500/40 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 font-bold text-xs flex items-center justify-between transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <span className="block text-sm font-bold text-white">Criar Nova Página do Zero</span>
+                  <span className="text-[11px] text-slate-400 font-normal">Iniciar com um modelo em branco sem rascunho</span>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            {/* Lista de Rascunhos Existentes */}
+            <div className="space-y-2 pt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Ou continue um rascunho em andamento ({drafts.length})
+              </span>
+              <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+                {drafts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-3.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-between gap-3 transition-all"
+                  >
+                    <div className="truncate flex-1">
+                      <h4 className="text-xs font-bold text-white truncate">
+                        {d.newTitle || 'Página Sem Título'}
+                      </h4>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                        <span className="text-amber-400 font-semibold">Etapa {d.currentStep || 1} de 4</span>
+                        <span>•</span>
+                        <span>{new Date(d.updatedAt).toLocaleDateString()} às {new Date(d.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDraft(d.id)}
+                        className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                        title="Excluir Rascunho"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDraftModal(false);
+                          router.push(`/dashboard/captacao/nova?draftId=${d.id}`);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <span>Continuar</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

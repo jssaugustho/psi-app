@@ -2,10 +2,10 @@ services:
   # 🐘 PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: foxbase-postgres
+    container_name: psi-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-foxbase_secure_pwd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -17,19 +17,19 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - foxbase-network
+      - psi-network
 
   # 🔑 GoTrue (Supabase Auth)
   gotrue:
     image: supabase/gotrue:v2.189.0
-    container_name: foxbase-gotrue
+    container_name: psi-gotrue
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-foxbase_secure_pwd}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable&search_path=auth,public"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable&search_path=auth,public"
       GOTRUE_DB_SEARCH_PATH: auth,public
-      GOTRUE_JWT_SECRET: ${JWT_SECRET:-foxbase_super_secret_jwt_token_for_local_dev_32_chars}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?A variável JWT_SECRET é obrigatória no .env}
       GOTRUE_JWT_EXP: 3600
       GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
       GOTRUE_URI_ALLOW_LIST: ${GOTRUE_SITE_URL:-http://localhost:3000}/*
@@ -39,28 +39,28 @@ services:
       GOTRUE_DB_DRIVER: postgres
       PORT: 9999
     networks:
-      - foxbase-network
+      - psi-network
 
   # 📝 PostgREST
   postgrest:
     image: postgrest/postgrest:v12.0.2
-    container_name: foxbase-postgrest
+    container_name: psi-postgrest
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-foxbase_secure_pwd}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
+      PGRST_DB_URI: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
       PGRST_DB_SCHEMAS: public
       PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: ${JWT_SECRET:-foxbase_super_secret_jwt_token_for_local_dev_32_chars}
+      PGRST_JWT_SECRET: ${JWT_SECRET:?A variável JWT_SECRET é obrigatória no .env}
       PGRST_SERVER_PORT: 3000
     networks:
-      - foxbase-network
+      - psi-network
 
   # 🐇 RabbitMQ Broker
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
-    container_name: foxbase-rabbitmq
+    container_name: psi-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
@@ -75,12 +75,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - foxbase-network
+      - psi-network
 
   # 🟢 Nginx API Gateway / Proxy Reverso
   nginx:
     image: nginx:alpine
-    container_name: foxbase-nginx
+    container_name: psi-nginx
     depends_on:
       - gotrue
       - postgrest
@@ -90,14 +90,14 @@ services:
     ports:
       - "8000:80"
     networks:
-      - foxbase-network
+      - psi-network
       
   # ⚡ Fastify API (Application)
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: foxbase-api
+    container_name: psi-api
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,10 +106,10 @@ services:
     volumes:
       - .:/usr/src/app
     environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-foxbase_secure_pwd}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672"
-      JWT_SECRET: ${JWT_SECRET:-foxbase_super_secret_jwt_token_for_local_dev_32_chars}
-      SERVICE_SECRET_KEY: ${SERVICE_SECRET_KEY:-c3d9a7e1-8f2b-4d5c-9e1a-6f4b3a2c1d0e}
+      JWT_SECRET: ${JWT_SECRET:?A variável JWT_SECRET é obrigatória no .env}
+      SERVICE_SECRET_KEY: ${SERVICE_SECRET_KEY:?A variável SERVICE_SECRET_KEY é obrigatória no .env}
       GOTRUE_URL: ${GOTRUE_URL:-http://gotrue:9999}
       PORT: 5000
       NODE_ENV: development
@@ -117,14 +117,14 @@ services:
     ports:
       - "5000:5000"
     networks:
-      - foxbase-network
+      - psi-network
 
   # ⚙️ TS Workers (Application)
   workers:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: foxbase-workers
+    container_name: psi-workers
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,18 +133,20 @@ services:
     volumes:
       - .:/usr/src/app
     environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-foxbase_secure_pwd}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}@postgres:5432/${POSTGRES_DB:-postgres}?sslmode=disable"
       RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672"
-      JWT_SECRET: ${JWT_SECRET:-foxbase_super_secret_jwt_token_for_local_dev_32_chars}
+      JWT_SECRET: ${JWT_SECRET:?A variável JWT_SECRET é obrigatória no .env}
+      SERVICE_SECRET_KEY: ${SERVICE_SECRET_KEY:?A variável SERVICE_SECRET_KEY é obrigatória no .env}
+      GOTRUE_URL: ${GOTRUE_URL:-http://gotrue:9999}
       NODE_ENV: development
     command: npm run dev:worker
     networks:
-      - foxbase-network
+      - psi-network
 
   # ☁️ Cloudflare Tunnel (Proxy reverso seguro para expor o gateway)
   tunnel:
     image: cloudflare/cloudflared:latest
-    container_name: foxbase-tunnel
+    container_name: psi-tunnel
     restart: unless-stopped
     depends_on:
       - nginx
@@ -152,7 +154,7 @@ services:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN}
     command: tunnel run
     networks:
-      - foxbase-network
+      - psi-network
 
 volumes:
   postgres_data:
@@ -161,5 +163,5 @@ volumes:
     driver: local
 
 networks:
-  foxbase-network:
+  psi-network:
     driver: bridge

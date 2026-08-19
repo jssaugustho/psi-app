@@ -237,9 +237,12 @@ export function LogoBuilderModal({
         isOpen={iconLibraryOpen}
         onClose={() => setIconLibraryOpen(false)}
         tenantId={tenantId}
+        resolution={{ width: 256, height: 256 }}
+        type="logotipo"
         uploadType="icon"
-        onSelectImage={(asset) => {
-          setCustomIconUrl(asset.url);
+        onSelectImage={(asset: any) => {
+          const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+          setCustomIconUrl(url);
           setIconLibraryOpen(false);
         }}
       />

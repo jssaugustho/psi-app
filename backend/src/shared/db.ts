@@ -1,11 +1,9 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import dotenv from 'dotenv';
+import { env } from '../config/env';
 import * as schema from './schema';
 
-dotenv.config();
-
-const connectionString = process.env.DATABASE_URL || 'postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable';
+const connectionString = env.DATABASE_URL;
 const poolSize = Number(process.env.POSTGRES_POOL_SIZE) || 3;
 
 export const sql = postgres(connectionString, {

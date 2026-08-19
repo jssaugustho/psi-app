@@ -158,7 +158,12 @@ const UploadBox = ({
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         tenantId={tenantId || ''}
-        onSelectImage={(asset) => onChange(asset.url)}
+        resolution={{ width: 800, height: 400 }}
+        type="logotipo"
+        onSelectImage={(asset: any) => {
+          const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+          onChange(url);
+        }}
       />
     </div>
   );
@@ -365,7 +370,12 @@ const ProfileAvatarField = ({
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         tenantId={tenantId || ''}
-        onSelectImage={(asset) => onChange(asset.url)}
+        resolution={{ width: 400, height: 400 }}
+        type="imagem"
+        onSelectImage={(asset: any) => {
+          const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+          onChange(url);
+        }}
       />
     </div>
   );
@@ -1060,9 +1070,12 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
               isOpen={siteLogoLibraryOpen}
               onClose={() => setSiteLogoLibraryOpen(false)}
               tenantId={tenant.id}
+              resolution={{ width: 600, height: 200 }}
+              type="logotipo"
               uploadType="logo"
-              onSelectImage={(asset) => {
-                setLogoUrl(asset.url);
+              onSelectImage={(asset: any) => {
+                const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+                setLogoUrl(url);
                 setLogoConfig({ mode: 'image' });
               }}
             />
@@ -1072,20 +1085,20 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
         {/* ABA 3: DOMÍNIOS */}
         {activeTab === 'dominios' && (
           <div className="space-y-6 animate-page-enter">
-            {/* Endereço Gratuito */}
+            {/* Endereço Gratuito (Obrigatório e Sempre Ativo) */}
             <Card>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <Globe className="w-4 h-4 text-[var(--brand-gradient-start)]" />
-                  Endereço Gratuito na Internet
+                  1. Seu Endereço Gratuito na Internet (Subdomínio TheraOS)
                 </h3>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Ativo e Prontinho
+                  Obrigatório e Sempre Ativo
                 </span>
               </div>
 
               <p className="text-xs text-slate-400 mb-4">
-                Endereço gratuito fornecido pelo nosso sistema para você divulgar suas páginas sem precisar comprar um domínio:
+                Endereço fornecido automaticamente pelo nosso sistema. Suas páginas estarão sempre acessíveis por este endereço:
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
@@ -1119,14 +1132,19 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
               </div>
             </Card>
 
-            {/* Domínio Próprio */}
+            {/* Domínio Próprio (Opcional) */}
             <Card>
-              <h3 className="text-base font-bold text-slate-100 mb-1 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[var(--brand-gradient-start)]" />
-                Usar Seu Domínio Próprio (Ex: www.suaclinica.com.br)
-              </h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[var(--brand-gradient-start)]" />
+                  2. Conectar Seu Domínio Próprio (Opcional)
+                </h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Opcional
+                </span>
+              </div>
               <p className="text-xs text-slate-400 mb-4">
-                Se você já comprou um domínio próprio (no Registro.br, GoDaddy, Hostinger, etc.), informe ele abaixo para conectar ao seu site:
+                Se você já comprou um domínio próprio (no Registro.br, GoDaddy, Hostinger, etc.), informe ele abaixo. Seu site passará a responder no seu domínio e continuará funcionando no endereço gratuito acima:
               </p>
 
               <div className="space-y-4">

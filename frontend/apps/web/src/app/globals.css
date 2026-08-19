@@ -3,9 +3,9 @@
 @source "../../../../packages/ui";
 
 :root {
-  /* ── Gradiente & Contraste da Marca ── */
-  --brand-gradient-start: #4F46E5;
-  --brand-gradient-end: #06B6D4;
+  /* ── Gradiente & Contraste da Marca (Fallback Neutro - Cores reais sobem via API do Tenant) ── */
+  --brand-gradient-start: #27272A;
+  --brand-gradient-end: #52525B;
   --brand-contrast-color: #FFFFFF;
   --brand-gradient: linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end));
 

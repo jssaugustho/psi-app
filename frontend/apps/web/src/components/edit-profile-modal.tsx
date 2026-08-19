@@ -269,34 +269,11 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop escurecido */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
-        }}
-        onClick={onClose}
-      />
-
-      {/* Modal Container */}
-      <div
-        className="brand-modal w-full max-w-md rounded-2xl p-6 shadow-2xl relative z-10 overflow-y-auto max-h-[90vh] space-y-6"
-        style={{
-          color: 'var(--brand-text-color)',
-        }}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 bg-transparent border-none cursor-pointer p-1 transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
+    <BrandModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
+      <div className="space-y-6">
         {/* Title */}
         <div className="text-center space-y-1">
           <h2 className="text-lg font-bold">Editar Perfil</h2>
@@ -480,7 +457,14 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           isOpen={libraryOpen}
           onClose={() => setLibraryOpen(false)}
           tenantId={tenant.id}
-          onSelectImage={handleSelectFromLibrary}
+          resolution={{ width: 400, height: 400 }}
+          type="imagem"
+          uploadType="avatar"
+          onSelectImage={(asset: any) => {
+            const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+            setAvatarUrl(url);
+            setLibraryOpen(false);
+          }}
         />
       )}
 
@@ -573,6 +557,6 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
           </div>
         </div>
       </BrandModal>
-    </div>
+    </BrandModal>
   );
 }

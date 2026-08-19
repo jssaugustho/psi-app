@@ -1,14 +1,12 @@
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
-import dotenv from 'dotenv';
+import { env } from '../config/env';
 import { db } from '../shared/db';
 import { profiles } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 import { createGoTrueUser } from '../shared/auth';
 
-dotenv.config();
-
-const GOTRUE_URL = process.env.GOTRUE_EXTERNAL_URL || 'http://localhost:8000/auth/v1';
+const GOTRUE_URL = env.GOTRUE_URL;
 
 async function bootstrap() {
   console.log('\n🔐 === SCRIPT DE BOOTSTRAP: PROVISIONAMENTO DO PRIMEIRO ADMIN ===\n');

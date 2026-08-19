@@ -102,23 +102,23 @@ export function ConfirmModal({
       />
 
       {/* Modal Card */}
-      <div className="brand-modal w-full max-w-md bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl relative z-10 animate-modal-enter text-left p-6 space-y-5">
+      <div className="brand-modal w-full max-w-md bg-white dark:bg-zinc-950 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl relative z-10 animate-modal-enter text-left p-6 space-y-5">
         <div className="flex items-start gap-4">
           <div className={`p-3 rounded-xl border shrink-0 ${getIconBg()}`}>
             {getIcon()}
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-white tracking-wide">{title}</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-sans">{description}</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-wide">{title}</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-sans">{description}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
           <button
             type="button"
             disabled={loading || isSubmitting}
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white bg-zinc-900 border border-white/10 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-white/10 rounded-xl transition-all cursor-pointer disabled:opacity-50"
           >
             {cancelText}
           </button>

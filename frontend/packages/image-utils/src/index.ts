@@ -192,3 +192,79 @@ export async function compressImage(
     reader.onerror = reject;
   });
 }
+
+export type ImageCategory = 'logotipo' | 'imagem';
+
+export interface ImageValidationOptions {
+  resolution?: { width: number; height: number };
+  type: ImageCategory;
+  maxFileSizeMB?: number;
+}
+
+/**
+ * Detecta se um contexto de canvas possui transparência (canal alfa < 255).
+ */
+export function checkHasAlphaChannel(ctx: CanvasRenderingContext2D, width: number, height: number): boolean {
+  try {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 255) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao verificar transparência da imagem:', err);
+  }
+  return false;
+}
+
+/**
+ * Valida os parâmetros de segurança de uma imagem (tamanho e proibição de transparência para não-logotipos).
+ */
+export async function validateImageSafety(
+  fileOrUrl: File | string,
+  options: ImageValidationOptions
+): Promise<{ valid: boolean; error?: string }> {
+  const maxMb = options.maxFileSizeMB || 15;
+  if (typeof fileOrUrl !== 'string' && fileOrUrl.size > maxMb * 1024 * 1024) {
+    return { valid: false, error: `O arquivo excede o limite máximo permitido de ${maxMb}MB.` };
+  }
+
+  if (options.type === 'imagem') {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const src = typeof fileOrUrl === 'string' ? fileOrUrl : URL.createObjectURL(fileOrUrl);
+      img.src = src;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.min(img.width, 400);
+        canvas.height = Math.min(img.height, 400);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          if (typeof fileOrUrl !== 'string') URL.revokeObjectURL(src);
+          return resolve({ valid: true });
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const hasAlpha = checkHasAlphaChannel(ctx, canvas.width, canvas.height);
+        if (typeof fileOrUrl !== 'string') URL.revokeObjectURL(src);
+
+        if (hasAlpha) {
+          return resolve({
+            valid: false,
+            error: 'Imagens do tipo "imagem" não podem conter transparência. Apenas logotipos permitem fundo transparente.'
+          });
+        }
+        resolve({ valid: true });
+      };
+      img.onerror = () => {
+        if (typeof fileOrUrl !== 'string') URL.revokeObjectURL(src);
+        resolve({ valid: true });
+      };
+    });
+  }
+
+  return { valid: true };
+}
+

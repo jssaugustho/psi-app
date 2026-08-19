@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import { env } from '../config/env';
 import { getChannel, assertQuorumQueue } from '../shared/queue';
 import { db } from '../shared/db';
 import { systemStatusLogs, emailLogs, platformSettings, tenants } from '../shared/schema';
@@ -6,8 +6,6 @@ import { lt, sql, eq, gt, and } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { renderEmailTemplate, TemplateName, TemplatePropsMap } from '../emails/render';
 import { deriveEmailDomain } from '../shared/email-domain';
-
-dotenv.config();
 
 async function main() {
   console.log('⚙️ Inicializando TS Workers...');
@@ -361,7 +359,7 @@ function startWorkerHeartbeats(channel: any) {
       };
 
       channel.publish(
-        'foxbase.direct',
+        'psi.direct',
         'system.status',
         Buffer.from(JSON.stringify(payload))
       );

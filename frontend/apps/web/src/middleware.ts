@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
   const hostname = (forwardedHost || hostHeader).split(':')[0].toLowerCase();
 
   // 2. Definir domínios base da plataforma (que não devem ser tratados como subdomínio de psicóloga)
-  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'ajstrategy.digital';
+  const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app';
   const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
 
   // Ignorar rotas de API interna

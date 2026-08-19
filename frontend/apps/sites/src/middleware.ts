@@ -21,7 +21,7 @@ export function middleware(request: NextRequest) {
   const hostname = (forwardedHost || hostHeader).split(':')[0].toLowerCase();
 
   const isLocal = hostname.includes('localhost');
-  const mainAppUrl = process.env.NEXT_PUBLIC_MAIN_APP_URL || (isLocal ? 'http://localhost:3000' : 'https://app.ajstrategy.digital');
+  const mainAppUrl = process.env.NEXT_PUBLIC_MAIN_APP_URL || (isLocal ? 'http://localhost:3000' : 'https://app.theraos.app');
 
   // Permitir rotas de teste local e preview direto em /p/[tenant]/[slug]
   if (url.pathname.startsWith('/p/')) {

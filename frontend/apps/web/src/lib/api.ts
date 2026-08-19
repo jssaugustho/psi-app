@@ -190,6 +190,24 @@ async function doRefresh(): Promise<string> {
   return _refreshPromise;
 }
 
+type ApiConnectionListener = (status: 'offline' | 'online', errorDetails?: string) => void;
+const connectionListeners = new Set<ApiConnectionListener>();
+
+export const apiConnection = {
+  subscribe(listener: ApiConnectionListener) {
+    connectionListeners.add(listener);
+    return () => {
+      connectionListeners.delete(listener);
+    };
+  },
+  notifyOffline(errorMsg?: string) {
+    connectionListeners.forEach((fn) => fn('offline', errorMsg));
+  },
+  notifyOnline() {
+    connectionListeners.forEach((fn) => fn('online'));
+  },
+};
+
 /**
  * Helper genérico de fetch para chamadas à API
  */
@@ -220,19 +238,17 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     });
   } catch (err: any) {
     console.error('Falha de conexão com o backend:', err);
-    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
-      window.location.href = '/offline';
-    }
+    apiConnection.notifyOffline('Sem resposta do servidor de API. Verifique se o backend está rodando.');
     throw new Error('Servidor de API indisponível.');
   }
 
   // Verificar status 502, 503, 504 (erros de proxy/gateway)
   if ([502, 503, 504].includes(response.status)) {
-    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
-      window.location.href = '/offline';
-    }
+    apiConnection.notifyOffline(`O servidor de API retornou código de erro ${response.status}.`);
     throw new Error('Servidor de API temporariamente indisponível.');
   }
+
+  apiConnection.notifyOnline();
 
   // Tratar resposta vazia (204 No Content ou corpo sem texto)
   const contentType = response.headers.get('content-type');
@@ -834,7 +850,7 @@ export const api = {
   },
 
   deleteCapturePage: async (id: string): Promise<void> => {
-    await fetchApi(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
+    await fetchApi(`/crm/captacao/pages/${id}`, {
       method: 'DELETE'
     });
   },
@@ -900,10 +916,11 @@ export const api = {
     return fetchApi<{ base_domain: string | null }>('/platform/setup/status');
   },
 
-  checkSubdomainAvailability: async (slug: string): Promise<{ available: boolean; slug: string; fullUrl: string; reason: string }> => {
-    return fetchApi<{ available: boolean; slug: string; fullUrl: string; reason: string }>(
-      `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}`
-    );
+  checkSubdomainAvailability: async (slug: string, tenantId?: string): Promise<{ available: boolean; slug: string; fullUrl: string; reason: string }> => {
+    const query = tenantId 
+      ? `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}&tenantId=${encodeURIComponent(tenantId)}`
+      : `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}`;
+    return fetchApi<{ available: boolean; slug: string; fullUrl: string; reason: string }>(query);
   },
 
   registerCustomHostname: async (pageId: string | null, domain: string): Promise<{

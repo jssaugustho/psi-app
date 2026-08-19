@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { api, Tenant } from '@/lib/api';
 import { Input } from '@psi/ui';
+import { validateImageSafety } from '@psi/image-utils';
 
 interface WhiteLabelSettingsProps {
   tenant: Tenant;
@@ -206,6 +207,15 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
     setUploading((u) => ({ ...u, [field]: true }));
     try {
       const uploadType = field.includes('icon') ? 'icon' : 'logo';
+      const isIcon = uploadType === 'icon';
+      const targetRes = isIcon ? { width: 128, height: 128 } : { width: 800, height: 400 };
+
+      const validation = await validateImageSafety(file, { resolution: targetRes, type: 'logotipo' });
+      if (!validation.valid && validation.error) {
+        setError(`Erro ao enviar ${field.replace(/_/g, ' ')}: ${validation.error}`);
+        return;
+      }
+
       const { url } = await api.uploadImage(file, uploadType);
       setForm((f) => ({ ...f, [field]: url }));
     } catch (err: any) {

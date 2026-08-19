@@ -53,6 +53,7 @@ export const tenants = pgTable('tenants', {
   // Configurações Customizadas de E-mail
   emailDomain: text('email_domain'),
   resendApiKey: text('resend_api_key'),
+  cfHostnameId: text('cf_hostname_id'),
 
   // Configurações do CRM (Fontes de Tráfego)
   trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook']).notNull(),

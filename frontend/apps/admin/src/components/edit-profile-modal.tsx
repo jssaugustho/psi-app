@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api, User } from '@/lib/api';
 import { Input } from '@psi/ui';
+import { validateImageSafety } from '@psi/image-utils';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -53,6 +54,13 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
     setUploading(true);
     setError('');
     try {
+      const validation = await validateImageSafety(file, { resolution: { width: 400, height: 400 }, type: 'imagem' });
+      if (!validation.valid && validation.error) {
+        setError(validation.error);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       const { url } = await api.uploadImage(file, 'avatar');
       setAvatarUrl(url);
     } catch (err: any) {

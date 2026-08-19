@@ -1,9 +1,7 @@
 import * as amqp from 'amqplib';
-import dotenv from 'dotenv';
+import { env } from '../config/env';
 
-dotenv.config();
-
-const rabbitmqUrl = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+const rabbitmqUrl = env.RABBITMQ_URL;
 
 type AmqpConnection = Awaited<ReturnType<typeof amqp.connect>>;
 type AmqpChannel = Awaited<ReturnType<AmqpConnection['createChannel']>>;
@@ -19,7 +17,7 @@ export async function getChannel(): Promise<AmqpChannel> {
     const ch = await conn.createChannel();
 
     // Configuração de Dead Letter Exchange padrão (Quorum Queue)
-    const deadLetterExchange = 'foxbase.dlx';
+    const deadLetterExchange = 'psi.dlx';
     const deadLetterQueue = 'messages.dlq';
 
     await ch.assertExchange(deadLetterExchange, 'direct', { durable: true });
@@ -30,7 +28,7 @@ export async function getChannel(): Promise<AmqpChannel> {
     await ch.bindQueue(deadLetterQueue, deadLetterExchange, 'dead-letter');
 
     // Exchange Direct Principal
-    const exchange = 'foxbase.direct';
+    const exchange = 'psi.direct';
     await ch.assertExchange(exchange, 'direct', { durable: true });
 
     // Exchange Fanout para mensagens Realtime Broadcast
@@ -50,8 +48,8 @@ export async function getChannel(): Promise<AmqpChannel> {
 
 export async function assertQuorumQueue(queueName: string, routingKey: string): Promise<void> {
   const ch = await getChannel();
-  const exchange = 'foxbase.direct';
-  const deadLetterExchange = 'foxbase.dlx';
+  const exchange = 'psi.direct';
+  const deadLetterExchange = 'psi.dlx';
 
   await ch.assertQueue(queueName, {
     durable: true,
@@ -65,7 +63,7 @@ export async function assertQuorumQueue(queueName: string, routingKey: string): 
 export async function publishToQueue(routingKey: string, payload: any): Promise<boolean> {
   try {
     const ch = await getChannel();
-    const exchange = 'foxbase.direct';
+    const exchange = 'psi.direct';
     const content = Buffer.from(JSON.stringify(payload));
 
     return ch.publish(exchange, routingKey, content, {

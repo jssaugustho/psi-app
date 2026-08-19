@@ -1,7 +1,15 @@
 import postgres from 'postgres';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL é obrigatória.');
+  process.exit(1);
+}
 
 async function run() {
-  const sql = postgres('postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable');
+  const sql = postgres(process.env.DATABASE_URL!);
   console.log('Connecting and adding draft columns...');
   try {
     await sql.unsafe(`

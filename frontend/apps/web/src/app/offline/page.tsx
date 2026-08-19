@@ -200,7 +200,7 @@ export default function OfflinePage() {
             {/* Serviço 1: API */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
               <div className="flex items-center gap-2">
-                <ServerCrash className="w-4 h-4 text-indigo-400" />
+                <ServerCrash className="w-4 h-4 text-zinc-400" />
                 <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Servidor de API</span>
               </div>
               {getStatusBadge(apiStatus)}
@@ -209,7 +209,7 @@ export default function OfflinePage() {
             {/* Serviço 2: Database */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
               <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-emerald-400" />
+                <Database className="w-4 h-4 text-zinc-400" />
                 <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Banco de Dados</span>
               </div>
               {getStatusBadge(dbStatus)}
@@ -218,7 +218,7 @@ export default function OfflinePage() {
             {/* Serviço 3: Mensageria */}
             <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <AlertTriangle className="w-4 h-4 text-zinc-400" />
                 <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Realtime & Fila</span>
               </div>
               {getStatusBadge(queueStatus)}

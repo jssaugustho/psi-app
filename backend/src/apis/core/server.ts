@@ -1,8 +1,8 @@
+import { env } from '../../config/env';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import socketio from 'socket.io';
-import dotenv from 'dotenv';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { getChannel, publishRealtime } from '../../shared/queue';
 import { authRoutes } from './routes/auth';
@@ -12,9 +12,7 @@ import { crmRoutes } from './routes/crm';
 import { captacaoRoutes } from './routes/captacao';
 import { sql } from '../../shared/db';
 
-dotenv.config();
-
-const port = Number(process.env.PORT) || 5000;
+const port = env.PORT;
 
 // Inicializar Fastify com o ZodTypeProvider
 const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();

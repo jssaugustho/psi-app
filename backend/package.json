@@ -1,7 +1,7 @@
 {
-  "name": "foxbase-backend",
+  "name": "psi-backend",
   "version": "1.0.0",
-  "description": "Backend template for Foxbase: Fastify API, TS Workers, RabbitMQ and Postgres RLS",
+  "description": "Backend para Plataforma PSI: Fastify API, TS Workers, RabbitMQ e Postgres RLS",
   "main": "dist/apis/core/server.js",
   "scripts": {
     "build": "rimraf dist && tsc",
@@ -13,7 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "ts-node src/scripts/migrate.ts",
-    "db:reset": "node -e \"const postgres = require('postgres'); const sql = postgres('postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable'); async function run() { await sql.unsafe('TRUNCATE TABLE auth.users CASCADE; TRUNCATE TABLE public.profiles CASCADE;'); console.log('✅ Banco de dados limpo com sucesso!'); process.exit(0); } run();\"",
+    "db:reset": "node -e \"require('dotenv').config(); const postgres = require('postgres'); const url = process.env.DATABASE_URL; if (!url) { console.error('❌ DATABASE_URL ausente no .env'); process.exit(1); } const sql = postgres(url); async function run() { await sql.unsafe('TRUNCATE TABLE auth.users CASCADE; TRUNCATE TABLE public.profiles CASCADE;'); console.log('✅ Banco de dados limpo com sucesso!'); process.exit(0); } run();\"",
     "bootstrap": "ts-node src/scripts/bootstrap.ts",
     "test-leads-webhook": "ts-node src/scripts/test-leads-webhook.ts",
     "reset-crm": "ts-node src/scripts/reset-crm.ts"

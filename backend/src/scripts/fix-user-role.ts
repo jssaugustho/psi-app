@@ -3,7 +3,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable';
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL é obrigatória para o script fix-user-role.');
+  process.exit(1);
+}
+
+const DATABASE_URL = process.env.DATABASE_URL;
 
 async function main() {
   console.log('🔄 Conectando ao banco de dados para corrigir role do usuário...');

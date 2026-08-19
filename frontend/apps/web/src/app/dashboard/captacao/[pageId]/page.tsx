@@ -706,110 +706,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         isOpen={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         tenantId={tenantId}
-        onSelectImage={handleSelectFromLibrary}
-        uploadType={allowTransparency ? (id?.includes('favicon') ? 'icon' : 'logo') : 'asset'}
-      />
-
-      {/* Visual Crop Modal */}
-      <BrandModal
-        isOpen={cropModalOpen}
-        onClose={() => {
-          setCropModalOpen(false);
-          setImageSrc(null);
-          setSelectedAsset(null);
+        resolution={{
+          width: targetWidth || 800,
+          height: targetHeight || (aspectRatio ? Math.round((targetWidth || 800) / aspectRatio) : 800)
         }}
-      >
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Ajustar e Recortar Imagem</h3>
-            <p className="text-[10px] text-slate-400">Arraste a foto e ajuste o zoom para enquadrar na área destacada.</p>
-          </div>
-
-          {/* Workspace */}
-          <div 
-            className="relative border border-[var(--surface-border)] rounded-xl flex items-center justify-center overflow-hidden cursor-move select-none"
-            style={{
-              width: '100%',
-              height: '360px',
-              // Checkerboard for transparent images; solid bg for opaque ones
-              background: allowTransparency
-                ? 'repeating-conic-gradient(#3f3f46 0% 25%, #27272a 0% 50%)'
-                : '#09090B',
-              backgroundSize: allowTransparency ? '20px 20px' : undefined,
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            {/* Cutout Highlight Target Area */}
-            {aspectRatio && (
-              <div 
-                className="absolute z-20 pointer-events-none rounded-lg border border-dashed border-[var(--brand-gradient-start)]"
-                style={{
-                  width: `${frameW}px`,
-                  height: `${frameH}px`,
-                  boxShadow: '0 0 0 9999px rgba(9, 9, 11, 0.75)'
-                }}
-              />
-            )}
-
-            {/* Draggable Panned and Zoomed Image */}
-            {imageSrc && (
-              <img
-                ref={imageElementRef}
-                src={imageSrc}
-                alt="Crop Workspace"
-                className="max-w-none origin-center pointer-events-none transition-transform duration-75"
-                style={{
-                  width: `${baseW}px`,
-                  height: `${baseH}px`,
-                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                }}
-              />
-            )}
-          </div>
-
-          {/* Zoom Slider Control */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400 font-medium">
-              <span>Zoom</span>
-              <span>{Math.round(zoom * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="4"
-              step="0.05"
-              value={zoom}
-              onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-full h-1 bg-slate-300 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[var(--brand-gradient-start)]"
-            />
-          </div>
-
-          {/* Modal Action Buttons */}
-          <div className="flex gap-2 justify-end pt-2">
-            <Button
-              type="button"
-              onClick={() => {
-                setCropModalOpen(false);
-                setImageSrc(null);
-                setSelectedAsset(null);
-              }}
-              className="text-[10px] uppercase font-bold glass-sm border border-[var(--surface-border)] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer px-4 h-8"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCropAndSave}
-              className="text-[10px] uppercase font-bold brand-accent cursor-pointer px-4 h-8"
-            >
-              Recortar e Salvar
-            </Button>
-          </div>
-        </div>
-      </BrandModal>
+        type={allowTransparency || isLogo ? 'logotipo' : 'imagem'}
+        onSelectImage={(asset: any) => {
+          const url = typeof asset === 'string' ? asset : (asset?.url || asset);
+          onChange(url);
+          setLibraryOpen(false);
+        }}
+        uploadType={allowTransparency ? (id?.includes('favicon') ? 'icon' : 'logo') : 'asset'}
+        usageContext={id}
+      />
     </div>
   );
 };
@@ -4897,13 +4806,13 @@ export default function PageEditor({ params }: PageProps) {
                     Endereço da Página no seu site
                   </label>
                   
-                  <div className="flex items-center">
-                    <span className="h-10 px-3 flex items-center glass-sm border border-r-0 border-[var(--surface-border)] rounded-l-xl text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-white/5 truncate max-w-[240px]">
+                  <div className="flex items-center flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-sm focus-within:border-[var(--brand-gradient-start)] transition-all">
+                    <span className="h-10 px-3 flex items-center shrink-0 border-r border-[var(--surface-border)] text-xs font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-zinc-800/80 select-none whitespace-nowrap">
                       https://{tenant?.domain || `${tenant?.slug || 'site'}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}`}/
                     </span>
-                    <Input
+                    <input
                       type="text"
-                      className="brand-input rounded-l-none text-xs font-mono"
+                      className="h-10 px-3 flex-1 min-w-[120px] bg-transparent text-xs font-mono text-slate-900 dark:text-white outline-none border-none placeholder:text-slate-400 dark:placeholder:text-zinc-500"
                       placeholder="ex: terapia (ou deixe em branco)"
                       value={page.slug || ''}
                       onChange={(e) => {
@@ -4913,6 +4822,12 @@ export default function PageEditor({ params }: PageProps) {
                       }}
                     />
                   </div>
+
+                  {tenant?.domain && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono pt-0.5">
+                      🔗 Também disponível no seu endereço gratuito: <span className="font-bold text-indigo-500 dark:text-indigo-400">https://{tenant.slug}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}/{page.slug}</span>
+                    </p>
+                  )}
 
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
                     💡 <strong>Deixe em branco</strong> para que esta seja a <strong>Página Principal (Home)</strong> do seu site, ou digite o nome que deseja usar no endereço (ex: terapia, consultas).

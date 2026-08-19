@@ -1,3 +1,4 @@
+import { env } from '../../../config/env';
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -434,7 +435,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         // 1. Se fornecida senha, atualiza no GoTrue via Admin API
         if (password && password.trim()) {
           const adminToken = generateServiceRoleJwt();
-          const response = await fetch(`${process.env.GOTRUE_URL || 'http://gotrue:9999'}/admin/users/${userId}`, {
+          const response = await fetch(`${env.GOTRUE_URL}/admin/users/${userId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -612,7 +613,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         let isNewUser = false;
         let actionLink = '';
 
-        const gotrueSiteUrl = process.env.GOTRUE_SITE_URL || 'http://localhost:3000';
+        const gotrueSiteUrl = env.GOTRUE_SITE_URL || 'http://localhost:3000';
 
         if (existingProfile) {
           // --- USUÁRIO EXISTENTE ---
@@ -802,7 +803,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 4. Gerar novo link de convite ou link mágico conforme o status do usuário
-        const gotrueSiteUrl = process.env.GOTRUE_SITE_URL || 'http://localhost:3000';
+        const gotrueSiteUrl = env.GOTRUE_SITE_URL || 'http://localhost:3000';
         let actionLink = '';
         let isNewUser = false;
 

@@ -5,7 +5,7 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, tenants, emailLogs, mediaAssets, tenantMembers } from '../../../shared/schema';
+import { platformSettings, tenants, emailLogs, mediaAssets, tenantMembers, capturePages, contacts, interactionHistory } from '../../../shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -1828,6 +1828,113 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           error: 'Erro no reenvio',
           message: err.message || 'Não foi possível reenviar o e-mail.',
         });
+      }
+    }
+  );
+
+  // DELETE /v1/platform/tenants/:id
+  // Exclui um tenant, suas páginas, membros, mídias e hostnames do Cloudflare
+  fastify.delete(
+    '/tenants/:id',
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const { id } = request.params as any;
+
+        const targetTenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, id),
+        });
+
+        if (!targetTenant) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não encontrado.' });
+        }
+
+        // Permissão: apenas o dono do tenant ou um administrador global
+        const isOwner = targetTenant.ownerId === decoded.sub;
+        const currentUserProfile = await db.query.tenantMembers.findFirst({
+          where: and(
+            eq(tenantMembers.userId, decoded.sub),
+            eq(tenantMembers.role, 'admin')
+          ),
+        });
+
+        if (!isOwner && !currentUserProfile) {
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para excluir este tenant.' });
+        }
+
+        const settings = await db.query.platformSettings.findFirst();
+
+        // 1. Limpar Hostnames na Cloudflare (se houver cfHostnameId ou se as páginas possuírem customDomain)
+        if (settings?.cloudflareApiToken && settings?.cloudflareZoneId) {
+          const token = settings.cloudflareApiToken;
+          const zoneId = settings.cloudflareZoneId;
+
+          // Limpar cfHostnameId do tenant se existir
+          if (targetTenant.cfHostnameId) {
+            try {
+              await fetch(
+                `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames/${targetTenant.cfHostnameId}`,
+                {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+            } catch (cfErr) {
+              fastify.log.error(cfErr, 'Erro ao excluir tenant custom hostname na Cloudflare');
+            }
+          }
+
+          // Buscar páginas do tenant com customDomain para remover do Cloudflare também
+          const pages = await db.query.capturePages.findMany({
+            where: eq(capturePages.tenantId, id),
+          });
+
+          for (const page of pages) {
+            if (page.customDomain) {
+              try {
+                const listRes = await fetch(
+                  `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${page.customDomain}`,
+                  {
+                    method: 'GET',
+                    headers: { Authorization: `Bearer ${token}` },
+                  }
+                );
+                const listData: any = await listRes.json().catch(() => ({}));
+                if (listData.result && listData.result.length > 0) {
+                  const hostnameId = listData.result[0].id;
+                  await fetch(
+                    `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames/${hostnameId}`,
+                    {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${token}` },
+                    }
+                  );
+                }
+              } catch (pCfErr) {
+                fastify.log.error(pCfErr, 'Erro ao excluir page custom hostname na Cloudflare');
+              }
+            }
+          }
+        }
+
+        // 2. Limpar tabelas filhas / dependentes
+        await db.delete(interactionHistory).where(eq(interactionHistory.tenantId, id)).catch(() => {});
+        await db.delete(contacts).where(eq(contacts.tenantId, id)).catch(() => {});
+        await db.delete(capturePages).where(eq(capturePages.tenantId, id)).catch(() => {});
+        await db.delete(mediaAssets).where(eq(mediaAssets.tenantId, id)).catch(() => {});
+        await db.delete(tenantMembers).where(eq(tenantMembers.tenantId, id)).catch(() => {});
+
+        // 3. Excluir o tenant
+        await db.delete(tenants).where(eq(tenants.id, id));
+
+        return reply.send({ success: true, message: 'Tenant excluído com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
   );

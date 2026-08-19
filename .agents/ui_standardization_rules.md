@@ -8,11 +8,11 @@ Estas regras governam como todos os elementos visuais recorrentes devem ser cons
 
 O sistema de White-Label expõe **apenas 3 variáveis de cor** configuráveis pelo tenant:
 
-| Variável CSS                  | Significado                                | Padrão         |
-|-------------------------------|--------------------------------------------|----------------|
-| `--brand-gradient-start`      | Cor inicial do gradiente da marca          | `#4F46E5`      |
-| `--brand-gradient-end`        | Cor final do gradiente da marca            | `#06B6D4`      |
-| `--brand-contrast-color`      | Cor do texto sobre o gradiente (botões)    | `#FFFFFF`      |
+| Variável CSS                  | Significado                                | Padrão (Fallback Neutro) |
+|-------------------------------|--------------------------------------------|--------------------------|
+| `--brand-gradient-start`      | Cor inicial do gradiente da marca          | `#27272A`                |
+| `--brand-gradient-end`        | Cor final do gradiente da marca            | `#52525B`                |
+| `--brand-contrast-color`      | Cor do texto sobre o gradiente (botões)    | `#FFFFFF`                |
 
 **Todas as demais cores de fundo, cartões e textos são neutras e fixas** (zinc-950/900/100 no dark; zinc-50/white/zinc-950 no light). Elas se mesclam sutilmente com o gradiente via `color-mix` no `body`.
 

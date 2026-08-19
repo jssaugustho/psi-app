@@ -747,7 +747,7 @@ export const api = {
   },
 
   deleteTenant: async (id: string) => {
-    await fetchApi(`${PGRST_BASE_URL}/tenants?id=eq.${id}`, {
+    await fetchApi(`/platform/tenants/${id}`, {
       method: 'DELETE'
     });
   },

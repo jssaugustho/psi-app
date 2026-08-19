@@ -1,6 +1,6 @@
 # Arquitetura e Funcionamento do Editor de Sites (Psi-App)
 
-Este documento detalha o funcionamento técnico, o fluxo de dados, o sistema de temas globais (Cores & Tipografia) e os controles de layout estilo Elementor da plataforma de captação de pacientes para psicólogas.
+> **Diferenciação de Fluxos:** Este documento detalha a arquitetura do **Editor de Páginas Existentes** (`/dashboard/captacao/[pageId]`). Para a documentação do **Wizard de Criação de Novas Páginas (`/dashboard/captacao/nova`)**, extração de cores em Base64 e sistema de múltiplos rascunhos, consulte: [`site_creation_wizard_architecture.md`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_creation_wizard_architecture.md).
 
 ---
 

@@ -1,11 +1,9 @@
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
+import { env } from '../config/env';
 
-dotenv.config();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'foxbase_super_secret_jwt_token_for_local_dev_32_chars';
-const GOTRUE_URL = process.env.GOTRUE_URL || 'http://gotrue:9999';
-const SERVICE_SECRET_KEY = process.env.SERVICE_SECRET_KEY || 'c3d9a7e1-8f2b-4d5c-9e1a-6f4b3a2c1d0e';
+const JWT_SECRET = env.JWT_SECRET;
+const GOTRUE_URL = env.GOTRUE_URL;
+const SERVICE_SECRET_KEY = env.SERVICE_SECRET_KEY;
 
 /**
  * Gera um JWT com role service_role assinado com JWT_SECRET

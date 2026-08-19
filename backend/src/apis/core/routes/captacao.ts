@@ -469,13 +469,15 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
-  // GET /v1/crm/captacao/check-subdomain?slug=...
+  // GET /v1/crm/captacao/check-subdomain?slug=...&tenantId=...
   // Verifica se um subdomínio (slug) está livre para uso
   fastify.get(
     '/check-subdomain',
     async (request, reply) => {
       try {
         const querySlug = (request.query as any)?.slug;
+        const queryTenantId = (request.query as any)?.tenantId;
+
         if (!querySlug || typeof querySlug !== 'string') {
           return reply.status(400).send({ error: 'Bad Request', message: 'Slug é obrigatório.' });
         }
@@ -483,6 +485,23 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         const normalizedSlug = querySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
         if (normalizedSlug.length < 2) {
           return reply.send({ available: false, reason: 'Slug muito curto (mínimo 2 caracteres).' });
+        }
+
+        // Tentar identificar o tenant do usuário via query ou token JWT
+        let currentTenantId: string | null = typeof queryTenantId === 'string' ? queryTenantId : null;
+        const authHeader = request.headers.authorization;
+        if (!currentTenantId && authHeader && authHeader.startsWith('Bearer ')) {
+          try {
+            const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+            const member = await db.query.tenantMembers.findFirst({
+              where: eq(tenantMembers.userId, decoded.sub),
+            });
+            if (member) {
+              currentTenantId = member.tenantId;
+            }
+          } catch {
+            // Se token for inválido, segue verificação global
+          }
         }
 
         // 1. Checar se já existe em algum tenant
@@ -495,7 +514,28 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           where: eq(capturePages.slug, normalizedSlug),
         });
 
-        const isAvailable = !existingTenant && !existingPage;
+        let isAvailable = true;
+        let reason = 'Subdomínio disponível!';
+
+        if (existingTenant) {
+          if (currentTenantId && existingTenant.id === currentTenantId) {
+            isAvailable = true;
+            reason = 'Subdomínio pertence ao seu próprio tenant e está disponível!';
+          } else {
+            isAvailable = false;
+            reason = 'Subdomínio já em uso por outro tenant.';
+          }
+        }
+
+        if (isAvailable && existingPage) {
+          if (currentTenantId && existingPage.tenantId === currentTenantId) {
+            isAvailable = true;
+            reason = 'Subdomínio pertence ao seu tenant e está disponível!';
+          } else {
+            isAvailable = false;
+            reason = 'Subdomínio já em uso por outro site.';
+          }
+        }
 
         const platformSet = await db.query.platformSettings.findFirst();
         const baseDomain = platformSet?.baseDomain || 'psiapp.com.br';
@@ -504,7 +544,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           available: isAvailable,
           slug: normalizedSlug,
           fullUrl: `https://${normalizedSlug}.${baseDomain}`,
-          reason: isAvailable ? 'Subdomínio disponível!' : 'Subdomínio já em uso por outro usuário.',
+          reason,
         });
       } catch (err: any) {
         fastify.log.error(err);
@@ -512,6 +552,86 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // DELETE /v1/crm/captacao/pages/:id
+  // Exclui uma página de captação e limpa registros associados
+  fastify.delete(
+    '/pages/:id',
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const { id } = request.params as any;
+
+        const page = await db.query.capturePages.findFirst({
+          where: eq(capturePages.id, id),
+        });
+
+        if (!page) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Página de captação não encontrada.' });
+        }
+
+        // Verificar se usuário pertence ao tenant da página
+        const member = await db.query.tenantMembers.findFirst({
+          where: and(
+            eq(tenantMembers.userId, decoded.sub),
+            eq(tenantMembers.tenantId, page.tenantId)
+          ),
+        });
+
+        const tenant = await db.query.tenants.findFirst({
+          where: eq(tenants.id, page.tenantId),
+        });
+
+        const isOwner = tenant?.ownerId === decoded.sub;
+
+        if (!member && !isOwner) {
+          return reply.status(403).send({ error: 'Proibido', message: 'Sem permissão para excluir esta página.' });
+        }
+
+        // Limpar Hostname no Cloudflare se houver domínio customizado
+        if (page.customDomain) {
+          try {
+            const settings = await db.query.platformSettings.findFirst();
+            if (settings?.cloudflareApiToken && settings?.cloudflareZoneId) {
+              const listRes = await fetch(
+                `https://api.cloudflare.com/client/v4/zones/${settings.cloudflareZoneId}/custom_hostnames?hostname=${page.customDomain}`,
+                {
+                  method: 'GET',
+                  headers: { Authorization: `Bearer ${settings.cloudflareApiToken}` },
+                }
+              );
+              const listData: any = await listRes.json().catch(() => ({}));
+              if (listData.result && listData.result.length > 0) {
+                const hostnameId = listData.result[0].id;
+                await fetch(
+                  `https://api.cloudflare.com/client/v4/zones/${settings.cloudflareZoneId}/custom_hostnames/${hostnameId}`,
+                  {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${settings.cloudflareApiToken}` },
+                  }
+                );
+              }
+            }
+          } catch (cfErr) {
+            fastify.log.error(cfErr, 'Erro ao excluir custom hostname da Cloudflare');
+          }
+        }
+
+        // Excluir a página de captação
+        await db.delete(capturePages).where(eq(capturePages.id, id));
+
+        return reply.send({ success: true, message: 'Página removida com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
 
   // POST /v1/crm/captacao/custom-hostname/register
   // Registra um domínio próprio no Cloudflare Custom Hostnames

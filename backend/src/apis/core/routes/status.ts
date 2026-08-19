@@ -6,6 +6,7 @@ import { systemStatusLogs } from '../../../shared/schema';
 import { getChannel } from '../../../shared/queue';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
+import { env } from '../../../config/env';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Funções de verificação ativa (Self-Checks)
@@ -33,7 +34,7 @@ async function checkDatabase() {
 
 async function checkGoTrue() {
   const start = Date.now();
-  const gotrueUrl = process.env.GOTRUE_URL || 'http://gotrue:9999';
+  const gotrueUrl = env.GOTRUE_URL;
   try {
     const res = await fetch(`${gotrueUrl}/health`, {
       method: 'GET',
@@ -127,7 +128,7 @@ async function publishStatus(
       message: checkResult.message,
     };
     channel.publish(
-      'foxbase.direct',
+      'psi.direct',
       'system.status',
       Buffer.from(JSON.stringify(payload))
     );

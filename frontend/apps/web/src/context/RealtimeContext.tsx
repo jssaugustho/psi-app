@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import { apiConnection } from '@/lib/api';
 import { useAuth } from './AuthContext';
 import { useBrand } from './BrandContext';
 
@@ -82,7 +83,16 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setSocket(newSocket);
 
+    // Re-conectar socket quando a API voltar a ficar online
+    const unsubscribeApi = apiConnection.subscribe((status) => {
+      if (status === 'online' && newSocket && !newSocket.connected) {
+        console.log('🔄 API restabelecida. Reconectando WebSocket...');
+        newSocket.connect();
+      }
+    });
+
     return () => {
+      unsubscribeApi();
       newSocket.disconnect();
       setSocket(null);
     };

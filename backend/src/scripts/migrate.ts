@@ -5,7 +5,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://postgres:foxbase_secure_pwd@localhost:5432/postgres?sslmode=disable';
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL é obrigatória para rodar as migrações.');
+  process.exit(1);
+}
+
+const DATABASE_URL = process.env.DATABASE_URL;
 
 async function migrate() {
   console.log('📦 Executando migrações SQL do banco de dados...');

@@ -26,6 +26,41 @@ const BrandContext = createContext<BrandContextType>({
   reloadBrand: async () => {},
 });
 
+const BACKUP_STORAGE_KEY = 'psi_branding_backup';
+
+function saveBrandBackup(primary: Tenant | null, userTenant: Tenant | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (primary || userTenant) {
+      localStorage.setItem(
+        BACKUP_STORAGE_KEY,
+        JSON.stringify({
+          primaryTenant: primary,
+          tenant: userTenant,
+          updatedAt: Date.now(),
+        })
+      );
+    }
+  } catch (e) {
+    console.warn('Falha ao salvar backup de branding no localStorage:', e);
+  }
+}
+
+function loadBrandBackup(): { primaryTenant: Tenant | null; tenant: Tenant | null } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      primaryTenant: parsed.primaryTenant || null,
+      tenant: parsed.tenant || null,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [primaryTenant, setPrimaryTenant] = useState<Tenant | null>(null);
@@ -47,8 +82,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
 
     const activeTenant = uTenant || pTenant;
-    const start = uTenant?.gradientColorStart || pTenant?.gradientColorStart || '#4F46E5';
-    const end = uTenant?.gradientColorEnd || pTenant?.gradientColorEnd || '#06B6D4';
+    // Se não houver tenant nem backup, utiliza escala de cinza neutra (#52525B / #27272A)
+    const start = uTenant?.gradientColorStart || pTenant?.gradientColorStart || '#52525B';
+    const end = uTenant?.gradientColorEnd || pTenant?.gradientColorEnd || '#27272A';
     const contrast = uTenant?.contrastColor || pTenant?.contrastColor || '#FFFFFF';
 
     root.style.setProperty('--brand-gradient-start', start);
@@ -93,6 +129,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
     if (activeTenant?.name) {
       document.title = activeTenant.name;
+    } else {
+      document.title = 'Psi App';
     }
   }, []);
 
@@ -108,6 +146,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       const host = typeof window !== 'undefined' ? window.location.hostname : '';
       let resolvedPrimary: Tenant | null = null;
       let resolvedUserTenant: Tenant | null = null;
+      let hasApiError = false;
 
       // 1. Sempre buscar o Tenant-Pai (Plataforma White-Label Principal)
       try {
@@ -116,29 +155,34 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
           resolvedPrimary = primaryRes.tenant;
         }
       } catch (err) {
-        console.warn('Erro ao carregar tenant principal:', err);
+        console.warn('Erro ao carregar tenant principal da API:', err);
+        hasApiError = true;
       }
-      setPrimaryTenant(resolvedPrimary);
 
-      // 2. Resolver o tenant ativo do usuário (sessionStorage ou id)
+      // 2. Resolver o tenant ativo do usuário (sessionStorage ou id ou dominio)
       const activeTenantId = typeof window !== 'undefined' ? sessionStorage.getItem('active_tenant_id') : null;
       if (activeTenantId) {
         try {
           resolvedUserTenant = await api.getTenantById(activeTenantId);
         } catch (err) {
           console.warn('Erro ao carregar tenant do sessionStorage:', err);
+          hasApiError = true;
         }
       }
 
       if (!resolvedUserTenant && host && host !== 'localhost' && host !== '127.0.0.1') {
-        resolvedUserTenant = await api.getTenantByDomain(host);
-        
-        if (!resolvedUserTenant) {
-          const parts = host.split('.');
-          if (parts.length > 2) {
-            const slugCandidate = parts[0];
-            resolvedUserTenant = await api.getTenantBySlug(slugCandidate);
+        try {
+          resolvedUserTenant = await api.getTenantByDomain(host);
+          if (!resolvedUserTenant) {
+            const parts = host.split('.');
+            if (parts.length > 2) {
+              const slugCandidate = parts[0];
+              resolvedUserTenant = await api.getTenantBySlug(slugCandidate);
+            }
           }
+        } catch (err) {
+          console.warn('Erro ao carregar tenant por domínio/slug:', err);
+          hasApiError = true;
         }
       }
 
@@ -146,9 +190,33 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         resolvedUserTenant = resolvedPrimary;
       }
 
-      setTenant(resolvedUserTenant);
+      if (resolvedPrimary || resolvedUserTenant) {
+        setPrimaryTenant(resolvedPrimary);
+        setTenant(resolvedUserTenant);
+        // Persistir backup no localStorage para caso a API fique offline no futuro
+        saveBrandBackup(resolvedPrimary, resolvedUserTenant);
+      } else if (hasApiError) {
+        // API offline: Recorrer exclusivamente ao backup salvo no localStorage
+        const backup = loadBrandBackup();
+        if (backup && (backup.primaryTenant || backup.tenant)) {
+          console.log('📦 Identidade visual carregada do backup no localStorage.');
+          setPrimaryTenant(backup.primaryTenant);
+          setTenant(backup.tenant);
+        } else {
+          setPrimaryTenant(null);
+          setTenant(null);
+        }
+      }
     } catch (err) {
       console.error('Erro ao resolver branding:', err);
+      const backup = loadBrandBackup();
+      if (backup && (backup.primaryTenant || backup.tenant)) {
+        setPrimaryTenant(backup.primaryTenant);
+        setTenant(backup.tenant);
+      } else {
+        setPrimaryTenant(null);
+        setTenant(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -164,7 +232,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     applyBrandStyles(primaryTenant, tenant, theme);
   }, [primaryTenant, tenant, theme, applyBrandStyles]);
 
-  // Handle two-stage premium brand loader (black screen -> spinner + logo (min 1s) -> fade out)
+  // Handle loading state transitions
   useEffect(() => {
     if (loading) {
       setLoaderState('black');
@@ -175,9 +243,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       theme === 'light'
         ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
         : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
-    let spinnerStartTime = Date.now();
+
     let doneTimer: NodeJS.Timeout;
     let remainingTimer: NodeJS.Timeout;
+    const spinnerStartTime = Date.now();
 
     const proceedToDone = () => {
       setLoaderState('fadeout');
@@ -188,7 +257,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
     const startSpinnerTimeout = () => {
       const elapsed = Date.now() - spinnerStartTime;
-      const remaining = 1000 - elapsed;
+      const remaining = 800 - elapsed;
       if (remaining > 0) {
         remainingTimer = setTimeout(proceedToDone, remaining);
       } else {
@@ -223,7 +292,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     theme === 'light'
       ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
       : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
-  const bootBrandName = tenant?.name || primaryTenant?.name || 'Psi App';
+  const bootBrandName = tenant?.name || primaryTenant?.name || '';
+
+  const spinnerStartColor = tenant?.gradientColorStart || primaryTenant?.gradientColorStart || '#52525B';
+  const spinnerEndColor = tenant?.gradientColorEnd || primaryTenant?.gradientColorEnd || '#27272A';
 
   return (
     <BrandContext.Provider value={{ tenant, primaryTenant, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
@@ -254,8 +326,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
               gap: '32px',
               animation: 'fadeIn 0.5s ease-out forwards',
             }}>
-              {/* Logo (Tenant -> Fallback Tenant-Pai) */}
-              {bootLogoUrl ? (
+              {/* Se a API falhou e não há logo, mostra APENAS o spinner neutro sem caixas nem textos */}
+              {bootLogoUrl && (
                 <img 
                   src={bootLogoUrl} 
                   alt={bootBrandName} 
@@ -265,33 +337,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
                     objectFit: 'contain',
                   }}
                 />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '16px',
-                    background: `linear-gradient(135deg, ${tenant?.gradientColorStart || '#4F46E5'}, ${tenant?.gradientColorEnd || '#06B6D4'})`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 'bold',
-                    color: '#FFFFFF',
-                    fontSize: '24px',
-                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                  }}>
-                    Ψ
-                  </div>
-                  <span style={{
-                    fontFamily: 'serif',
-                    fontSize: '18px',
-                    letterSpacing: '0.05em',
-                    color: 'var(--brand-text-color, #F4F4F5)',
-                  }}>{tenant?.name || 'Psi App'}</span>
-                </div>
               )}
 
-              {/* Custom Spinner */}
+              {/* Custom Spinner (neutro se não houver dados de marca) */}
               <div style={{
                 position: 'relative',
                 width: '40px',
@@ -302,8 +350,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
                   inset: 0,
                   borderRadius: '50%',
                   border: '2px solid transparent',
-                  borderTopColor: tenant?.gradientColorStart || '#4F46E5',
-                  borderRightColor: tenant?.gradientColorEnd || '#06B6D4',
+                  borderTopColor: spinnerStartColor,
+                  borderRightColor: spinnerEndColor,
                   animation: 'spin 1s linear infinite',
                 }} />
                 <div style={{
