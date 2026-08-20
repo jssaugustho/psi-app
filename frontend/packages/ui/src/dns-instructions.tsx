@@ -56,11 +56,13 @@ export function DnsInstructions({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const fallbackCnameTarget = baseDomain && !baseDomain.includes('localhost') ? `custom.${baseDomain}` : 'custom.ajstrategy.digital';
+
   const recordsToDisplay =
     dnsRecords && dnsRecords.length > 0
       ? dnsRecords
       : [
-          { type: 'CNAME', name: 'www', value: `cname.${baseDomain}`, description: 'Redirecionamento do subdomínio www' },
+          { type: 'CNAME', name: 'www', value: fallbackCnameTarget, description: 'Redirecionamento CNAME do subdomínio para o servidor da plataforma' },
           { type: 'A', name: '@ (ou em branco)', value: '185.199.108.153', description: 'Endereço IP do servidor do site' },
         ];
 

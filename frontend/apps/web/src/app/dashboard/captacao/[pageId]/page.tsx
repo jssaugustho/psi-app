@@ -1057,7 +1057,7 @@ const SortableSectionItem = ({
 
 export default function PageEditor({ params }: PageProps) {
   const { pageId } = use(params);
-  const { tenant, theme, toggleTheme } = useBrand();
+  const { tenant, primaryTenant, theme, toggleTheme } = useBrand();
   const router = useRouter();
 
   const [page, setPage] = useState<CapturePage | null>(null);
@@ -3524,10 +3524,14 @@ export default function PageEditor({ params }: PageProps) {
   }), []);
 
   if (loading || !page) {
-    const logoUrl =
+    const bootLogoUrl =
       theme === 'light'
-        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl)
-        : (tenant?.logoDarkUrl || tenant?.logoLightUrl);
+        ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+        : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
+    const bootBrandName = tenant?.name || primaryTenant?.name || '';
+    const spinnerStartColor = tenant?.gradientColorStart || primaryTenant?.gradientColorStart || '#52525B';
+    const spinnerEndColor = tenant?.gradientColorEnd || primaryTenant?.gradientColorEnd || '#27272A';
+
     return (
       <div
         className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-8 select-none"
@@ -3558,32 +3562,31 @@ export default function PageEditor({ params }: PageProps) {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-8" style={{ animation: 'fadeIn 0.4s ease-out forwards' }}>
-            {logoUrl ? (
+            {bootLogoUrl && (
               <img
-                src={logoUrl}
-                alt={tenant?.name || 'Logo'}
-                className="max-h-12 max-w-[180px] object-contain"
+                src={bootLogoUrl}
+                alt={bootBrandName}
+                className="max-h-16 max-w-[240px] object-contain"
                 style={{ animation: 'fadeIn 0.6s ease-out forwards' }}
               />
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <span className="h-12 w-12 rounded-xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center font-bold text-white text-xl">
-                  Ψ
-                </span>
-                <span className="font-serif text-sm tracking-wider mt-1" style={{ color: 'var(--brand-text-color)' }}>{tenant?.name || 'Psi App'}</span>
-              </div>
             )}
-            {/* Spinner com cores do tenant */}
+            {/* Spinner com cores do tenant replicado do BrandContext */}
             <div className="relative h-10 w-10">
               <div
                 className="absolute inset-0 rounded-full border-2 animate-spin"
                 style={{
                   borderColor: 'transparent',
-                  borderTopColor: 'var(--brand-gradient-start, #4F46E5)',
-                  borderRightColor: 'var(--brand-gradient-end, #06B6D4)',
+                  borderTopColor: spinnerStartColor,
+                  borderRightColor: spinnerEndColor,
                 }}
               />
-              <div className="absolute inset-2 rounded-full border border-[var(--surface-border)] bg-[var(--surface-hover)] animate-pulse" />
+              <div
+                className="absolute inset-2 rounded-full animate-pulse"
+                style={{
+                  border: theme === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.05)',
+                  backgroundColor: theme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)',
+                }}
+              />
             </div>
           </div>
         )}

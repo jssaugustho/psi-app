@@ -775,6 +775,15 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           }
         }
 
+        const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
+        const targetTenantId = userPayload?.tenant_id || userPayload?.tenantId;
+        if (targetTenantId && cleanDomain) {
+          await db
+            .update(tenants)
+            .set({ domain: cleanDomain, cfHostnameId: hostnameId, updatedAt: new Date() })
+            .where(eq(tenants.id, targetTenantId));
+        }
+
         return reply.send({
           success: true,
           status: cfStatus,

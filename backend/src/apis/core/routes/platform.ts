@@ -807,6 +807,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         const isOwner = targetTenant.ownerId === decoded.sub;
+        const isAdmin = decoded.role === 'admin' || decoded.role === 'superadmin';
         const member = await db.query.tenantMembers.findFirst({
           where: and(
             eq(tenantMembers.userId, decoded.sub),
@@ -814,16 +815,13 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           ),
         });
 
-        if (!isOwner && !member) {
+        if (!isOwner && !member && !isAdmin) {
           return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este tenant.' });
         }
 
-        // Buscar assets
+        // Buscar assets (todos os assets do tenant, ordenados pelos mais recentes)
         const assets = await db.query.mediaAssets.findMany({
-          where: and(
-            eq(mediaAssets.tenantId, tenantId),
-            eq(mediaAssets.isCropped, false)
-          ),
+          where: eq(mediaAssets.tenantId, tenantId),
           orderBy: desc(mediaAssets.createdAt),
         });
 
@@ -876,6 +874,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         const isOwner = targetTenant.ownerId === decoded.sub;
+        const isAdmin = decoded.role === 'admin' || decoded.role === 'superadmin';
         const member = await db.query.tenantMembers.findFirst({
           where: and(
             eq(tenantMembers.userId, decoded.sub),
@@ -883,7 +882,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           ),
         });
 
-        if (!isOwner && !member) {
+        if (!isOwner && !member && !isAdmin) {
           return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este tenant.' });
         }
 

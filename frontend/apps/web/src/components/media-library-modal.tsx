@@ -3,9 +3,44 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
 import { BrandModal, Button, ConfirmModal } from '@psi/ui';
-import { Trash2, Upload, Image as ImageIcon, Loader2, CheckSquare, Square, ZoomIn, ZoomOut, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { Trash2, Upload, Image as ImageIcon, Loader2, CheckSquare, Square, ZoomIn, ZoomOut, ArrowLeft, ShieldAlert, Maximize2, Focus, Sun, Moon } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { type UploadType, validateImageSafety, checkHasAlphaChannel, type ImageCategory } from '@psi/image-utils';
+
+/**
+ * Detecta a luminância média de uma imagem para ajustar automaticamente
+ * o contraste do fundo do modal de corte (fundo claro para logotipo escuro, fundo escuro para logotipo claro).
+ */
+function detectImageLuminance(img: HTMLImageElement): 'dark' | 'light' {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 60;
+    canvas.height = 60;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return 'dark';
+    ctx.drawImage(img, 0, 0, 60, 60);
+    const imageData = ctx.getImageData(0, 0, 60, 60);
+    const data = imageData.data;
+    let totalLum = 0;
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      if (alpha > 30) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const lum = (r * 299 + g * 587 + b * 114) / 1000;
+        totalLum += lum;
+        count++;
+      }
+    }
+    if (count === 0) return 'dark';
+    const avgLum = totalLum / count;
+    return avgLum < 140 ? 'dark' : 'light';
+  } catch (e) {
+    return 'dark';
+  }
+}
 
 export interface MediaLibraryModalProps {
   isOpen: boolean;
@@ -51,6 +86,7 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [imgDimensions, setImgDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [workspaceTheme, setWorkspaceTheme] = useState<'dark' | 'light'>('dark');
   const [processingCrop, setProcessingCrop] = useState(false);
 
   const isDraggingRef = useRef(false);
@@ -79,12 +115,13 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      if (step === 'gallery' && activeTab === 'library') {
+      if (step === 'gallery') {
         fetchAssets();
       }
     } else {
       // Reset state on modal close
       setStep('gallery');
+      setActiveTab('library');
       setIsMultiSelectMode(false);
       setSelectedAssetIds([]);
       setImageSrc(null);
@@ -339,7 +376,10 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
         return;
       }
 
-      // 4. Fire callback returning R2 storage URL
+      // 4. Update gallery assets state
+      await fetchAssets();
+
+      // 5. Fire callback returning R2 storage URL
       onSelectImage(registered.url);
       onClose();
     } catch (err: any) {
@@ -549,7 +589,12 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
             <div className="space-y-4">
               {/* Full Interactive Workspace Container (400px height, full width) */}
               <div
-                className="relative w-full h-[400px] flex items-center justify-center bg-zinc-950/95 dark:bg-black/95 rounded-2xl border border-[var(--surface-border)] overflow-hidden select-none shadow-inner cursor-grab active:cursor-grabbing"
+                className="relative w-full h-[400px] flex items-center justify-center rounded-2xl border border-[var(--surface-border)] overflow-hidden select-none shadow-inner cursor-grab active:cursor-grabbing transition-colors duration-300"
+                style={{
+                  background: workspaceTheme === 'light'
+                    ? 'repeating-conic-gradient(#f8fafc 0% 25%, #e2e8f0 0% 50%) 0 0 / 20px 20px'
+                    : 'repeating-conic-gradient(#18181b 0% 25%, #09090b 0% 50%) 0 0 / 20px 20px'
+                }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -557,9 +602,53 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                 onWheel={(e) => {
                   e.preventDefault();
                   const delta = e.deltaY < 0 ? 0.05 : -0.05;
-                  setZoom((prev) => Math.min(Math.max(1, prev + delta), 3.5));
+                  setZoom((prev) => Math.min(Math.max(0.1, prev + delta), 8.0));
                 }}
               >
+                {/* Floating Corner Toolbar: High-Contrast Enquadrar, Centralizar & Theme Toggle */}
+                <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+                  {/* Background Contrast Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setWorkspaceTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+                    title="Alternar contraste do fundo do molde (Claro / Escuro)"
+                    className="p-2 rounded-xl bg-zinc-950 text-white border border-zinc-700 hover:border-amber-400/80 shadow-2xl transition-all cursor-pointer select-none active:scale-95"
+                  >
+                    {workspaceTheme === 'dark' ? (
+                      <Sun className="h-4 w-4 text-amber-400" />
+                    ) : (
+                      <Moon className="h-4 w-4 text-indigo-400" />
+                    )}
+                  </button>
+
+                  {/* Enquadrar Button (Re-enquadra ajustando o zoom e a posição) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOffset({ x: 0, y: 0 });
+                      setZoom(1);
+                    }}
+                    title="Reenquadra a imagem centralizada no molde ajustando o zoom"
+                    className="px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white border border-zinc-700 shadow-2xl hover:bg-zinc-900 hover:border-indigo-400 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none whitespace-nowrap active:scale-95"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5 text-indigo-400" />
+                    Enquadrar
+                  </button>
+
+                  {/* Centralizar Button (Centraliza a posição mantendo o zoom atual) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOffset({ x: 0, y: 0 });
+                    }}
+                    title="Centraliza a imagem na posição sem mexer no nível de zoom"
+                    className="px-3.5 py-1.5 rounded-xl bg-zinc-950 text-white border border-zinc-700 shadow-2xl hover:bg-zinc-900 hover:border-indigo-400 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none whitespace-nowrap active:scale-95"
+                  >
+                    <Focus className="h-3.5 w-3.5 text-indigo-400" />
+                    Centralizar
+                  </button>
+                </div>
+
                 {/* 1. Full Image rendered across the entire workspace */}
                 {imageSrc && (
                   <img
@@ -570,6 +659,9 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                       const img = e.currentTarget;
                       if (img.naturalWidth && img.naturalHeight) {
                         setImgDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+                        // Auto-detect luminance to pick best contrast background
+                        const lumCategory = detectImageLuminance(img);
+                        setWorkspaceTheme(lumCategory === 'dark' ? 'light' : 'dark');
                       }
                     }}
                     className="absolute max-w-none pointer-events-none transition-transform ease-out duration-75 select-none"
@@ -586,9 +678,13 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                   />
                 )}
 
-                {/* 2. Highlight Cutout Frame Mask with 75% Dark Overlay outside */}
+                {/* 2. Highlight Cutout Frame Mask with contrast Overlay outside */}
                 <div
-                  className="absolute pointer-events-none border-2 border-dashed border-indigo-400/90 rounded-lg shadow-[0_0_0_9999px_rgba(9,9,11,0.75)] z-10"
+                  className={`absolute pointer-events-none border-2 border-dashed border-indigo-500 rounded-lg z-10 ${
+                    workspaceTheme === 'light'
+                      ? 'shadow-[0_0_0_9999px_rgba(241,245,249,0.85)]'
+                      : 'shadow-[0_0_0_9999px_rgba(9,9,11,0.85)]'
+                  }`}
                   style={{
                     width: `${frameW}px`,
                     height: `${frameH}px`,
@@ -598,20 +694,13 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                 >
                   {/* Rule of Thirds Grid Overlay (inside crop frame) */}
                   <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 opacity-30">
-                    <div className="border-r border-b border-white/30"></div>
-                    <div className="border-r border-b border-white/30"></div>
-                    <div className="border-b border-white/30"></div>
-                    <div className="border-r border-b border-white/30"></div>
-                    <div className="border-r border-b border-white/30"></div>
-                    <div className="border-b border-white/30"></div>
+                    <div className={`border-r border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
+                    <div className={`border-r border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
+                    <div className={`border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
+                    <div className={`border-r border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
+                    <div className={`border-r border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
+                    <div className={`border-b ${workspaceTheme === 'light' ? 'border-slate-900/30' : 'border-white/30'}`}></div>
                   </div>
-                </div>
-
-                {/* 3. Helper tip badge at bottom of workspace */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-                  <span className="px-3 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-[10px] text-slate-300 font-sans flex items-center gap-1.5 shadow-md">
-                    <span>💡</span> Clique e arraste em qualquer lugar da tela ou use a roda do mouse para dar zoom.
-                  </span>
                 </div>
               </div>
 
@@ -621,8 +710,8 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                   <ZoomOut className="h-4 w-4 text-slate-400 shrink-0" />
                   <input
                     type="range"
-                    min="1"
-                    max="3.5"
+                    min="0.1"
+                    max="6.0"
                     step="0.05"
                     value={zoom}
                     onChange={(e) => setZoom(parseFloat(e.target.value))}

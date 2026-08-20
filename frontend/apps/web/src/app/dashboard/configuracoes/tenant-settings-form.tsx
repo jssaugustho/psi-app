@@ -2,18 +2,20 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api, Tenant, User } from '@/lib/api';
-import { Card, Button, Input } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, BrandModal, DnsInstructions } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
 import { useAuth } from '@/context/AuthContext';
 import { MediaLibraryModal } from '@/components/media-library-modal';
 import { LogoOptionModal } from '@/components/logo-option-modal';
 import { LogoBuilderModal } from '@/components/logo-builder-modal';
+import { DomainManager } from '@/components/domain-manager';
 import {
   User as UserIcon,
   Palette,
   Globe,
   Image as ImageIcon,
   Check,
+  CheckCircle2,
   Plus,
   Trash2,
   Copy,
@@ -26,7 +28,8 @@ import {
   Camera,
   Lock,
   Mail,
-  Edit3
+  Edit3,
+  RefreshCw
 } from 'lucide-react';
 
 interface TenantSettingsFormProps {
@@ -1085,120 +1088,14 @@ export default function TenantSettingsForm({ tenant, initialUser }: TenantSettin
         {/* ABA 3: DOMÍNIOS */}
         {activeTab === 'dominios' && (
           <div className="space-y-6 animate-page-enter">
-            {/* Endereço Gratuito (Obrigatório e Sempre Ativo) */}
-            <Card>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-[var(--brand-gradient-start)]" />
-                  1. Seu Endereço Gratuito na Internet (Subdomínio TheraOS)
-                </h3>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Obrigatório e Sempre Ativo
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-400 mb-4">
-                Endereço fornecido automaticamente pelo nosso sistema. Suas páginas estarão sempre acessíveis por este endereço:
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Nome do Seu Endereço Gratuito</label>
-                  <div className="flex items-center">
-                    <Input
-                      type="text"
-                      value={slug}
-                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                      placeholder="minha-clinica"
-                      className="rounded-r-none"
-                    />
-                    <span className="h-10 px-3 flex items-center glass-sm border border-l-0 border-[var(--surface-border)] rounded-r-xl text-xs font-mono font-bold text-slate-300 bg-white/5">
-                      .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-5">
-                  <a
-                    href={`https://${slug || 'site'}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--brand-gradient-start)] hover:underline"
-                  >
-                    <span>Abrir Seu Site Agora</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            </Card>
-
-            {/* Domínio Próprio (Opcional) */}
-            <Card>
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[var(--brand-gradient-start)]" />
-                  2. Conectar Seu Domínio Próprio (Opcional)
-                </h3>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Opcional
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mb-4">
-                Se você já comprou um domínio próprio (no Registro.br, GoDaddy, Hostinger, etc.), informe ele abaixo. Seu site passará a responder no seu domínio e continuará funcionando no endereço gratuito acima:
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-1">Seu Domínio Comprado</label>
-                  <Input
-                    type="text"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value.toLowerCase())}
-                    placeholder="Ex: www.geovannabastos.com.br"
-                  />
-                </div>
-
-                {/* Passo a Passo Simples para Leigos */}
-                <div className="p-4 rounded-2xl border border-[var(--surface-border)] bg-white/[0.01] space-y-3">
-                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Como Conectar Seu Domínio Comprado (Passo a Passo)
-                  </h4>
-
-                  <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
-                    <li>Acesse o painel do site onde você comprou o seu domínio (ex: Registro.br, GoDaddy).</li>
-                    <li>Vá até a opção <strong>'Gerenciar DNS'</strong> ou <strong>'Editar Zona DNS'</strong>.</li>
-                    <li>Crie ou edite o registro com as informações da tabela abaixo:</li>
-                  </ol>
-
-                  <div className="overflow-x-auto pt-1">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-[var(--surface-border)] text-slate-400 font-bold">
-                          <th className="pb-2">Tipo de Registro</th>
-                          <th className="pb-2">Nome / Host</th>
-                          <th className="pb-2">Apontar Para (Valor)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--surface-border)] font-mono text-slate-200">
-                        <tr>
-                          <td className="py-2.5 text-emerald-400 font-bold">CNAME</td>
-                          <td className="py-2.5">www</td>
-                          <td className="py-2.5 font-bold">cname.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2.5 text-indigo-400 font-bold">A</td>
-                          <td className="py-2.5">@ (ou em branco)</td>
-                          <td className="py-2.5 font-bold">185.199.108.153</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
-                    💡 Após salvar aqui e criar a regra na sua gerenciadora de domínio, o seu site estará funcionando com seu endereço próprio. A ativação pode levar de 15 minutos até 24 horas.
-                  </p>
-                </div>
-              </div>
+            <Card className="p-6">
+              <DomainManager
+                tenantId={tenant.id}
+                subdomain={slug}
+                onSubdomainChange={setSlug}
+                customDomain={domain}
+                onCustomDomainChange={setDomain}
+              />
             </Card>
           </div>
         )}

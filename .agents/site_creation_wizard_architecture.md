@@ -70,18 +70,16 @@ Esta etapa reúne toda a experiência de marca em 4 sub-seções estruturadas:
 
 ### 2.3 Etapa 3: Escolha de Endereço & Domínio
 
-Oferece duas opções de roteamento:
+Esta etapa gerencia o roteamento e o endereço da página na internet:
 
-#### 1. Subdomínio Gratuito TheraOS (`.theraos.app`)
-- A psicóloga define o subdomínio da sua clínica (ex: `geovannabastos.theraos.app`).
-- **Validação de Disponibilidade:** Verificação em tempo real via backend API (`api.checkSubdomainAvailability`), prevenindo colisão de URLs registradas por outros usuários.
+#### 1. Domínios no Nível da Conta (`tenant.slug` & `tenant.domain`)
+- O **Subdomínio TheraOS** (`.theraos.app`) e o **Domínio Próprio Customizado** pertencem ao **nível da conta (Tenant)** e são compartilhados entre todas as páginas do mesmo psicólogo. O usuário pode ter ambos ativos simultaneamente.
+- **Trava de Edição no Wizard:** Se a conta já possuir pelo menos um registro cadastrado (`tenant.slug` ou `tenant.domain`), a interface do wizard exibe os endereços ativos em modo de leitura (Read-Only) com o selo "Domínios da Conta Configurados" e um botão que redireciona em nova aba (`target="_blank"`) para a tela de **Configurações da Conta** (`/dashboard/configuracoes`), onde o gerenciamento global deve ser realizado.
+- **Cadastro Inicial (Sem Subdomínio):** Se a conta ainda não possuir subdomínio cadastrado (`!tenant.slug`), o wizard permite registrar o primeiro subdomínio gratuito durante a criação do primeiro site.
 
-#### 2. Domínio Próprio Customizado (White-Label)
-- Permite vincular um domínio ou subdomínio registrado na Cloudflare/Registro.br (ex: `consulta.psicologageovanna.com.br`).
-- Exibe o painel de registros DNS (Registros CNAME e A) e possibilita a verificação do status de propagação SSL em tempo real.
-
-#### 3. Slug da Página (`/slug`)
-- Define o endereço específico da landing page (ex: `/terapia-adulto`).
+#### 2. Slug da Página (`/slug`) e Validação Única por Conta
+- Define o caminho/endereço específico da landing page (ex: `/terapia-adulto`, ou raiz `/` para a página principal).
+- **Validação Única por Conta ao Avançar:** Ao clicar em "Avançar" ou navegar a partir da Etapa 3, o sistema executa uma consulta assíncrona (`api.getCapturePages`) para verificar se a slug informada já pertence a outra página da mesma conta. Caso pertença, o avanço é bloqueado com aviso visual, prevenindo colisões ou sobrescrita acidental de páginas existentes.
 
 ---
 
