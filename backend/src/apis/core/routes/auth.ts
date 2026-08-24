@@ -78,7 +78,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
       const settings = await db.query.platformSettings.findFirst();
 
       const hasAdmin = !!existingAdmin;
-      const hasPlatformSettings = !!settings;
+      const hasPlatformSettings = !!settings && settings.isConfigured === true;
       const bootstrapped = hasAdmin && hasPlatformSettings;
 
       return reply.send({

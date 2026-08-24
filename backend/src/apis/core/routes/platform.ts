@@ -60,10 +60,6 @@ const SetupTenantBodySchema = z.object({
   contrast_color: z.string().default('#FFFFFF'),
   bg_light_color: z.string().default('#F8FAFC'),
   bg_dark_color: z.string().default('#020617'),
-  card_light_color: z.string().default('#FFFFFF'),
-  card_dark_color: z.string().default('#0F172A'),
-  text_light_color: z.string().default('#0F172A'),
-  text_dark_color: z.string().default('#F8FAFC'),
 });
 
 export async function platformRoutes(fastifyApp: FastifyInstance) {
@@ -81,7 +77,9 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         settings?.r2AccessKeyId &&
         settings?.r2SecretAccessKey
       );
-      const hasResend = !!(settings?.resendApiKey);
+      const hasResendKey = !!(settings?.resendApiKey);
+      const hasResendDomain = !!(settings?.resendFromDomain);
+      const hasResend = hasResendKey && hasResendDomain;
 
       const platformBrand = {
         name: settings?.platformName || 'TheraOS',
@@ -94,22 +92,24 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         contrastColor: settings?.contrastColor || '#FFFFFF',
         bgLightColor: settings?.bgLightColor || '#F8FAFC',
         bgDarkColor: settings?.bgDarkColor || '#09090B',
-        cardLightColor: settings?.cardLightColor || '#FFFFFF',
-        cardDarkColor: settings?.cardDarkColor || '#18181B',
-        textLightColor: settings?.textLightColor || '#0F172A',
-        textDarkColor: settings?.textDarkColor || '#F8FAFC',
       };
 
       return reply.send({
         is_configured: settings ? settings.isConfigured : false,
         has_cloudflare: hasCloudflare,
         has_r2: hasR2,
+        has_resend_key: hasResendKey,
+        has_resend_domain: hasResendDomain,
         has_resend: hasResend,
+        cloudflare_api_token: settings?.cloudflareApiToken || null,
         cloudflare_zone_id: settings?.cloudflareZoneId || null,
         cloudflare_account_id: settings?.cloudflareAccountId || null,
         base_domain: settings?.baseDomain || null,
         r2_bucket_name: settings?.r2BucketName || null,
         r2_public_domain: settings?.r2PublicDomain || null,
+        r2_access_key_id: settings?.r2AccessKeyId || null,
+        r2_secret_access_key: settings?.r2SecretAccessKey || null,
+        resend_api_key: settings?.resendApiKey || null,
         resend_from_domain: settings?.resendFromDomain || null,
         primary_tenant: platformBrand,
       });
@@ -188,22 +188,31 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         let resolvedBaseDomain = base_domain?.trim() || zoneName || existingSettings?.baseDomain || null;
 
-        // 2. Testar acesso direto ao R2 Bucket via S3 Client (se chaves disponíveis)
-        if (effectiveAccessKeyId && effectiveSecretAccessKey) {
-          try {
-            const s3TestClient = new S3Client({
-              region: 'auto',
-              endpoint: `https://${account_id.trim()}.r2.cloudflarestorage.com`,
-              credentials: {
-                accessKeyId: effectiveAccessKeyId,
-                secretAccessKey: effectiveSecretAccessKey,
-              },
-            });
+        // 2. Testar acesso direto ao R2 Bucket via S3 Client (obrigatório)
+        if (!effectiveAccessKeyId || !effectiveSecretAccessKey) {
+          return reply.status(400).send({
+            error: 'Validação do Cloudflare R2 Falhou',
+            message: 'R2 Access Key ID e R2 Secret Access Key são obrigatórios.',
+          });
+        }
 
-            await s3TestClient.send(new HeadBucketCommand({ Bucket: r2_bucket_name.trim() }));
-          } catch (s3Err: any) {
-            fastify.log.warn(`S3 HeadBucket aviso: ${s3Err.message}`);
-          }
+        try {
+          const s3TestClient = new S3Client({
+            region: 'auto',
+            endpoint: `https://${account_id.trim()}.r2.cloudflarestorage.com`,
+            credentials: {
+              accessKeyId: effectiveAccessKeyId,
+              secretAccessKey: effectiveSecretAccessKey,
+            },
+          });
+
+          await s3TestClient.send(new HeadBucketCommand({ Bucket: r2_bucket_name.trim() }));
+        } catch (s3Err: any) {
+          fastify.log.error(`S3 HeadBucket erro: ${s3Err.message}`);
+          return reply.status(400).send({
+            error: 'Validação do Bucket R2 Falhou',
+            message: `Não foi possível acessar o Bucket R2 "${r2_bucket_name.trim()}": ${s3Err.message || 'Credenciais de S3 inválidas ou Bucket não encontrado.'}`,
+          });
         }
 
         // Normalizar o r2PublicDomain garantindo protocolo https:// e sem barra final
@@ -1103,10 +1112,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           contrastColor: body.contrast_color || '#FFFFFF',
           bgLightColor: body.bg_light_color || '#F8FAFC',
           bgDarkColor: body.bg_dark_color || '#09090B',
-          cardLightColor: body.card_light_color || '#FFFFFF',
-          cardDarkColor: body.card_dark_color || '#18181B',
-          textLightColor: body.text_light_color || '#0F172A',
-          textDarkColor: body.text_dark_color || '#F8FAFC',
           isConfigured: true,
           updatedAt: new Date(),
         };
@@ -1155,10 +1160,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         contrastColor: settings?.contrastColor || '#FFFFFF',
         bgLightColor: settings?.bgLightColor || '#F8FAFC',
         bgDarkColor: settings?.bgDarkColor || '#09090B',
-        cardLightColor: settings?.cardLightColor || '#FFFFFF',
-        cardDarkColor: settings?.cardDarkColor || '#18181B',
-        textLightColor: settings?.textLightColor || '#0F172A',
-        textDarkColor: settings?.textDarkColor || '#F8FAFC',
       };
 
       return reply.send({
@@ -1190,10 +1191,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           contrast_color: z.string().optional(),
           bg_light_color: z.string().optional(),
           bg_dark_color: z.string().optional(),
-          card_light_color: z.string().optional(),
-          card_dark_color: z.string().optional(),
-          text_light_color: z.string().optional(),
-          text_dark_color: z.string().optional(),
         }),
       },
     },
@@ -1219,8 +1216,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (body.contrast_color) updatePayload.contrastColor = body.contrast_color;
         if (body.bg_light_color) updatePayload.bgLightColor = body.bg_light_color;
         if (body.bg_dark_color) updatePayload.bgDarkColor = body.bg_dark_color;
-        if (body.card_light_color) updatePayload.cardLightColor = body.card_light_color;
-        if (body.card_dark_color) updatePayload.cardDarkColor = body.card_dark_color;
 
         let updatedSettings: any;
         if (existingSettings) {
@@ -1247,10 +1242,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           contrastColor: updatedSettings?.contrastColor || '#FFFFFF',
           bgLightColor: updatedSettings?.bgLightColor || '#F8FAFC',
           bgDarkColor: updatedSettings?.bgDarkColor || '#09090B',
-          cardLightColor: updatedSettings?.cardLightColor || '#FFFFFF',
-          cardDarkColor: updatedSettings?.cardDarkColor || '#18181B',
-          textLightColor: updatedSettings?.textLightColor || '#0F172A',
-          textDarkColor: updatedSettings?.textDarkColor || '#F8FAFC',
         };
 
         return reply.send({

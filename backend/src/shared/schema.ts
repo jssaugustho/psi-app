@@ -122,10 +122,6 @@ export const platformSettings = pgTable('platform_settings', {
   contrastColor: text('contrast_color').default('#FFFFFF').notNull(),
   bgLightColor: text('bg_light_color').default('#F8FAFC').notNull(),
   bgDarkColor: text('bg_dark_color').default('#09090B').notNull(),
-  cardLightColor: text('card_light_color').default('#FFFFFF').notNull(),
-  cardDarkColor: text('card_dark_color').default('#18181B').notNull(),
-  textLightColor: text('text_light_color').default('#0F172A').notNull(),
-  textDarkColor: text('text_dark_color').default('#F8FAFC').notNull(),
 
   // Credenciais de Infraestrutura (Cloudflare, R2, Resend)
   cloudflareApiToken: text('cloudflare_api_token'),
