@@ -5,7 +5,7 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, tenants, emailLogs, mediaAssets, tenantMembers, capturePages, contacts, interactionHistory } from '../../../shared/schema';
+import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory } from '../../../shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -49,7 +49,7 @@ const SaveStorageBodySchema = z.object({
 
 const SetupTenantBodySchema = z.object({
   name: z.string().min(1, 'Nome da plataforma é obrigatório'),
-  slug: z.string().min(1, 'Slug é obrigatório'),
+  slug: z.string().optional().nullable(),
   domain: z.string().optional().nullable(),
   logo_light_url: z.string().optional().nullable(),
   logo_dark_url: z.string().optional().nullable(),
@@ -74,17 +74,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     try {
       const settings = await db.query.platformSettings.findFirst();
 
-      let primaryTenant = null;
-      if (settings?.primaryTenantId) {
-        primaryTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, settings.primaryTenantId),
-        });
-      } else {
-        primaryTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.isPrimary, true),
-        });
-      }
-
       const hasCloudflare = !!(settings?.cloudflareApiToken && settings?.cloudflareZoneId);
       const hasR2 = !!(
         settings?.cloudflareAccountId &&
@@ -93,6 +82,23 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         settings?.r2SecretAccessKey
       );
       const hasResend = !!(settings?.resendApiKey);
+
+      const platformBrand = {
+        name: settings?.platformName || 'TheraOS',
+        logoLightUrl: settings?.logoLightUrl || null,
+        logoDarkUrl: settings?.logoDarkUrl || null,
+        iconLightUrl: settings?.iconLightUrl || null,
+        iconDarkUrl: settings?.iconDarkUrl || null,
+        gradientColorStart: settings?.gradientColorStart || '#7C3AED',
+        gradientColorEnd: settings?.gradientColorEnd || '#A855F7',
+        contrastColor: settings?.contrastColor || '#FFFFFF',
+        bgLightColor: settings?.bgLightColor || '#F8FAFC',
+        bgDarkColor: settings?.bgDarkColor || '#09090B',
+        cardLightColor: settings?.cardLightColor || '#FFFFFF',
+        cardDarkColor: settings?.cardDarkColor || '#18181B',
+        textLightColor: settings?.textLightColor || '#0F172A',
+        textDarkColor: settings?.textDarkColor || '#F8FAFC',
+      };
 
       return reply.send({
         is_configured: settings ? settings.isConfigured : false,
@@ -105,7 +111,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         r2_bucket_name: settings?.r2BucketName || null,
         r2_public_domain: settings?.r2PublicDomain || null,
         resend_from_domain: settings?.resendFromDomain || null,
-        primary_tenant: primaryTenant,
+        primary_tenant: platformBrand,
       });
     } catch (err: any) {
       fastify.log.error(err);
@@ -795,33 +801,34 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
 
-        const { tenantId } = request.query;
+        const query = request.query as any;
+        const targetWorkspaceId = query.workspaceId || query.tenantId;
 
-        // Validar se o usuário pertence ao tenant
-        const targetTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, tenantId),
+        // Validar se o usuário pertence ao workspace
+        const targetWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
         });
 
-        if (!targetTenant) {
-          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        if (!targetWorkspace) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Workspace não cadastrado.' });
         }
 
-        const isOwner = targetTenant.ownerId === decoded.sub;
-        const isAdmin = decoded.role === 'admin' || decoded.role === 'superadmin';
-        const member = await db.query.tenantMembers.findFirst({
+        const isOwner = targetWorkspace.ownerId === decoded.sub;
+        const isAdmin = decoded.role === 'admin';
+        const member = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.tenantId, tenantId)
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, targetWorkspaceId)
           ),
         });
 
         if (!isOwner && !member && !isAdmin) {
-          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este tenant.' });
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem acesso a este workspace.' });
         }
 
-        // Buscar assets (todos os assets do tenant, ordenados pelos mais recentes)
+        // Buscar assets (todos os assets do workspace, ordenados pelos mais recentes)
         const assets = await db.query.mediaAssets.findMany({
-          where: eq(mediaAssets.tenantId, tenantId),
+          where: eq(mediaAssets.workspaceId, targetWorkspaceId),
           orderBy: desc(mediaAssets.createdAt),
         });
 
@@ -840,7 +847,8 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     {
       schema: {
         body: z.object({
-          tenantId: z.string().uuid('ID do Tenant inválido'),
+          workspaceId: z.string().uuid('ID do Workspace inválido').optional(),
+          tenantId: z.string().uuid('ID do Workspace inválido').optional(),
           name: z.string().min(1, 'Nome é obrigatório'),
           key: z.string().min(1, 'Chave é obrigatória'),
           url: z.string().url('URL inválida'),
@@ -862,23 +870,24 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
 
-        const body = request.body;
+        const body = request.body as any;
+        const targetWorkspaceId = body.workspaceId || body.tenantId;
 
-        // Validar se o usuário pertence ao tenant
-        const targetTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, body.tenantId),
+        // Validar se o usuário pertence ao workspace
+        const targetWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
         });
 
-        if (!targetTenant) {
-          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        if (!targetWorkspace) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Workspace não cadastrado.' });
         }
 
-        const isOwner = targetTenant.ownerId === decoded.sub;
-        const isAdmin = decoded.role === 'admin' || decoded.role === 'superadmin';
-        const member = await db.query.tenantMembers.findFirst({
+        const isOwner = targetWorkspace.ownerId === decoded.sub;
+        const isAdmin = decoded.role === 'admin';
+        const member = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.tenantId, body.tenantId)
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, targetWorkspaceId)
           ),
         });
 
@@ -917,7 +926,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (body.isCropped && body.usageContext) {
           const oldCrop = await db.query.mediaAssets.findFirst({
             where: and(
-              eq(mediaAssets.tenantId, body.tenantId),
+              eq(mediaAssets.workspaceId, targetWorkspaceId),
               eq(mediaAssets.usageContext, body.usageContext)
             ),
           });
@@ -956,7 +965,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const [newAsset] = await db
           .insert(mediaAssets)
           .values({
-            tenantId: body.tenantId,
+            workspaceId: body.workspaceId || body.tenantId,
             name: body.name,
             key: body.key,
             url: body.url,
@@ -1008,25 +1017,25 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           return reply.status(404).send({ error: 'Não Encontrado', message: 'Asset não encontrado.' });
         }
 
-        // Validar se o usuário pertence ao tenant do asset
-        const targetTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, asset.tenantId),
+        // Validar se o usuário pertence ao workspace do asset
+        const targetWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, asset.workspaceId),
         });
 
-        if (!targetTenant) {
-          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não cadastrado.' });
+        if (!targetWorkspace) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Workspace não cadastrado.' });
         }
 
-        const isOwner = targetTenant.ownerId === decoded.sub;
-        const member = await db.query.tenantMembers.findFirst({
+        const isOwner = targetWorkspace.ownerId === decoded.sub;
+        const member = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.tenantId, asset.tenantId)
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, asset.workspaceId)
           ),
         });
 
         if (!isOwner && !member) {
-          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para remover assets deste tenant.' });
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para remover assets deste workspace.' });
         }
 
         // 1. Excluir do Cloudflare R2
@@ -1064,7 +1073,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
-  // POST /v1/platform/setup/tenant (Cadastra/Atualiza o Tenant-Pai Principal)
+  // POST /v1/platform/setup/tenant (Cadastra/Atualiza a Marca da Plataforma em platform_settings)
   fastify.post(
     '/setup/tenant',
     {
@@ -1082,127 +1091,88 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const body = request.body;
 
-        // Executar transação de atualização do Tenant-Pai
-        const newPrimaryTenant = await db.transaction(async (tx) => {
-          // 1. Desmarcar is_primary de todos os tenants existentes
-          await tx.update(tenants).set({ isPrimary: false });
+        const existingSettings = await db.query.platformSettings.findFirst();
+        const settingsData = {
+          platformName: body.name || 'TheraOS',
+          logoLightUrl: body.logo_light_url || null,
+          logoDarkUrl: body.logo_dark_url || null,
+          iconLightUrl: body.icon_light_url || null,
+          iconDarkUrl: body.icon_dark_url || null,
+          gradientColorStart: body.gradient_color_start || '#7C3AED',
+          gradientColorEnd: body.gradient_color_end || '#A855F7',
+          contrastColor: body.contrast_color || '#FFFFFF',
+          bgLightColor: body.bg_light_color || '#F8FAFC',
+          bgDarkColor: body.bg_dark_color || '#09090B',
+          cardLightColor: body.card_light_color || '#FFFFFF',
+          cardDarkColor: body.card_dark_color || '#18181B',
+          textLightColor: body.text_light_color || '#0F172A',
+          textDarkColor: body.text_dark_color || '#F8FAFC',
+          isConfigured: true,
+          updatedAt: new Date(),
+        };
 
-          // 2. Inserir ou atualizar o tenant
-          const [createdTenant] = await tx
-            .insert(tenants)
-            .values({
-              name: body.name,
-              slug: body.slug,
-              domain: body.domain || null,
-              isPrimary: true,
-              logoLightUrl: body.logo_light_url || null,
-              logoDarkUrl: body.logo_dark_url || null,
-              iconLightUrl: body.icon_light_url || null,
-              iconDarkUrl: body.icon_dark_url || null,
-              gradientColorStart: body.gradient_color_start,
-              gradientColorEnd: body.gradient_color_end,
-              contrastColor: body.contrast_color,
-              bgLightColor: body.bg_light_color,
-              bgDarkColor: body.bg_dark_color,
-              cardLightColor: body.card_light_color,
-              cardDarkColor: body.card_dark_color,
-              textLightColor: body.text_light_color,
-              textDarkColor: body.text_dark_color,
-            })
-            .onConflictDoUpdate({
-              target: tenants.slug,
-              set: {
-                name: body.name,
-                domain: body.domain || null,
-                isPrimary: true,
-                logoLightUrl: body.logo_light_url || null,
-                logoDarkUrl: body.logo_dark_url || null,
-                iconLightUrl: body.icon_light_url || null,
-                iconDarkUrl: body.icon_dark_url || null,
-                gradientColorStart: body.gradient_color_start,
-                gradientColorEnd: body.gradient_color_end,
-                contrastColor: body.contrast_color,
-                bgLightColor: body.bg_light_color,
-                bgDarkColor: body.bg_dark_color,
-                cardLightColor: body.card_light_color,
-                cardDarkColor: body.card_dark_color,
-                textLightColor: body.text_light_color,
-                textDarkColor: body.text_dark_color,
-                updatedAt: new Date(),
-              },
-            })
+        let updatedSettings;
+        if (existingSettings) {
+          [updatedSettings] = await db
+            .update(platformSettings)
+            .set(settingsData)
+            .where(eq(platformSettings.id, existingSettings.id))
             .returning();
-
-          // 3. Atualizar platform_settings vinculando primary_tenant_id e is_configured = true
-          const existingSettings = await tx.query.platformSettings.findFirst();
-          if (existingSettings) {
-            await tx
-              .update(platformSettings)
-              .set({
-                primaryTenantId: createdTenant.id,
-                isConfigured: true,
-                updatedAt: new Date(),
-              })
-              .where(eq(platformSettings.id, existingSettings.id));
-          } else {
-            await tx.insert(platformSettings).values({
-              primaryTenantId: createdTenant.id,
-              isConfigured: true,
-            });
-          }
-
-          return createdTenant;
-        });
+        } else {
+          [updatedSettings] = await db
+            .insert(platformSettings)
+            .values(settingsData)
+            .returning();
+        }
 
         return reply.status(201).send({
-          message: 'Tenant principal e identidade visual configurados com sucesso!',
-          tenant: newPrimaryTenant,
+          message: 'Identidade visual da plataforma salva em platform_settings!',
+          settings: updatedSettings,
         });
       } catch (err: any) {
         fastify.log.error(err);
         return reply.status(400).send({
-          error: 'Erro ao configurar Tenant',
-          message: err.message || 'Não foi possível salvar as configurações do Tenant-Pai.',
+          error: 'Erro ao configurar Plataforma',
+          message: err.message || 'Não foi possível salvar a marca da plataforma.',
         });
       }
     }
   );
 
-  // GET /v1/platform/tenant/primary (Público)
+  // GET /v1/platform/tenant/primary (Público - Retorna a Marca do SaaS em platform_settings)
   fastify.get('/tenant/primary', async (request, reply) => {
     try {
       const settings = await db.query.platformSettings.findFirst();
 
-      let primaryTenant = null;
-      if (settings?.primaryTenantId) {
-        primaryTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, settings.primaryTenantId),
-        });
-      } else {
-        primaryTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.isPrimary, true),
-        });
-      }
-
-      if (!primaryTenant) {
-        return reply.status(404).send({
-          error: 'Não encontrado',
-          message: 'Tenant principal ainda não configurado.',
-        });
-      }
+      const platformBrand = {
+        name: settings?.platformName || 'TheraOS',
+        logoLightUrl: settings?.logoLightUrl || null,
+        logoDarkUrl: settings?.logoDarkUrl || null,
+        iconLightUrl: settings?.iconLightUrl || null,
+        iconDarkUrl: settings?.iconDarkUrl || null,
+        gradientColorStart: settings?.gradientColorStart || '#7C3AED',
+        gradientColorEnd: settings?.gradientColorEnd || '#A855F7',
+        contrastColor: settings?.contrastColor || '#FFFFFF',
+        bgLightColor: settings?.bgLightColor || '#F8FAFC',
+        bgDarkColor: settings?.bgDarkColor || '#09090B',
+        cardLightColor: settings?.cardLightColor || '#FFFFFF',
+        cardDarkColor: settings?.cardDarkColor || '#18181B',
+        textLightColor: settings?.textLightColor || '#0F172A',
+        textDarkColor: settings?.textDarkColor || '#F8FAFC',
+      };
 
       return reply.send({
-        tenant: primaryTenant,
+        tenant: platformBrand,
       });
     } catch (err: any) {
       return reply.status(500).send({
         error: 'Erro no servidor',
-        message: 'Não foi possível buscar a marca do tenant principal.',
+        message: 'Não foi possível buscar a marca da plataforma.',
       });
     }
   });
 
-  // PUT /v1/platform/tenant/primary (Atualizar configurações White-Label - Requer Admin)
+  // PUT /v1/platform/tenant/primary (Atualizar configurações White-Label da Plataforma em platform_settings)
   fastify.put(
     '/tenant/primary',
     {
@@ -1236,61 +1206,63 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         verifyUserJwt(authHeader.split(' ')[1]);
 
         const body = request.body;
+        const existingSettings = await db.query.platformSettings.findFirst();
 
-        // Localizar o Tenant-Pai atual
-        const settings = await db.query.platformSettings.findFirst();
-        let primaryTenant = null;
-        if (settings?.primaryTenantId) {
-          primaryTenant = await db.query.tenants.findFirst({
-            where: eq(tenants.id, settings.primaryTenantId),
-          });
+        const updatePayload: Record<string, any> = { updatedAt: new Date() };
+        if (body.name) updatePayload.platformName = body.name;
+        if (body.logo_light_url !== undefined) updatePayload.logoLightUrl = body.logo_light_url;
+        if (body.logo_dark_url !== undefined) updatePayload.logoDarkUrl = body.logo_dark_url;
+        if (body.icon_light_url !== undefined) updatePayload.iconLightUrl = body.icon_light_url;
+        if (body.icon_dark_url !== undefined) updatePayload.iconDarkUrl = body.icon_dark_url;
+        if (body.gradient_color_start) updatePayload.gradientColorStart = body.gradient_color_start;
+        if (body.gradient_color_end) updatePayload.gradientColorEnd = body.gradient_color_end;
+        if (body.contrast_color) updatePayload.contrastColor = body.contrast_color;
+        if (body.bg_light_color) updatePayload.bgLightColor = body.bg_light_color;
+        if (body.bg_dark_color) updatePayload.bgDarkColor = body.bg_dark_color;
+        if (body.card_light_color) updatePayload.cardLightColor = body.card_light_color;
+        if (body.card_dark_color) updatePayload.cardDarkColor = body.card_dark_color;
+
+        let updatedSettings: any;
+        if (existingSettings) {
+          [updatedSettings] = await db
+            .update(platformSettings)
+            .set(updatePayload)
+            .where(eq(platformSettings.id, existingSettings.id))
+            .returning();
         } else {
-          primaryTenant = await db.query.tenants.findFirst({
-            where: eq(tenants.isPrimary, true),
-          });
+          [updatedSettings] = await db
+            .insert(platformSettings)
+            .values(updatePayload as any)
+            .returning();
         }
 
-        if (!primaryTenant) {
-          return reply.status(404).send({
-            error: 'Não encontrado',
-            message: 'Tenant principal não configurado.',
-          });
-        }
-
-        // Atualizar somente os campos enviados (partial update)
-        const [updatedTenant] = await db
-          .update(tenants)
-          .set({
-            name: body.name ?? primaryTenant.name,
-            slug: body.slug ?? primaryTenant.slug,
-            domain: body.domain !== undefined ? body.domain : primaryTenant.domain,
-            logoLightUrl: body.logo_light_url !== undefined ? body.logo_light_url : primaryTenant.logoLightUrl,
-            logoDarkUrl: body.logo_dark_url !== undefined ? body.logo_dark_url : primaryTenant.logoDarkUrl,
-            iconLightUrl: body.icon_light_url !== undefined ? body.icon_light_url : primaryTenant.iconLightUrl,
-            iconDarkUrl: body.icon_dark_url !== undefined ? body.icon_dark_url : primaryTenant.iconDarkUrl,
-            gradientColorStart: body.gradient_color_start ?? primaryTenant.gradientColorStart,
-            gradientColorEnd: body.gradient_color_end ?? primaryTenant.gradientColorEnd,
-            contrastColor: body.contrast_color ?? primaryTenant.contrastColor,
-            bgLightColor: body.bg_light_color ?? primaryTenant.bgLightColor,
-            bgDarkColor: body.bg_dark_color ?? primaryTenant.bgDarkColor,
-            cardLightColor: body.card_light_color ?? primaryTenant.cardLightColor,
-            cardDarkColor: body.card_dark_color ?? primaryTenant.cardDarkColor,
-            textLightColor: body.text_light_color ?? primaryTenant.textLightColor,
-            textDarkColor: body.text_dark_color ?? primaryTenant.textDarkColor,
-            updatedAt: new Date(),
-          })
-          .where(eq(tenants.id, primaryTenant.id))
-          .returning();
+        const platformBrand = {
+          name: updatedSettings?.platformName || 'TheraOS',
+          logoLightUrl: updatedSettings?.logoLightUrl || null,
+          logoDarkUrl: updatedSettings?.logoDarkUrl || null,
+          iconLightUrl: updatedSettings?.iconLightUrl || null,
+          iconDarkUrl: updatedSettings?.iconDarkUrl || null,
+          gradientColorStart: updatedSettings?.gradientColorStart || '#7C3AED',
+          gradientColorEnd: updatedSettings?.gradientColorEnd || '#A855F7',
+          contrastColor: updatedSettings?.contrastColor || '#FFFFFF',
+          bgLightColor: updatedSettings?.bgLightColor || '#F8FAFC',
+          bgDarkColor: updatedSettings?.bgDarkColor || '#09090B',
+          cardLightColor: updatedSettings?.cardLightColor || '#FFFFFF',
+          cardDarkColor: updatedSettings?.cardDarkColor || '#18181B',
+          textLightColor: updatedSettings?.textLightColor || '#0F172A',
+          textDarkColor: updatedSettings?.textDarkColor || '#F8FAFC',
+        };
 
         return reply.send({
-          message: 'Configurações White-Label atualizadas com sucesso!',
-          tenant: updatedTenant,
+          message: 'Configurações White-Label da Plataforma salvas em platform_settings!',
+          tenant: platformBrand,
+          settings: updatedSettings,
         });
       } catch (err: any) {
         fastify.log.error(err);
         return reply.status(500).send({
           error: 'Erro ao atualizar',
-          message: err.message || 'Não foi possível atualizar as configurações White-Label.',
+          message: err.message || 'Não foi possível atualizar as configurações.',
         });
       }
     }
@@ -1831,10 +1803,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
-  // DELETE /v1/platform/tenants/:id
-  // Exclui um tenant, suas páginas, membros, mídias e hostnames do Cloudflare
+  // DELETE /v1/platform/workspaces/:id
+  // Exclui um workspace, suas páginas, membros, mídias e domínios
   fastify.delete(
-    '/tenants/:id',
+    '/workspaces/:id',
     async (request, reply) => {
       try {
         const authHeader = request.headers.authorization;
@@ -1844,52 +1816,36 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
         const { id } = request.params as any;
 
-        const targetTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, id),
+        const targetWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, id),
         });
 
-        if (!targetTenant) {
-          return reply.status(404).send({ error: 'Não Encontrado', message: 'Tenant não encontrado.' });
+        if (!targetWorkspace) {
+          return reply.status(404).send({ error: 'Não Encontrado', message: 'Workspace não encontrado.' });
         }
 
-        // Permissão: apenas o dono do tenant ou um administrador global
-        const isOwner = targetTenant.ownerId === decoded.sub;
-        const currentUserProfile = await db.query.tenantMembers.findFirst({
+        // Permissão: apenas o dono do workspace ou um administrador global
+        const isOwner = targetWorkspace.ownerId === decoded.sub;
+        const currentUserProfile = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.role, 'admin')
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.role, 'admin')
           ),
         });
 
         if (!isOwner && !currentUserProfile) {
-          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para excluir este tenant.' });
+          return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para excluir este workspace.' });
         }
 
         const settings = await db.query.platformSettings.findFirst();
 
-        // 1. Limpar Hostnames na Cloudflare (se houver cfHostnameId ou se as páginas possuírem customDomain)
+        // 1. Limpar Hostnames na Cloudflare (se houver customDomain em workspaceDomains ou em páginas)
         if (settings?.cloudflareApiToken && settings?.cloudflareZoneId) {
           const token = settings.cloudflareApiToken;
           const zoneId = settings.cloudflareZoneId;
 
-          // Limpar cfHostnameId do tenant se existir
-          if (targetTenant.cfHostnameId) {
-            try {
-              await fetch(
-                `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames/${targetTenant.cfHostnameId}`,
-                {
-                  method: 'DELETE',
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
-            } catch (cfErr) {
-              fastify.log.error(cfErr, 'Erro ao excluir tenant custom hostname na Cloudflare');
-            }
-          }
-
-          // Buscar páginas do tenant com customDomain para remover do Cloudflare também
           const pages = await db.query.capturePages.findMany({
-            where: eq(capturePages.tenantId, id),
+            where: eq(capturePages.workspaceId, id),
           });
 
           for (const page of pages) {
@@ -1921,16 +1877,16 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 2. Limpar tabelas filhas / dependentes
-        await db.delete(interactionHistory).where(eq(interactionHistory.tenantId, id)).catch(() => {});
-        await db.delete(contacts).where(eq(contacts.tenantId, id)).catch(() => {});
-        await db.delete(capturePages).where(eq(capturePages.tenantId, id)).catch(() => {});
-        await db.delete(mediaAssets).where(eq(mediaAssets.tenantId, id)).catch(() => {});
-        await db.delete(tenantMembers).where(eq(tenantMembers.tenantId, id)).catch(() => {});
+        await db.delete(interactionHistory).where(eq(interactionHistory.workspaceId, id)).catch(() => {});
+        await db.delete(contacts).where(eq(contacts.workspaceId, id)).catch(() => {});
+        await db.delete(capturePages).where(eq(capturePages.workspaceId, id)).catch(() => {});
+        await db.delete(mediaAssets).where(eq(mediaAssets.workspaceId, id)).catch(() => {});
+        await db.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, id)).catch(() => {});
 
-        // 3. Excluir o tenant
-        await db.delete(tenants).where(eq(tenants.id, id));
+        // 3. Excluir o workspace
+        await db.delete(workspaces).where(eq(workspaces.id, id));
 
-        return reply.send({ success: true, message: 'Tenant excluído com sucesso.' });
+        return reply.send({ success: true, message: 'Workspace excluído com sucesso.' });
       } catch (err: any) {
         fastify.log.error(err);
         return reply.status(500).send({ error: 'Erro interno', message: err.message });

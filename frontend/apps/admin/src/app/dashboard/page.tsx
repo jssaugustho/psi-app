@@ -83,12 +83,12 @@ export default function AdminDashboardPage() {
             Validado & Conectado
           </span>
         </Card>
-        <Card title="Tenant Principal" subtitle={primaryTenant?.slug || 'Padrão'}>
+        <Card title="Marca da Plataforma" subtitle={primaryTenant?.name || 'TheraOS'}>
           <span
             className="text-2xl font-bold"
             style={{ color: 'var(--brand-gradient-start)' }}
           >
-            Ativo (is_primary)
+            Ativa (platform_settings)
           </span>
         </Card>
       </div>

@@ -3,12 +3,12 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { profiles, platformSettings, tenants, tenantMembers, emailLogs } from '../../../shared/schema';
+import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink } from '../../../shared/auth';
+import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest } from '../../../shared/auth';
 import { queueEmail } from '../../../emails/queue-email';
 
-async function resolveTenantFromRequest(request: any) {
+async function resolveWorkspaceFromRequest(request: any) {
   const origin = request.headers['origin'] as string | undefined;
   const referer = request.headers['referer'] as string | undefined;
   
@@ -20,29 +20,27 @@ async function resolveTenantFromRequest(request: any) {
     const hostname = parsedUrl.hostname.toLowerCase();
 
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      const tenantByDomain = await db.query.tenants.findFirst({
-        where: eq(tenants.domain, hostname),
+      const domainRecord = await db.query.workspaceDomains.findFirst({
+        where: eq(workspaceDomains.customDomain, hostname),
       });
-      if (tenantByDomain) return tenantByDomain;
+      if (domainRecord) {
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, domainRecord.workspaceId),
+        });
+        if (workspace) return workspace;
+      }
 
       const parts = hostname.split('.');
       if (parts.length > 2) {
-        const slug = parts[0];
-        const tenantBySlug = await db.query.tenants.findFirst({
-          where: eq(tenants.slug, slug),
+        const subdomain = parts[0];
+        const subRecord = await db.query.workspaceDomains.findFirst({
+          where: eq(workspaceDomains.subdomain, subdomain),
         });
-        if (tenantBySlug) return tenantBySlug;
-      }
-    }
-
-    if (referer) {
-      const pathParts = parsedUrl.pathname.split('/');
-      for (const part of pathParts) {
-        if (part && part !== 'login' && part !== 'auth' && part !== 'dashboard') {
-          const tenantByPathSlug = await db.query.tenants.findFirst({
-            where: eq(tenants.slug, part.toLowerCase()),
+        if (subRecord) {
+          const workspace = await db.query.workspaces.findFirst({
+            where: eq(workspaces.id, subRecord.workspaceId),
           });
-          if (tenantByPathSlug) return tenantByPathSlug;
+          if (workspace) return workspace;
         }
       }
     }
@@ -77,9 +75,20 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
       const existingAdmin = await db.query.profiles.findFirst({
         where: eq(profiles.role, 'admin'),
       });
+      const settings = await db.query.platformSettings.findFirst();
+
+      const hasAdmin = !!existingAdmin;
+      const hasPlatformSettings = !!settings;
+      const bootstrapped = hasAdmin && hasPlatformSettings;
+
       return reply.send({
-        bootstrapped: !!existingAdmin,
+        bootstrapped,
+        has_admin: hasAdmin,
+        has_platform_settings: hasPlatformSettings,
         admin_email: existingAdmin ? existingAdmin.email : null,
+        message: bootstrapped
+          ? 'Sistema inicializado e pronto para uso.'
+          : 'Sistema necessita de bootstrap inicial via Backoffice.',
       });
     } catch (err: any) {
       fastify.log.error(err);
@@ -187,6 +196,19 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
+        // 0. Bloquear cadastro se o sistema não possuir Administrador cadastrado
+        const existingAdmin = await db.query.profiles.findFirst({
+          where: eq(profiles.role, 'admin'),
+        });
+
+        if (!existingAdmin) {
+          return reply.status(403).send({
+            error: 'Operação não permitida',
+            message:
+              'O sistema ainda não possui um Administrador cadastrado. O cadastro de novos usuários está temporariamente bloqueado até que o bootstrap inicial seja realizado no Backoffice.',
+          });
+        }
+
         const { nome, sobrenome, telefone, email, password } = request.body;
 
         // 1. Criar usuário no GoTrue usando o token admin service_role
@@ -270,25 +292,21 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
 
         // 3. Disparar e-mail de notificação de login (assíncrono, sem bloquear resposta)
         if (profile) {
-          // Resolve o tenant a partir do origin/referer da requisição para envio white-label correto
-          let matchedTenant = await resolveTenantFromRequest(request);
+          // Resolve o workspace a partir do origin/referer da requisição para envio white-label correto
+          let matchedWorkspace = await resolveWorkspaceFromRequest(request);
 
-          let primaryTenant = null;
           const settings = await db.query.platformSettings.findFirst();
-          if (settings?.primaryTenantId) {
-            primaryTenant = await db.query.tenants.findFirst({
-              where: eq(tenants.id, settings.primaryTenantId),
-            }) ?? null;
-          }
 
-          if (!matchedTenant) {
-            matchedTenant = primaryTenant;
-          }
-
-          const brandName = matchedTenant?.name ?? 'Plataforma';
-          const gradientStart = matchedTenant?.gradientColorStart ?? '#4F46E5';
-          const gradientEnd = matchedTenant?.gradientColorEnd ?? '#06B6D4';
-          const logoUrl = matchedTenant?.logoDarkUrl || matchedTenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl || null;
+          const brandName = matchedWorkspace?.name ?? settings?.platformName ?? 'TheraOS';
+          const visualIdentity = matchedWorkspace ? await db.query.visualIdentities.findFirst({
+            where: and(
+              eq(visualIdentities.workspaceId, matchedWorkspace.id),
+              eq(visualIdentities.isWorkspaceDefault, true)
+            ),
+          }) : null;
+          const gradientStart = visualIdentity?.primaryColor ?? settings?.gradientColorStart ?? '#7C3AED';
+          const gradientEnd = visualIdentity?.secondaryColor ?? settings?.gradientColorEnd ?? '#A855F7';
+          const logoUrl = visualIdentity?.logoUrl || settings?.logoDarkUrl || settings?.logoLightUrl || null;
 
           // Gerar assunto de e-mail dinâmico e personalizado para evitar agrupamento no Gmail
           const now = new Date();
@@ -310,7 +328,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           queueEmail({
             template: 'login_notification',
             to: email,
-            tenantId: matchedTenant?.id,
+            tenantId: matchedWorkspace?.id,
             subject: emailSubject,
             props: {
               userName: profile.firstName,
@@ -535,59 +553,57 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
   );
 
   // POST /v1/auth/invite
-  // Convia um novo colaborador ou adiciona um colaborador existente ao tenant
+  // Convia um novo colaborador ou adiciona um colaborador existente ao workspace
   fastify.post(
     '/invite',
     {
       schema: {
         body: z.object({
           email: z.string().email('E-mail inválido'),
-          tenantId: z.string().uuid('ID do tenant inválido'),
-          role: z.enum(['admin', 'secretaria', 'psicologo', 'agent']),
+          workspaceId: z.string().uuid('ID do workspace inválido'),
+          role: z.enum(['owner', 'admin', 'secretaria', 'psicologo', 'agent', 'membro']),
         }),
       },
     },
     async (request, reply) => {
       try {
-        // 1. Validar autenticação do remetente
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({
             error: 'Não autorizado',
-            message: 'Cabeçalho Authorization ausente ou malformatado.',
+            message: 'Cabeçalho Authorization ou Cookie ausente.',
           });
         }
 
-        const token = authHeader.split(' ')[1];
         const payload = verifyUserJwt(token);
         const inviterId = payload.sub;
 
-        const { email, tenantId, role } = request.body;
+        const { email, workspaceId, role } = request.body;
         const targetEmail = email.trim().toLowerCase();
 
-        // 2. Buscar dados do tenant (Consultório) e validar privilégios do inviter
-        const invitingTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, tenantId),
+        // 2. Buscar dados do workspace (Consultório) e validar privilégios do inviter
+        const invitingWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, workspaceId),
         });
 
-        if (!invitingTenant) {
+        if (!invitingWorkspace) {
           return reply.status(404).send({
             error: 'Não encontrado',
-            message: 'O tenant/clínica especificado não foi encontrado.',
+            message: 'O workspace/clínica especificado não foi encontrado.',
           });
         }
 
-        // Validar se o inviter é dono do tenant ou possui role admin em tenantMembers
-        const inviterMember = await db.query.tenantMembers.findFirst({
+        // Validar se o inviter é dono do workspace ou possui role admin em workspaceMembers
+        const inviterMember = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.tenantId, tenantId),
-            eq(tenantMembers.userId, inviterId)
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, inviterId)
           ),
         });
 
         const isInviterAdmin =
-          invitingTenant.ownerId === inviterId ||
-          (inviterMember && inviterMember.role === 'admin');
+          invitingWorkspace.ownerId === inviterId ||
+          (inviterMember && (inviterMember.role === 'admin' || inviterMember.role === 'owner'));
 
         if (!isInviterAdmin) {
           return reply.status(403).send({
@@ -619,11 +635,11 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           // --- USUÁRIO EXISTENTE ---
           targetUserId = existingProfile.id;
 
-          // Verificar se já é membro do tenant
-          const existingMember = await db.query.tenantMembers.findFirst({
+          // Verificar se já é membro do workspace
+          const existingMember = await db.query.workspaceMembers.findFirst({
             where: and(
-              eq(tenantMembers.tenantId, tenantId),
-              eq(tenantMembers.userId, targetUserId)
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.userId, targetUserId)
             ),
           });
 
@@ -634,23 +650,22 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             });
           }
 
-          // Adicionar membro ao tenant com a role escolhida
-          await db.insert(tenantMembers).values({
-            tenantId,
+          // Adicionar membro ao workspace com a role escolhida
+          await db.insert(workspaceMembers).values({
+            workspaceId,
             userId: targetUserId,
             role,
           });
 
           // Gerar link mágico (magiclink) para o login do usuário existente
-          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=login&tenant_id=${tenantId}`;
+          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=login&workspace_id=${workspaceId}`;
           const gotrueLinkRes = await generateGoTrueLink('magiclink', targetEmail, linkRedirectUrl);
           actionLink = gotrueLinkRes.action_link;
         } else {
           // --- NOVO USUÁRIO ---
           isNewUser = true;
 
-          // Convidar no GoTrue (cria o usuário no auth.users sem senha, o que dispara handle_new_user() e cria o perfil no public.profiles)
-          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=invite&tenant_id=${tenantId}`;
+          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=invite&workspace_id=${workspaceId}`;
           
           // Geramos um link de convite no GoTrue
           const gotrueLinkRes = await generateGoTrueLink('invite', targetEmail, linkRedirectUrl, {
@@ -661,41 +676,40 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           targetUserId = gotrueLinkRes.id;
           actionLink = gotrueLinkRes.action_link;
 
-          // Adicionar o novo usuário na tabela tenant_members
-          await db.insert(tenantMembers).values({
-            tenantId,
+          // Adicionar o novo usuário na tabela workspace_members
+          await db.insert(workspaceMembers).values({
+            workspaceId,
             userId: targetUserId,
             role,
           });
         }
 
-        const brandName = invitingTenant.name ?? 'Psi App';
-        const gradientStart = invitingTenant.gradientColorStart ?? '#4F46E5';
-        const gradientEnd = invitingTenant.gradientColorEnd ?? '#06B6D4';
-        let primaryTenant = null;
-        if (!invitingTenant.logoDarkUrl && !invitingTenant.logoLightUrl) {
-          const settings = await db.query.platformSettings.findFirst();
-          if (settings?.primaryTenantId) {
-            primaryTenant = await db.query.tenants.findFirst({
-              where: eq(tenants.id, settings.primaryTenantId),
-            }) ?? null;
-          }
-        }
-        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl || null;
+        const brandName = invitingWorkspace.name ?? 'TheraOS';
+        const visualIdentity = await db.query.visualIdentities.findFirst({
+          where: and(
+            eq(visualIdentities.workspaceId, workspaceId),
+            eq(visualIdentities.isWorkspaceDefault, true)
+          ),
+        });
+        const gradientStart = visualIdentity?.primaryColor ?? '#4F46E5';
+        const gradientEnd = visualIdentity?.secondaryColor ?? '#06B6D4';
+        const logoUrl = visualIdentity?.logoUrl || null;
 
         // Converter role técnica para nome legível em português
         const roleLabels: Record<string, string> = {
-          admin: 'Administrador',
+          owner: 'Proprietário(a)',
+          admin: 'Administrador(a)',
           secretaria: 'Secretária(o)',
           psicologo: 'Psicólogo(a)',
           agent: 'Agente',
+          membro: 'Membro',
         };
         const roleLabel = roleLabels[role] || role;
 
         await queueEmail({
           template: 'invite_member',
           to: targetEmail,
-          tenantId,
+          tenantId: workspaceId,
           subject: `Você foi convidado para colaborar na clínica ${brandName}`,
           props: {
             userName: existingProfile ? `${existingProfile.firstName}`.trim() : 'Colaborador',
@@ -714,7 +728,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         return reply.status(200).send({
           message: isNewUser
             ? 'Novo usuário convidado com sucesso! E-mail de ativação enfileirado.'
-            : 'Usuário existente associado ao tenant com sucesso! E-mail de notificação enfileirado.',
+            : 'Usuário existente associado ao workspace com sucesso! E-mail de notificação enfileirado.',
           user_id: targetUserId,
           is_new: isNewUser,
         });
@@ -736,44 +750,43 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
       schema: {
         body: z.object({
           email: z.string().email('E-mail inválido'),
-          tenantId: z.string().uuid('ID do tenant inválido'),
+          workspaceId: z.string().uuid('ID do workspace inválido'),
         }),
       },
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({
             error: 'Não autorizado',
-            message: 'Cabeçalho Authorization ausente ou malformatado.',
+            message: 'Cabeçalho Authorization ou Cookie ausente.',
           });
         }
 
-        const token = authHeader.split(' ')[1];
         const payload = verifyUserJwt(token);
         const inviterId = payload.sub;
 
-        const { email, tenantId } = request.body;
+        const { email, workspaceId } = request.body;
         const targetEmail = email.trim().toLowerCase();
 
         // 1. Validar permissões administrativas do inviter
-        const invitingTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, tenantId),
+        const invitingWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, workspaceId),
         });
-        if (!invitingTenant) {
-          return reply.status(404).send({ error: 'Não encontrado', message: 'Clínica/Tenant não encontrado.' });
+        if (!invitingWorkspace) {
+          return reply.status(404).send({ error: 'Não encontrado', message: 'Workspace não encontrado.' });
         }
 
-        const inviterMember = await db.query.tenantMembers.findFirst({
-          where: and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, inviterId)),
+        const inviterMember = await db.query.workspaceMembers.findFirst({
+          where: and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, inviterId)),
         });
-        const isInviterAdmin = invitingTenant.ownerId === inviterId || (inviterMember && inviterMember.role === 'admin');
+        const isInviterAdmin = invitingWorkspace.ownerId === inviterId || (inviterMember && (inviterMember.role === 'admin' || inviterMember.role === 'owner'));
         if (!isInviterAdmin) {
           return reply.status(403).send({ error: 'Proibido', message: 'Sem permissões administrativas.' });
         }
 
-        // 2. Verificar se o usuário existe no tenant
+        // 2. Verificar se o usuário existe no workspace
         const targetUser = await db.query.profiles.findFirst({
           where: eq(profiles.email, targetEmail),
         });
@@ -781,11 +794,11 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           return reply.status(404).send({ error: 'Não encontrado', message: 'Colaborador não cadastrado.' });
         }
 
-        const memberRecord = await db.query.tenantMembers.findFirst({
-          where: and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.userId, targetUser.id)),
+        const memberRecord = await db.query.workspaceMembers.findFirst({
+          where: and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetUser.id)),
         });
         if (!memberRecord) {
-          return reply.status(404).send({ error: 'Não encontrado', message: 'Colaborador não é membro deste espaço clínico.' });
+          return reply.status(404).send({ error: 'Não encontrado', message: 'Colaborador não é membro deste espaço.' });
         }
 
         // 3. Rate limiting de 60 segundos baseando-se nos logs de e-mail do destinatário
@@ -794,88 +807,61 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           orderBy: (emailLogs, { desc }) => [desc(emailLogs.createdAt)],
         });
 
-        if (lastMail && Date.now() - new Date(lastMail.createdAt).getTime() < 60000) {
-          const remainingSecs = Math.ceil((60000 - (Date.now() - new Date(lastMail.createdAt).getTime())) / 1000);
-          return reply.status(429).send({
-            error: 'Too Many Requests',
-            message: `Aguarde ${remainingSecs} segundos antes de solicitar um novo reenvio.`,
-          });
+        if (lastMail) {
+          const secondsDiff = Math.floor((Date.now() - new Date(lastMail.createdAt).getTime()) / 1000);
+          if (secondsDiff < 60) {
+            const waitTime = 60 - secondsDiff;
+            return reply.status(429).send({
+              error: 'Muitas requisições',
+              message: `Aguarde ${waitTime} segundo(s) antes de solicitar um novo e-mail.`,
+            });
+          }
         }
 
         // 4. Gerar novo link de convite ou link mágico conforme o status do usuário
         const gotrueSiteUrl = env.GOTRUE_SITE_URL || 'http://localhost:3000';
-        let actionLink = '';
-        let isNewUser = false;
+        const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=invite&workspace_id=${workspaceId}`;
 
-        // Se o nome for 'Colaborador', consideramos que ainda não concluiu seu setup
-        if (targetUser.firstName === 'Colaborador' && targetUser.lastName === '') {
-          isNewUser = true;
-          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=invite&tenant_id=${tenantId}`;
-          const gotrueLinkRes = await generateGoTrueLink('invite', targetEmail, linkRedirectUrl);
-          actionLink = gotrueLinkRes.action_link;
-        } else {
-          const linkRedirectUrl = `${gotrueSiteUrl}/auth/callback?type=login&tenant_id=${tenantId}`;
-          const gotrueLinkRes = await generateGoTrueLink('magiclink', targetEmail, linkRedirectUrl);
-          actionLink = gotrueLinkRes.action_link;
-        }
+        const gotrueLinkRes = await generateGoTrueLink('invite', targetEmail, linkRedirectUrl);
+        const actionLink = gotrueLinkRes.action_link;
 
         // 5. Enviar e-mail com a identidade visual do consultório
-        const brandName = invitingTenant.name ?? 'Psi App';
-        const gradientStart = invitingTenant.gradientColorStart ?? '#4F46E5';
-        const gradientEnd = invitingTenant.gradientColorEnd ?? '#06B6D4';
-        let primaryTenantResend = null;
-        if (!invitingTenant.logoDarkUrl && !invitingTenant.logoLightUrl) {
-          const settings = await db.query.platformSettings.findFirst();
-          if (settings?.primaryTenantId) {
-            primaryTenantResend = await db.query.tenants.findFirst({
-              where: eq(tenants.id, settings.primaryTenantId),
-            }) ?? null;
-          }
-        }
-        const logoUrl = invitingTenant.logoDarkUrl || invitingTenant.logoLightUrl || primaryTenantResend?.logoDarkUrl || primaryTenantResend?.logoLightUrl || null;
-
-        const roleLabels: Record<string, string> = {
-          admin: 'Administrador',
-          secretaria: 'Secretária(o)',
-          psicologo: 'Psicólogo(a)',
-          agent: 'Agente',
-        };
-        const roleLabel = roleLabels[memberRecord.role] || memberRecord.role;
-
-        const inviterProfile = await db.query.profiles.findFirst({ where: eq(profiles.id, inviterId) });
-        const inviterName = inviterProfile ? `${inviterProfile.firstName} ${inviterProfile.lastName}`.trim() : 'Um administrador';
+        const visualIdentity = await db.query.visualIdentities.findFirst({
+          where: and(
+            eq(visualIdentities.workspaceId, workspaceId),
+            eq(visualIdentities.isWorkspaceDefault, true)
+          ),
+        });
 
         await queueEmail({
           template: 'invite_member',
           to: targetEmail,
-          tenantId,
-          subject: `Reenvio: Convite para colaborar na clínica ${brandName}`,
+          tenantId: workspaceId,
+          subject: `Convite de acesso - ${invitingWorkspace.name}`,
           props: {
-            userName: targetUser.firstName === 'Colaborador' ? 'Colaborador' : targetUser.firstName,
-            inviterName,
-            tenantName: brandName,
-            roleName: roleLabel,
+            userName: `${targetUser.firstName}`.trim(),
+            inviterName: 'Administrador',
+            tenantName: invitingWorkspace.name,
+            roleName: memberRecord.role,
             actionLink,
-            isNewUser,
-            brandName,
-            gradientStart,
-            gradientEnd,
-            logoUrl,
+            isNewUser: false,
+            brandName: invitingWorkspace.name,
+            gradientStart: visualIdentity?.primaryColor ?? '#4F46E5',
+            gradientEnd: visualIdentity?.secondaryColor ?? '#06B6D4',
+            logoUrl: visualIdentity?.logoUrl || null,
           },
         });
 
         return reply.status(200).send({
-          message: 'Convite reenviado com sucesso!',
+          message: 'E-mail de convite reenviado com sucesso!',
         });
       } catch (err: any) {
         fastify.log.error(err);
         return reply.status(400).send({
-          error: 'Erro ao reenviar',
+          error: 'Erro ao reenviar convite',
           message: err.message || 'Não foi possível reenviar o convite.',
         });
       }
     }
   );
 }
-
-

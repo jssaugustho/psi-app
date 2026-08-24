@@ -6,7 +6,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,defaultSiteAvatarUrl:default_site_avatar_url,defaultSiteLogoUrl:default_site_logo_url,defaultSiteFaviconUrl:default_site_favicon_url,defaultSiteLogoConfig:default_site_logo_config,defaultSitePrimaryColor:default_site_primary_color,defaultSiteSecondaryColor:default_site_secondary_color,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
+const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source';
 
 export interface User {
   id: string;
@@ -16,40 +16,76 @@ export interface User {
   email: string;
   role?: string;
   avatar_url?: string | null;
-  crp?: string | null;
-  bio?: string | null;
-  specialties?: string[] | null;
-  city_state?: string | null;
-  instagram?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface Tenant {
+export interface BootstrapStatusResponse {
+  bootstrapped: boolean;
+  has_admin?: boolean;
+  has_platform_settings?: boolean;
+  admin_email?: string | null;
+  message?: string;
+}
+
+export interface VisualIdentity {
   id: string;
+  workspaceId: string;
   name: string;
-  slug: string;
-  domain: string | null;
-  isPrimary: boolean;
-  ownerId?: string | null;
-  logoLightUrl: string | null;
-  logoDarkUrl: string | null;
-  iconLightUrl: string | null;
-  iconDarkUrl: string | null;
-  defaultSiteAvatarUrl?: string | null;
-  defaultSiteLogoUrl?: string | null;
-  defaultSiteFaviconUrl?: string | null;
-  defaultSiteLogoConfig?: {
+  isWorkspaceDefault: boolean;
+  logoUrl?: string | null;
+  faviconUrl?: string | null;
+  logoConfig?: {
     mode: 'html' | 'image';
     text?: string;
     iconType?: 'psi' | 'custom';
     customIconUrl?: string;
   } | null;
-  defaultSitePrimaryColor?: string;
-  defaultSiteSecondaryColor?: string;
-  gradientColorStart: string;
-  gradientColorEnd: string;
+  primaryColor: string;
+  secondaryColor: string;
   contrastColor: string;
+  bgColor: string;
+  cardColor: string;
+  textColor: string;
+  fontHeading: string;
+  fontBody: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkspaceDomain {
+  id: string;
+  workspaceId: string;
+  subdomain: string;
+  customDomain?: string | null;
+  cfHostnameId?: string | null;
+  dnsStatus: string;
+  dnsRecords?: Array<{ type: string; name: string; value: string; description?: string }> | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug?: string;
+  domain?: string | null;
+  ownerId?: string | null;
+  crp?: string | null;
+  bio?: string | null;
+  specialties?: string[] | null;
+  cityState?: string | null;
+  instagram?: string | null;
+  isOnlineService?: boolean;
+  defaultSiteAvatarUrl?: string | null;
+  traffic_sources?: string[];
+  default_traffic_source?: string;
+  visualIdentity?: VisualIdentity | null;
+  workspaceDomain?: WorkspaceDomain | null;
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Fallbacks de compatibilidade visual
   bgLightColor?: string;
   bgDarkColor?: string;
   cardLightColor?: string;
@@ -57,22 +93,36 @@ export interface Tenant {
   textLightColor?: string;
   textDarkColor?: string;
   emailDomain?: string | null;
-  resendApiKey?: string | null;
-  traffic_sources?: string[];
-  default_traffic_source?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  logoLightUrl?: string | null;
+  logoDarkUrl?: string | null;
+  iconLightUrl?: string | null;
+  iconDarkUrl?: string | null;
+  defaultSiteLogoUrl?: string | null;
+  defaultSiteFaviconUrl?: string | null;
+  defaultSiteLogoConfig?: any;
+  defaultSitePrimaryColor?: string;
+  defaultSiteSecondaryColor?: string;
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
+  contrastColor?: string;
 }
 
-export interface TenantMember {
+// Alias de compatibilidade
+export type Tenant = Workspace;
+
+export interface WorkspaceMember {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
+  tenant_id?: string;
   user_id: string;
-  role: 'admin' | 'secretaria' | 'psicologo' | 'agent';
+  role: 'owner' | 'admin' | 'secretaria' | 'psicologo' | 'agent' | 'membro';
+  permissions?: string[];
   created_at: string;
   updated_at: string;
   profile?: User;
 }
+
+export type TenantMember = WorkspaceMember;
 
 export interface TenantSubscription {
   tenant_id: string;
@@ -226,14 +276,20 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
-    ? endpoint
-    : `${API_BASE_URL}${endpoint}`;
+  let resolvedEndpoint = endpoint;
+  if (API_BASE_URL.endsWith('/v1') && resolvedEndpoint.startsWith('/v1/')) {
+    resolvedEndpoint = resolvedEndpoint.slice(3);
+  }
+
+  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
+    ? resolvedEndpoint
+    : `${API_BASE_URL}${resolvedEndpoint}`;
 
   let response;
   try {
     response = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers,
     });
   } catch (err: any) {
@@ -462,22 +518,60 @@ export const api = {
     });
   },
 
-  getMyTenants: async (userId: string) => {
-    const memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${userId}&select=role,tenant:tenants(${TENANT_SELECT})`);
-    const ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?owner_id=eq.${userId}&select=${TENANT_SELECT}`);
+  getBootstrapStatus: () => fetchApi<BootstrapStatusResponse>('/auth/bootstrap/status'),
+
+  getMyTenants: async (userId: string, userRole?: string) => {
+    if (userRole === 'admin') {
+      try {
+        const allTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc`);
+        if (allTenants && allTenants.length > 0) {
+          return allTenants.map((t) => ({ ...t, memberRole: 'admin' }));
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar lista global de tenants para admin:', e);
+      }
+    }
+
+    let memberRes: any[] = [];
+    let ownedRes: Tenant[] = [];
+
+    try {
+      memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${userId}&select=role,tenant:tenants(${TENANT_SELECT})`);
+      ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?owner_id=eq.${userId}&select=${TENANT_SELECT}`);
+    } catch (err) {
+      console.warn('Erro com TENANT_SELECT customizado, tentando fallback simples:', err);
+      try {
+        const SIMPLE_SELECT = 'id,name,slug,domain,ownerId:owner_id';
+        memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${userId}&select=role,tenant:tenants(${SIMPLE_SELECT})`);
+        ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?owner_id=eq.${userId}&select=${SIMPLE_SELECT}`);
+      } catch (errFallback) {
+        console.error('Erro ao buscar pertencimento de tenants:', errFallback);
+      }
+    }
     
     const list: (Tenant & { memberRole?: string })[] = [];
     const ids = new Set<string>();
     
-    for (const t of ownedRes) {
+    for (const t of ownedRes || []) {
       list.push({ ...t, memberRole: 'admin' });
       ids.add(t.id);
     }
     
-    for (const m of memberRes) {
+    for (const m of memberRes || []) {
       if (m.tenant && !ids.has(m.tenant.id)) {
         list.push({ ...m.tenant, memberRole: m.role });
         ids.add(m.tenant.id);
+      }
+    }
+
+    if (list.length === 0) {
+      try {
+        const fallbackTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=id,name,slug,domain,owner_id&order=created_at.desc`);
+        if (fallbackTenants && fallbackTenants.length > 0) {
+          return fallbackTenants.map((t) => ({ ...t, memberRole: 'admin' }));
+        }
+      } catch (e) {
+        console.warn('Falha no fallback de tenants:', e);
       }
     }
     
@@ -489,6 +583,12 @@ export const api = {
     if (body.name !== undefined) dbBody.name = body.name;
     if (body.slug !== undefined) dbBody.slug = body.slug;
     if (body.domain !== undefined) dbBody.domain = body.domain;
+    if (body.crp !== undefined) dbBody.crp = body.crp;
+    if (body.bio !== undefined) dbBody.bio = body.bio;
+    if (body.specialties !== undefined) dbBody.specialties = body.specialties;
+    if (body.cityState !== undefined) dbBody.city_state = body.cityState;
+    if (body.instagram !== undefined) dbBody.instagram = body.instagram;
+    if (body.isOnlineService !== undefined) dbBody.is_online_service = body.isOnlineService;
     if (body.gradientColorStart !== undefined) dbBody.gradient_color_start = body.gradientColorStart;
     if (body.gradientColorEnd !== undefined) dbBody.gradient_color_end = body.gradientColorEnd;
     if (body.contrastColor !== undefined) dbBody.contrast_color = body.contrastColor;
@@ -551,8 +651,28 @@ export const api = {
   },
 
   getPrimaryTenant: async () => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&is_primary=eq.true&limit=1`);
-    return { tenant: res[0] || null };
+    try {
+      const res = await fetchApi<{ tenant: Tenant }>(`/platform/tenant/primary`);
+      return { tenant: res.tenant || null };
+    } catch {
+      return { tenant: null };
+    }
+  },
+
+  updatePlatformBranding: async (body: {
+    name?: string;
+    logo_light_url?: string | null;
+    logo_dark_url?: string | null;
+    icon_light_url?: string | null;
+    icon_dark_url?: string | null;
+    gradient_color_start?: string;
+    gradient_color_end?: string;
+    contrast_color?: string;
+  }) => {
+    return fetchApi<{ message: string; settings: any }>(`/platform/tenant/primary`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
   },
 
   getTenantByDomain: async (domain: string) => {
@@ -855,6 +975,68 @@ export const api = {
     });
   },
 
+  // --- Formulários de Triagem (Screening Forms) ---
+  getForms: async (tenantId: string): Promise<ScreeningForm[]> => {
+    const res = await fetchApi<{ success: boolean; forms: ScreeningForm[] }>(`/crm/forms?tenantId=${tenantId}`);
+    return res.forms || [];
+  },
+
+  createForm: async (body: {
+    title: string;
+    slug?: string;
+    tenantId: string;
+    themeConfig?: Record<string, any>;
+    formFlow?: Record<string, any>;
+  }): Promise<ScreeningForm> => {
+    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    return res.form;
+  },
+
+  getFormById: async (id: string): Promise<ScreeningForm> => {
+    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms/${id}`);
+    return res.form;
+  },
+
+  updateForm: async (id: string, body: {
+    titleDraft?: string;
+    slugDraft?: string;
+    themeConfigDraft?: Record<string, any>;
+    formFlowDraft?: Record<string, any>;
+    isPublish?: boolean;
+  }): Promise<ScreeningForm> => {
+    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    return res.form;
+  },
+
+  deleteForm: async (id: string): Promise<void> => {
+    await fetchApi(`/crm/forms/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  submitPublicForm: async (body: {
+    tenantId: string;
+    formId?: string;
+    pageId?: string;
+    responses: Record<string, any>;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    utmTerm?: string;
+    utmContent?: string;
+  }): Promise<{ success: boolean; contactId: string; name: string }> => {
+    return fetchApi(`/crm/forms/public/submit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
   // --- Captação: Contract Templates ---
   getContractTemplates: async (tenantId: string): Promise<ContractTemplate[]> => {
     const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?tenant_id=eq.${tenantId}&order=created_at.desc`);
@@ -959,6 +1141,14 @@ export interface CapturePage {
   title: string;
   slug: string;
   isActive: boolean;
+  ctaType?: 'whatsapp' | 'external_url' | 'form';
+  ctaWhatsappMessage?: string | null;
+  ctaExternalUrl?: string | null;
+  formId?: string | null;
+  ctaTypeDraft?: 'whatsapp' | 'external_url' | 'form' | null;
+  ctaWhatsappMessageDraft?: string | null;
+  ctaExternalUrlDraft?: string | null;
+  formIdDraft?: string | null;
   customDomain: string | null;
   crp?: string;
   logoText?: string;
@@ -970,7 +1160,10 @@ export interface CapturePage {
   seoConfig: {
     metaTitle: string;
     metaDescription: string;
+    keywords?: string;
+    socialImage?: string;
     ogImageUrl?: string;
+    allowIndexing?: boolean;
   };
   siteConfig: any;
   dictionary: any;
@@ -981,11 +1174,38 @@ export interface CapturePage {
   seoConfigDraft?: {
     metaTitle: string;
     metaDescription: string;
+    keywords?: string;
+    socialImage?: string;
     ogImageUrl?: string;
+    allowIndexing?: boolean;
   } | null;
   siteConfigDraft?: any;
   dictionaryDraft?: any;
   formFlowDraft?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScreeningForm {
+  id: string;
+  tenantId: string;
+  title: string;
+  slug: string;
+  isActive: boolean;
+  themeConfig: {
+    primaryStart?: string;
+    primaryEnd?: string;
+    contrast?: string;
+    fontHeading?: string;
+    fontBody?: string;
+  };
+  formFlow: any;
+  titleDraft?: string | null;
+  slugDraft?: string | null;
+  themeConfigDraft?: any;
+  formFlowDraft?: any;
+  boundPages?: Array<{ id: string; title: string; slug: string }>;
+  submissionsCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -998,4 +1218,3 @@ export interface ContractTemplate {
   createdAt: string;
   updatedAt: string;
 }
-

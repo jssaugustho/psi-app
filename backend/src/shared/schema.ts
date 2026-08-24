@@ -1,5 +1,6 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, unique } from 'drizzle-orm/pg-core';
 
+// ── 1. Contas de Usuário (Pessoa Física) ───────────────────────────────────
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey(),
   firstName: text('first_name').notNull(),
@@ -7,53 +8,28 @@ export const profiles = pgTable('profiles', {
   phone: text('phone'),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
-  crp: text('crp'),
-  bio: text('bio'),
-  specialties: jsonb('specialties').$type<string[]>(),
-  cityState: text('city_state'),
-  instagram: text('instagram'),
   role: text('role').$type<'admin' | 'user'>().default('user').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const tenants = pgTable('tenants', {
+export type Profile = typeof profiles.$inferSelect;
+export type NewProfile = typeof profiles.$inferInsert;
+
+// ── 2. Workspaces (Consultórios / Clínicas / Espaços de Trabalho) ───────────
+export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
-  slug: text('slug').notNull().unique(),
-  domain: text('domain'),
-  isPrimary: boolean('is_primary').default(false).notNull(),
   ownerId: uuid('owner_id').references(() => profiles.id),
 
-  // Identidade Visual White-Label
-  logoLightUrl: text('logo_light_url'),
-  logoDarkUrl: text('logo_dark_url'),
-  iconLightUrl: text('icon_light_url'),
-  iconDarkUrl: text('icon_dark_url'),
+  // Informações Práticas & Clínicas do Workspace
+  crp: text('crp'),
+  bio: text('bio'),
+  specialties: jsonb('specialties').$type<string[]>(),
+  cityState: text('city_state'),
+  instagram: text('instagram'),
+  isOnlineService: boolean('is_online_service').default(true).notNull(),
   defaultSiteAvatarUrl: text('default_site_avatar_url'),
-  defaultSiteLogoUrl: text('default_site_logo_url'),
-  defaultSiteFaviconUrl: text('default_site_favicon_url'),
-  defaultSiteLogoConfig: jsonb('default_site_logo_config').$type<{ mode: 'html' | 'image'; text?: string; iconType?: 'psi' | 'custom'; customIconUrl?: string }>(),
-  defaultSitePrimaryColor: text('default_site_primary_color').default('#4F46E5'),
-  defaultSiteSecondaryColor: text('default_site_secondary_color').default('#06B6D4'),
-
-  // Cores do Gradiente e Contraste
-  gradientColorStart: text('gradient_color_start').default('#4F46E5').notNull(),
-  gradientColorEnd: text('gradient_color_end').default('#06B6D4').notNull(),
-  contrastColor: text('contrast_color').default('#FFFFFF').notNull(),
-
-  // Cores de Fundo, Cartões e Texto (Temas Claro / Escuro)
-  bgLightColor: text('bg_light_color').default('#F8FAFC').notNull(),
-  bgDarkColor: text('bg_dark_color').default('#020617').notNull(),
-  cardLightColor: text('card_light_color').default('#FFFFFF').notNull(),
-  cardDarkColor: text('card_dark_color').default('#0F172A').notNull(),
-  textLightColor: text('text_light_color').default('#0F172A').notNull(),
-  textDarkColor: text('text_dark_color').default('#F8FAFC').notNull(),
-
-  // Configurações Customizadas de E-mail
-  emailDomain: text('email_domain'),
-  resendApiKey: text('resend_api_key'),
-  cfHostnameId: text('cf_hostname_id'),
 
   // Configurações do CRM (Fontes de Tráfego)
   trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook']).notNull(),
@@ -63,8 +39,95 @@ export const tenants = pgTable('tenants', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export type Workspace = typeof workspaces.$inferSelect;
+export type NewWorkspace = typeof workspaces.$inferInsert;
+
+// ── 3. Identidades Visuais (Padrão do Workspace & Overrides de Páginas) ────
+export const visualIdentities = pgTable('visual_identities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(), // Ex: "Identidade Padrão do Workspace" ou "Override Landing Page Terapia"
+  isWorkspaceDefault: boolean('is_workspace_default').default(false).notNull(),
+
+  // Imagens & Logotipo Padrão (Único - Sem diferenciação Claro/Escuro)
+  logoUrl: text('logo_url'),
+  faviconUrl: text('favicon_url'),
+  logoConfig: jsonb('logo_config').$type<{ mode: 'html' | 'image'; text?: string; iconType?: 'psi' | 'custom'; customIconUrl?: string }>(),
+
+  // Paleta de Cores Única do Workspace
+  primaryColor: text('primary_color').default('#4F46E5').notNull(),
+  secondaryColor: text('secondary_color').default('#06B6D4').notNull(),
+  contrastColor: text('contrast_color').default('#FFFFFF').notNull(),
+  bgColor: text('bg_color').default('#F8FAFC').notNull(),
+  cardColor: text('card_color').default('#FFFFFF').notNull(),
+  textColor: text('text_color').default('#0F172A').notNull(),
+
+  // Tipografia (Fontes da Marca)
+  fontHeading: text('font_heading').default('serif').notNull(),
+  fontBody: text('font_body').default('sans').notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type VisualIdentity = typeof visualIdentities.$inferSelect;
+export type NewVisualIdentity = typeof visualIdentities.$inferInsert;
+
+// ── 4. Domínios do Workspace (Subdomínio TheraOS & Domínio Customizado) ─────
+export const workspaceDomains = pgTable('workspace_domains', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull().unique(),
+  subdomain: text('subdomain').notNull().unique(),
+  customDomain: text('custom_domain'),
+  cfHostnameId: text('cf_hostname_id'),
+  dnsStatus: text('dns_status').default('pending').notNull(),
+  dnsRecords: jsonb('dns_records').$type<Array<{ type: string; name: string; value: string; description?: string }>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type WorkspaceDomain = typeof workspaceDomains.$inferSelect;
+export type NewWorkspaceDomain = typeof workspaceDomains.$inferInsert;
+
+// ── 5. Membros & Acessos do Workspace (RBAC Futuro) ────────────────────────
+export const workspaceMembers = pgTable('workspace_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
+  role: text('role').$type<'owner' | 'admin' | 'secretaria' | 'psicologo' | 'agent' | 'membro'>().default('membro').notNull(),
+  permissions: jsonb('permissions').$type<string[]>().default([]).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique('workspace_members_workspace_user_unique').on(t.workspaceId, t.userId),
+]);
+
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
+export type NewWorkspaceMember = typeof workspaceMembers.$inferInsert;
+
+// ── 6. Configurações Globais SaaS (Platform Settings - White-Label Central) 
 export const platformSettings = pgTable('platform_settings', {
   id: uuid('id').primaryKey().defaultRandom(),
+
+  // Marca e Identidade Visual Central da Plataforma (Backoffice / SaaS)
+  platformName: text('platform_name').default('TheraOS').notNull(),
+  logoLightUrl: text('logo_light_url'),
+  logoDarkUrl: text('logo_dark_url'),
+  iconLightUrl: text('icon_light_url'),
+  iconDarkUrl: text('icon_dark_url'),
+
+  // Tema Visual e Cores da Plataforma (Dashboard / Admin)
+  gradientColorStart: text('gradient_color_start').default('#7C3AED').notNull(),
+  gradientColorEnd: text('gradient_color_end').default('#A855F7').notNull(),
+  contrastColor: text('contrast_color').default('#FFFFFF').notNull(),
+  bgLightColor: text('bg_light_color').default('#F8FAFC').notNull(),
+  bgDarkColor: text('bg_dark_color').default('#09090B').notNull(),
+  cardLightColor: text('card_light_color').default('#FFFFFF').notNull(),
+  cardDarkColor: text('card_dark_color').default('#18181B').notNull(),
+  textLightColor: text('text_light_color').default('#0F172A').notNull(),
+  textDarkColor: text('text_dark_color').default('#F8FAFC').notNull(),
+
+  // Credenciais de Infraestrutura (Cloudflare, R2, Resend)
   cloudflareApiToken: text('cloudflare_api_token'),
   cloudflareZoneId: text('cloudflare_zone_id'),
   cloudflareAccountId: text('cloudflare_account_id'),
@@ -74,11 +137,9 @@ export const platformSettings = pgTable('platform_settings', {
   r2AccessKeyId: text('r2_access_key_id'),
   r2SecretAccessKey: text('r2_secret_access_key'),
   backupR2Buckets: jsonb('backup_r2_buckets').default([]).notNull(),
-  // Resend — envio de e-mails transacionais
   resendApiKey: text('resend_api_key'),
   resendFromDomain: text('resend_from_domain'),
   hasResend: boolean('has_resend').default(false).notNull(),
-  primaryTenantId: uuid('primary_tenant_id').references(() => tenants.id),
   isConfigured: boolean('is_configured').default(false).notNull(),
   baseTenantPrice: integer('base_tenant_price').default(0).notNull(),
   additionalMemberPrice: integer('additional_member_price').default(0).notNull(),
@@ -86,15 +147,10 @@ export const platformSettings = pgTable('platform_settings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export type Profile = typeof profiles.$inferSelect;
-export type NewProfile = typeof profiles.$inferInsert;
-
-export type Tenant = typeof tenants.$inferSelect;
-export type NewTenant = typeof tenants.$inferInsert;
-
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type NewPlatformSetting = typeof platformSettings.$inferInsert;
 
+// ── 7. Logs de Status do Sistema & E-mails ─────────────────────────────────
 export const systemStatusLogs = pgTable('system_status_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   serviceName: text('service_name').notNull(),
@@ -107,7 +163,6 @@ export const systemStatusLogs = pgTable('system_status_logs', {
 export type SystemStatusLog = typeof systemStatusLogs.$inferSelect;
 export type NewSystemStatusLog = typeof systemStatusLogs.$inferInsert;
 
-// ── E-mail Logs ────────────────────────────────────────────────────────────
 export const emailLogs = pgTable('email_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   toEmail: text('to_email').notNull(),
@@ -124,22 +179,10 @@ export const emailLogs = pgTable('email_logs', {
 export type EmailLog = typeof emailLogs.$inferSelect;
 export type NewEmailLog = typeof emailLogs.$inferInsert;
 
-export const tenantMembers = pgTable('tenant_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
-  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
-  role: text('role').$type<'admin' | 'secretaria' | 'psicologo' | 'agent'>().default('secretaria').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type TenantMember = typeof tenantMembers.$inferSelect;
-export type NewTenantMember = typeof tenantMembers.$inferInsert;
-
-// ── CRM: Pipeline Columns (Estágios do Funil) ────────────────────────────────
+// ── 8. CRM: Estágios do Funil (Pipeline Columns) ───────────────────────────
 export const pipelineColumns = pgTable('pipeline_columns', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
   slug: text('slug').default('').notNull(),
   color: text('color').default('#6366F1').notNull(),
@@ -152,20 +195,76 @@ export const pipelineColumns = pgTable('pipeline_columns', {
 export type PipelineColumn = typeof pipelineColumns.$inferSelect;
 export type NewPipelineColumn = typeof pipelineColumns.$inferInsert;
 
-// ── CRM: Contacts (Leads / Pacientes em triagem) ─────────────────────────────
+// ── 9. Formulários de Triagem ──────────────────────────────────────────────
+export const screeningForms = pgTable('screening_forms', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  visualIdentityId: uuid('visual_identity_id').references(() => visualIdentities.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  slug: text('slug').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+
+  // Configuração Visual & Fluxograma Publicado
+  themeConfig: jsonb('theme_config').$type<Record<string, any>>().notNull(),
+  formFlow: jsonb('form_flow').$type<Record<string, any>>().notNull(),
+
+  // Objeto Único de Rascunho / Staging (Auto-Save)
+  draftData: jsonb('draft_data').$type<Record<string, any>>(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ScreeningForm = typeof screeningForms.$inferSelect;
+export type NewScreeningForm = typeof screeningForms.$inferInsert;
+
+// ── 10. Páginas de Captação / Landing Pages ─────────────────────────────────
+export const capturePages = pgTable('capture_pages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  visualIdentityId: uuid('visual_identity_id').references(() => visualIdentities.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  slug: text('slug').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+
+  // Destino das Ações (CTAs) & Formulário Vinculado
+  ctaType: text('cta_type').$type<'whatsapp' | 'external_url' | 'form'>().default('form').notNull(),
+  ctaWhatsappMessage: text('cta_whatsapp_message'),
+  ctaExternalUrl: text('cta_external_url'),
+  formId: uuid('form_id').references(() => screeningForms.id, { onDelete: 'set null' }),
+
+  // SEO, Configuração Visual & Dicionário
+  customDomain: text('custom_domain'),
+  seoConfig: jsonb('seo_config').$type<{ metaTitle: string; metaDescription: string; ogImageUrl?: string }>().notNull(),
+  siteConfig: jsonb('site_config').$type<Record<string, any>>().notNull(),
+  dictionary: jsonb('dictionary').$type<Record<string, any>>().notNull(),
+  formFlow: jsonb('form_flow').$type<Record<string, any>>().notNull(),
+
+  // Objeto Único de Rascunho / Staging (Auto-Save)
+  draftData: jsonb('draft_data').$type<Record<string, any>>(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type CapturePage = typeof capturePages.$inferSelect;
+export type NewCapturePage = typeof capturePages.$inferInsert;
+
+// ── 11. CRM: Contatos (Leads / Pacientes) ──────────────────────────────────
 export const contacts = pgTable('contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  pipelineColumnId: uuid('pipeline_column_id').references(() => pipelineColumns.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   phone: text('phone'),
   email: text('email'),
-  status: text('status').notNull(), // mapeia para name de pipeline_columns
-  source: text('source'), // ex: Instagram, Google Ads, Indicação, Webhook
+  status: text('status').notNull(),
+  source: text('source'),
   screeningNotes: text('screening_notes'),
   nextContactAt: timestamp('next_contact_at', { withTimezone: true }),
   lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
-  
-  // Novos Campos Clínicos
+
+  // Informações Clínicas & Emergência
   emergencyContactName: text('emergency_contact_name'),
   emergencyContactRelation: text('emergency_contact_relation'),
   emergencyContactPhone: text('emergency_contact_phone'),
@@ -179,6 +278,10 @@ export const contacts = pgTable('contacts', {
   utmTerm: text('utm_term'),
   utmContent: text('utm_content'),
 
+  // Origem do Lead
+  formId: uuid('form_id').references(() => screeningForms.id, { onDelete: 'set null' }),
+  capturePageId: uuid('capture_page_id').references(() => capturePages.id, { onDelete: 'set null' }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -186,11 +289,11 @@ export const contacts = pgTable('contacts', {
 export type Contact = typeof contacts.$inferSelect;
 export type NewContact = typeof contacts.$inferInsert;
 
-// ── CRM: Interaction History (Timeline de contatos e logs) ───────────────────
+// ── 12. Histórico de Interações CRM ────────────────────────────────────────
 export const interactionHistory = pgTable('interaction_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
   type: text('type').$type<'comment' | 'status_change' | 'appointment' | 'email_sent'>().notNull(),
   durationSeconds: integer('duration_seconds'),
   notes: text('notes'),
@@ -200,77 +303,10 @@ export const interactionHistory = pgTable('interaction_history', {
 export type InteractionHistory = typeof interactionHistory.$inferSelect;
 export type NewInteractionHistory = typeof interactionHistory.$inferInsert;
 
-// ── CRM: Email Campaigns (Campanhas de E-mail White-label) ──────────────────
-export const emailCampaigns = pgTable('email_campaigns', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
-  title: text('title').notNull(),
-  subject: text('subject').notNull(),
-  body: text('body').notNull(),
-  status: text('status').$type<'draft' | 'sending' | 'sent'>().default('draft').notNull(),
-  sentAt: timestamp('sent_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-export type EmailCampaign = typeof emailCampaigns.$inferSelect;
-export type NewEmailCampaign = typeof emailCampaigns.$inferInsert;
-
-// Tabela de Modelos de Contrato Clínico
-export const contractTemplates = pgTable('contract_templates', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
-  title: text('title').notNull(), // Nome identificador (Ex: "Contrato Adulto TCC")
-  content: text('content').notNull(), // Corpo do contrato com markdown/html
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-// Tabela de Páginas de Captação
-export const capturePages = pgTable('capture_pages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
-  title: text('title').notNull(),
-  slug: text('slug').notNull(), // Caminho relativo padrão (Ex: "terapia")
-  isActive: boolean('is_active').default(true).notNull(),
-
-  // Configurações de Domínio & SEO (Aba 3)
-  customDomain: text('custom_domain'), // Ex: "terapia.geovannabastos.com.br"
-  seoConfig: jsonb('seo_config').$type<{
-    metaTitle: string;
-    metaDescription: string;
-    ogImageUrl?: string;
-  }>().notNull(),
-
-  // Configuração Visual & Textos da Landing Page (Aba 1)
-  siteConfig: jsonb('site_config').$type<Record<string, any>>().notNull(),
-
-  dictionary: jsonb('dictionary').$type<Record<string, any>>().notNull(),
-
-  // Árvore do Fluxo de Etapas (Aba 2 - React Flow Model)
-  formFlow: jsonb('form_flow').$type<Record<string, any>>().notNull(),
-
-  // --- Rascunho / Staging (Salvamento Automático) ---
-  titleDraft: text('title_draft'),
-  slugDraft: text('slug_draft'),
-  customDomainDraft: text('custom_domain_draft'),
-  seoConfigDraft: jsonb('seo_config_draft').$type<{
-    metaTitle: string;
-    metaDescription: string;
-    ogImageUrl?: string;
-  }>(),
-  siteConfigDraft: jsonb('site_config_draft').$type<Record<string, any>>(),
-  dictionaryDraft: jsonb('dictionary_draft').$type<Record<string, any>>(),
-  formFlowDraft: jsonb('form_flow_draft').$type<Record<string, any>>(),
-
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-// Tabela de Galeria de Mídia (Compartilhada por Tenant para uso público)
+// ── 13. Galeria de Mídia do Workspace ───────────────────────────────────────
 export const mediaAssets = pgTable('media_assets', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').references(() => tenants.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
   key: text('key').unique().notNull(),
   url: text('url').notNull(),
@@ -285,14 +321,5 @@ export const mediaAssets = pgTable('media_assets', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export type ContractTemplate = typeof contractTemplates.$inferSelect;
-export type NewContractTemplate = typeof contractTemplates.$inferInsert;
-
-export type CapturePage = typeof capturePages.$inferSelect;
-export type NewCapturePage = typeof capturePages.$inferInsert;
-
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type NewMediaAsset = typeof mediaAssets.$inferInsert;
-
-
-

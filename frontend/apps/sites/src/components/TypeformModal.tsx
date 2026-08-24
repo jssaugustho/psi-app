@@ -350,7 +350,7 @@ export function TypeformModal({
         {/* Progress Bar */}
         <div className="w-full bg-muted/20 h-1.5 relative">
           <div 
-            className="bg-[#CC8667] h-full transition-all duration-300 ease-out"
+            className="bg-[var(--brand-gradient-start,#CC8667)] h-full transition-all duration-300 ease-out"
             style={{ width: `${isSubmitted ? 100 : progressPercent}%` }}
           />
         </div>
@@ -358,7 +358,7 @@ export function TypeformModal({
         {/* Top bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/10">
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-            <Sparkles className="h-3.5 w-3.5 text-[#CC8667]" />
+            <Sparkles className="h-3.5 w-3.5 text-[var(--brand-gradient-start,#CC8667)]" />
             <span>Triagem Clínica</span>
           </div>
           <button
@@ -455,7 +455,7 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "Escreva aqui..."}
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[#CC8667] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
                   />
                 )}
 
@@ -470,7 +470,7 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "Digite sua resposta..."}
-                    className="w-full text-base p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[#CC8667] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors resize-none"
+                    className="w-full text-base p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors resize-none"
                   />
                 )}
 
@@ -483,7 +483,7 @@ export function TypeformModal({
                         const match = countriesList.find(c => c.code === e.target.value)
                         if (match) setSelectedPhoneCountry(match)
                       }}
-                      className="h-12 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-foreground text-sm focus:border-[#CC8667] outline-none w-full sm:w-32"
+                      className="h-12 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-foreground text-sm focus:border-[var(--brand-gradient-start,#CC8667)] outline-none w-full sm:w-32"
                     >
                       {countriesList.map(c => (
                         <option key={c.code} value={c.code}>
@@ -501,7 +501,7 @@ export function TypeformModal({
                         setErrorMsg("")
                       }}
                       placeholder={selectedPhoneCountry.placeholder}
-                      className="flex-1 h-12 px-4 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#CC8667] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors w-full"
+                      className="flex-1 h-12 px-4 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors w-full"
                     />
                   </div>
                 )}
@@ -517,7 +517,7 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "exemplo@email.com"}
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[#CC8667] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
                   />
                 )}
 
@@ -532,7 +532,7 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder="000.000.000-00"
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[#CC8667] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
                   />
                 )}
 
@@ -543,7 +543,7 @@ export function TypeformModal({
                       onClick={() => handleSelectChoice("Sim", "Sim")}
                       className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
                         maioridade === "Sim"
-                          ? "border-[#CC8667] bg-[#CC8667]/10 text-white"
+                          ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
                           : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -554,7 +554,7 @@ export function TypeformModal({
                       onClick={() => handleSelectChoice("Não", "Não")}
                       className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
                         maioridade === "Não"
-                          ? "border-[#CC8667] bg-[#CC8667]/10 text-white"
+                          ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
                           : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -575,7 +575,7 @@ export function TypeformModal({
                         value={emergenciaNome}
                         onChange={(e) => { setEmergenciaNome(e.target.value); setErrorMsg(""); }}
                         placeholder="Ex: Maria Silva"
-                        className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#CC8667] outline-none text-foreground text-sm"
+                        className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
                       />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -586,7 +586,7 @@ export function TypeformModal({
                           value={emergenciaRelacao}
                           onChange={(e) => { setEmergenciaRelacao(e.target.value); setErrorMsg(""); }}
                           placeholder="Ex: Cônjuge, Mãe, Amigo"
-                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#CC8667] outline-none text-foreground text-sm"
+                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
                         />
                       </div>
                       <div>
@@ -596,14 +596,12 @@ export function TypeformModal({
                           value={emergenciaTelefone}
                           onChange={(e) => { setEmergenciaTelefone(e.target.value); setErrorMsg(""); }}
                           placeholder="(11) 99999-9999"
-                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[#CC8667] outline-none text-foreground text-sm"
+                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
                         />
                       </div>
                     </div>
                   </div>
                 )}
-
-
 
                 {/* CUSTOM SELECTOR (SELETOR CONDICIONAL) */}
                 {currentNode.type === "seletor" && (
@@ -616,7 +614,7 @@ export function TypeformModal({
                           onClick={() => handleSelectChoice(opt.value, opt.label)}
                           className={`h-12 px-4 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
                             isSelected
-                              ? "border-[#CC8667] bg-[#CC8667]/10 text-white"
+                              ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
                               : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
                           }`}
                         >

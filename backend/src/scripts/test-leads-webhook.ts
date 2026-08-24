@@ -1,5 +1,5 @@
 import { db } from '../shared/db';
-import { tenants } from '../shared/schema';
+import { workspaces } from '../shared/schema';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -47,21 +47,21 @@ function generateRandomPhone(): string {
 async function main() {
   console.log('🚀 Iniciando script de teste de carga de leads via Webhook...');
 
-  // 1. Obter o primeiro Tenant do banco de dados
-  const allTenants = await db.select().from(tenants);
-  if (allTenants.length === 0) {
-    console.error('❌ Erro: Nenhum tenant encontrado no banco de dados para testar.');
+  // 1. Obter o primeiro Workspace do banco de dados
+  const allWorkspaces = await db.select().from(workspaces);
+  if (allWorkspaces.length === 0) {
+    console.error('❌ Erro: Nenhum workspace encontrado no banco de dados para testar.');
     process.exit(1);
   }
 
-  const tenant = allTenants[0];
-  const tenantId = tenant.id;
-  const tenantName = tenant.name;
-  console.log(`🏢 Tenant selecionado: ${tenantName} (ID: ${tenantId})`);
-  console.log(`📋 Origens de tráfego configuradas no tenant:`, tenant.trafficSources);
+  const workspace = allWorkspaces[0];
+  const workspaceId = workspace.id;
+  const workspaceName = workspace.name;
+  console.log(`🏢 Workspace selecionado: ${workspaceName} (ID: ${workspaceId})`);
+  console.log(`📋 Origens de tráfego configuradas no workspace:`, workspace.trafficSources);
 
   // Endpoint do webhook
-  const webhookUrl = `http://localhost:5000/crm/webhook?tenant_id=${tenantId}`;
+  const webhookUrl = `http://localhost:5000/crm/webhook?workspace_id=${workspaceId}`;
   console.log(`🔗 URL do Webhook: ${webhookUrl}\n`);
 
   let successCount = 0;

@@ -1066,7 +1066,7 @@ export default function CrmPage() {
             <div className="px-6 py-5 border-b border-[var(--surface-border)] bg-slate-950/20 flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-semibold tracking-wider text-[var(--brand-gradient-start)]">
-                  Triagem CRM
+                  Triagem
                 </span>
                 <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                   <Settings className="w-5 h-5 text-[var(--brand-gradient-start)]" /> Configurações do Funil
@@ -1136,7 +1136,7 @@ export default function CrmPage() {
                       <div>
                         <h3 className="text-sm font-bold text-slate-100">Gerenciar Estágios</h3>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Arraste pelos três pontos para alterar a sequência do funil no CRM.
+                          Arraste pelos três pontos para alterar a sequência do funil na Triagem.
                         </p>
                       </div>
                     </div>
@@ -1686,7 +1686,7 @@ export default function CrmPage() {
         description={
           confirmDelete?.type === 'column'
             ? `Deseja mesmo remover a coluna "${confirmDelete.name || ''}"? Os contatos associados retornarão para o estágio inicial.`
-            : `Deseja excluir permanentemente o contato "${confirmDelete?.name || ''}" do CRM?`
+            : `Deseja excluir permanentemente o contato "${confirmDelete?.name || ''}" da Triagem?`
         }
         confirmText="Excluir"
         cancelText="Cancelar"

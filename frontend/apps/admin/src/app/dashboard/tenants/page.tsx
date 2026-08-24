@@ -42,7 +42,6 @@ export default function TenantsPage() {
     slug: '',
     domain: '',
     ownerId: '',
-    isPrimary: false,
   });
   const [creatingTenant, setCreatingTenant] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -79,7 +78,6 @@ export default function TenantsPage() {
       slug: '',
       domain: '',
       ownerId: 'none',
-      isPrimary: false,
     });
     setCreateError('');
     setIsCreateModalOpen(true);
@@ -96,7 +94,6 @@ export default function TenantsPage() {
         slug: createForm.slug.toLowerCase().trim(),
         domain: createForm.domain || null,
         ownerId: resolvedOwnerId,
-        isPrimary: createForm.isPrimary,
       });
       setIsCreateModalOpen(false);
       await loadData();
@@ -238,15 +235,9 @@ export default function TenantsPage() {
                           {getOwnerText(tenant.ownerId)}
                         </td>
                         <td className="py-3.5 px-3 text-center">
-                          {tenant.isPrimary ? (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 25%, transparent)', color: 'var(--brand-gradient-start)' }}>
-                              Principal (Pai)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700">
-                              Membro
-                            </span>
-                          )}
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Ativo
+                          </span>
                         </td>
                       </tr>
                     ))
@@ -317,19 +308,6 @@ export default function TenantsPage() {
                     })),
                   ]}
                 />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="create_is_primary"
-                  checked={createForm.isPrimary}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, isPrimary: e.target.checked }))}
-                  className="w-4 h-4 rounded border" style={{ borderColor: "var(--surface-border)", background: "var(--surface-input)", accentColor: "var(--brand-gradient-start)" }}
-                />
-                <label htmlFor="create_is_primary" className="text-xs text-slate-300 font-semibold cursor-pointer">
-                  Definir como Tenant Principal (Pai) da plataforma
-                </label>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-800/40">

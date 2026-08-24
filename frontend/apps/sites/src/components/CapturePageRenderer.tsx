@@ -28,6 +28,11 @@ interface CapturePageRendererProps {
     textDarkColor?: string | null;
     logoDarkUrl?: string | null;
     logoLightUrl?: string | null;
+    iconDarkUrl?: string | null;
+    iconLightUrl?: string | null;
+    defaultSiteLogoUrl?: string | null;
+    defaultSiteFaviconUrl?: string | null;
+    defaultSiteLogoConfig?: any;
   };
   contractText?: string;
 }
@@ -213,9 +218,13 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
     : `color-mix(in srgb, ${bgCol} 92%, #ffffff)`;
   const mixBaseCol = defaultMixBase;
 
+  const effectiveLogoUrl = cfg.logoUrl || tenant.defaultSiteLogoUrl || tenant.logoLightUrl || tenant.logoDarkUrl || '';
+  const effectiveFaviconUrl = cfg.faviconUrl || tenant.defaultSiteFaviconUrl || tenant.iconLightUrl || tenant.iconDarkUrl || '';
+  const effectiveLogoConfig = cfg.logoConfig || tenant.defaultSiteLogoConfig;
+
   const themeStyles = {
-    '--brand-gradient-start': theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667',
-    '--brand-gradient-end': theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533',
+    '--brand-gradient-start': theme?.colors?.primaryStart || tenant.gradientColorStart || '#52525B',
+    '--brand-gradient-end': theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#27272A',
     '--brand-contrast-color': theme?.colors?.contrast || defaultContrast,
     '--brand-bg-color': bgCol,
     '--brand-card-bg-color': cardCol,
@@ -546,17 +555,17 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
               isPreview ? 'hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2 rounded-lg p-1' : ''
             }`}
           >
-            {cfg.logoUrl ? (
+            {effectiveLogoUrl ? (
               <img 
-                src={cfg.logoUrl} 
+                src={effectiveLogoUrl} 
                 alt={cfg.professional?.name || 'Psicologia'} 
                 className="max-h-11 max-w-[220px] object-contain"
               />
             ) : (
               <div className="flex items-center gap-2.5 font-serif select-none">
-                {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
+                {(effectiveFaviconUrl || (effectiveLogoConfig?.iconType === 'custom' && effectiveLogoConfig?.customIconUrl)) ? (
                   <img 
-                    src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
+                    src={effectiveFaviconUrl || effectiveLogoConfig?.customIconUrl} 
                     alt="Ícone" 
                     className="h-8 w-8 object-contain shrink-0" 
                   />
@@ -569,7 +578,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                   </div>
                 )}
                 <span className="font-serif text-lg tracking-wide text-[var(--brand-text-color)] font-normal">
-                  {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
+                  {page.title || cfg.professional?.name || effectiveLogoConfig?.text || 'Psicologia'}
                 </span>
               </div>
             )}
@@ -577,7 +586,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            {activeSections.filter((s: any) => s.showInNavbar ?? true).map((s: any) => {
+            {activeSections.filter((s: any) => s.showInNavbar ?? (s.id !== 'faq')).slice(0, 4).map((s: any) => {
               const navInfo = getSectionNavInfo(s);
               if (!navInfo) return null;
               
@@ -618,7 +627,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
       {mobileMenuOpen && (
         <div className="fixed inset-0 top-16 z-30 bg-[var(--brand-bg-color)] flex flex-col justify-between py-8 px-6 animate-in slide-in-from-right duration-250 border-t border-white/5">
           <nav className="flex flex-col gap-6 text-center">
-            {activeSections.filter((s: any) => s.showInNavbar ?? true).map((s: any) => {
+            {activeSections.filter((s: any) => !s.hideOnMobile && (s.showInNavbar ?? (s.id !== 'faq'))).slice(0, 4).map((s: any) => {
               const navInfo = getSectionNavInfo(s);
               if (!navInfo) return null;
               
@@ -1474,7 +1483,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                 const navInfo = getSectionNavInfo(s);
                 if (!navInfo) return null;
                 return (
-                  <li key={s.id}>
+                  <li key={s.id} className={s.hideOnMobile ? 'hidden md:block' : ''}>
                     <button
                       onClick={() => scrollToSection(navInfo.id)}
                       className="hover:text-[var(--brand-text-color)] text-[var(--brand-text-muted)] cursor-pointer transition-colors bg-transparent border-none p-0 text-center md:text-left"

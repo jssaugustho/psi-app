@@ -1,5 +1,5 @@
 import { db } from '../shared/db';
-import { tenants, capturePages, platformSettings } from '../shared/schema';
+import { workspaces, workspaceDomains, capturePages, platformSettings } from '../shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 import dotenv from 'dotenv';
 
@@ -16,20 +16,20 @@ async function runCleanup() {
   console.log(`====================================================\n`);
 
   try {
-    const allTenants = await db.query.tenants.findMany();
+    const allWorkspaces = await db.query.workspaces.findMany();
     const allPages = await db.query.capturePages.findMany();
     const settings = await db.query.platformSettings.findFirst();
 
-    console.log(`📊 Total de Tenants cadastrados no Banco: ${allTenants.length}`);
+    console.log(`📊 Total de Workspaces cadastrados no Banco: ${allWorkspaces.length}`);
     console.log(`📊 Total de Páginas de Captação no Banco: ${allPages.length}\n`);
 
-    const tenantMap = new Map(allTenants.map((t) => [t.id, t]));
-    const orphanPages = allPages.filter((p) => !tenantMap.has(p.tenantId));
+    const workspaceMap = new Map(allWorkspaces.map((t: any) => [t.id, t]));
+    const orphanPages = allPages.filter((p: any) => !workspaceMap.has(p.workspaceId));
 
     if (orphanPages.length > 0) {
-      console.log(`⚠️  Páginas de Captação Órfãs (sem tenant associado): ${orphanPages.length}`);
-      orphanPages.forEach((p) => {
-        console.log(`   - ID: ${p.id} | Slug: ${p.slug} | TenantID: ${p.tenantId}`);
+      console.log(`⚠️  Páginas de Captação Órfãs (sem workspace associado): ${orphanPages.length}`);
+      orphanPages.forEach((p: any) => {
+        console.log(`   - ID: ${p.id} | Slug: ${p.slug} | WorkspaceID: ${p.workspaceId}`);
       });
 
       if (isFix) {
@@ -43,27 +43,9 @@ async function runCleanup() {
       console.log(`✅ Nenhuma página de captação órfã encontrada no banco de dados.`);
     }
 
-    console.log('\n--- Verificação de Unicidade de Slugs de Tenant ---');
-    const slugTenantMap = new Map<string, string[]>();
-    for (const t of allTenants) {
-      if (t.slug) {
-        const list = slugTenantMap.get(t.slug) || [];
-        list.push(t.id);
-        slugTenantMap.set(t.slug, list);
-      }
-    }
-
-    let duplicateSlugsFound = 0;
-    for (const [slug, ids] of slugTenantMap.entries()) {
-      if (ids.length > 1) {
-        duplicateSlugsFound++;
-        console.log(`⚠️  Slug de Tenant duplicado "${slug}" presente nos Tenants: ${ids.join(', ')}`);
-      }
-    }
-
-    if (duplicateSlugsFound === 0) {
-      console.log(`✅ Todos os slugs de tenant são únicos no banco de dados.`);
-    }
+    console.log('\n--- Verificação de Unicidade de Subdomínios de Workspace ---');
+    const allDomains = await db.query.workspaceDomains.findMany();
+    console.log(`✅ Total de registros de domínios em workspace_domains: ${allDomains.length}`);
 
     console.log('\n--- Verificação de Hostnames Customizados no Cloudflare ---');
     if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
@@ -88,10 +70,10 @@ async function runCleanup() {
         console.log(`📊 Total de Custom Hostnames na Zone do Cloudflare: ${cfHostnames.length}`);
 
         const dbCustomDomains = new Set<string>();
-        allTenants.forEach((t) => {
-          if (t.domain) dbCustomDomains.add(t.domain.toLowerCase().trim());
+        allDomains.forEach((t: any) => {
+          if (t.customDomain) dbCustomDomains.add(t.customDomain.toLowerCase().trim());
         });
-        allPages.forEach((p) => {
+        allPages.forEach((p: any) => {
           if (p.customDomain) dbCustomDomains.add(p.customDomain.toLowerCase().trim());
         });
 

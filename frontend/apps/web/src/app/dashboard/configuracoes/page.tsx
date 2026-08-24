@@ -1,21 +1,19 @@
-import React from 'react';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import TenantSettingsForm from './tenant-settings-form';
+import { WorkspaceSettingsForm } from './workspace-settings-form';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color,emailDomain:email_domain,resendApiKey:resend_api_key,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source';
+const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color,emailDomain:email_domain,resendApiKey:resend_api_key,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source';
 
 interface Tenant {
   id: string;
   name: string;
   slug: string;
   domain: string | null;
-  isPrimary: boolean;
   ownerId?: string | null;
   logoLightUrl: string | null;
   logoDarkUrl: string | null;
@@ -65,18 +63,13 @@ export default async function SettingsPage() {
     redirect('/login');
   }
 
-  // 2. Resolver o tenant ativo com base no Hostname
-  const headersList = await headers();
-  const host = headersList.get('host') || '';
+  // 2. Resolver o tenant ativo (Cookie active_tenant_id -> Membro do Tenant -> Owner -> Fallback Admin)
+  const activeTenantId = cookieStore.get('active_tenant_id')?.value;
   let resolvedTenant: Tenant | null = null;
 
-  if (host && host !== 'localhost' && !host.startsWith('127.0.0.1') && !host.startsWith('localhost:')) {
-    // Remover a porta se existir
-    const hostname = host.split(':')[0];
-
-    // Buscar por domínio
+  if (activeTenantId) {
     try {
-      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&domain=eq.${hostname}`, {
+      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&id=eq.${activeTenantId}`, {
         headers: { 'Accept': 'application/json' },
         next: { revalidate: 0 }
       });
@@ -87,36 +80,32 @@ export default async function SettingsPage() {
         }
       }
     } catch (e) {
-      console.error('Erro ao resolver tenant por domínio via SSR:', e);
-    }
-
-    // Se não encontrou por domínio, tentar por slug (subdomínio)
-    if (!resolvedTenant) {
-      const parts = hostname.split('.');
-      if (parts.length > 2) {
-        const slugCandidate = parts[0];
-        try {
-          const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&slug=eq.${slugCandidate}`, {
-            headers: { 'Accept': 'application/json' },
-            next: { revalidate: 0 }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.length > 0) {
-              resolvedTenant = data[0];
-            }
-          }
-        } catch (e) {
-          console.error('Erro ao resolver tenant por slug via SSR:', e);
-        }
-      }
+      console.error('Erro ao resolver tenant por cookie active_tenant_id via SSR:', e);
     }
   }
 
-  // Fallback para o tenant primário
-  if (!resolvedTenant) {
+  // Se não encontrou por cookie, tentar pelos pertencimentos do usuário em tenant_members
+  if (!resolvedTenant && user?.id) {
     try {
-      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&is_primary=eq.true&limit=1`, {
+      const memberRes = await fetch(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${user.id}&select=tenant:tenants(${TENANT_SELECT})&limit=1`, {
+        headers: { 'Accept': 'application/json' },
+        next: { revalidate: 0 }
+      });
+      if (memberRes.ok) {
+        const memberData = await memberRes.json();
+        if (memberData && memberData.length > 0 && memberData[0].tenant) {
+          resolvedTenant = memberData[0].tenant;
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao resolver tenant por tenant_members via SSR:', e);
+    }
+  }
+
+  // Se não encontrou por membro, tentar por owner_id
+  if (!resolvedTenant && user?.id) {
+    try {
+      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&owner_id=eq.${user.id}&limit=1`, {
         headers: { 'Accept': 'application/json' },
         next: { revalidate: 0 }
       });
@@ -127,7 +116,25 @@ export default async function SettingsPage() {
         }
       }
     } catch (e) {
-      console.error('Erro ao carregar tenant primário via SSR:', e);
+      console.error('Erro ao carregar tenant do usuário proprietário via SSR:', e);
+    }
+  }
+
+  // Fallback para administrador global da plataforma
+  if (!resolvedTenant && user.role === 'admin') {
+    try {
+      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc&limit=1`, {
+        headers: { 'Accept': 'application/json' },
+        next: { revalidate: 0 }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          resolvedTenant = data[0];
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao carregar primeiro tenant para admin via SSR:', e);
     }
   }
 
@@ -140,13 +147,12 @@ export default async function SettingsPage() {
     );
   }
 
-  // 3. Checar permissão (Dono do tenant, administrador de tenant, ou admin global da plataforma)
+  // 3. Checar permissão de administrador (Dono do tenant, administrador de tenant, ou admin global da plataforma)
   let isTenantAdmin = false;
   
   if (resolvedTenant.ownerId === user.id || user.role === 'admin') {
     isTenantAdmin = true;
   } else {
-    // Consultar se o usuário é admin na tabela tenant_members
     try {
       const memberRes = await fetch(
         `${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${resolvedTenant.id}&user_id=eq.${user.id}&role=eq.admin`,
@@ -177,13 +183,13 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-page-enter">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Configurações</h1>
+        <h1 className="text-2xl font-bold text-slate-100">Configurações do Consultório / Clínica</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Gerencie seu perfil profissional, marca padrão para os sites, domínios e biblioteca de mídia.
+          Gerencie o nome da marca, logomarcas, paleta de cores, domínio customizado e biblioteca de mídia deste consultório.
         </p>
       </div>
 
-      <TenantSettingsForm tenant={resolvedTenant} initialUser={user} />
+      <WorkspaceSettingsForm tenant={resolvedTenant} initialUser={user} />
     </div>
   );
 }

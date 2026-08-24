@@ -14,17 +14,19 @@ export function Button({
   style,
   ...props
 }: ButtonProps) {
+  const hasWidthClass = /\b(!?w-|inline-flex|shrink-0)\b/.test(className);
+  const baseWidth = hasWidthClass ? '' : 'w-full';
   const baseStyle =
-    'w-full font-semibold py-3 px-5 rounded-xl shadow-lg transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer text-sm outline-none border-none';
+    `${baseWidth} font-semibold py-3 px-5 rounded-xl shadow-lg transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer text-sm outline-none border-none`;
 
   // Estilos dinâmicos via CSS vars — sem cores hardcoded
   const variantStyle: React.CSSProperties = (() => {
     switch (variant) {
       case 'primary':
         return {
-          background: 'var(--brand-gradient, linear-gradient(135deg, #4F46E5, #06B6D4))',
+          background: 'var(--brand-gradient, linear-gradient(135deg, var(--brand-gradient-start, #27272A), var(--brand-gradient-end, #52525B)))',
           color: 'var(--brand-contrast-color, #FFFFFF)',
-          boxShadow: '0 4px 24px color-mix(in srgb, var(--brand-gradient-start, #4F46E5) 30%, transparent)',
+          boxShadow: '0 4px 24px color-mix(in srgb, var(--brand-gradient-start, #27272A) 20%, transparent)',
         };
       case 'secondary':
         return {

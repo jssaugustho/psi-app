@@ -40,7 +40,7 @@ Quando uma ação de login ou cadastro ocorrer, o backend deve identificar dinam
     1. Domínio customizado correspondente (`tenants.domain`).
     2. Subdomínio correspondente ao slug (`tenants.slug`).
     3. Slug presente no path da URL (ex: `/slug/login`).
-  * Se nenhum tenant for mapeado pela URL, faça o fallback seguro para o **Tenant Primário** cadastrado nas configurações gerais da plataforma (`platformSettings.primaryTenantId`).
+  * Se nenhum tenant for mapeado pela URL, faça o fallback seguro para a **Marca Global da Plataforma** cadastrada em `platform_settings` (`platformName` e logotipos globais).
 
 ### Exemplo de Implementação (Fastify API):
 ```typescript

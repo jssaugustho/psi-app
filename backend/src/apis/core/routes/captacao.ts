@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { capturePages, contacts, pipelineColumns, interactionHistory, tenantMembers, tenants } from '../../../shared/schema';
+import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 
@@ -10,7 +10,8 @@ import { verifyUserJwt } from '../../../shared/auth';
 const CreatePageBodySchema = z.object({
   title: z.string().min(1, 'O título é obrigatório'),
   slug: z.string().optional().default(''),
-  tenantId: z.string().uuid('ID do Tenant inválido'),
+  workspaceId: z.string().uuid('ID do Workspace inválido').optional(),
+  tenantId: z.string().uuid('ID do Tenant inválido').optional(),
   crp: z.string().optional(),
   approach: z.string().optional(),
   address: z.string().optional(),
@@ -26,7 +27,8 @@ const CreatePageBodySchema = z.object({
 });
 
 const SubmitFormBodySchema = z.object({
-  tenantId: z.string().uuid('ID do Tenant inválido'),
+  workspaceId: z.string().uuid('ID do Workspace inválido').optional(),
+  tenantId: z.string().uuid('ID do Tenant inválido').optional(),
   pageId: z.string().uuid('ID da Página inválido'),
   responses: z.record(z.any()),
 });
@@ -231,26 +233,28 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
       try {
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-        const { title, slug, tenantId, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl } = request.body;
+        const body = request.body as any;
+        const targetWorkspaceId = body.workspaceId || body.tenantId;
+        const { title, slug, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl } = body;
 
-        // 1. Resolver tenant e verificar permissão
-        const targetTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, tenantId),
+        // 1. Resolver workspace e verificar permissão
+        const targetWorkspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
         });
 
-        if (!targetTenant) {
+        if (!targetWorkspace) {
           return reply.status(404).send({
             error: 'Não Encontrado',
-            message: 'Tenant não cadastrado.',
+            message: 'Workspace não cadastrado.',
           });
         }
 
-        const isOwner = targetTenant.ownerId === decoded.sub;
+        const isOwner = targetWorkspace.ownerId === decoded.sub;
 
-        const member = await db.query.tenantMembers.findFirst({
+        const member = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.tenantId, tenantId)
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, targetWorkspaceId)
           ),
         });
 
@@ -259,16 +263,16 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         if (!hasAccess) {
           return reply.status(403).send({
             error: 'Proibido',
-            message: 'Você não possui acesso para criar páginas neste tenant.',
+            message: 'Você não possui acesso para criar páginas neste workspace.',
           });
         }
 
-        // 2. Verificar duplicidade de slug no mesmo tenant
+        // 2. Verificar duplicidade de slug no mesmo workspace
         const normalizedSlug = (slug || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '').replace(/[^a-z0-9-]/g, '');
 
         const duplicate = await db.query.capturePages.findFirst({
           where: and(
-            eq(capturePages.tenantId, tenantId),
+            eq(capturePages.workspaceId, targetWorkspaceId),
             eq(capturePages.slug, normalizedSlug)
           ),
         });
@@ -278,25 +282,24 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
             error: 'Conflito',
             message: normalizedSlug === ''
               ? 'Já existe uma Página Principal (Home) cadastrada para o seu site.'
-              : 'Já existe uma página com este endereço neste tenant.',
+              : 'Já existe uma página com este endereço neste workspace.',
           });
         }
 
-        let primaryTenant = null;
-        if (!targetTenant.defaultSiteLogoUrl && !targetTenant.defaultSiteFaviconUrl && !targetTenant.defaultSiteLogoConfig) {
-          const settings = await db.query.platformSettings.findFirst();
-          if (settings?.primaryTenantId) {
-            primaryTenant = await db.query.tenants.findFirst({
-              where: eq(tenants.id, settings.primaryTenantId),
-            }) ?? null;
-          }
-        }
 
-        const activeLogoUrl = logoUrl || targetTenant.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || undefined;
-        const activeFaviconUrl = targetTenant.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || undefined;
-        const activeLogoConfig = targetTenant.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || {
+
+        const visualIdentity = await db.query.visualIdentities.findFirst({
+          where: and(
+            eq(visualIdentities.workspaceId, targetWorkspaceId),
+            eq(visualIdentities.isWorkspaceDefault, true)
+          ),
+        });
+
+        const activeLogoUrl = logoUrl || visualIdentity?.logoUrl || targetWorkspace.defaultSiteAvatarUrl || undefined;
+        const activeFaviconUrl = visualIdentity?.faviconUrl || undefined;
+        const activeLogoConfig = visualIdentity?.logoConfig || {
           mode: 'html',
-          text: logoText || targetTenant.name || title,
+          text: logoText || targetWorkspace.name || title,
           iconType: 'psi',
         };
 
@@ -307,15 +310,15 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           logoConfig: activeLogoConfig,
           theme: {
             colors: {
-              primaryStart: primaryStart || targetTenant.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor || '#CC8667',
-              primaryEnd: primaryEnd || targetTenant.defaultSiteSecondaryColor || primaryTenant?.defaultSiteSecondaryColor || '#AA5533',
-              contrast: contrast || targetTenant.contrastColor || primaryTenant?.contrastColor || '#FFFFFF',
+              primaryStart: primaryStart || visualIdentity?.primaryColor || '#7C3AED',
+              primaryEnd: primaryEnd || visualIdentity?.secondaryColor || '#A855F7',
+              contrast: contrast || visualIdentity?.contrastColor || '#FFFFFF',
             },
           },
           professional: {
             ...defaultSiteConfig.professional,
-            name: logoText || targetTenant.name || title,
-            crp: crp || defaultSiteConfig.professional.crp,
+            name: logoText || targetWorkspace.name || title,
+            crp: crp || targetWorkspace.crp || defaultSiteConfig.professional.crp,
             approach: approach || defaultSiteConfig.professional.approach,
             address: address || defaultSiteConfig.professional.address,
           }
@@ -343,7 +346,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         const [newPage] = await db
           .insert(capturePages)
           .values({
-            tenantId,
+            workspaceId: targetWorkspaceId,
             title,
             slug: normalizedSlug,
             isActive: true,
@@ -379,7 +382,9 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { tenantId, pageId, responses } = request.body;
+      const body = request.body as any;
+      const targetWorkspaceId = body.workspaceId || body.tenantId;
+      const { pageId, responses } = body;
 
       try {
         // 1. Extrair informações básicas do paciente
@@ -396,10 +401,10 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        // 2. Resolver o estágio clínico inicial do tenant (categoria "pendente")
+        // 2. Resolver o estágio clínico inicial do workspace (categoria "pendente")
         const firstColumn = await db.query.pipelineColumns.findFirst({
           where: and(
-            eq(pipelineColumns.tenantId, tenantId),
+            eq(pipelineColumns.workspaceId, targetWorkspaceId),
             eq(pipelineColumns.category, 'pendente')
           ),
           orderBy: [pipelineColumns.order],
@@ -428,7 +433,8 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         const [newContact] = await db
           .insert(contacts)
           .values({
-            tenantId,
+            workspaceId: targetWorkspaceId,
+            pipelineColumnId: firstColumn?.id || null,
             name: rawName,
             phone: rawPhone || null,
             email: rawEmail || null,
@@ -440,7 +446,6 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
             emergencyContactName: emergencyName,
             emergencyContactRelation: emergencyRelation,
             emergencyContactPhone: emergencyPhone,
-            // CPF
             utmSource: 'Landing Page',
           })
           .returning();
@@ -448,7 +453,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         // 5. Inserir log inicial no histórico de interações do lead
         await db.insert(interactionHistory).values({
           contactId: newContact.id,
-          tenantId,
+          workspaceId: targetWorkspaceId,
           type: 'comment',
           notes: `Triagem concluída e enviada com sucesso pelo paciente via formulário público.`,
         });
@@ -469,14 +474,14 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
-  // GET /v1/crm/captacao/check-subdomain?slug=...&tenantId=...
+  // GET /v1/crm/captacao/check-subdomain?slug=...&workspaceId=...
   // Verifica se um subdomínio (slug) está livre para uso
   fastify.get(
     '/check-subdomain',
     async (request, reply) => {
       try {
         const querySlug = (request.query as any)?.slug;
-        const queryTenantId = (request.query as any)?.tenantId;
+        const queryWorkspaceId = (request.query as any)?.workspaceId || (request.query as any)?.tenantId;
 
         if (!querySlug || typeof querySlug !== 'string') {
           return reply.status(400).send({ error: 'Bad Request', message: 'Slug é obrigatório.' });
@@ -487,26 +492,26 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           return reply.send({ available: false, reason: 'Slug muito curto (mínimo 2 caracteres).' });
         }
 
-        // Tentar identificar o tenant do usuário via query ou token JWT
-        let currentTenantId: string | null = typeof queryTenantId === 'string' ? queryTenantId : null;
+        // Tentar identificar o workspace do usuário via query ou token JWT
+        let currentWorkspaceId: string | null = typeof queryWorkspaceId === 'string' ? queryWorkspaceId : null;
         const authHeader = request.headers.authorization;
-        if (!currentTenantId && authHeader && authHeader.startsWith('Bearer ')) {
+        if (!currentWorkspaceId && authHeader && authHeader.startsWith('Bearer ')) {
           try {
             const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-            const member = await db.query.tenantMembers.findFirst({
-              where: eq(tenantMembers.userId, decoded.sub),
+            const member = await db.query.workspaceMembers.findFirst({
+              where: eq(workspaceMembers.userId, decoded.sub),
             });
             if (member) {
-              currentTenantId = member.tenantId;
+              currentWorkspaceId = member.workspaceId;
             }
           } catch {
             // Se token for inválido, segue verificação global
           }
         }
 
-        // 1. Checar se já existe em algum tenant
-        const existingTenant = await db.query.tenants.findFirst({
-          where: eq(tenants.slug, normalizedSlug),
+        // 1. Checar se já existe em algum workspace_domains
+        const existingDomain = await db.query.workspaceDomains.findFirst({
+          where: eq(workspaceDomains.subdomain, normalizedSlug),
         });
 
         // 2. Checar se já existe em alguma página de captação
@@ -517,20 +522,20 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         let isAvailable = true;
         let reason = 'Subdomínio disponível!';
 
-        if (existingTenant) {
-          if (currentTenantId && existingTenant.id === currentTenantId) {
+        if (existingDomain) {
+          if (currentWorkspaceId && existingDomain.workspaceId === currentWorkspaceId) {
             isAvailable = true;
-            reason = 'Subdomínio pertence ao seu próprio tenant e está disponível!';
+            reason = 'Subdomínio pertence ao seu próprio workspace e está disponível!';
           } else {
             isAvailable = false;
-            reason = 'Subdomínio já em uso por outro tenant.';
+            reason = 'Subdomínio já em uso por outro workspace.';
           }
         }
 
         if (isAvailable && existingPage) {
-          if (currentTenantId && existingPage.tenantId === currentTenantId) {
+          if (currentWorkspaceId && existingPage.workspaceId === currentWorkspaceId) {
             isAvailable = true;
-            reason = 'Subdomínio pertence ao seu tenant e está disponível!';
+            reason = 'Subdomínio pertence ao seu workspace e está disponível!';
           } else {
             isAvailable = false;
             reason = 'Subdomínio já em uso por outro site.';
@@ -538,7 +543,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         }
 
         const platformSet = await db.query.platformSettings.findFirst();
-        const baseDomain = platformSet?.baseDomain || 'psiapp.com.br';
+        const baseDomain = platformSet?.baseDomain || 'theraos.app';
 
         return reply.send({
           available: isAvailable,
@@ -574,19 +579,19 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           return reply.status(404).send({ error: 'Não Encontrado', message: 'Página de captação não encontrada.' });
         }
 
-        // Verificar se usuário pertence ao tenant da página
-        const member = await db.query.tenantMembers.findFirst({
+        // Verificar se usuário pertence ao workspace da página
+        const member = await db.query.workspaceMembers.findFirst({
           where: and(
-            eq(tenantMembers.userId, decoded.sub),
-            eq(tenantMembers.tenantId, page.tenantId)
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, page.workspaceId)
           ),
         });
 
-        const tenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, page.tenantId),
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, page.workspaceId),
         });
 
-        const isOwner = tenant?.ownerId === decoded.sub;
+        const isOwner = workspace?.ownerId === decoded.sub;
 
         if (!member && !isOwner) {
           return reply.status(403).send({ error: 'Proibido', message: 'Sem permissão para excluir esta página.' });
@@ -662,11 +667,11 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         const baseDomain = settings?.baseDomain || 'psiapp.com.br';
         const cnameTarget = `custom.${baseDomain}`;
 
-        // Atualizar rascunho da página se pageId fornecido
+        // Atualizar domínio da página se pageId fornecido
         if (pageId) {
           await db
             .update(capturePages)
-            .set({ customDomainDraft: cleanDomain, updatedAt: new Date() })
+            .set({ customDomain: cleanDomain, updatedAt: new Date() })
             .where(eq(capturePages.id, pageId));
         }
 
@@ -776,12 +781,26 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         }
 
         const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
-        const targetTenantId = userPayload?.tenant_id || userPayload?.tenantId;
-        if (targetTenantId && cleanDomain) {
+        const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
+        if (targetWorkspaceId && cleanDomain) {
           await db
-            .update(tenants)
-            .set({ domain: cleanDomain, cfHostnameId: hostnameId, updatedAt: new Date() })
-            .where(eq(tenants.id, targetTenantId));
+            .insert(workspaceDomains)
+            .values({
+              workspaceId: targetWorkspaceId,
+              subdomain: cleanDomain.split('.')[0],
+              customDomain: cleanDomain,
+              cfHostnameId: hostnameId,
+              dnsRecords,
+            })
+            .onConflictDoUpdate({
+              target: workspaceDomains.workspaceId,
+              set: {
+                customDomain: cleanDomain,
+                cfHostnameId: hostnameId,
+                dnsRecords,
+                updatedAt: new Date(),
+              },
+            });
         }
 
         return reply.send({

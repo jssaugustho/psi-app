@@ -8,7 +8,7 @@ import { Button, Input, Card } from '@psi/ui';
 
 export default function RegisterPage() {
   const { register } = useAuth();
-  const { tenant, primaryTenant, theme, toggleTheme } = useBrand();
+  const { tenant, primaryTenant, bootstrapped, theme, toggleTheme } = useBrand();
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -89,57 +89,73 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Nome *"
-              type="text"
-              required
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="João"
-            />
-            <Input
-              label="Sobrenome *"
-              type="text"
-              required
-              value={sobrenome}
-              onChange={(e) => setSobrenome(e.target.value)}
-              placeholder="Silva"
-            />
+        {bootstrapped === false ? (
+          <div
+            className="space-y-3 text-center p-4 rounded-xl text-xs font-medium"
+            style={{
+              background: 'var(--status-warning-bg, rgba(245, 158, 11, 0.1))',
+              border: '1px solid var(--status-warning-border, rgba(245, 158, 11, 0.3))',
+              color: 'var(--status-warning-text, #F59E0B)',
+            }}
+          >
+            <div className="text-2xl mb-1">🔒</div>
+            <h3 className="font-bold text-sm">Cadastro Bloqueado</h3>
+            <p className="opacity-80 leading-relaxed">
+              O sistema ainda não possui um Administrador inicial cadastrado. O registro de novos usuários permanece bloqueado até o bootstrap via Backoffice.
+            </p>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Nome *"
+                type="text"
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="João"
+              />
+              <Input
+                label="Sobrenome *"
+                type="text"
+                required
+                value={sobrenome}
+                onChange={(e) => setSobrenome(e.target.value)}
+                placeholder="Silva"
+              />
+            </div>
 
-          <Input
-            label="Telefone"
-            type="tel"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-            placeholder="(11) 99999-9999"
-          />
+            <Input
+              label="Telefone (WhatsApp)"
+              type="tel"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              placeholder="(11) 99999-9999"
+            />
 
-          <Input
-            label="E-mail *"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="joao@exemplo.com"
-          />
+            <Input
+              label="E-mail *"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seuemail@exemplo.com"
+            />
 
-          <Input
-            label="Senha *"
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-          />
+            <Input
+              label="Senha (mínimo 6 caracteres) *"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
 
-          <Button type="submit" submitting={submitting} className="w-full mt-2">
-            Cadastrar
-          </Button>
-        </form>
+            <Button type="submit" submitting={submitting} className="w-full mt-2">
+              Cadastrar
+            </Button>
+          </form>
+        )}
 
         <div className="text-center text-xs" style={{ color: 'var(--brand-text-color)', opacity: 0.65 }}>
           Já possui uma conta?{' '}

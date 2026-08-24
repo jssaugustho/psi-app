@@ -24,6 +24,30 @@ const BrandContext = createContext<BrandContextType>({
   reloadBrand: async () => {},
 });
 
+const BACKUP_STORAGE_KEY = 'theraos_admin_platform_brand_cache';
+
+function saveBrandBackup(primary: Tenant | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (primary) {
+      localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({ platformBrand: primary, updatedAt: Date.now() }));
+    }
+  } catch (e) {
+    console.warn('Falha ao salvar cache em localStorage:', e);
+  }
+}
+
+function loadBrandBackup(): Tenant | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw).platformBrand || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [theme, setTheme] = useState<ThemeMode>('dark');
@@ -43,9 +67,12 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const applyBrandStyles = useCallback((t: Tenant | null, currentTheme: ThemeMode) => {
     const root = document.documentElement;
 
-    const start = t?.gradientColorStart || '#4F46E5';
-    const end = t?.gradientColorEnd || '#06B6D4';
-    const contrast = t?.contrastColor || '#FFFFFF';
+    const cachedPlatform = !t ? loadBrandBackup() : null;
+    const activePlatform = t || cachedPlatform;
+
+    const start = activePlatform?.gradientColorStart || '#7C3AED';
+    const end = activePlatform?.gradientColorEnd || '#A855F7';
+    const contrast = activePlatform?.contrastColor || '#FFFFFF';
 
     root.style.setProperty('--brand-gradient-start', start);
     root.style.setProperty('--brand-gradient-end', end);
@@ -69,8 +96,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     // Favicon e Título
     const iconUrl =
       currentTheme === 'light'
-        ? t?.iconLightUrl || t?.iconDarkUrl
-        : t?.iconDarkUrl || t?.iconLightUrl;
+        ? activePlatform?.iconLightUrl || activePlatform?.iconDarkUrl
+        : activePlatform?.iconDarkUrl || activePlatform?.iconLightUrl;
 
     if (iconUrl) {
       const existingIcons = document.querySelectorAll("link[rel*='icon']");
@@ -87,9 +114,8 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (t?.name) {
-      document.title = t.name;
-    }
+    const platformTitle = activePlatform?.name || 'TheraOS Admin';
+    document.title = platformTitle;
   }, []);
 
   const toggleTheme = () => {
@@ -101,39 +127,21 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   const loadBrand = useCallback(async () => {
     try {
-      const host = typeof window !== 'undefined' ? window.location.hostname : '';
-      let resolvedTenant: Tenant | null = null;
-
-      // 1. Tentar resolver por domínio customizado ou por subdomínio (slug)
-      if (host && host !== 'localhost' && host !== '127.0.0.1') {
-        resolvedTenant = await api.getTenantByDomain(host);
-        
-        if (!resolvedTenant) {
-          const parts = host.split('.');
-          if (parts.length > 2) {
-            const slugCandidate = parts[0];
-            resolvedTenant = await api.getTenantBySlug(slugCandidate);
-          }
-        }
-      }
-
-      // 2. Fallback para o tenant principal caso não tenha encontrado por domínio
-      if (!resolvedTenant) {
-        const primaryRes = await api.getPrimaryTenant();
-        if (primaryRes?.tenant) {
-          resolvedTenant = primaryRes.tenant;
-        }
-      }
-
-      if (resolvedTenant) {
-        setTenant(resolvedTenant);
-        applyBrandStyles(resolvedTenant, theme);
+      const primaryRes = await api.getPrimaryTenant();
+      if (primaryRes?.tenant) {
+        setTenant(primaryRes.tenant);
+        saveBrandBackup(primaryRes.tenant);
+        applyBrandStyles(primaryRes.tenant, theme);
       } else {
-        applyBrandStyles(null, theme);
+        const cached = loadBrandBackup();
+        setTenant(cached);
+        applyBrandStyles(cached, theme);
       }
     } catch (err) {
-      console.error('Erro ao resolver branding:', err);
-      applyBrandStyles(null, theme);
+      console.error('Erro ao resolver branding no admin:', err);
+      const cached = loadBrandBackup();
+      setTenant(cached);
+      applyBrandStyles(cached, theme);
     } finally {
       setLoading(false);
     }

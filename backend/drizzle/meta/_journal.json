@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1784653580241,
-      "tag": "0000_whole_moira_mactaggert",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1784663358710,
-      "tag": "0001_spooky_zemo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785727777712,
-      "tag": "0002_fuzzy_stranger",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1785731721032,
-      "tag": "0003_happy_callisto",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1785861372101,
-      "tag": "0004_sparkling_ink",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1786086496435,
-      "tag": "0005_lazy_longshot",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1786316461234,
-      "tag": "0006_futuristic_shotgun",
+      "when": 1787558720671,
+      "tag": "0000_initial_schema",
       "breakpoints": true
     }
   ]

@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import socketio from 'socket.io';
+import cookie from '@fastify/cookie';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { getChannel, publishRealtime } from '../../shared/queue';
 import { authRoutes } from './routes/auth';
@@ -10,6 +11,7 @@ import { platformRoutes } from './routes/platform';
 import { statusRoutes, startSystemStatusHeartbeats } from './routes/status';
 import { crmRoutes } from './routes/crm';
 import { captacaoRoutes } from './routes/captacao';
+import { formsRoutes } from './routes/forms';
 import { sql } from '../../shared/db';
 
 const port = env.PORT;
@@ -20,12 +22,24 @@ const fastify = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 fastify.setValidatorCompiler(validatorCompiler);
 fastify.setSerializerCompiler(serializerCompiler);
 
+// Registrar suporte a cookies HttpOnly
+fastify.register(cookie, {
+  secret: env.JWT_SECRET,
+});
+
 // Registrar suporte a multipart/form-data (uploads de até 10MB)
 fastify.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Registrar suporte a CORS para o frontend Next.js (http://localhost:3000 e http://localhost:3001)
+// Registrar suporte a CORS com suporte a cookies (credentials: true)
 fastify.register(cors, {
-  origin: '*',
+  origin: (origin, cb) => {
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.endsWith('.theraos.app') || origin.endsWith('.ajstrategy.digital')) {
+      cb(null, true);
+      return;
+    }
+    cb(null, true);
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-service-secret'],
 });
@@ -70,6 +84,7 @@ fastify.register(platformRoutes, { prefix: '/platform' });
 fastify.register(statusRoutes, { prefix: '/platform' });
 fastify.register(crmRoutes, { prefix: '/crm' });
 fastify.register(captacaoRoutes, { prefix: '/crm/captacao' });
+fastify.register(formsRoutes, { prefix: '/crm/forms' });
 
 const start = async () => {
   try {

@@ -1,7 +1,7 @@
 import { env } from '../config/env';
 import { getChannel, assertQuorumQueue } from '../shared/queue';
 import { db } from '../shared/db';
-import { systemStatusLogs, emailLogs, platformSettings, tenants } from '../shared/schema';
+import { systemStatusLogs, emailLogs, platformSettings, workspaces, workspaceDomains } from '../shared/schema';
 import { lt, sql, eq, gt, and } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { renderEmailTemplate, TemplateName, TemplatePropsMap } from '../emails/render';
@@ -123,13 +123,11 @@ async function main() {
         //   3. resendFromDomain da plataforma (fallback global)
         let effectiveFromDomain: string | null = null;
         if (tenantId) {
-          const tenantRow = await db.query.tenants.findFirst({
-            where: eq(tenants.id, tenantId),
+          const domainRecord = await db.query.workspaceDomains.findFirst({
+            where: eq(workspaceDomains.workspaceId, tenantId),
           });
-          effectiveFromDomain = tenantRow?.emailDomain ?? null;
-          // Derivar no-reply.<rootDomain> se emailDomain não foi configurado explicitamente
-          if (!effectiveFromDomain && tenantRow?.domain) {
-            effectiveFromDomain = deriveEmailDomain(tenantRow.domain);
+          if (domainRecord?.customDomain) {
+            effectiveFromDomain = deriveEmailDomain(domainRecord.customDomain);
           }
         }
         if (!effectiveFromDomain) {

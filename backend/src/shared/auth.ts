@@ -44,10 +44,24 @@ export interface JwtUserPayload {
 }
 
 /**
- * Valida um token JWT de usuário enviado no Authorization header
+ * Valida um token JWT de usuário enviado no Authorization header ou Cookie HttpOnly
  */
 export function verifyUserJwt(token: string): JwtUserPayload {
   return jwt.verify(token, JWT_SECRET) as JwtUserPayload;
+}
+
+/**
+ * Extrai o token JWT da requisição (seja via Cookie HttpOnly ou via Authorization Header)
+ */
+export function extractJwtFromRequest(request: any): string | null {
+  if (request.cookies?.access_token) {
+    return request.cookies.access_token;
+  }
+  const authHeader = request.headers['authorization'] || request.headers['Authorization'];
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return null;
 }
 
 /**

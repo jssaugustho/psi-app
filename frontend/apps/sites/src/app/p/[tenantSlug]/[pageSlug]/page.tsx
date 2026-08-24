@@ -41,6 +41,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const metaDescription = seoConfig?.metaDescription || `Agende sua consulta de psicologia com ${title}.`
   const faviconUrl = siteConfig?.faviconUrl
   const logoUrl = siteConfig?.logoUrl
+  const socialImage = seoConfig?.socialImage || seoConfig?.ogImageUrl || logoUrl
 
   return {
     title: metaTitle,
@@ -54,13 +55,13 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       title: metaTitle,
       description: metaDescription,
       type: 'website',
-      images: logoUrl ? [{ url: logoUrl }] : [],
+      images: socialImage ? [{ url: socialImage }] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title: metaTitle,
       description: metaDescription,
-      images: logoUrl ? [logoUrl] : [],
+      images: socialImage ? [socialImage] : [],
     },
   }
 }

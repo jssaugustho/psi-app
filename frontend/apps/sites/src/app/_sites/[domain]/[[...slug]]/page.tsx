@@ -1,6 +1,6 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { getCapturePageByDomain, getContractTemplateContent, getTenantByDomain, getPrimaryTenant } from '../../../../lib/api'
+import { getCapturePageByDomain, getContractTemplateContent, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../../lib/api'
 import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
 import { NotFoundView } from '../../../../components/NotFoundView'
 
@@ -36,6 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const metaDescription = seoConfig?.metaDescription || `Agende sua consulta de psicologia com ${title}.`
   const faviconUrl = siteConfig?.faviconUrl
   const logoUrl = siteConfig?.logoUrl
+  const socialImage = seoConfig?.socialImage || seoConfig?.ogImageUrl || logoUrl
 
   return {
     title: metaTitle,
@@ -49,19 +50,36 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: metaTitle,
       description: metaDescription,
       type: 'website',
-      images: logoUrl ? [{ url: logoUrl }] : [],
+      images: socialImage ? [{ url: socialImage }] : [],
     },
     twitter: {
       card: 'summary_large_image',
       title: metaTitle,
       description: metaDescription,
-      images: logoUrl ? [logoUrl] : [],
+      images: socialImage ? [socialImage] : [],
     },
   }
 }
 
 export default async function CustomDomainCapturePage({ params }: PageProps) {
   const { domain, slug } = await params
+
+  // 0. Bloqueio se a plataforma não estiver inicializada
+  const bootStatus = await getBootstrapStatus();
+  if (bootStatus && bootStatus.bootstrapped === false) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
+        <div className="max-w-md w-full p-8 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
+          <div className="text-3xl">🛠️</div>
+          <h1 className="text-xl font-bold">Plataforma em Manutenção</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            A plataforma ainda não concluiu o processo de inicialização inicial.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const pathSlug = slug && slug.length > 0 ? slug.join('/') : ''
 
   // Resolve page and tenant by domain and path slug using PostgREST

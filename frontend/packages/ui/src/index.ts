@@ -8,3 +8,4 @@ export * from './select-with-helper';
 export * from './brand-modal';
 export * from './confirm-modal';
 export * from './dns-instructions';
+export * from './textarea';

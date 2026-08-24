@@ -225,9 +225,6 @@ export default function TenantBrandingPage() {
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Confirmação Tenant Principal
-  const [isConfirmPrimaryModalOpen, setIsConfirmPrimaryModalOpen] = useState(false);
-
   // Uploading logo state
   const [uploadingLogo, setUploadingLogo] = useState<Partial<Record<LogoField, boolean>>>({});
 
@@ -237,7 +234,6 @@ export default function TenantBrandingPage() {
     slug: '',
     domain: '',
     ownerId: 'none',
-    isPrimary: false,
     // E-mail
     emailDomain: '',
     resendApiKey: '',
@@ -269,7 +265,7 @@ export default function TenantBrandingPage() {
         api.getUsers(),
       ]);
       if (!data) {
-        setError('Tenant nãoo encontrado.');
+        setError('Tenant não encontrado.');
         return;
       }
       setTenant(data);
@@ -279,7 +275,6 @@ export default function TenantBrandingPage() {
         slug: data.slug || '',
         domain: data.domain || '',
         ownerId: data.ownerId || 'none',
-        isPrimary: data.isPrimary || false,
         emailDomain: data.emailDomain || '',
         resendApiKey: data.resendApiKey || '',
         logoLightUrl: data.logoLightUrl || '',
@@ -337,7 +332,6 @@ export default function TenantBrandingPage() {
         slug: form.slug.toLowerCase().trim(),
         domain: form.domain || null,
         ownerId: resolvedOwnerId,
-        isPrimary: form.isPrimary,
         emailDomain: form.emailDomain || null,
         resendApiKey: form.resendApiKey || null,
         logoLightUrl: form.logoLightUrl || null,
@@ -456,29 +450,6 @@ export default function TenantBrandingPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-xl md:col-span-2 mt-2 border" style={{ background: "var(--surface-input, rgba(0,0,0,0.30))", borderColor: "var(--surface-border)" }}>
-                  <div>
-                    <span className="text-xs font-semibold text-slate-300 block">Tenant Principal (Pai)</span>
-                    <span className="text-[10px] text-slate-500 block mt-0.5">
-                      Define este espaço de trabalho como o tenant base e padrão do sistema.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (form.isPrimary) {
-                        alert("Este já é o tenant principal. Para definir outro tenant como principal, vá até a página do respectivo tenant e ative o switch de principal lá.");
-                      } else {
-                        setIsConfirmPrimaryModalOpen(true);
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--brand-gradient-start)] focus:ring-offset-2 focus:ring-offset-slate-950 ${form.isPrimary ? '' : 'bg-[var(--surface-border)]'}`} style={form.isPrimary ? { backgroundColor: 'var(--brand-gradient-start)' } : {}}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.isPrimary ? 'translate-x-5' : 'translate-x-0'}`}
-                    />
-                  </button>
-                </div>
               </div>
             </div>
           </Card>
@@ -489,13 +460,11 @@ export default function TenantBrandingPage() {
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/60 flex-wrap gap-2">
                 <h3 className="text-base font-bold text-slate-200">Identidade Visual & Branding do Site</h3>
                 <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
-                  {form.isPrimary ? '🌟 Marca Oficial da Plataforma (App Shell)' : '🌐 Personalização dos Sites de Captação'}
+                  🌐 Personalização dos Sites de Captação
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                {form.isPrimary 
-                  ? 'Estes logotipos e cores definem o visual global do sistema (App Shell, barra lateral, tela de login e favicon do painel).' 
-                  : 'Logotipos e paleta padrão para os sites e páginas de captação gerados por este consultório.'}
+                Logotipos e paleta padrão para os sites e páginas de captação gerados por este consultório.
               </p>
               
               {/* Uploads (R2) */}
@@ -830,52 +799,6 @@ export default function TenantBrandingPage() {
                 className="text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Excluir Definitivamente
-              </Button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* ── MODAL: CONFIRMAR ALTERAÇÃO DE TENANT PRINCIPAL ── */}
-      {isConfirmPrimaryModalOpen && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up shadow-2xl">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-100">Alterar Tenant Principal</h3>
-                <p className="text-xs text-slate-400">Esta ação afetará a estilização global e o branding padrão.</p>
-              </div>
-              <button
-                onClick={() => setIsConfirmPrimaryModalOpen(false)}
-                className="opacity-55 hover:opacity-100 bg-transparent border-none text-slate-400 cursor-pointer"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            <div className="text-xs p-3 rounded-lg leading-relaxed border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 30%, transparent)', color: 'var(--brand-gradient-start)' }}>
-              Ao definir <strong>{tenant?.name}</strong> como o tenant principal, o tenant principal anterior será desativado no banco de dados e este passará a ditar as configurações visuais de white-label padrão do sistema.
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t border-slate-800/40">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsConfirmPrimaryModalOpen(false)}
-                className="text-xs py-2"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setForm(prev => ({ ...prev, isPrimary: true }));
-                  setIsConfirmPrimaryModalOpen(false);
-                }}
-                className="text-xs py-2"
-              >
-                Confirmar e Definir
               </Button>
             </div>
           </div>

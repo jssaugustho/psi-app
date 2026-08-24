@@ -7,6 +7,7 @@ import { useBrand } from '@/context/BrandContext';
 import { api, Tenant } from '@/lib/api';
 import { AppShell, LoadingSpinner, Card } from '@psi/ui';
 import { Link } from '@/components/Link';
+import { UserProfileModal } from '@/components/user-profile-modal';
 
 const CrmIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -33,11 +34,17 @@ const GlobeIcon = () => (
   </svg>
 );
 
+const FormIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
 import { RealtimeProvider, useRealtime } from '@/context/RealtimeContext';
 
 function getFriendlyPath(path: string): string {
   if (path.startsWith('/dashboard/captacao')) return 'No Criador de Sites';
-  if (path.startsWith('/dashboard/crm')) return 'No CRM';
+  if (path.startsWith('/dashboard/crm')) return 'Na Triagem';
   if (path.startsWith('/dashboard/configuracoes')) return 'Nas Configurações';
   if (path === '/dashboard') return 'No Perfil';
   return 'No Painel';
@@ -172,7 +179,7 @@ function TenantSwitcher({ myTenants, activeTenantId }: { myTenants: any[], activ
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { user, loading, logout, setIsProfileOpen } = useAuth();
-  const { tenant, primaryTenant, theme, toggleTheme, reloadBrand } = useBrand();
+  const { tenant, primaryTenant, bootstrapped, theme, toggleTheme, reloadBrand } = useBrand();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -187,26 +194,60 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, router]);
 
-  // 2. Buscar tenants do usuário e gerenciar seleção automática
+  // Bloqueio global se o sistema não estiver inicializado (sem Admin)
+  if (bootstrapped === false) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center text-white">
+        <Card className="max-w-md w-full p-8 space-y-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-3xl flex items-center justify-center mx-auto mb-2">
+            🔒
+          </div>
+          <h1 className="text-xl font-bold">Sistema Indisponível</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            O sistema ainda não possui um Administrador inicial cadastrado. Por favor, acesse o <strong>Backoffice Admin</strong> para realizar a inicialização (bootstrap) da plataforma.
+          </p>
+          <button
+            onClick={() => logout()}
+            className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer border border-slate-700 bg-slate-900 hover:bg-slate-800 transition-all font-mono uppercase text-slate-200 mt-4"
+          >
+            Sair da Sessão
+          </button>
+        </Card>
+      </div>
+    );
+  }
+
+  // 2. Buscar workspaces do usuário e gerenciar seleção automática
   useEffect(() => {
     async function loadUserTenants() {
       if (!user) return;
       try {
-        const list = await api.getMyTenants(user.id);
+        const list = await api.getMyTenants(user.id, user.role);
         setMyTenants(list);
 
-        const storedId = sessionStorage.getItem('active_tenant_id');
-        if (storedId) {
+        const storedId = typeof window !== 'undefined' 
+          ? (localStorage.getItem('active_workspace_id') || localStorage.getItem('active_tenant_id') || sessionStorage.getItem('active_workspace_id'))
+          : null;
+
+        if (storedId && list.some((t) => t.id === storedId)) {
           setActiveTenantId(storedId);
+          document.cookie = `active_workspace_id=${storedId}; path=/; max-age=31536000; SameSite=Lax`;
+          document.cookie = `active_tenant_id=${storedId}; path=/; max-age=31536000; SameSite=Lax`;
         } else if (list.length === 1) {
           // Se tiver apenas 1, seleciona automaticamente
           const singleId = list[0].id;
-          sessionStorage.setItem('active_tenant_id', singleId);
+          localStorage.setItem('active_workspace_id', singleId);
+          localStorage.setItem('active_tenant_id', singleId);
+          sessionStorage.setItem('active_workspace_id', singleId);
+          document.cookie = `active_workspace_id=${singleId}; path=/; max-age=31536000; SameSite=Lax`;
+          document.cookie = `active_tenant_id=${singleId}; path=/; max-age=31536000; SameSite=Lax`;
           setActiveTenantId(singleId);
           await reloadBrand();
+        } else if (list.length > 1 && pathname !== '/dashboard/selecionar-consultorio') {
+          router.push('/dashboard/selecionar-consultorio');
         }
       } catch (err) {
-        console.error('Erro ao carregar consultórios:', err);
+        console.error('Erro ao carregar workspaces:', err);
       } finally {
         setLoadingTenants(false);
       }
@@ -214,10 +255,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     if (user) {
       loadUserTenants();
     }
-  }, [user, reloadBrand]);
+  }, [user, reloadBrand, pathname, router]);
 
   const handleSelectTenant = async (id: string) => {
-    sessionStorage.setItem('active_tenant_id', id);
+    localStorage.setItem('active_workspace_id', id);
+    localStorage.setItem('active_tenant_id', id);
+    sessionStorage.setItem('active_workspace_id', id);
+    document.cookie = `active_workspace_id=${id}; path=/; max-age=31536000; SameSite=Lax`;
+    document.cookie = `active_tenant_id=${id}; path=/; max-age=31536000; SameSite=Lax`;
     setActiveTenantId(id);
     await reloadBrand();
     window.location.reload();
@@ -227,70 +272,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // 3. Aguardar silenciosamente enquanto busca consultórios
+  // 3. Aguardar silenciosamente enquanto busca workspaces
   if (loadingTenants) {
     return null;
   }
 
-  // 4. Barreira de Seleção: se possuir múltiplos consultórios e nenhum selecionado
+  // Permitir exibição direta da página de seleção de workspace
+  if (pathname === '/dashboard/selecionar-consultorio') {
+    return <>{children}</>;
+  }
+
+  // 4. Barreira de Seleção: se possuir múltiplos workspaces e nenhum selecionado
   if (myTenants.length > 1 && !activeTenantId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
-        <Card className="w-full max-w-2xl p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <h2 
-              className="text-3xl font-bold bg-clip-text text-transparent"
-              style={{
-                background: 'var(--brand-gradient)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Acessar Consultório
-            </h2>
-            <p className="text-sm text-slate-400">
-              Escolha qual espaço clínico você deseja acessar neste momento:
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {myTenants.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => handleSelectTenant(t.id)}
-                className="w-full text-left p-5 rounded-2xl border border-[var(--surface-border)] glass-md hover:bg-white/5 transition-all duration-200 cursor-pointer flex flex-col justify-between h-36 relative group"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    {t.logoDarkUrl || t.logoLightUrl ? (
-                      <img src={t.logoDarkUrl || t.logoLightUrl || ''} alt={t.name} className="max-h-6 max-w-[120px] object-contain" />
-                    ) : (
-                      <span className="font-bold text-slate-200 truncate">{t.name}</span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">/{t.slug}</span>
-                </div>
-                <div className="flex items-center justify-between w-full mt-4">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Acessar</span>
-                  <svg className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="text-center pt-2">
-            <button
-              onClick={logout}
-              className="text-xs text-red-400 hover:underline bg-transparent border-none cursor-pointer"
-            >
-              Sair da conta
-            </button>
-          </div>
-        </Card>
-      </div>
-    );
+    router.push('/dashboard/selecionar-consultorio');
+    return null;
   }
 
   // 5. Se não tiver nenhum consultório vinculado
@@ -315,7 +310,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   const menuItems = [
-    { label: 'CRM (Leads)', href: '/dashboard/crm', icon: <CrmIcon />, active: pathname === '/dashboard/crm' },
+    { label: 'Triagem', href: '/dashboard/crm', icon: <CrmIcon />, active: pathname === '/dashboard/crm' },
     { label: 'Criador de Sites', href: '/dashboard/captacao', icon: <GlobeIcon />, active: pathname.startsWith('/dashboard/captacao') },
     { label: 'Configurações', href: '/dashboard/configuracoes', icon: <SettingsIcon />, active: pathname === '/dashboard/configuracoes' },
   ];
@@ -332,6 +327,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       ? (tenant?.iconLightUrl || tenant?.iconDarkUrl || tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.iconLightUrl || primaryTenant?.iconDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
       : (tenant?.iconDarkUrl || tenant?.iconLightUrl || tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.iconDarkUrl || primaryTenant?.iconLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
+  const isFullScreenEditor = 
+    (pathname.startsWith('/dashboard/captacao/') && pathname !== '/dashboard/captacao' && pathname !== '/dashboard/captacao/nova') ||
+    (pathname.startsWith('/dashboard/formularios/') && pathname !== '/dashboard/formularios');
+
+  if (isFullScreenEditor) {
+    return (
+      <div className="w-screen h-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col">
+        {children}
+      </div>
+    );
+  }
+
   return (
     <AppShell
       appName={appName}
@@ -342,7 +349,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       theme={theme}
       onToggleTheme={toggleTheme}
       onLogout={logout}
-      onEditProfile={() => router.push('/dashboard/configuracoes')}
+      onEditProfile={() => setIsProfileOpen(true)}
+      onSelectTenant={() => router.push('/dashboard/selecionar-consultorio')}
       LinkComponent={Link}
       headerRightActions={
         <div className="flex items-center gap-3">
@@ -352,6 +360,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       }
     >
       {children}
+      <UserProfileModal />
     </AppShell>
   );
 }

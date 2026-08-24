@@ -14,6 +14,7 @@ export interface CapturePageData {
   seo_config: {
     metaTitle: string;
     metaDescription: string;
+    socialImage?: string;
     ogImageUrl?: string;
   };
   site_config: any;
@@ -25,6 +26,7 @@ export interface CapturePageData {
   seo_config_draft?: {
     metaTitle: string;
     metaDescription: string;
+    socialImage?: string;
     ogImageUrl?: string;
   } | null;
   site_config_draft?: any;
@@ -283,33 +285,68 @@ export async function getTenantByDomain(domain: string): Promise<TenantData | nu
 }
 
 /**
- * Fetch the primary tenant (tenant-pai da plataforma)
+ * Fetch the platform brand (marca global da plataforma em platform_settings)
  */
 export async function getPrimaryTenant(): Promise<TenantData | null> {
-  const url = `${PGRST_BASE_URL}/tenants?is_primary=eq.true&limit=1`;
+  const url = `${API_BASE_URL}/platform/tenant/primary`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-    const t = data[0];
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.tenant) {
+        const t = data.tenant;
+        return {
+          id: 'platform',
+          name: t.name || 'TheraOS',
+          slug: 'platform',
+          domain: null,
+          phone: null,
+          gradientColorStart: t.gradientColorStart || '#7C3AED',
+          gradientColorEnd: t.gradientColorEnd || '#A855F7',
+          contrastColor: t.contrastColor || '#FFFFFF',
+          bgDarkColor: t.bgDarkColor || '#09090B',
+          cardDarkColor: t.cardDarkColor || '#18181B',
+          textDarkColor: t.textDarkColor || '#F8FAFC',
+          logoLightUrl: t.logoLightUrl || null,
+          logoDarkUrl: t.logoDarkUrl || null,
+        };
+      }
+    }
+
+    // Fallback direto via PostgREST na tabela platform_settings
+    const pgrstUrl = `${PGRST_BASE_URL}/platform_settings?limit=1`;
+    const pgrstRes = await fetch(pgrstUrl, { cache: 'no-store' });
+    if (!pgrstRes.ok) return null;
+    const pgrstData = await pgrstRes.json();
+    if (!Array.isArray(pgrstData) || pgrstData.length === 0) return null;
+    const ps = pgrstData[0];
     return {
-      id: t.id,
-      name: t.name,
-      slug: t.slug,
-      domain: t.domain,
-      phone: t.phone,
-      gradientColorStart: t.gradient_color_start,
-      gradientColorEnd: t.gradient_color_end,
-      contrastColor: t.contrast_color,
-      bgDarkColor: t.bg_dark_color,
-      cardDarkColor: t.card_dark_color,
-      textDarkColor: t.text_dark_color,
-      logoLightUrl: t.logo_light_url,
-      logoDarkUrl: t.logo_dark_url,
+      id: ps.id || 'platform',
+      name: ps.platform_name || 'TheraOS',
+      slug: 'platform',
+      domain: ps.base_domain || null,
+      phone: null,
+      gradientColorStart: ps.gradient_color_start || '#7C3AED',
+      gradientColorEnd: ps.gradient_color_end || '#A855F7',
+      contrastColor: ps.contrast_color || '#FFFFFF',
+      bgDarkColor: ps.bg_dark_color || '#09090B',
+      cardDarkColor: ps.card_dark_color || '#18181B',
+      textDarkColor: ps.text_dark_color || '#F8FAFC',
+      logoLightUrl: ps.logo_light_url || null,
+      logoDarkUrl: ps.logo_dark_url || null,
     };
   } catch (err) {
-    console.error('Error fetching primary tenant:', err);
+    console.error('Error fetching platform brand:', err);
+    return null;
+  }
+}
+
+export async function getBootstrapStatus(): Promise<{ bootstrapped: boolean } | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/bootstrap/status`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
     return null;
   }
 }

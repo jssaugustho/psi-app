@@ -510,13 +510,13 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
                           <div
                             key={asset.id}
                             onClick={() => handleSelectAssetForCrop(asset)}
-                            className={`relative aspect-square border rounded-xl overflow-hidden group cursor-pointer transition-all bg-contain bg-center bg-no-repeat bg-[var(--brand-bg-color,transparent)] ${
+                            className={`relative aspect-square border rounded-xl overflow-hidden group cursor-pointer transition-all bg-[var(--brand-bg-color,transparent)] ${
                               isSelected
                                 ? 'border-2 border-indigo-500 ring-2 ring-indigo-500/30'
                                 : 'border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)]/60'
                             }`}
-                            style={{ backgroundImage: `url(${asset.url})` }}
                           >
+                            <img src={asset.url} alt={asset.name} className="w-full h-full object-cover" />
                             {/* Checkbox indicator in Multi-select Mode */}
                             {isMultiSelectMode ? (
                               <div className="absolute top-2 left-2 z-10">

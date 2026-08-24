@@ -7,7 +7,7 @@ import {
   User, Phone, Mail, Globe, GitBranch, Shield, 
   AlertTriangle, Check, StickyNote 
 } from 'lucide-react';
-import { Select } from '@psi/ui';
+import { Select, Textarea } from '@psi/ui';
 
 interface ContactFieldsPanelProps {
   contact: Contact;
@@ -313,15 +313,13 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
             <span>Observações</span>
           </div>
           <div className="col-span-2 pr-4">
-            <textarea
+            <Textarea
               ref={notesRef}
               value={notes}
               onChange={(e) => {
                 setNotes(e.target.value);
                 triggerAutoSave({ screening_notes: e.target.value });
               }}
-              rows={3}
-              className="w-full bg-white/[0.02] border border-[var(--surface-border)] rounded-lg text-slate-200 focus:outline-none p-3 text-xs resize-none"
               placeholder="Digite notas de acolhimento e triagem..."
             />
           </div>

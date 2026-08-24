@@ -6,7 +6,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,isPrimary:is_primary,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
+const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
 
 const PROFILE_SELECT = 'id,nome:first_name,sobrenome:last_name,telefone:phone,email,avatar_url,role,created_at';
 
@@ -33,7 +33,10 @@ export interface AuthResponse {
 
 export interface BootstrapStatusResponse {
   bootstrapped: boolean;
-  admin_email: string | null;
+  has_admin?: boolean;
+  has_platform_settings?: boolean;
+  admin_email?: string | null;
+  message?: string;
 }
 
 export interface Tenant {
@@ -41,7 +44,6 @@ export interface Tenant {
   name: string;
   slug: string;
   domain: string | null;
-  isPrimary: boolean;
   ownerId?: string | null;
   logoLightUrl: string | null;
   logoDarkUrl: string | null;
@@ -87,7 +89,6 @@ export interface PlatformSettings {
   resend_api_key: string | null;
   resend_from_domain: string | null;
   has_resend: boolean;
-  primary_tenant_id: string | null;
   is_configured: boolean;
   base_tenant_price: number;
   additional_member_price: number;
@@ -233,6 +234,7 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   try {
     response = await fetch(url, {
       ...options,
+      credentials: 'include',
       headers,
     });
   } catch (err: any) {
@@ -291,10 +293,8 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
 
 
 export const api = {
-  // Checar status de bootstrap do Admin inicial (PostgREST View)
-  getBootstrapStatus: () => fetchApi<BootstrapStatusResponse>(`${PGRST_BASE_URL}/bootstrap_status?limit=1`, {
-    headers: { 'Accept': 'application/vnd.pgrst.object+json' }
-  }),
+  // Checar status de bootstrap do Admin inicial (Fastify REST API)
+  getBootstrapStatus: () => fetchApi<BootstrapStatusResponse>('/auth/bootstrap/status'),
 
   // Renovar access_token usando o refresh_token
   // Nota: persiste automaticamente no localStorage via doRefresh() no fetchApi.
@@ -326,16 +326,11 @@ export const api = {
       body: JSON.stringify({ ...body, appType: 'admin' }),
     }),
 
-  // Buscar perfil do usuário logado (PostgREST + RLS)
-  getMe: async () => {
-    const res = await fetchApi<User[]>(`${PGRST_BASE_URL}/profiles?select=${PROFILE_SELECT}&limit=1`);
-    return { user: res[0] };
-  },
+  // Buscar perfil do usuário logado através da API autenticada
+  getMe: () => fetchApi<{ user: User }>('/auth/me'),
 
-  // Platform Setup Status (PostgREST View)
-  getPlatformSetupStatus: () => fetchApi<PlatformSetupStatusResponse>(`${PGRST_BASE_URL}/platform_setup_status?limit=1`, {
-    headers: { 'Accept': 'application/vnd.pgrst.object+json' }
-  }),
+  // Platform Setup Status (Backend API)
+  getPlatformSetupStatus: () => fetchApi<PlatformSetupStatusResponse>('/platform/setup/status'),
 
   // Salvar e validar credenciais Cloudflare + R2 Bucket
   saveCloudflare: (body: {
@@ -475,13 +470,17 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  // Buscar Tenant-Pai Principal (PostgREST)
+  // Buscar Marca da Plataforma em platform_settings
   getPrimaryTenant: async () => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&is_primary=eq.true&limit=1`);
-    return { tenant: res[0] };
+    try {
+      const res = await fetchApi<{ tenant: Tenant }>('/platform/tenant/primary');
+      return { tenant: res.tenant };
+    } catch (e) {
+      return { tenant: null as any };
+    }
   },
 
-  // Atualizar configurações White-Label do Tenant-Pai (PostgREST PATCH)
+  // Atualizar configurações da Marca da Plataforma em platform_settings
   updatePrimaryTenant: async (body: Partial<{
     name: string;
     slug: string;
@@ -500,14 +499,11 @@ export const api = {
     text_light_color: string;
     text_dark_color: string;
   }>) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&is_primary=eq.true`, {
-      method: 'PATCH',
+    const res = await fetchApi<{ message: string; tenant: Tenant }>('/platform/tenant/primary', {
+      method: 'PUT',
       body: JSON.stringify(body),
-      headers: {
-        'Prefer': 'return=representation'
-      }
     });
-    return { message: 'Configurações White-Label atualizadas com sucesso!', tenant: res[0] };
+    return { message: res.message || 'Configurações White-Label salvas com sucesso!', tenant: res.tenant };
   },
 
   // Configurar Resend no wizard de setup inicial (valida API key + domínio)
@@ -696,7 +692,7 @@ export const api = {
     return res[0];
   },
 
-  createTenant: async (body: { name: string; slug: string; domain?: string | null; ownerId?: string | null; isPrimary?: boolean }) => {
+  createTenant: async (body: { name: string; slug: string; domain?: string | null; ownerId?: string | null }) => {
     const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants`, {
       method: 'POST',
       body: JSON.stringify({
@@ -704,7 +700,6 @@ export const api = {
         slug: body.slug,
         domain: body.domain || null,
         owner_id: body.ownerId || null,
-        is_primary: body.isPrimary || false,
       }),
       headers: {
         'Prefer': 'return=representation'
@@ -718,7 +713,6 @@ export const api = {
     if (body.name !== undefined) dbBody.name = body.name;
     if (body.slug !== undefined) dbBody.slug = body.slug;
     if (body.domain !== undefined) dbBody.domain = body.domain;
-    if (body.isPrimary !== undefined) dbBody.is_primary = body.isPrimary;
     if (body.ownerId !== undefined) dbBody.owner_id = body.ownerId;
     if (body.logoLightUrl !== undefined) dbBody.logo_light_url = body.logoLightUrl;
     if (body.logoDarkUrl !== undefined) dbBody.logo_dark_url = body.logoDarkUrl;

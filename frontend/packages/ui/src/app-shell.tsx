@@ -26,6 +26,8 @@ export interface AppShellProps {
   onToggleTheme?: () => void;
   onLogout?: () => void;
   onEditProfile?: () => void;
+  onSelectWorkspace?: () => void;
+  onSelectTenant?: () => void;
   LinkComponent?: React.ComponentType<any>;
   headerRightActions?: React.ReactNode;
   children: React.ReactNode;
@@ -41,6 +43,7 @@ export function AppShell({
   onToggleTheme,
   onLogout,
   onEditProfile,
+  onSelectTenant,
   LinkComponent,
   headerRightActions,
   children,
@@ -171,6 +174,22 @@ export function AppShell({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     <span>Configurações & Perfil</span>
+                  </button>
+                )}
+                {onSelectTenant && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onSelectTenant();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold hover:bg-[var(--surface-hover)] transition-all cursor-pointer bg-transparent border-none text-left"
+                    style={{ color: 'var(--brand-text-color)' }}
+                  >
+                    <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11a1 1 0 011-1h2a1 1 0 011 1v10" />
+                    </svg>
+                    <span>Trocar Consultório / Workspace</span>
                   </button>
                 )}
                 {onLogout && (

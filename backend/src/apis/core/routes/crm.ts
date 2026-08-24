@@ -2,11 +2,12 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { contacts, pipelineColumns, interactionHistory, tenants } from '../../../shared/schema';
+import { contacts, pipelineColumns, interactionHistory, workspaces } from '../../../shared/schema';
 import { eq, and, or } from 'drizzle-orm';
 
 const WebhookQuerySchema = z.object({
-  tenant_id: z.string().uuid('ID do Tenant inválido'),
+  workspace_id: z.string().uuid('ID do Workspace inválido').optional(),
+  tenant_id: z.string().uuid('ID do Workspace inválido').optional(),
 });
 
 const WebhookBodySchema = z.object({
@@ -25,7 +26,7 @@ const WebhookBodySchema = z.object({
 export async function crmRoutes(fastifyApp: FastifyInstance) {
   const fastify = fastifyApp.withTypeProvider<ZodTypeProvider>();
 
-  // POST /v1/crm/webhook?tenant_id={{TENANT_ID}}
+  // POST /v1/crm/webhook?workspace_id={{WORKSPACE_ID}}
   fastify.post(
     '/webhook',
     {
@@ -35,7 +36,12 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { tenant_id } = request.query;
+      const query = request.query as any;
+      const targetWorkspaceId = query.workspace_id || query.tenant_id;
+      if (!targetWorkspaceId) {
+        return reply.status(400).send({ error: 'Bad Request', message: 'workspace_id é obrigatório.' });
+      }
+
       const {
         name,
         phone,
@@ -54,7 +60,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         const normalizedPhone = phone ? phone.trim().replace(/\D/g, '') : null;
         const normalizedEmail = email ? email.trim().toLowerCase() : null;
 
-        // 2. Verificar duplicados (por telefone ou por e-mail no mesmo tenant)
+        // 2. Verificar duplicados (por telefone ou por e-mail no mesmo workspace)
         let existingContact = null;
 
         if (normalizedPhone || normalizedEmail) {
@@ -68,7 +74,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
 
           existingContact = await db.query.contacts.findFirst({
             where: and(
-              eq(contacts.tenantId, tenant_id),
+              eq(contacts.workspaceId, targetWorkspaceId),
               or(...conditions)
             ),
           });
@@ -85,7 +91,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
 
           await db.insert(interactionHistory).values({
             contactId: existingContact.id,
-            tenantId: tenant_id,
+            workspaceId: targetWorkspaceId,
             type: 'comment',
             notes: logNotes,
           });
@@ -101,15 +107,15 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        // 3. Buscar tenant para obter origens de tráfego configuradas
-        const tenant = await db.query.tenants.findFirst({
-          where: eq(tenants.id, tenant_id),
+        // 3. Buscar workspace para obter origens de tráfego configuradas
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
         });
 
-        if (!tenant) {
+        if (!workspace) {
           return reply.status(404).send({
-            error: 'Tenant não encontrado',
-            message: 'O tenant_id fornecido não corresponde a nenhuma clínica registrada.',
+            error: 'Workspace não encontrado',
+            message: 'O workspace_id fornecido não corresponde a nenhuma clínica registrada.',
           });
         }
 
@@ -117,8 +123,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         let resolvedSource = source;
         const utmSource = utm_source;
 
-        // trafficSources pode ser string[] ou objeto[] {id, name, utm_source, ...}
-        const rawSources = tenant.trafficSources || [];
+        const rawSources = workspace.trafficSources || [];
         type SourceObj = { id?: string; name: string; utm_source?: string; utm_medium?: string; utm_campaign?: string; };
         const sourcesNormalized: SourceObj[] = rawSources.map((s: string | SourceObj) =>
           typeof s === 'string' ? { name: s } : s
@@ -127,7 +132,6 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         if (utmSource) {
           const utmLower = utmSource.toLowerCase();
 
-          // 1. Tenta match direto no campo utm_source dos objetos cadastrados
           const byUtmField = sourcesNormalized.find(
             (s) => s.utm_source && s.utm_source.toLowerCase() === utmLower
           );
@@ -135,7 +139,6 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
           if (byUtmField) {
             resolvedSource = byUtmField.name;
           } else {
-            // 2. Tenta match parcial no nome da origem
             const byName = sourcesNormalized.find((s) => {
               const sLower = s.name.toLowerCase();
               return sLower.includes(utmLower) || utmLower.includes(sLower);
@@ -144,7 +147,6 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
             if (byName) {
               resolvedSource = byName.name;
             } else {
-              // 3. Aliases comuns
               if (utmLower === 'ig' || utmLower === 'instagram') {
                 const igSource = sourcesNormalized.find((s) => s.name.toLowerCase().includes('instagram'));
                 resolvedSource = igSource ? igSource.name : 'Instagram';
@@ -155,18 +157,17 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
                 const gSource = sourcesNormalized.find((s) => s.name.toLowerCase().includes('google'));
                 resolvedSource = gSource ? gSource.name : 'Google Ads';
               } else {
-                // Capitaliza e usa a própria utm_source como nome de origem
                 resolvedSource = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);
               }
             }
           }
         } else if (!resolvedSource) {
-          resolvedSource = tenant.defaultTrafficSource || 'Webhook';
+          resolvedSource = workspace.defaultTrafficSource || 'Webhook';
         }
 
-        // 5. Lead Novo: busca primeiro estágio do funil do tenant
+        // 5. Lead Novo: busca primeiro estágio do funil do workspace
         const firstColumn = await db.query.pipelineColumns.findFirst({
-          where: eq(pipelineColumns.tenantId, tenant_id),
+          where: eq(pipelineColumns.workspaceId, targetWorkspaceId),
           orderBy: [pipelineColumns.order],
         });
 
@@ -176,7 +177,8 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         const [newContact] = await db
           .insert(contacts)
           .values({
-            tenantId: tenant_id,
+            workspaceId: targetWorkspaceId,
+            pipelineColumnId: firstColumn?.id || null,
             name: name.trim(),
             phone: phone ? phone.trim() : null,
             email: normalizedEmail || null,
@@ -191,13 +193,13 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
           })
           .returning();
 
-        // 5. Inserir log inicial na timeline do contato
+        // 7. Inserir log inicial na timeline do contato
         const startLogNotes = `Contato criado automaticamente via Webhook.\n` +
           `Origem da Campanha (UTM): ${utm_source || 'Direto'} / ${utm_medium || '-'} / ${utm_campaign || '-'}`;
 
         await db.insert(interactionHistory).values({
           contactId: newContact.id,
-          tenantId: tenant_id,
+          workspaceId: targetWorkspaceId,
           type: 'comment',
           notes: startLogNotes,
         });

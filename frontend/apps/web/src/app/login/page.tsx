@@ -35,8 +35,8 @@ export default function LoginPage() {
 
   const logoUrl =
     theme === 'light'
-      ? tenant?.logoLightUrl || tenant?.logoDarkUrl
-      : tenant?.logoDarkUrl || tenant?.logoLightUrl;
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl || primaryTenant?.logoLightUrl || primaryTenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl || primaryTenant?.logoDarkUrl || primaryTenant?.logoLightUrl);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
@@ -67,7 +67,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           {logoUrl && (
-            <img src={logoUrl} alt={tenant?.name || 'Logo'} className="max-h-16 max-w-[80%] mx-auto object-contain mb-4" />
+            <img src={logoUrl} alt={tenant?.name || primaryTenant?.name || 'Logo'} className="max-h-16 max-w-[80%] mx-auto object-contain mb-4" />
           )}
 
           <h1 className="text-3xl font-bold bg-clip-text text-transparent" style={{ background: "var(--brand-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>

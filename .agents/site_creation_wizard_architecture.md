@@ -42,7 +42,10 @@ Esta etapa reúne toda a experiência de marca em 4 sub-seções estruturadas:
   - **Ícone do Site (Favicon):** Exibido na aba do navegador e nos símbolos decorativos.
 - Suporta upload direto ou seleção via Biblioteca de Mídia (`MediaLibraryModal`).
 
-#### 2. Paleta de Cores & Extração Inteligente de Cores (Canvas + HSL Saturation Clustering)
+#### 2. Paleta de Cores, Herança & Overrides (Canvas + HSL Saturation Clustering)
+- **Lógica de Herança vs. Override:**
+  - **Herança Padrão (Sem Override):** Por padrão, ao abrir o wizard, a paleta é inicializada com as **cores da marca do Tenant dono** (`tenant.gradientColorStart`, `tenant.gradientColorEnd`, `tenant.contrastColor`). Se a psicóloga não alterar as cores (ou mantiver a opção "Usar Cores da Minha Marca"), o site é salvo sem override estático, herdando dinamicamente as alterações futuras da marca da conta.
+  - **Override Customizado:** Caso a psicóloga selecione uma paleta pronta (`COLOR_PALETTES`) ou defina cores personalizadas, o site salva a flag `isOverride: true` e grava os valores em `siteConfig.theme.colors` como um **override exclusivo** do site.
 - **Modo Paletas Prontas:** Apresenta uma coleção de combinações harmônicas pré-configuradas (`COLOR_PALETTES`), além da paleta extraída da marca.
 - **Extração de Cores do Logo/Favicon (Algoritmo Imune a CORS e Canvas Tainting):**
   1. O algoritmo passa a URL da imagem (Logotipo ou Ícone/Favicon) pelo proxy interno mesmo-domínio [`/api/proxy-image?url=...`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/api/proxy-image/route.ts). O servidor Node faz o download da imagem sem restrições de CORS e retorna a imagem com o cabeçalho `Access-Control-Allow-Origin: *`.
@@ -137,7 +140,7 @@ O sistema permite salvar e retomar múltiplos rascunhos em paralelo durante a cr
 
 Para evitar que as cores de uma clínica ou do tema padrão azulem/vazem para a interface de outro psicólogo, o sistema segue uma **ordem estrita de resolução de marca**:
 
-1. **API do Backend (`tenant` / `primaryTenant` via `AuthContext` / `BrandContext`):** Fonte primária e mandatória.
+1. **API do Backend (`tenant` / `platformBrand` via `BrandContext`):** Fonte primária e mandatória.
 2. **Cache Local (`localStorage`):** Utilizado para preservar rascunhos em andamento específicos do tenant ativo.
 3. **Escala de Cinza Neutra / Preto (`#27272A` / `#52525B`):** Fallback técnico seguro em `globals.css`. NUNCA utiliza azul ou cores vibrantes genéricas.
 

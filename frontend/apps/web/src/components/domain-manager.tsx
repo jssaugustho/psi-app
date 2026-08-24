@@ -36,6 +36,8 @@ export interface DomainManagerProps {
   subdomainAvailable?: boolean | null;
   checkingSubdomain?: boolean;
   onCheckSubdomain?: (subdomain: string) => void;
+  /** Se true, otimiza o layout para painéis laterais/sidebars de largura reduzida */
+  compactMode?: boolean;
   className?: string;
 }
 
@@ -56,6 +58,7 @@ export function DomainManager({
   subdomainAvailable: externalSubdomainAvailable,
   checkingSubdomain: externalCheckingSubdomain,
   onCheckSubdomain,
+  compactMode = false,
   className = '',
 }: DomainManagerProps) {
   // DNS Modal & Status States
@@ -367,28 +370,71 @@ export function DomainManager({
         )}
       </div>
 
-      {/* 2. Endereço da Página no seu site (Caminho / Slug - Opcional para o Wizard) */}
+      {/* 2. Endereço da Página no seu site (Caminho - Opcional para o Wizard) */}
       {showSlugInput && onSlugChange && (
-        <div className="space-y-3 pt-3 border-t border-[var(--surface-border)]">
+        <div className="space-y-2.5 pt-3 border-t border-[var(--surface-border)]">
           <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block uppercase tracking-wider">
-            2. Endereço da Página no seu site (Caminho / Slug)
+            2. Endereço da Página no seu site (Caminho)
           </label>
 
-          <div className="flex items-center flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-sm focus-within:border-[var(--brand-gradient-start)] transition-all">
-            <span className="h-10 px-3 flex items-center shrink-0 border-r border-[var(--surface-border)] text-xs font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-zinc-800/80 select-none whitespace-nowrap">
-              https://{activeDomainPrefix}/
-            </span>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => {
-                const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                onSlugChange(val);
-              }}
-              placeholder="ex: terapia (ou deixe em branco)"
-              className="h-10 px-3 flex-1 min-w-[120px] bg-transparent text-xs font-mono text-slate-900 dark:text-white outline-none border-none placeholder:text-slate-400 dark:placeholder:text-zinc-500"
-            />
-          </div>
+          {compactMode ? (
+            /* 2-Row Stack Layout for Narrow Sidebars */
+            <div className="space-y-1.5">
+              <div
+                title={`https://${activeDomainPrefix}/`}
+                className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-zinc-800/80 px-2.5 py-1.5 rounded-xl border border-[var(--surface-border)] truncate select-all flex items-center gap-1.5 shadow-xs"
+              >
+                <Globe className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                <span className="truncate">https://{activeDomainPrefix}/</span>
+              </div>
+
+              <div className="flex items-center rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-xs focus-within:border-[var(--brand-gradient-start)] transition-all">
+                <span className="h-9 px-3 flex items-center shrink-0 border-r border-[var(--surface-border)] text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-200/80 dark:bg-zinc-800/50 select-none">
+                  /
+                </span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    onSlugChange(val);
+                  }}
+                  placeholder="ex: terapia (ou deixe em branco)"
+                  className="h-9 px-2.5 flex-1 w-full bg-transparent text-xs font-mono text-slate-900 dark:text-white outline-none border-none placeholder:text-slate-400 dark:placeholder:text-zinc-500"
+                />
+              </div>
+
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate pt-0.5">
+                🔗 Link final: <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all">https://{activeDomainPrefix}/{slug}</span>
+              </p>
+            </div>
+          ) : (
+            /* Single Row Layout for Wide Wizards */
+            <>
+              <div className="flex items-center flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-sm focus-within:border-[var(--brand-gradient-start)] transition-all">
+                <span
+                  title={`https://${activeDomainPrefix}/`}
+                  className="h-10 px-2.5 flex items-center shrink min-w-0 max-w-[62%] border-r border-[var(--surface-border)] text-xs font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-zinc-800/80 select-none truncate"
+                >
+                  https://{activeDomainPrefix}/
+                </span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    onSlugChange(val);
+                  }}
+                  placeholder="ex: terapia (ou deixe em branco)"
+                  className="h-10 px-2.5 flex-1 min-w-[70px] bg-transparent text-xs font-mono text-slate-900 dark:text-white outline-none border-none placeholder:text-slate-400 dark:placeholder:text-zinc-500"
+                />
+              </div>
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                🔗 Link final: <span className="font-bold text-indigo-600 dark:text-indigo-400 select-all">https://{activeDomainPrefix}/{slug}</span>
+              </p>
+            </>
+          )}
 
           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
             💡 <strong>Deixe em branco</strong> para que esta seja a <strong>Página Principal (Home)</strong> do seu site, ou digite o nome que deseja usar no endereço (ex: terapia, consultas).
