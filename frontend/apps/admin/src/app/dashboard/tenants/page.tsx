@@ -39,8 +39,6 @@ export default function TenantsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
-    slug: '',
-    domain: '',
     ownerId: '',
   });
   const [creatingTenant, setCreatingTenant] = useState(false);
@@ -59,7 +57,7 @@ export default function TenantsPage() {
       setUsers(usersRes);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro ao carregar os dados de tenants.');
+      setError(err.message || 'Erro ao carregar os dados de workspaces.');
     } finally {
       setLoadingTenants(false);
     }
@@ -75,8 +73,6 @@ export default function TenantsPage() {
   const handleOpenCreate = () => {
     setCreateForm({
       name: '',
-      slug: '',
-      domain: '',
       ownerId: 'none',
     });
     setCreateError('');
@@ -91,26 +87,24 @@ export default function TenantsPage() {
       const resolvedOwnerId = createForm.ownerId === 'none' ? null : createForm.ownerId;
       await api.createTenant({
         name: createForm.name,
-        slug: createForm.slug.toLowerCase().trim(),
-        domain: createForm.domain || null,
         ownerId: resolvedOwnerId,
       });
       setIsCreateModalOpen(false);
       await loadData();
     } catch (err: any) {
-      setCreateError(err.message || 'Erro ao cadastrar tenant.');
+      setCreateError(err.message || 'Erro ao cadastrar workspace.');
     } finally {
       setCreatingTenant(false);
     }
   };
 
-  // Filtro de Busca
   const filteredTenants = tenants.filter(t => {
     const s = search.toLowerCase();
+    const owner = users.find(u => u.id === t.ownerId);
+    const ownerName = owner ? `${owner.nome} ${owner.sobrenome} ${owner.email}`.toLowerCase() : '';
     return (
-      t.name.toLowerCase().includes(s) ||
-      t.slug.toLowerCase().includes(s) ||
-      (t.domain && t.domain.toLowerCase().includes(s))
+      (t.name && t.name.toLowerCase().includes(s)) ||
+      ownerName.includes(s)
     );
   });
 
@@ -120,25 +114,23 @@ export default function TenantsPage() {
     return owner ? `${owner.nome} ${owner.sobrenome} (${owner.email})` : 'Usuário não encontrado';
   };
 
-
-
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-page-enter">
       {loadingTenants ? (
-        <LoadingSpinner message="Carregando tenants..." className="min-h-[50vh]" />
+        <LoadingSpinner message="Carregando workspaces..." className="min-h-[50vh]" />
       ) : (
         <>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Tenants (Espaços de Trabalho)</h1>
+            <h1 className="text-2xl font-bold">Workspaces (Espaços de Trabalho)</h1>
             <p className="text-sm mt-1" style={{ opacity: 0.6 }}>
-              Visualização, cadastro e configuração de todos os tenants do sistema. Clique em qualquer linha para gerenciar.
+              Visualização, cadastro e configuração de todos os workspaces do sistema. Clique em qualquer linha para gerenciar.
             </p>
           </div>
           <Button onClick={handleOpenCreate} className="flex items-center gap-2">
             <PlusIcon />
-            <span>Novo Tenant</span>
+            <span>Novo Workspace</span>
           </Button>
         </div>
 
@@ -163,7 +155,7 @@ export default function TenantsPage() {
             </span>
             <input
               type="text"
-              placeholder="Buscar por nome, slug ou domínio..."
+              placeholder="Buscar por nome do workspace ou proprietário..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none transition-colors brand-input"
@@ -182,16 +174,14 @@ export default function TenantsPage() {
                   borderTopColor: 'var(--brand-gradient-start)',
                 }}
               />
-              <p className="text-sm opacity-60">Carregando tenants...</p>
+              <p className="text-sm opacity-60">Carregando workspaces...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-800 opacity-75">
-                    <th className="py-3 px-3 font-semibold">Tenant</th>
-                    <th className="py-3 px-3 font-semibold">Slug / Subdomínio</th>
-                    <th className="py-3 px-3 font-semibold">Domínio Customizado</th>
+                    <th className="py-3 px-3 font-semibold">Workspace</th>
                     <th className="py-3 px-3 font-semibold">Proprietário (Owner)</th>
                     <th className="py-3 px-3 text-center font-semibold">Status</th>
                   </tr>
@@ -199,8 +189,8 @@ export default function TenantsPage() {
                 <tbody className="divide-y divide-slate-800/40">
                   {filteredTenants.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 opacity-60">
-                        Nenhum tenant encontrado.
+                      <td colSpan={3} className="text-center py-8 opacity-60">
+                        Nenhum workspace encontrado.
                       </td>
                     </tr>
                   ) : (
@@ -212,24 +202,14 @@ export default function TenantsPage() {
                       >
                         <td className="py-3.5 px-3">
                           <div className="flex items-center gap-2">
-                            {tenant.iconLightUrl ? (
-                              <img src={tenant.iconLightUrl} className="w-6 h-6 object-contain rounded-md" alt="" />
-                            ) : (
-                              <div className="w-6 h-6 rounded-md flex items-center justify-center font-bold text-[10px] border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)', color: 'var(--brand-gradient-start)' }}>
-                                {tenant.name[0]?.toUpperCase()}
-                              </div>
-                            )}
+                            <div className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs border" style={{ background: 'color-mix(in srgb, var(--brand-gradient-start) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)', color: 'var(--brand-gradient-start)' }}>
+                              {tenant.name[0]?.toUpperCase() || 'W'}
+                            </div>
                             <div>
                               <span className="font-semibold block text-slate-200">{tenant.name}</span>
                               <span className="text-[10px] opacity-40 font-mono block">{tenant.id}</span>
                             </div>
                           </div>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-slate-300">
-                          {tenant.slug}
-                        </td>
-                        <td className="py-3.5 px-3 text-slate-400 font-mono">
-                          {tenant.domain || <span className="opacity-40 italic">Nenhum</span>}
                         </td>
                         <td className="py-3.5 px-3 text-slate-300">
                           {getOwnerText(tenant.ownerId)}
@@ -248,14 +228,14 @@ export default function TenantsPage() {
           )}
         </Card>
 
-      {/* ── MODAL: NOVO TENANT ── */}
+      {/* ── MODAL: NOVO WORKSPACE ── */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
           <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up">
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-slate-100">Criar Espaço de Trabalho</h3>
-                <p className="text-xs text-slate-400">Insira os dados iniciais do novo tenant.</p>
+                <p className="text-xs text-slate-400">Insira o nome e proprietário do novo workspace.</p>
               </div>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
@@ -278,21 +258,6 @@ export default function TenantsPage() {
                 value={createForm.name}
                 onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Ex: Consultório Psi"
-              />
-
-              <Input
-                label="Slug (Subdomínio único) *"
-                required
-                value={createForm.slug}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                placeholder="ex-consultorio"
-              />
-
-              <Input
-                label="Domínio customizado (Opcional)"
-                value={createForm.domain}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, domain: e.target.value.toLowerCase().trim() }))}
-                placeholder="exemplo.com"
               />
 
               <div className="flex flex-col gap-1.5">
@@ -320,7 +285,7 @@ export default function TenantsPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" submitting={creatingTenant} className="text-xs py-2">
-                  Criar Tenant
+                  Criar Workspace
                 </Button>
               </div>
             </form>

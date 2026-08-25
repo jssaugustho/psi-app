@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
-import { api, Tenant, PlatformSetupStatusResponse } from '@/lib/api';
+import { api, PlatformBrand, PlatformSetupStatusResponse } from '@/lib/api';
 import { WhiteLabelSettings } from '@/components/white-label-settings';
 import { ResendSettings } from '@/components/resend-settings';
 import { CloudflareDomainsSettings } from '@/components/cloudflare-domains-settings';
@@ -63,7 +63,7 @@ export default function SettingsPage() {
   const { reloadBrand } = useBrand();
 
   const [activeTab, setActiveTab] = useState<Tab>('white-label');
-  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [tenant, setTenant] = useState<PlatformBrand | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -108,7 +108,7 @@ export default function SettingsPage() {
     if (user) loadTenant();
   }, [user, loadTenant]);
 
-  const handleTenantSaved = async (updated: Tenant) => {
+  const handleTenantSaved = async (updated: PlatformBrand) => {
     setTenant(updated);
     await reloadBrand();
   };

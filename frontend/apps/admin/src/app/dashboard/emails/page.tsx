@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
+import { env } from '@/env';
 import { LoadingSpinner, Select } from '@psi/ui';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────
@@ -100,8 +101,8 @@ function templateLabel(template: string): string {
 }
 
 const PAGE_SIZE = 20;
-// O PostgREST é exposto via Nginx em /rest/v1/
-const POSTGREST_BASE = process.env.NEXT_PUBLIC_POSTGREST_URL || 'http://localhost:8000/rest/v1';
+// O PostgREST é exposto via Nginx conforme env.NEXT_PUBLIC_POSTGREST_URL
+const POSTGREST_BASE = env.NEXT_PUBLIC_POSTGREST_URL;
 
 async function fetchEmailLogs(
   token: string,

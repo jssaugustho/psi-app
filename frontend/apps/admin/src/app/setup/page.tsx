@@ -22,11 +22,14 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [hasAdmin, setHasAdmin] = useState(false);
+
   useEffect(() => {
     async function checkStatus() {
       try {
         const status = await api.getBootstrapStatus();
         setBootstrapped(status.bootstrapped);
+        setHasAdmin(Boolean(status.has_admin));
       } catch (err: any) {
         console.error('Erro ao verificar status de bootstrap:', err);
       } finally {
@@ -87,8 +90,8 @@ export default function SetupPage() {
     );
   }
 
-  // ── Já inicializado ───────────────────────────────────────────────────────
-  if (bootstrapped) {
+  // ── Já possui Administrador cadastrado ─────────────────────────────────────
+  if (bootstrapped || hasAdmin) {
     return (
       <div
         className="min-h-screen flex items-center justify-center p-4"

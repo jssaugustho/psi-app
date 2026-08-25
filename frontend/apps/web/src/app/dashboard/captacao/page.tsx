@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
-import { api, CapturePage } from '@/lib/api';
+import { api, CapturePage, WorkspaceDomain } from '@/lib/api';
 import { Card, Button, LoadingSpinner, ConfirmModal } from '@psi/ui';
 import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, Copy, Loader2, Clock, ArrowRight, Edit3, X, ChevronRight } from 'lucide-react';
 import { Link } from '@/components/Link';
@@ -18,6 +18,7 @@ export default function CaptacaoPage() {
   const [error, setError] = useState('');
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [pageToDelete, setPageToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [workspaceDomain, setWorkspaceDomain] = useState<WorkspaceDomain | null>(null);
   const [verifiedDomains, setVerifiedDomains] = useState<Record<string, boolean>>({});
   const [isTenantDomainActive, setIsTenantDomainActive] = useState(false);
   const [drafts, setDrafts] = useState<any[]>([]);
@@ -138,8 +139,12 @@ export default function CaptacaoPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.getCapturePages(tenant.id);
+      const [data, domainData] = await Promise.all([
+        api.getCapturePages(tenant.id),
+        api.getWorkspaceDomain(tenant.id).catch(() => null),
+      ]);
       setPages(data);
+      setWorkspaceDomain(domainData);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar as páginas de captação.');
     } finally {
@@ -170,10 +175,11 @@ export default function CaptacaoPage() {
 
   // Check tenant custom domain active status in production
   useEffect(() => {
-    if (tenant?.domain) {
+    const customDomain = workspaceDomain?.customDomain;
+    if (customDomain) {
       const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
       if (!isLocal) {
-        checkDomainActive(tenant.domain).then((active) => {
+        checkDomainActive(customDomain).then((active) => {
           setIsTenantDomainActive(active);
         });
       }
@@ -275,7 +281,9 @@ export default function CaptacaoPage() {
     if (!tenant) return '#';
 
     const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app';
-    const domainHost = tenant.domain ? tenant.domain : `${tenant.slug}.${baseDomain}`;
+    const subdomain = workspaceDomain?.subdomain;
+    const customDomain = workspaceDomain?.customDomain;
+    const domainHost = customDomain ? customDomain : subdomain ? `${subdomain}.${baseDomain}` : baseDomain;
     const pagePath = page.slug ? `/${page.slug}` : '/';
 
     return `https://${domainHost}${pagePath}`;
@@ -451,29 +459,31 @@ export default function CaptacaoPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>Endereço Gratuito:</span>
-                    <a
-                      href={`https://${tenant?.slug}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}${page.slug ? `/${page.slug}` : '/'}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
-                    >
-                      {tenant?.slug}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}{page.slug ? `/${page.slug}` : '/'}
-                      <ExternalLink className="h-3 w-3 shrink-0" />
-                    </a>
-                  </div>
+                  {workspaceDomain?.subdomain && (
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>Endereço Gratuito:</span>
+                      <a
+                        href={`https://${workspaceDomain.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}${page.slug ? `/${page.slug}` : '/'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--brand-gradient-start)] hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
+                      >
+                        {workspaceDomain.subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app'}{page.slug ? `/${page.slug}` : '/'}
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    </div>
+                  )}
 
-                  {tenant?.domain && (
+                  {workspaceDomain?.customDomain && (
                     <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                       <span>Domínio Próprio:</span>
                       <a
-                        href={`https://${tenant.domain}${page.slug ? `/${page.slug}` : '/'}`}
+                        href={`https://${workspaceDomain.customDomain}${page.slug ? `/${page.slug}` : '/'}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-emerald-500 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[200px]"
                       >
-                        {tenant.domain}{page.slug ? `/${page.slug}` : '/'}
+                        {workspaceDomain.customDomain}{page.slug ? `/${page.slug}` : '/'}
                         <ExternalLink className="h-3 w-3 shrink-0" />
                       </a>
                     </div>

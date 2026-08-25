@@ -209,10 +209,10 @@ export function BillingSettings() {
                 ) : (
                   subscriptions.map((sub) => {
                     return (
-                      <tr key={sub.tenant_id} className="hover:bg-slate-900/10 transition-colors">
+                      <tr key={sub.workspace_id} className="hover:bg-slate-900/10 transition-colors">
                         <td className="py-3 px-2 font-medium">
-                          <span className="block font-semibold">{sub.tenant_name}</span>
-                          <span className="block text-[10px] opacity-50 font-mono">{sub.tenant_id}</span>
+                          <span className="block font-semibold">{sub.workspace_name}</span>
+                          <span className="block text-[10px] opacity-50 font-mono">{sub.workspace_id}</span>
                         </td>
                         <td className="py-3 px-2 text-slate-300 font-semibold">
                           {sub.owner_email}

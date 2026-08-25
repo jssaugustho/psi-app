@@ -6,7 +6,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source';
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source';
 
 export interface User {
   id: string;
@@ -68,8 +68,6 @@ export interface WorkspaceDomain {
 export interface Workspace {
   id: string;
   name: string;
-  slug?: string;
-  domain?: string | null;
   ownerId?: string | null;
   crp?: string | null;
   bio?: string | null;
@@ -285,13 +283,18 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     ? resolvedEndpoint
     : `${API_BASE_URL}${resolvedEndpoint}`;
 
+  const isPostgrest = url.includes('/rest/v1');
+  const fetchOptions: RequestInit = {
+    ...options,
+    headers,
+  };
+  if (!isPostgrest && options.credentials === undefined) {
+    fetchOptions.credentials = 'include';
+  }
+
   let response;
   try {
-    response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers,
-    });
+    response = await fetch(url, fetchOptions);
   } catch (err: any) {
     console.error('Falha de conexão com o backend:', err);
     apiConnection.notifyOffline('Sem resposta do servidor de API. Verifique se o backend está rodando.');
@@ -356,6 +359,23 @@ export const api = {
     fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ ...body, appType: 'app' }),
+    }),
+
+  // Solicitar reset de senha por e-mail
+  forgotPassword: (email: string) =>
+    fetchApi<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, appType: 'app' }),
+    }),
+
+  // Redefinir senha com token de recuperação
+  resetPassword: (password: string, token: string) =>
+    fetchApi<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password }),
     }),
 
   // Renovar access_token usando o refresh_token
@@ -473,7 +493,7 @@ export const api = {
   },
 
   getTenantMembers: async (tenantId: string) => {
-    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${tenantId}&select=id,tenant_id,user_id,role,created_at,updated_at,profile:profiles(id,nome:first_name,sobrenome:last_name,email,phone)`);
+    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/workspace_members?workspace_id=eq.${tenantId}&select=id,workspace_id,user_id,role,created_at,updated_at,profile:profiles(id,nome:first_name,sobrenome:last_name,email,phone)`);
   },
 
   addTenantMemberByEmail: async (tenantId: string, email: string, role: 'admin' | 'secretaria' | 'psicologo' | 'agent') => {
@@ -523,12 +543,12 @@ export const api = {
   getMyTenants: async (userId: string, userRole?: string) => {
     if (userRole === 'admin') {
       try {
-        const allTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc`);
+        const allTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&order=created_at.desc`);
         if (allTenants && allTenants.length > 0) {
           return allTenants.map((t) => ({ ...t, memberRole: 'admin' }));
         }
       } catch (e) {
-        console.warn('Erro ao carregar lista global de tenants para admin:', e);
+        console.warn('Erro ao carregar lista global de workspaces para admin:', e);
       }
     }
 
@@ -536,16 +556,16 @@ export const api = {
     let ownedRes: Tenant[] = [];
 
     try {
-      memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${userId}&select=role,tenant:tenants(${TENANT_SELECT})`);
-      ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?owner_id=eq.${userId}&select=${TENANT_SELECT}`);
+      memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_members?user_id=eq.${userId}&select=role,workspace:workspaces(${TENANT_SELECT})`);
+      ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?owner_id=eq.${userId}&select=${TENANT_SELECT}`);
     } catch (err) {
       console.warn('Erro com TENANT_SELECT customizado, tentando fallback simples:', err);
       try {
-        const SIMPLE_SELECT = 'id,name,slug,domain,ownerId:owner_id';
-        memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${userId}&select=role,tenant:tenants(${SIMPLE_SELECT})`);
-        ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?owner_id=eq.${userId}&select=${SIMPLE_SELECT}`);
+        const SIMPLE_SELECT = 'id,name,ownerId:owner_id';
+        memberRes = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_members?user_id=eq.${userId}&select=role,workspace:workspaces(${SIMPLE_SELECT})`);
+        ownedRes = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?owner_id=eq.${userId}&select=${SIMPLE_SELECT}`);
       } catch (errFallback) {
-        console.error('Erro ao buscar pertencimento de tenants:', errFallback);
+        console.error('Erro ao buscar pertencimento de workspaces:', errFallback);
       }
     }
     
@@ -558,20 +578,20 @@ export const api = {
     }
     
     for (const m of memberRes || []) {
-      if (m.tenant && !ids.has(m.tenant.id)) {
-        list.push({ ...m.tenant, memberRole: m.role });
-        ids.add(m.tenant.id);
+      if (m.workspace && !ids.has(m.workspace.id)) {
+        list.push({ ...m.workspace, memberRole: m.role });
+        ids.add(m.workspace.id);
       }
     }
 
     if (list.length === 0) {
       try {
-        const fallbackTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=id,name,slug,domain,owner_id&order=created_at.desc`);
+        const fallbackTenants = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=id,name,owner_id&order=created_at.desc`);
         if (fallbackTenants && fallbackTenants.length > 0) {
           return fallbackTenants.map((t) => ({ ...t, memberRole: 'admin' }));
         }
       } catch (e) {
-        console.warn('Falha no fallback de tenants:', e);
+        console.warn('Falha no fallback de workspaces:', e);
       }
     }
     
@@ -581,34 +601,17 @@ export const api = {
   updateTenantBranding: async (tenantId: string, body: Partial<Tenant>) => {
     const dbBody: Record<string, any> = {};
     if (body.name !== undefined) dbBody.name = body.name;
-    if (body.slug !== undefined) dbBody.slug = body.slug;
-    if (body.domain !== undefined) dbBody.domain = body.domain;
     if (body.crp !== undefined) dbBody.crp = body.crp;
     if (body.bio !== undefined) dbBody.bio = body.bio;
     if (body.specialties !== undefined) dbBody.specialties = body.specialties;
     if (body.cityState !== undefined) dbBody.city_state = body.cityState;
     if (body.instagram !== undefined) dbBody.instagram = body.instagram;
     if (body.isOnlineService !== undefined) dbBody.is_online_service = body.isOnlineService;
-    if (body.gradientColorStart !== undefined) dbBody.gradient_color_start = body.gradientColorStart;
-    if (body.gradientColorEnd !== undefined) dbBody.gradient_color_end = body.gradientColorEnd;
-    if (body.contrastColor !== undefined) dbBody.contrast_color = body.contrastColor;
-    if (body.bgLightColor !== undefined) dbBody.bg_light_color = body.bgLightColor;
-    if (body.bgDarkColor !== undefined) dbBody.bg_dark_color = body.bgDarkColor;
-    if (body.cardLightColor !== undefined) dbBody.card_light_color = body.cardLightColor;
-    if (body.cardDarkColor !== undefined) dbBody.card_dark_color = body.cardDarkColor;
-    if (body.textLightColor !== undefined) dbBody.text_light_color = body.textLightColor;
-    if (body.textDarkColor !== undefined) dbBody.text_dark_color = body.textDarkColor;
-    if (body.emailDomain !== undefined) dbBody.email_domain = body.emailDomain;
     if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
-    if (body.defaultSiteLogoUrl !== undefined) dbBody.default_site_logo_url = body.defaultSiteLogoUrl;
-    if (body.defaultSiteFaviconUrl !== undefined) dbBody.default_site_favicon_url = body.defaultSiteFaviconUrl;
-    if (body.defaultSiteLogoConfig !== undefined) dbBody.default_site_logo_config = body.defaultSiteLogoConfig;
-    if (body.defaultSitePrimaryColor !== undefined) dbBody.default_site_primary_color = body.defaultSitePrimaryColor;
-    if (body.defaultSiteSecondaryColor !== undefined) dbBody.default_site_secondary_color = body.defaultSiteSecondaryColor;
     if (body.traffic_sources !== undefined) dbBody.traffic_sources = body.traffic_sources;
     if (body.default_traffic_source !== undefined) dbBody.default_traffic_source = body.default_traffic_source;
 
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?id=eq.${tenantId}`, {
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?id=eq.${tenantId}`, {
       method: 'PATCH',
       body: JSON.stringify(dbBody),
       headers: {
@@ -676,29 +679,30 @@ export const api = {
   },
 
   getTenantByDomain: async (domain: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&domain=eq.${domain}`);
-    return res[0] || null;
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(${TENANT_SELECT})&domain=eq.${domain}`);
+    return res[0]?.workspace || null;
   },
 
   getTenantBySlug: async (slug: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&slug=eq.${slug}`);
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&name=ilike.*${slug}*`);
     return res[0] || null;
   },
 
   getTenantById: async (id: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&id=eq.${id}`);
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&id=eq.${id}`);
     return res[0] || null;
   },
 
   // --- CRM: Pipeline Columns ---
   getPipelineColumns: async (tenantId: string): Promise<PipelineColumn[]> => {
-    return fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns?tenant_id=eq.${tenantId}&order=order.asc`);
+    return fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns?workspace_id=eq.${tenantId}&order=order.asc`);
   },
 
   createPipelineColumn: async (body: { tenant_id: string; name: string; order: number; slug?: string; color?: string; category?: string }): Promise<PipelineColumn> => {
+    const { tenant_id, ...rest } = body;
     const res = await fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
       headers: { 'Prefer': 'return=representation' }
     });
     return res[0];
@@ -721,7 +725,7 @@ export const api = {
 
   // --- CRM: Contacts ---
   getContacts: async (tenantId: string): Promise<Contact[]> => {
-    return fetchApi<Contact[]>(`${PGRST_BASE_URL}/contacts?tenant_id=eq.${tenantId}&order=created_at.desc`);
+    return fetchApi<Contact[]>(`${PGRST_BASE_URL}/contacts?workspace_id=eq.${tenantId}&order=created_at.desc`);
   },
 
   createContact: async (body: {
@@ -733,9 +737,10 @@ export const api = {
     source?: string | null;
     screening_notes?: string | null;
   }): Promise<Contact> => {
+    const { tenant_id, ...rest } = body;
     const res = await fetchApi<Contact[]>(`${PGRST_BASE_URL}/contacts`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
       headers: { 'Prefer': 'return=representation' }
     });
     return res[0];
@@ -762,7 +767,7 @@ export const api = {
   },
 
   getGlobalInteractionHistory: async (tenantId: string): Promise<InteractionHistory[]> => {
-    return fetchApi<InteractionHistory[]>(`${PGRST_BASE_URL}/interaction_history?tenant_id=eq.${tenantId}&select=*,contact:contacts(name)&order=created_at.desc&limit=50`);
+    return fetchApi<InteractionHistory[]>(`${PGRST_BASE_URL}/interaction_history?workspace_id=eq.${tenantId}&select=*,contact:contacts(name)&order=created_at.desc&limit=50`);
   },
 
   createInteractionHistory: async (body: {
@@ -772,9 +777,10 @@ export const api = {
     duration_seconds?: number | null;
     notes?: string | null;
   }): Promise<InteractionHistory> => {
+    const { tenant_id, ...rest } = body;
     const res = await fetchApi<InteractionHistory[]>(`${PGRST_BASE_URL}/interaction_history`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
       headers: { 'Prefer': 'return=representation' }
     });
     return res[0];
@@ -817,10 +823,10 @@ export const api = {
 
   // --- Captação: Capture Pages ---
   getCapturePages: async (tenantId: string): Promise<CapturePage[]> => {
-    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?tenant_id=eq.${tenantId}&order=created_at.desc`);
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?workspace_id=eq.${tenantId}&order=created_at.desc`);
     return list.map(item => ({
       id: item.id,
-      tenantId: item.tenant_id,
+      tenantId: item.workspace_id,
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
@@ -847,7 +853,7 @@ export const api = {
     const item = list[0];
     return {
       id: item.id,
-      tenantId: item.tenant_id,
+      tenantId: item.workspace_id,
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
@@ -899,7 +905,7 @@ export const api = {
       success: res.success,
       page: {
         id: res.page.id,
-        tenantId: res.page.tenantId || res.page.tenant_id,
+        tenantId: res.page.workspaceId || res.page.workspace_id || res.page.tenantId || res.page.tenant_id,
         title: res.page.title,
         slug: res.page.slug,
         isActive: res.page.isActive ?? res.page.is_active,
@@ -948,7 +954,7 @@ export const api = {
     const item = res[0];
     return {
       id: item.id,
-      tenantId: item.tenant_id,
+      tenantId: item.workspace_id,
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
@@ -1039,10 +1045,10 @@ export const api = {
 
   // --- Captação: Contract Templates ---
   getContractTemplates: async (tenantId: string): Promise<ContractTemplate[]> => {
-    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?tenant_id=eq.${tenantId}&order=created_at.desc`);
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?workspace_id=eq.${tenantId}&order=created_at.desc`);
     return list.map(item => ({
       id: item.id,
-      tenantId: item.tenant_id,
+      tenantId: item.workspace_id || item.tenant_id,
       title: item.title,
       content: item.content,
       createdAt: item.created_at,
@@ -1051,15 +1057,16 @@ export const api = {
   },
 
   createContractTemplate: async (body: { tenant_id: string; title: string; content: string }): Promise<ContractTemplate> => {
+    const { tenant_id, ...rest } = body;
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
       headers: { 'Prefer': 'return=representation' }
     });
     const item = res[0];
     return {
       id: item.id,
-      tenantId: item.tenant_id,
+      tenantId: item.workspace_id || item.tenant_id,
       title: item.title,
       content: item.content,
       createdAt: item.created_at,
@@ -1132,7 +1139,91 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ domain, hostnameId }),
     });
-  }
+  },
+
+  createWorkspace: async (name: string, ownerId: string): Promise<Workspace> => {
+    const res = await fetchApi<Workspace[]>(`${PGRST_BASE_URL}/workspaces`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        owner_id: ownerId,
+      }),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
+  createWorkspaceMember: async (workspaceId: string, userId: string, role: string): Promise<WorkspaceMember> => {
+    const res = await fetchApi<WorkspaceMember[]>(`${PGRST_BASE_URL}/workspace_members`, {
+      method: 'POST',
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        user_id: userId,
+        role,
+      }),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
+  createWorkspaceDomain: async (workspaceId: string, subdomain: string): Promise<any> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains`, {
+      method: 'POST',
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        subdomain,
+      }),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
+  createVisualIdentity: async (body: {
+    workspaceId: string;
+    name: string;
+    isWorkspaceDefault: boolean;
+    primaryColor: string;
+    secondaryColor: string;
+    contrastColor: string;
+    bgColor: string;
+    cardColor: string;
+    textColor: string;
+  }): Promise<any> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities`, {
+      method: 'POST',
+      body: JSON.stringify({
+        workspace_id: body.workspaceId,
+        name: body.name,
+        is_workspace_default: body.isWorkspaceDefault,
+        primary_color: body.primaryColor,
+        secondary_color: body.secondaryColor,
+        contrast_color: body.contrastColor,
+        bg_color: body.bgColor,
+        card_color: body.cardColor,
+        text_color: body.textColor,
+      }),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
+  checkSubdomainExists: async (subdomain: string): Promise<boolean> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?subdomain=eq.${subdomain.toLowerCase().trim()}`);
+    return res.length > 0;
+  },
+
+  getWorkspaceDomain: async (workspaceId: string): Promise<WorkspaceDomain | null> => {
+    const res = await fetchApi<WorkspaceDomain[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}&select=id,workspaceId:workspace_id,subdomain,customDomain:custom_domain,cfHostnameId:cf_hostname_id,dnsStatus:dns_status,dnsRecords:dns_records,createdAt:created_at,updatedAt:updated_at`);
+    return res[0] || null;
+  },
 };
 
 export interface CapturePage {

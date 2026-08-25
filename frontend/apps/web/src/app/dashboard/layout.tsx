@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, Tenant } from '@/lib/api';
-import { AppShell, LoadingSpinner, Card } from '@psi/ui';
+import { AppShell, LoadingSpinner, Card, Button } from '@psi/ui';
 import { Link } from '@/components/Link';
 import { UserProfileModal } from '@/components/user-profile-modal';
 
@@ -197,21 +197,48 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   // Bloqueio global se o sistema não estiver inicializado (sem Admin)
   if (bootstrapped === false) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-center text-white">
-        <Card className="max-w-md w-full p-8 space-y-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-3xl flex items-center justify-center mx-auto mb-2">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center relative animate-page-enter">
+        {/* Botão de alternância de tema no canto superior direito */}
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            style={{
+              border: '1px solid var(--surface-border)',
+              color: 'var(--brand-text-color)',
+            }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all text-base cursor-pointer bg-transparent hover:bg-[var(--surface-hover)]"
+            title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+          >
+            {theme === 'dark' ? (
+              <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10 5 5 0 000-10z" />
+              </svg>
+            ) : (
+              <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        <Card className="max-w-md w-full p-8 space-y-5 text-center">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-3xl flex items-center justify-center mx-auto mb-2">
             🔒
           </div>
-          <h1 className="text-xl font-bold">Sistema Indisponível</h1>
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent" style={{ background: "var(--brand-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            Sistema Indisponível
+          </h1>
+          <p className="text-xs leading-relaxed brand-text-muted">
             O sistema ainda não possui um Administrador inicial cadastrado. Por favor, acesse o <strong>Backoffice Admin</strong> para realizar a inicialização (bootstrap) da plataforma.
           </p>
-          <button
+          <Button
             onClick={() => logout()}
-            className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer border border-slate-700 bg-slate-900 hover:bg-slate-800 transition-all font-mono uppercase text-slate-200 mt-4"
+            variant="primary"
+            className="w-full mt-4"
           >
             Sair da Sessão
-          </button>
+          </Button>
         </Card>
       </div>
     );
@@ -277,8 +304,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // Permitir exibição direta da página de seleção de workspace
-  if (pathname === '/dashboard/selecionar-consultorio') {
+  // Permitir exibição direta da página de seleção de workspace ou onboarding
+  if (pathname === '/dashboard/selecionar-consultorio' || pathname === '/dashboard/onboarding') {
     return <>{children}</>;
   }
 
@@ -288,25 +315,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // 5. Se não tiver nenhum consultório vinculado
+  // 5. Se não tiver nenhum consultório vinculado, redireciona para a página de onboarding
   if (myTenants.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
-        <Card className="w-full max-w-md p-6 text-center space-y-4">
-          <div className="text-xl">⚠️</div>
-          <h2 className="text-lg font-bold text-slate-100">Nenhuma Clínica Vinculada</h2>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Você ainda não está associado a nenhuma clínica ou espaço clínico na plataforma. Entre em contato com seu administrador para receber um convite de acesso.
-          </p>
-          <button
-            onClick={logout}
-            className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer border-none text-white bg-slate-900 hover:bg-slate-800 transition-all font-mono uppercase"
-          >
-            Sair da Sessão
-          </button>
-        </Card>
-      </div>
-    );
+    if (pathname !== '/dashboard/onboarding') {
+      router.push('/dashboard/onboarding');
+      return null;
+    }
   }
 
   const menuItems = [

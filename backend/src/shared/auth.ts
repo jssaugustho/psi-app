@@ -92,6 +92,8 @@ export async function createGoTrueUser(
       email,
       password,
       email_confirm: true,
+      role: 'authenticated',
+      app_metadata: { provider: 'email', providers: ['email'] },
       user_metadata: metadata,
     }),
   });

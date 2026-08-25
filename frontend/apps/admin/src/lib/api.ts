@@ -1,12 +1,17 @@
 import { compressImage, type UploadType } from '@psi/image-utils';
+import { env } from '../env';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+const API_BASE_URL = env.NEXT_PUBLIC_API_URL;
 
-const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
+const PGRST_BASE_URL = env.NEXT_PUBLIC_POSTGREST_URL || (API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
-  : API_BASE_URL + '/rest/v1';
+  : API_BASE_URL ? API_BASE_URL + '/rest/v1' : '/rest/v1');
 
-const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color';
+// Workspace tem apenas: id, name, owner_id, crp, bio, specialties, city_state,
+// instagram, is_online_service, default_site_avatar_url, traffic_sources,
+// default_traffic_source, created_at, updated_at
+// Branding (logos, cores) fica em visual_identities — não em workspaces
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source,createdAt:created_at,updatedAt:updated_at';
 
 const PROFILE_SELECT = 'id,nome:first_name,sobrenome:last_name,telefone:phone,email,avatar_url,role,created_at';
 
@@ -42,26 +47,17 @@ export interface BootstrapStatusResponse {
 export interface Tenant {
   id: string;
   name: string;
-  slug: string;
-  domain: string | null;
   ownerId?: string | null;
-  logoLightUrl: string | null;
-  logoDarkUrl: string | null;
-  iconLightUrl: string | null;
-  iconDarkUrl: string | null;
-  gradientColorStart: string;
-  gradientColorEnd: string;
-  contrastColor: string;
-  bgLightColor?: string;
-  bgDarkColor?: string;
-  cardLightColor?: string;
-  cardDarkColor?: string;
-  textLightColor?: string;
-  textDarkColor?: string;
-  emailDomain?: string | null;
-  resendApiKey?: string | null;
-  traffic_sources?: string[];
-  default_traffic_source?: string;
+  // Informações clínicas do workspace
+  crp?: string | null;
+  bio?: string | null;
+  specialties?: string[] | null;
+  cityState?: string | null;
+  instagram?: string | null;
+  isOnlineService?: boolean;
+  defaultSiteAvatarUrl?: string | null;
+  trafficSources?: string[];
+  defaultTrafficSource?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -98,7 +94,7 @@ export interface PlatformSettings {
 
 export interface TenantMember {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
   user_id: string;
   role: 'admin' | 'agent';
   created_at: string;
@@ -107,8 +103,8 @@ export interface TenantMember {
 }
 
 export interface TenantSubscription {
-  tenant_id: string;
-  tenant_name: string;
+  workspace_id: string;
+  workspace_name: string;
   owner_id: string | null;
   base_price: number;
   additional_member_price: number;
@@ -119,18 +115,39 @@ export interface TenantSubscription {
 }
 
 
+export interface PlatformBrand {
+  name: string;
+  slug?: string;
+  domain?: string | null;
+  logoLightUrl: string | null;
+  logoDarkUrl: string | null;
+  iconLightUrl: string | null;
+  iconDarkUrl: string | null;
+  gradientColorStart: string;
+  gradientColorEnd: string;
+  contrastColor: string;
+  bgLightColor?: string;
+  bgDarkColor?: string;
+}
+
 export interface PlatformSetupStatusResponse {
   is_configured: boolean;
   has_cloudflare: boolean;
   has_r2: boolean;
+  has_resend_key?: boolean;
+  has_resend_domain?: boolean;
   has_resend: boolean;
+  cloudflare_api_token?: string | null;
   cloudflare_zone_id: string | null;
   cloudflare_account_id: string | null;
   base_domain: string | null;
   r2_bucket_name: string | null;
   r2_public_domain: string | null;
+  r2_access_key_id?: string | null;
+  r2_secret_access_key?: string | null;
+  resend_api_key?: string | null;
   resend_from_domain: string | null;
-  primary_tenant: Tenant | null;
+  primary_tenant: PlatformBrand | null;
 }
 
 export interface DnsRecord {
@@ -211,6 +228,24 @@ async function doRefresh(): Promise<string> {
   return _refreshPromise;
 }
 
+type ApiConnectionListener = (status: 'offline' | 'online', errorDetails?: string) => void;
+const connectionListeners = new Set<ApiConnectionListener>();
+
+export const apiConnection = {
+  subscribe(listener: ApiConnectionListener) {
+    connectionListeners.add(listener);
+    return () => {
+      connectionListeners.delete(listener);
+    };
+  },
+  notifyOffline(errorMsg?: string) {
+    connectionListeners.forEach((fn) => fn('offline', errorMsg));
+  },
+  notifyOnline() {
+    connectionListeners.forEach((fn) => fn('online'));
+  },
+};
+
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -226,30 +261,34 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
-    ? endpoint
-    : `${API_BASE_URL}${endpoint}`;
+  let resolvedEndpoint = endpoint;
+  if (API_BASE_URL.endsWith('/v1') && resolvedEndpoint.startsWith('/v1/')) {
+    resolvedEndpoint = resolvedEndpoint.slice(3);
+  }
+
+  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
+    ? resolvedEndpoint
+    : `${API_BASE_URL}${resolvedEndpoint}`;
+
+  const isPostgrest = url.includes('/rest/v1');
+  const fetchOptions: RequestInit = {
+    ...options,
+    headers,
+  };
+  if (!isPostgrest && options.credentials === undefined) {
+    fetchOptions.credentials = 'include';
+  }
 
   let response;
   try {
-    response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers,
-    });
+    response = await fetch(url, fetchOptions);
   } catch (err: any) {
-    console.error('Falha de conexão com o backend:', err);
-    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
-      window.location.href = '/offline';
-    }
+    console.error('Falha de conexão com o backend no endpoint:', endpoint, err);
     throw new Error('Servidor de API indisponível.');
   }
 
   // Verificar status 502, 503, 504 (erros de proxy/gateway)
   if ([502, 503, 504].includes(response.status)) {
-    if (typeof window !== 'undefined' && window.location.pathname !== '/offline') {
-      window.location.href = '/offline';
-    }
     throw new Error('Servidor de API temporariamente indisponível.');
   }
 
@@ -324,6 +363,23 @@ export const api = {
     fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ ...body, appType: 'admin' }),
+    }),
+
+  // Solicitar reset de senha por e-mail
+  forgotPassword: (email: string) =>
+    fetchApi<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, appType: 'admin' }),
+    }),
+
+  // Redefinir senha com token de recuperação
+  resetPassword: (password: string, token: string) =>
+    fetchApi<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password }),
     }),
 
   // Buscar perfil do usuário logado através da API autenticada
@@ -460,12 +516,8 @@ export const api = {
     contrast_color: string;
     bg_light_color?: string;
     bg_dark_color?: string;
-    card_light_color?: string;
-    card_dark_color?: string;
-    text_light_color?: string;
-    text_dark_color?: string;
   }) =>
-    fetchApi<{ message: string; tenant: Tenant }>('/platform/setup/tenant', {
+    fetchApi<{ message: string; tenant: PlatformBrand }>('/platform/setup/tenant', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -473,7 +525,7 @@ export const api = {
   // Buscar Marca da Plataforma em platform_settings
   getPrimaryTenant: async () => {
     try {
-      const res = await fetchApi<{ tenant: Tenant }>('/platform/tenant/primary');
+      const res = await fetchApi<{ tenant: PlatformBrand }>('/platform/tenant/primary');
       return { tenant: res.tenant };
     } catch (e) {
       return { tenant: null as any };
@@ -494,12 +546,8 @@ export const api = {
     contrast_color: string;
     bg_light_color: string;
     bg_dark_color: string;
-    card_light_color: string;
-    card_dark_color: string;
-    text_light_color: string;
-    text_dark_color: string;
   }>) => {
-    const res = await fetchApi<{ message: string; tenant: Tenant }>('/platform/tenant/primary', {
+    const res = await fetchApi<{ message: string; tenant: PlatformBrand }>('/platform/tenant/primary', {
       method: 'PUT',
       body: JSON.stringify(body),
     });
@@ -622,29 +670,55 @@ export const api = {
     return res[0];
   },
 
+  // Assinaturas: calculadas dinamicamente a partir de workspaces + workspace_members
+  // (tabela tenant_subscriptions não existe no banco)
   getTenantSubscriptions: async () => {
-    return fetchApi<TenantSubscription[]>(`${PGRST_BASE_URL}/tenant_subscriptions?order=created_at.desc`);
+    const workspaces = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&order=created_at.desc`);
+    const members = await fetchApi<Array<{ workspace_id: string }>>(`${PGRST_BASE_URL}/workspace_members?select=workspace_id`);
+    return workspaces.map(w => ({
+      workspace_id: w.id,
+      workspace_name: w.name,
+      owner_id: w.ownerId || null,
+      base_price: 0,
+      additional_member_price: 0,
+      members_count: members.filter(m => m.workspace_id === w.id).length,
+      total_price: 0,
+      created_at: w.createdAt || '',
+    })) as TenantSubscription[];
   },
 
-  getTenantSubscription: async (tenantId: string) => {
-    const res = await fetchApi<TenantSubscription[]>(`${PGRST_BASE_URL}/tenant_subscriptions?tenant_id=eq.${tenantId}&limit=1`);
-    return res[0] || null;
+  getTenantSubscription: async (workspaceId: string) => {
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&id=eq.${workspaceId}&limit=1`);
+    if (!res || res.length === 0) return null;
+    const w = res[0];
+    const members = await fetchApi<Array<{ workspace_id: string }>>(`${PGRST_BASE_URL}/workspace_members?workspace_id=eq.${workspaceId}&select=workspace_id`);
+    return {
+      workspace_id: w.id,
+      workspace_name: w.name,
+      owner_id: w.ownerId || null,
+      base_price: 0,
+      additional_member_price: 0,
+      members_count: members.length,
+      total_price: 0,
+      created_at: w.createdAt || '',
+    } as TenantSubscription;
   },
 
-  getTenantMembers: async (tenantId: string) => {
-    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${tenantId}&select=id,tenant_id,user_id,role,created_at,updated_at,profile:profiles(id,nome:first_name,sobrenome:last_name,email,phone)`);
+  // workspace_members (antes: tenant_members — tabela não existe mais)
+  getTenantMembers: async (workspaceId: string) => {
+    return fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/workspace_members?workspace_id=eq.${workspaceId}&select=id,workspace_id,user_id,role,created_at,updated_at,profile:profiles(id,nome:first_name,sobrenome:last_name,email,phone)`);
   },
 
-  addTenantMemberByEmail: async (tenantId: string, email: string, role: 'admin' | 'agent') => {
+  addTenantMemberByEmail: async (workspaceId: string, email: string, role: 'admin' | 'agent') => {
     const usersRes = await fetchApi<User[]>(`${PGRST_BASE_URL}/profiles?email=eq.${email.trim().toLowerCase()}&limit=1`);
     if (!usersRes || usersRes.length === 0) {
       throw new Error(`Usuário com e-mail "${email}" não encontrado na plataforma. Por favor, registre o usuário primeiro.`);
     }
     const userId = usersRes[0].id;
-    const res = await fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members`, {
+    const res = await fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/workspace_members`, {
       method: 'POST',
       body: JSON.stringify({
-        tenant_id: tenantId,
+        workspace_id: workspaceId,
         user_id: userId,
         role: role
       }),
@@ -656,7 +730,7 @@ export const api = {
   },
 
   updateTenantMemberRole: async (memberId: string, role: 'admin' | 'agent') => {
-    const res = await fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/tenant_members?id=eq.${memberId}`, {
+    const res = await fetchApi<TenantMember[]>(`${PGRST_BASE_URL}/workspace_members?id=eq.${memberId}`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
       headers: {
@@ -667,17 +741,17 @@ export const api = {
   },
 
   removeTenantMember: async (memberId: string) => {
-    await fetchApi(`${PGRST_BASE_URL}/tenant_members?id=eq.${memberId}`, {
+    await fetchApi(`${PGRST_BASE_URL}/workspace_members?id=eq.${memberId}`, {
       method: 'DELETE'
     });
   },
 
   getTenantsList: async () => {
-    return fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc`);
+    return fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&order=created_at.desc`);
   },
 
-  updateTenantOwner: async (tenantId: string, ownerId: string | null) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?id=eq.${tenantId}`, {
+  updateTenantOwner: async (workspaceId: string, ownerId: string | null) => {
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?id=eq.${workspaceId}`, {
       method: 'PATCH',
       body: JSON.stringify({ owner_id: ownerId }),
       headers: {
@@ -688,17 +762,16 @@ export const api = {
   },
 
   getTenantById: async (id: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&id=eq.${id}`);
+    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&id=eq.${id}`);
     return res[0];
   },
 
-  createTenant: async (body: { name: string; slug: string; domain?: string | null; ownerId?: string | null }) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants`, {
+  // Criar workspace — só campos reais existem: name, owner_id
+  createTenant: async (body: { name: string; ownerId?: string | null }) => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspaces`, {
       method: 'POST',
       body: JSON.stringify({
         name: body.name,
-        slug: body.slug,
-        domain: body.domain || null,
         owner_id: body.ownerId || null,
       }),
       headers: {
@@ -708,29 +781,22 @@ export const api = {
     return res[0];
   },
 
+  // Atualizar workspace — só campos reais: name, owner_id e campos clínicos
   updateTenant: async (id: string, body: Partial<Tenant>) => {
     const dbBody: Record<string, any> = {};
     if (body.name !== undefined) dbBody.name = body.name;
-    if (body.slug !== undefined) dbBody.slug = body.slug;
-    if (body.domain !== undefined) dbBody.domain = body.domain;
     if (body.ownerId !== undefined) dbBody.owner_id = body.ownerId;
-    if (body.logoLightUrl !== undefined) dbBody.logo_light_url = body.logoLightUrl;
-    if (body.logoDarkUrl !== undefined) dbBody.logo_dark_url = body.logoDarkUrl;
-    if (body.iconLightUrl !== undefined) dbBody.icon_light_url = body.iconLightUrl;
-    if (body.iconDarkUrl !== undefined) dbBody.icon_dark_url = body.iconDarkUrl;
-    if (body.gradientColorStart !== undefined) dbBody.gradient_color_start = body.gradientColorStart;
-    if (body.gradientColorEnd !== undefined) dbBody.gradient_color_end = body.gradientColorEnd;
-    if (body.contrastColor !== undefined) dbBody.contrast_color = body.contrastColor;
-    if (body.bgLightColor !== undefined) dbBody.bg_light_color = body.bgLightColor;
-    if (body.bgDarkColor !== undefined) dbBody.bg_dark_color = body.bgDarkColor;
-    if (body.cardLightColor !== undefined) dbBody.card_light_color = body.cardLightColor;
-    if (body.cardDarkColor !== undefined) dbBody.card_dark_color = body.cardDarkColor;
-    if (body.textLightColor !== undefined) dbBody.text_light_color = body.textLightColor;
-    if (body.textDarkColor !== undefined) dbBody.text_dark_color = body.textDarkColor;
-    if (body.emailDomain !== undefined) dbBody.email_domain = body.emailDomain;
-    if (body.resendApiKey !== undefined) dbBody.resend_api_key = body.resendApiKey;
+    if (body.crp !== undefined) dbBody.crp = body.crp;
+    if (body.bio !== undefined) dbBody.bio = body.bio;
+    if (body.specialties !== undefined) dbBody.specialties = body.specialties;
+    if (body.cityState !== undefined) dbBody.city_state = body.cityState;
+    if (body.instagram !== undefined) dbBody.instagram = body.instagram;
+    if (body.isOnlineService !== undefined) dbBody.is_online_service = body.isOnlineService;
+    if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
+    if (body.trafficSources !== undefined) dbBody.traffic_sources = body.trafficSources;
+    if (body.defaultTrafficSource !== undefined) dbBody.default_traffic_source = body.defaultTrafficSource;
 
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?id=eq.${id}`, {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspaces?id=eq.${id}`, {
       method: 'PATCH',
       body: JSON.stringify(dbBody),
       headers: {
@@ -741,19 +807,15 @@ export const api = {
   },
 
   deleteTenant: async (id: string) => {
-    await fetchApi(`/platform/tenants/${id}`, {
+    await fetchApi(`/platform/workspaces/${id}`, {
       method: 'DELETE'
     });
   },
 
+  // Busca por domínio customizado (coluna custom_domain, não domain)
   getTenantByDomain: async (domain: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&domain=eq.${domain}`);
-    return res[0] || null;
-  },
-
-  getTenantBySlug: async (slug: string) => {
-    const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&slug=eq.${slug}`);
-    return res[0] || null;
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(${TENANT_SELECT})&custom_domain=eq.${domain}`);
+    return res[0]?.workspace || null;
   },
 };
 

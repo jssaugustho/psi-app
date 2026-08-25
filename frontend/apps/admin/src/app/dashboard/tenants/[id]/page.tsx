@@ -133,77 +133,6 @@ const SearchableUserSelect = ({ users, selectedValue, onChange }: SearchableUser
   );
 };
 
-// ── COMPONENTE: UPLOAD BOX (CLOUD FLARE R2) ───────────────────────────────
-type LogoField = 'logoLightUrl' | 'logoDarkUrl' | 'iconLightUrl' | 'iconDarkUrl';
-
-const UploadBox = ({
-  label,
-  url,
-  onUpload,
-  onClear,
-  uploading,
-  previewBg,
-}: {
-  label: string;
-  url: string;
-  onUpload: (file: File) => void;
-  onClear: () => void;
-  uploading: boolean;
-  previewBg: string;
-}) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (uploading) return;
-    inputRef.current?.click();
-  };
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-semibold opacity-70 uppercase tracking-wide">{label}</p>
-      <div
-        onClick={handleClick}
-        className="relative flex items-center justify-center rounded-xl border-2 border-dashed border-slate-800 overflow-hidden cursor-pointer hover:border-slate-600 transition-all group"
-        style={{ minHeight: 90, backgroundColor: previewBg }}
-      >
-        {url ? (
-          <>
-            <img src={url} alt={label} className="max-h-16 max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClear();
-              }}
-              className="absolute top-1 right-1 w-5 h-5 bg-red-500/90 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600 transition-colors shadow z-10 border-none cursor-pointer"
-              title="Remover"
-            >
-              笨�
-            </button>
-            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/75 border border-white/10 text-[9px] font-bold text-white uppercase tracking-wider pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity">
-              Mudar
-            </div>
-          </>
-        ) : (
-          <div className="text-xs opacity-50 hover:opacity-100 transition-opacity py-4 px-6 flex flex-col items-center gap-1">
-            <span>{uploading ? '竢ｳ Enviando窶ｦ' : '+ Adicionar'}</span>
-          </div>
-        )}
-      </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onUpload(file);
-        }}
-      />
-    </div>
-  );
-};
-
 export default function TenantBrandingPage() {
   const params = useParams();
   const tenantId = params.id as string;
@@ -220,41 +149,24 @@ export default function TenantBrandingPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Exclusãoo modal
+  // Modal de exclusão
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Uploading logo state
-  const [uploadingLogo, setUploadingLogo] = useState<Partial<Record<LogoField, boolean>>>({});
-
-  // Formulário
+  // Formulário — só campos que existem em workspaces
   const [form, setForm] = useState({
     name: '',
-    slug: '',
-    domain: '',
     ownerId: 'none',
-    // E-mail
-    emailDomain: '',
-    resendApiKey: '',
-    // White Label - Logos/Ícones
-    logoLightUrl: '',
-    logoDarkUrl: '',
-    iconLightUrl: '',
-    iconDarkUrl: '',
-    // White Label - Cores
-    gradientColorStart: '#4F46E5',
-    gradientColorEnd: '#06B6D4',
-    contrastColor: '#FFFFFF',
-    bgLightColor: '#F8FAFC',
-    bgDarkColor: '#020617',
-    cardLightColor: '#FFFFFF',
-    cardDarkColor: '#0F172A',
-    textLightColor: '#0F172A',
-    textDarkColor: '#F8FAFC',
+    // Informações clínicas
+    crp: '',
+    bio: '',
+    instagram: '',
+    cityState: '',
+    isOnlineService: true,
   });
 
-  // Carregar dados do tenant
+  // Carregar dados do workspace
   const loadTenant = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -265,35 +177,23 @@ export default function TenantBrandingPage() {
         api.getUsers(),
       ]);
       if (!data) {
-        setError('Tenant não encontrado.');
+        setError('Workspace não encontrado.');
         return;
       }
       setTenant(data);
       setUsers(usersList);
       setForm({
         name: data.name || '',
-        slug: data.slug || '',
-        domain: data.domain || '',
         ownerId: data.ownerId || 'none',
-        emailDomain: data.emailDomain || '',
-        resendApiKey: data.resendApiKey || '',
-        logoLightUrl: data.logoLightUrl || '',
-        logoDarkUrl: data.logoDarkUrl || '',
-        iconLightUrl: data.iconLightUrl || '',
-        iconDarkUrl: data.iconDarkUrl || '',
-        gradientColorStart: data.gradientColorStart || '#4F46E5',
-        gradientColorEnd: data.gradientColorEnd || '#06B6D4',
-        contrastColor: data.contrastColor || '#FFFFFF',
-        bgLightColor: data.bgLightColor || '#F8FAFC',
-        bgDarkColor: data.bgDarkColor || '#020617',
-        cardLightColor: data.cardLightColor || '#FFFFFF',
-        cardDarkColor: data.cardDarkColor || '#0F172A',
-        textLightColor: data.textLightColor || '#0F172A',
-        textDarkColor: data.textDarkColor || '#F8FAFC',
+        crp: data.crp || '',
+        bio: data.bio || '',
+        instagram: data.instagram || '',
+        cityState: data.cityState || '',
+        isOnlineService: data.isOnlineService ?? true,
       });
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro ao obter dados do tenant.');
+      setError(err.message || 'Erro ao obter dados do workspace.');
     } finally {
       setLoading(false);
     }
@@ -305,21 +205,6 @@ export default function TenantBrandingPage() {
     }
   }, [currentUser, loadTenant]);
 
-  const handleUploadLogo = async (field: LogoField, file: File) => {
-    setUploadingLogo((u) => ({ ...u, [field]: true }));
-    setError('');
-    setSuccess('');
-    try {
-      const uploadType = field.toLowerCase().includes('icon') ? 'icon' : 'logo';
-      const { url } = await api.uploadImage(file, uploadType);
-      setForm((f) => ({ ...f, [field]: url }));
-    } catch (err: any) {
-      setError(`Erro ao enviar ${field.replace(/([A-Z])/g, ' $1')}: ${err.message}`);
-    } finally {
-      setUploadingLogo((u) => ({ ...u, [field]: false }));
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -329,26 +214,14 @@ export default function TenantBrandingPage() {
       const resolvedOwnerId = form.ownerId === 'none' ? null : form.ownerId;
       await api.updateTenant(tenantId, {
         name: form.name,
-        slug: form.slug.toLowerCase().trim(),
-        domain: form.domain || null,
         ownerId: resolvedOwnerId,
-        emailDomain: form.emailDomain || null,
-        resendApiKey: form.resendApiKey || null,
-        logoLightUrl: form.logoLightUrl || null,
-        logoDarkUrl: form.logoDarkUrl || null,
-        iconLightUrl: form.iconLightUrl || null,
-        iconDarkUrl: form.iconDarkUrl || null,
-        gradientColorStart: form.gradientColorStart,
-        gradientColorEnd: form.gradientColorEnd,
-        contrastColor: form.contrastColor,
-        bgLightColor: form.bgLightColor,
-        bgDarkColor: form.bgDarkColor,
-        cardLightColor: form.cardLightColor,
-        cardDarkColor: form.cardDarkColor,
-        textLightColor: form.textLightColor,
-        textDarkColor: form.textDarkColor,
+        crp: form.crp || null,
+        bio: form.bio || null,
+        instagram: form.instagram || null,
+        cityState: form.cityState || null,
+        isOnlineService: form.isOnlineService,
       });
-      setSuccess('Configurações do tenant salvas com sucesso!');
+      setSuccess('Configurações do workspace salvas com sucesso!');
       await reloadBrand();
       await loadTenant();
     } catch (err: any) {
@@ -361,7 +234,7 @@ export default function TenantBrandingPage() {
   const handleDeleteTenant = async () => {
     if (!tenant) return;
     if (deleteConfirmationText !== tenant.name) {
-      alert('O nome digitado nãoo corresponde ao nome do tenant.');
+      alert('O nome digitado não corresponde ao nome do workspace.');
       return;
     }
 
@@ -372,19 +245,17 @@ export default function TenantBrandingPage() {
       setIsDeleteModalOpen(false);
       router.push('/dashboard/tenants');
     } catch (err: any) {
-      setError(err.message || 'Erro ao excluir o tenant.');
+      setError(err.message || 'Erro ao excluir o workspace.');
       setIsDeleteModalOpen(false);
     } finally {
       setDeleting(false);
     }
   };
 
-
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-page-enter">
       {loading ? (
-        <LoadingSpinner message="Carregando dados do tenant..." className="min-h-[50vh]" />
+        <LoadingSpinner message="Carregando dados do workspace..." className="min-h-[50vh]" />
       ) : (
         <>
         {/* Header */}
@@ -397,7 +268,7 @@ export default function TenantBrandingPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Personalizar: {tenant?.name}</h1>
-            <p className="text-sm opacity-60">Configuração de white-label, domínio customizado e servidores de e-mail.</p>
+            <p className="text-sm opacity-60">Configuração geral e dados clínicos do workspace.</p>
           </div>
         </div>
 
@@ -413,296 +284,73 @@ export default function TenantBrandingPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* SEÇÃO 1: Identidade Geral e Domínio */}
+          {/* SEÇÃO 1: Informações Gerais */}
           <Card>
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-slate-200 pb-2 border-b border-slate-800/60">Geral e Domínio</h3>
+              <h3 className="text-base font-bold text-slate-200 pb-2 border-b border-slate-800/60">Informações Gerais</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
-                  label="Nome da Instância *"
+                  label="Nome do Workspace *"
                   required
                   value={form.name}
                   onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                 />
-                <Input
-                  label="Slug (Subdomínio único) *"
-                  required
-                  value={form.slug}
-                  onChange={(e) => setForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                />
-                <div className="md:col-span-2">
-                  <Input
-                    label="Domínio Customizado"
-                    value={form.domain}
-                    onChange={(e) => setForm(prev => ({ ...prev, domain: e.target.value.toLowerCase().trim() }))}
-                    placeholder="exemplo.com"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Insira o domínio configurado. Lembre-se de criar o apontamento CNAME/A correspondente no DNS de acordo com a infraestrutura Cloudflare da plataforma.
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
+                <div className="md:col-span-1">
                   <SearchableUserSelect
                     users={users}
                     selectedValue={form.ownerId}
                     onChange={(val) => setForm(prev => ({ ...prev, ownerId: val }))}
                   />
                 </div>
-
               </div>
             </div>
           </Card>
 
-          {/* SEÇÃO 2: White-Label (Logos, Ícones e Tema) */}
-          <Card>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800/60 flex-wrap gap-2">
-                <h3 className="text-base font-bold text-slate-200">Identidade Visual & Branding do Site</h3>
-                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
-                  🌐 Personalização dos Sites de Captação
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Logotipos e paleta padrão para os sites e páginas de captação gerados por este consultório.
-              </p>
-              
-              {/* Uploads (R2) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <UploadBox
-                  label="Logo (Tema Claro)"
-                  url={form.logoLightUrl}
-                  onUpload={(f) => handleUploadLogo('logoLightUrl', f)}
-                  onClear={() => setForm(prev => ({ ...prev, logoLightUrl: '' }))}
-                  uploading={!!uploadingLogo.logoLightUrl}
-                  previewBg={form.bgLightColor}
-                />
-                <UploadBox
-                  label="Logo (Tema Escuro)"
-                  url={form.logoDarkUrl}
-                  onUpload={(f) => handleUploadLogo('logoDarkUrl', f)}
-                  onClear={() => setForm(prev => ({ ...prev, logoDarkUrl: '' }))}
-                  uploading={!!uploadingLogo.logoDarkUrl}
-                  previewBg={form.bgDarkColor}
-                />
-                <UploadBox
-                  label="Ícone (Tema Claro)"
-                  url={form.iconLightUrl}
-                  onUpload={(f) => handleUploadLogo('iconLightUrl', f)}
-                  onClear={() => setForm(prev => ({ ...prev, iconLightUrl: '' }))}
-                  uploading={!!uploadingLogo.iconLightUrl}
-                  previewBg={form.bgLightColor}
-                />
-                <UploadBox
-                  label="Ícone (Tema Escuro)"
-                  url={form.iconDarkUrl}
-                  onUpload={(f) => handleUploadLogo('iconDarkUrl', f)}
-                  onClear={() => setForm(prev => ({ ...prev, iconDarkUrl: '' }))}
-                  uploading={!!uploadingLogo.iconDarkUrl}
-                  previewBg={form.bgDarkColor}
-                />
-              </div>
-
-              {/* Cores */}
-              <div className="space-y-4 pt-2">
-                <h4 className="text-xs font-bold text-slate-400">Paleta de Cores e Gradientes</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Gradiente Start */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Gradiente Início</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.gradientColorStart}
-                        onChange={(e) => setForm(prev => ({ ...prev, gradientColorStart: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.gradientColorStart}
-                        onChange={(e) => setForm(prev => ({ ...prev, gradientColorStart: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Gradiente End */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Gradiente Fim</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.gradientColorEnd}
-                        onChange={(e) => setForm(prev => ({ ...prev, gradientColorEnd: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.gradientColorEnd}
-                        onChange={(e) => setForm(prev => ({ ...prev, gradientColorEnd: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Contrast */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Cor de Contraste</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.contrastColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, contrastColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.contrastColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, contrastColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Fundo Claro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Fundo Claro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.bgLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, bgLightColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.bgLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, bgLightColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Fundo Escuro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Fundo Escuro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.bgDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, bgDarkColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.bgDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, bgDarkColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Cartãoo Claro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Cartãoo Claro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.cardLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, cardLightColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.cardLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, cardLightColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Cartãoo Escuro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Cartãoo Escuro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.cardDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, cardDarkColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.cardDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, cardDarkColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Texto Claro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Texto Claro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.textLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, textLightColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.textLightColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, textLightColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Texto Escuro */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] font-semibold text-slate-300">Texto Escuro</label>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="color"
-                        value={form.textDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, textDarkColor: e.target.value }))}
-                        className="w-10 h-10 bg-transparent rounded cursor-pointer border" style={{ borderColor: "var(--surface-border)" }}
-                      />
-                      <input
-                        type="text"
-                        value={form.textDarkColor}
-                        onChange={(e) => setForm(prev => ({ ...prev, textDarkColor: e.target.value }))}
-                        className="flex-1 text-xs rounded-xl px-2 h-9 outline-none brand-input font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* SEÇÃO 3: Domínio de E-mail por Tenant */}
+          {/* SEÇÃO 2: Informações Clínicas */}
           <Card>
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-slate-200 pb-2 border-b border-slate-800/60">Configuração de E-mail (Servidor Customizado)</h3>
-              <p className="text-xs text-slate-400">
-                Configure um domínio próprio de envio de e-mails para este tenant. Se deixado em branco, o tenant utilizará o servidor de e-mails padrão da plataforma.
-              </p>
+              <h3 className="text-base font-bold text-slate-200 pb-2 border-b border-slate-800/60">Dados Clínicos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
-                  label="Domínio de Envio de E-mail"
-                  value={form.emailDomain}
-                  onChange={(e) => setForm(prev => ({ ...prev, emailDomain: e.target.value.toLowerCase().trim() }))}
-                  placeholder="ex: mail.meuconsultorio.com"
+                  label="CRP"
+                  value={form.crp}
+                  onChange={(e) => setForm(prev => ({ ...prev, crp: e.target.value }))}
+                  placeholder="Ex: 06/123456"
                 />
                 <Input
-                  label="Chave API Resend do Tenant"
-                  type="password"
-                  value={form.resendApiKey}
-                  onChange={(e) => setForm(prev => ({ ...prev, resendApiKey: e.target.value }))}
-                  placeholder="re_..."
+                  label="Instagram"
+                  value={form.instagram}
+                  onChange={(e) => setForm(prev => ({ ...prev, instagram: e.target.value }))}
+                  placeholder="@usuario"
                 />
+                <Input
+                  label="Cidade / Estado"
+                  value={form.cityState}
+                  onChange={(e) => setForm(prev => ({ ...prev, cityState: e.target.value }))}
+                  placeholder="Ex: São Paulo, SP"
+                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold" style={{ opacity: 0.7 }}>Atendimento Online?</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.isOnlineService}
+                      onChange={(e) => setForm(prev => ({ ...prev, isOnlineService: e.target.checked }))}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm">Sim, oferece atendimento online</span>
+                  </label>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold block mb-1.5" style={{ opacity: 0.7 }}>Bio / Descrição</label>
+                  <textarea
+                    value={form.bio}
+                    onChange={(e) => setForm(prev => ({ ...prev, bio: e.target.value }))}
+                    rows={4}
+                    placeholder="Descrição do profissional ou consultório..."
+                    className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none brand-input"
+                  />
+                </div>
               </div>
             </div>
           </Card>
@@ -723,13 +371,13 @@ export default function TenantBrandingPage() {
           </div>
         </form>
 
-        {/* ⛔� ZONA DE PERIGO: Exclusãoo */}
+        {/* ⛔ ZONA DE PERIGO: Exclusão */}
         <Card className="border border-red-500/30 bg-red-500/5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-base font-bold text-red-400">Zona de Perigo</h3>
               <p className="text-xs text-slate-400">
-                A exclusãoo deste tenant removerá de forma permanente e irreversível todos os dados, configurações, equipe e registros vinculados.
+                A exclusão deste workspace removerá de forma permanente e irreversível todos os dados, configurações, equipe e registros vinculados.
               </p>
             </div>
             <div className="w-full sm:w-auto shrink-0">
@@ -741,7 +389,7 @@ export default function TenantBrandingPage() {
                   setIsDeleteModalOpen(true);
                 }}
               >
-                Excluir Tenant
+                Excluir Workspace
               </Button>
             </div>
           </div>
@@ -765,12 +413,12 @@ export default function TenantBrandingPage() {
             </div>
 
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg leading-relaxed">
-              ⚠️ **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste tenant após esta operação.
+              ⚠️ **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste workspace após esta operação.
             </div>
 
             <div className="space-y-3">
               <p className="text-xs text-slate-300 leading-normal">
-                Para confirmar a exclusão definitiva, digite o nome exato do tenant <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
+                Para confirmar a exclusão definitiva, digite o nome exato do workspace <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
               </p>
               <input
                 type="text"

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, Tenant } from '@/lib/api';
+import { api, PlatformBrand } from '@/lib/api';
 
 export type ThemeMode = 'light' | 'dark';
 
 export interface BrandContextType {
-  tenant: Tenant | null;
+  tenant: PlatformBrand | null;
   theme: ThemeMode;
   loading: boolean;
   /** true quando o loader de boot global sumiu — seguro para renderizar conteúdo */
@@ -26,7 +26,7 @@ const BrandContext = createContext<BrandContextType>({
 
 const BACKUP_STORAGE_KEY = 'theraos_admin_platform_brand_cache';
 
-function saveBrandBackup(primary: Tenant | null) {
+function saveBrandBackup(primary: PlatformBrand | null) {
   if (typeof window === 'undefined') return;
   try {
     if (primary) {
@@ -37,7 +37,7 @@ function saveBrandBackup(primary: Tenant | null) {
   }
 }
 
-function loadBrandBackup(): Tenant | null {
+function loadBrandBackup(): PlatformBrand | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
@@ -49,7 +49,7 @@ function loadBrandBackup(): Tenant | null {
 }
 
 export function BrandProvider({ children }: { children: React.ReactNode }) {
-  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [tenant, setTenant] = useState<PlatformBrand | null>(null);
   const [theme, setTheme] = useState<ThemeMode>('dark');
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +64,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const applyBrandStyles = useCallback((t: Tenant | null, currentTheme: ThemeMode) => {
+  const applyBrandStyles = useCallback((t: PlatformBrand | null, currentTheme: ThemeMode) => {
     const root = document.documentElement;
 
     const cachedPlatform = !t ? loadBrandBackup() : null;
@@ -79,18 +79,21 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty('--brand-contrast-color', contrast);
     root.style.setProperty('--brand-gradient', `linear-gradient(135deg, ${start}, ${end})`);
 
+    const bgLight = activePlatform?.bgLightColor || '#FAFAFA';
+    const bgDark = activePlatform?.bgDarkColor || '#09090B';
+
     if (currentTheme === 'light') {
       root.classList.remove('dark');
       root.classList.add('light');
-      root.style.setProperty('--brand-bg-color', '#FAFAFA');       // zinc-50
-      root.style.setProperty('--brand-card-bg-color', '#FFFFFF');  // white
-      root.style.setProperty('--brand-text-color', '#09090B');     // zinc-950
+      root.style.setProperty('--brand-bg-color', bgLight);
+      root.style.setProperty('--brand-card-bg-color', '#FFFFFF');
+      root.style.setProperty('--brand-text-color', '#09090B');
     } else {
       root.classList.remove('light');
       root.classList.add('dark');
-      root.style.setProperty('--brand-bg-color', '#09090B');       // zinc-950
-      root.style.setProperty('--brand-card-bg-color', '#18181B');  // zinc-900
-      root.style.setProperty('--brand-text-color', '#F4F4F5');     // zinc-100
+      root.style.setProperty('--brand-bg-color', bgDark);
+      root.style.setProperty('--brand-card-bg-color', 'color-mix(in srgb, #FFFFFF 6%, ' + bgDark + ')');
+      root.style.setProperty('--brand-text-color', '#F4F4F5');
     }
 
     // Favicon e Título

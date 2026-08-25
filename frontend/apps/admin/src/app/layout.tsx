@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { BrandProvider } from "@/context/BrandContext";
 import { ProgressProvider } from "@/context/ProgressContext";
+import { ApiStatusProvider } from "@/context/ApiStatusContext";
 
 export const metadata: Metadata = {
   title: "Psi App - Backoffice Admin",
@@ -18,14 +19,16 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       {/* bg e color são controlados pelo BrandContext via CSS vars */}
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
-        <AuthProvider>
-          <BrandProvider>
-            <ProgressProvider>
+        <ApiStatusProvider>
+          <AuthProvider>
+            <BrandProvider>
+              <ProgressProvider>
 
-              {children}
-            </ProgressProvider>
-          </BrandProvider>
-        </AuthProvider>
+                {children}
+              </ProgressProvider>
+            </BrandProvider>
+          </AuthProvider>
+        </ApiStatusProvider>
       </body>
     </html>
   );

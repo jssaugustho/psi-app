@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
 import { Card, Button, Input, BrandModal } from '@psi/ui';
+import { MediaLibraryModal } from '@/components/media-library-modal';
 import {
   User as UserIcon,
   Phone,
@@ -11,14 +13,17 @@ import {
   ShieldCheck,
   AlertCircle,
   Check,
+  Camera,
 } from 'lucide-react';
 
 export function UserProfileModal() {
   const { user, setUser: setGlobalAuthUser, isProfileOpen, setIsProfileOpen } = useAuth();
+  const { tenant } = useBrand();
 
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   // Senha
   const [newPassword, setNewPassword] = useState('');
@@ -26,6 +31,7 @@ export function UserProfileModal() {
 
   // Modais e Estados de UI
   const [loading, setLoading] = useState(false);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -34,6 +40,7 @@ export function UserProfileModal() {
       setNome(user.nome || '');
       setSobrenome(user.sobrenome || '');
       setTelefone(user.telefone || '');
+      setAvatarUrl(user.avatar_url || '');
       setNewPassword('');
       setConfirmPassword('');
       setError('');
@@ -69,6 +76,7 @@ export function UserProfileModal() {
           nome: nome.trim(),
           sobrenome: sobrenome.trim(),
           telefone: telefone.trim() || null,
+          avatarUrl: avatarUrl.trim() || null,
           password: newPassword.trim() || null,
         });
         if (updateMeRes && updateMeRes.user) {
@@ -82,6 +90,7 @@ export function UserProfileModal() {
         nome: nome.trim(),
         sobrenome: sobrenome.trim(),
         telefone: telefone.trim() || null,
+        avatar_url: avatarUrl.trim() || null,
       });
 
       const finalUser = updatedUser || meUpdatedUser || user;
@@ -132,6 +141,39 @@ export function UserProfileModal() {
             <span>{success}</span>
           </div>
         )}
+
+        {/* Foto do Perfil */}
+        <div className="flex flex-col items-center justify-center space-y-2.5 py-4 border-b border-[var(--surface-border)]/50 mb-2">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-purple-500/30 bg-slate-800/80 flex items-center justify-center shadow-lg relative">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={nome}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl font-bold text-slate-300 select-none">
+                  {nome ? nome[0]?.toUpperCase() : ''}
+                  {sobrenome ? sobrenome[0]?.toUpperCase() : ''}
+                </span>
+              )}
+            </div>
+            
+            {/* Botão de Alterar Foto com Câmera */}
+            <button
+              type="button"
+              onClick={() => setMediaModalOpen(true)}
+              className="absolute bottom-0 right-0 p-2 bg-purple-600 hover:bg-purple-500 text-white rounded-full cursor-pointer shadow-md transition-all border border-purple-500/20 active:scale-95 flex items-center justify-center w-8 h-8"
+              title="Selecionar foto de perfil"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
+          </div>
+          <span className="text-[10px] text-slate-400 font-medium">
+            Clique no ícone para alterar foto de perfil
+          </span>
+        </div>
 
         {/* 1. Dados Pessoais de Acesso */}
         <Card className="space-y-4 p-5">
@@ -244,6 +286,18 @@ export function UserProfileModal() {
           </Button>
         </div>
       </form>
+
+      {mediaModalOpen && (
+        <MediaLibraryModal
+          tenantId={tenant?.id || ''}
+          isOpen={mediaModalOpen}
+          onClose={() => setMediaModalOpen(false)}
+          onSelectImage={(asset: any) => {
+            setAvatarUrl(asset.url);
+            setMediaModalOpen(false);
+          }}
+        />
+      )}
     </BrandModal>
   );
 }

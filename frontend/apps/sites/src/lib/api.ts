@@ -199,7 +199,7 @@ export interface TenantData {
  * Fetch tenant details by slug
  */
 export async function getTenantBySlug(slug: string): Promise<TenantData | null> {
-  const url = `${PGRST_BASE_URL}/tenants?slug=eq.${slug}`;
+  const url = `${PGRST_BASE_URL}/workspaces?id=eq.${slug}`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;
@@ -209,20 +209,20 @@ export async function getTenantBySlug(slug: string): Promise<TenantData | null> 
     return {
       id: t.id,
       name: t.name,
-      slug: t.slug,
-      domain: t.domain,
-      phone: t.phone,
-      gradientColorStart: t.gradient_color_start,
-      gradientColorEnd: t.gradient_color_end,
-      contrastColor: t.contrast_color,
-      bgDarkColor: t.bg_dark_color,
-      cardDarkColor: t.card_dark_color,
-      textDarkColor: t.text_dark_color,
-      logoLightUrl: t.logo_light_url,
-      logoDarkUrl: t.logo_dark_url,
+      slug: t.name,
+      domain: null,
+      phone: null,
+      gradientColorStart: null,
+      gradientColorEnd: null,
+      contrastColor: null,
+      bgDarkColor: null,
+      cardDarkColor: null,
+      textDarkColor: null,
+      logoLightUrl: null,
+      logoDarkUrl: null,
     };
   } catch (err) {
-    console.error('Error fetching tenant by slug:', err);
+    console.error('Error fetching workspace by slug:', err);
     return null;
   }
 }
@@ -231,18 +231,18 @@ export async function getTenantBySlug(slug: string): Promise<TenantData | null> 
  * Fetch tenant details by domain (directly or via page)
  */
 export async function getTenantByDomain(domain: string): Promise<TenantData | null> {
-  // First check if tenant has this domain directly in tenants table
-  const url = `${PGRST_BASE_URL}/tenants?domain=eq.${domain}`;
+  // Check if workspace has this domain directly in workspace_domains table
+  const url = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&domain=eq.${domain}`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const t = data[0];
+      if (Array.isArray(data) && data.length > 0 && data[0].workspace) {
+        const t = data[0].workspace;
         return {
           id: t.id,
           name: t.name,
-          slug: t.slug,
+          slug: t.name,
           domain: t.domain,
           phone: t.phone,
           gradientColorStart: t.gradient_color_start,

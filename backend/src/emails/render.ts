@@ -2,13 +2,15 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { LoginNotificationEmail, LoginNotificationProps } from './templates/login-notification';
 import { InviteMemberEmail, InviteMemberProps } from './templates/invite-member';
+import { ResetPasswordEmail, ResetPasswordProps } from './templates/reset-password';
 
 // ── Tipos de templates disponíveis ────────────────────────────────────────
-export type TemplateName = 'login_notification' | 'invite_member';
+export type TemplateName = 'login_notification' | 'invite_member' | 'reset_password';
 
 export interface TemplatePropsMap {
   login_notification: LoginNotificationProps;
   invite_member: InviteMemberProps;
+  reset_password: ResetPasswordProps;
 }
 
 // ── Registro de templates ─────────────────────────────────────────────────
@@ -17,6 +19,7 @@ const templateComponents: {
 } = {
   login_notification: LoginNotificationEmail,
   invite_member: InviteMemberEmail,
+  reset_password: ResetPasswordEmail,
 };
 
 /**

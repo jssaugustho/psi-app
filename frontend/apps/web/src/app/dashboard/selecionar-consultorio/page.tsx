@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, Tenant } from '@/lib/api';
-import { Card, LoadingSpinner } from '@psi/ui';
+import { Card, LoadingSpinner, Button } from '@psi/ui';
 
 export default function SelectTenantPage() {
   const { user, loading: loadingAuth, logout } = useAuth();
-  const { reloadBrand } = useBrand();
+  const { reloadBrand, theme, toggleTheme } = useBrand();
   const router = useRouter();
 
   const [tenants, setTenants] = useState<(Tenant & { memberRole?: string })[]>([]);
@@ -69,7 +69,7 @@ export default function SelectTenantPage() {
 
   if (loadingAuth || loadingTenants) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center relative">
         <LoadingSpinner message="Carregando seus consultórios..." className="py-20" />
       </div>
     );
@@ -78,35 +78,64 @@ export default function SelectTenantPage() {
   const activeTenantId = typeof window !== 'undefined' ? localStorage.getItem('active_tenant_id') : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 md:p-6 animate-page-enter">
+    <div className="min-h-screen flex flex-col justify-center items-center p-4 md:p-6 relative animate-page-enter">
+      {/* Botão de alternância de tema no canto superior direito */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          style={{
+            border: '1px solid var(--surface-border)',
+            color: 'var(--brand-text-color)',
+          }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center transition-all text-base cursor-pointer bg-transparent hover:bg-[var(--surface-hover)]"
+          title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+        >
+          {theme === 'dark' ? (
+            <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 7a5 5 0 100 10 5 5 0 000-10z" />
+            </svg>
+          ) : (
+            <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
+      </div>
+
       <div className="w-full max-w-3xl space-y-8">
         {/* Cabeçalho */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-semibold uppercase tracking-wider">
-            <span>Espaços Clínicos & Consultórios</span>
+          <div className="brand-badge text-xs uppercase tracking-wider px-3 py-1">
+            <span>Espaços de Trabalho & Workspaces</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-            Selecione o Consultório que deseja acessar
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent" style={{ background: "var(--brand-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            Selecione o Workspace que deseja acessar
           </h1>
-          <p className="text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
-            Você está vinculado a múltiplos espaços na plataforma TheraOS. Escolha abaixo qual deseja visualizar e gerenciar agora.
+          <p className="text-sm max-w-lg mx-auto leading-relaxed brand-text-muted">
+            Você está vinculado a múltiplos workspaces na plataforma TheraOS. Escolha abaixo qual deseja visualizar e gerenciar agora.
           </p>
         </div>
 
         {/* Lista de Tenants */}
         {tenants.length === 0 ? (
-          <Card className="p-8 text-center space-y-4 max-w-md mx-auto">
-            <div className="text-2xl">⚠️</div>
-            <h2 className="text-lg font-bold text-slate-100">Nenhum Consultório Encontrado</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Você ainda não possui nenhum consultório ou workspace ativo vinculado ao seu perfil.
+          <Card className="p-8 text-center space-y-5 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-3xl flex items-center justify-center mx-auto mb-2">
+              ⚠️
+            </div>
+            <h2 className="text-xl font-bold bg-clip-text text-transparent" style={{ background: "var(--brand-gradient)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Nenhum Workspace Encontrado
+            </h2>
+            <p className="text-xs leading-relaxed brand-text-muted">
+              Você ainda não possui nenhum workspace ativo vinculado ao seu perfil.
             </p>
-            <button
+            <Button
               onClick={logout}
-              className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer border-none text-white bg-slate-900 hover:bg-slate-800 transition-all font-mono uppercase"
+              variant="primary"
+              className="w-full"
             >
               Sair da Sessão
-            </button>
+            </Button>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -125,9 +154,12 @@ export default function SelectTenantPage() {
                   key={t.id}
                   onClick={() => handleSelectTenant(t.id)}
                   disabled={isSelecting}
-                  className={`w-full text-left p-6 rounded-2xl border glass-md hover:border-purple-500/40 hover:bg-white/5 transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[160px] relative group ${
-                    isSelected ? 'border-purple-500/60 ring-2 ring-purple-500/20 bg-purple-500/5' : 'border-slate-800'
-                  }`}
+                  className="w-full text-left p-6 rounded-2xl border glass-md hover:border-[var(--brand-gradient-start)]/40 hover:bg-[var(--surface-hover)] transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[160px] relative group"
+                  style={{
+                    borderColor: isSelected ? 'var(--brand-gradient-start)' : undefined,
+                    boxShadow: isSelected ? '0 0 0 2px color-mix(in srgb, var(--brand-gradient-start) 20%, transparent)' : undefined,
+                    background: isSelected ? 'color-mix(in srgb, var(--brand-gradient-start) 5%, var(--mix-base))' : undefined,
+                  }}
                 >
                   <div>
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -137,36 +169,38 @@ export default function SelectTenantPage() {
                           <img
                             src={t.iconDarkUrl || t.iconLightUrl || t.logoDarkUrl || t.logoLightUrl || ''}
                             alt={t.name}
-                            className="w-10 h-10 rounded-xl object-contain bg-slate-900 p-1 border border-slate-800 shrink-0"
+                            className="w-10 h-10 rounded-xl object-contain p-1 border shrink-0"
+                            style={{
+                              backgroundColor: 'var(--mix-base)',
+                              borderColor: 'var(--surface-border)',
+                            }}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-lg">
+                          <div className="w-10 h-10 rounded-xl text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-lg" style={{ background: 'var(--brand-gradient)' }}>
                             {t.name?.[0]?.toUpperCase() || 'C'}
                           </div>
                         )}
                         <div className="truncate">
-                          <h3 className="font-bold text-base text-slate-100 group-hover:text-purple-300 transition-colors truncate">
+                          <h3 className="font-bold text-base transition-colors truncate group-hover:text-[var(--brand-gradient-start)]" style={{ color: 'var(--brand-text-color)' }}>
                             {t.name}
                           </h3>
-                          <span className="text-xs text-slate-500 font-mono block truncate">
-                            /{t.slug}
-                          </span>
                         </div>
                       </div>
 
                       {/* Badge de Papel */}
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 bg-slate-900 text-slate-300 border border-slate-800">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 border glass-sm brand-text-muted">
                         {roleBadge}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between w-full pt-4 border-t border-slate-800/60 mt-2">
-                    <span className="text-xs font-semibold text-purple-400 group-hover:underline flex items-center gap-1">
-                      {isSelecting ? 'Acessando...' : isSelected ? 'Ativo (Clique para Entrar)' : 'Acessar Consultório'}
+                  <div className="flex items-center justify-between w-full pt-4 border-t border-[var(--surface-border)] mt-2">
+                    <span className="text-xs font-semibold group-hover:underline flex items-center gap-1" style={{ color: 'var(--brand-gradient-start)' }}>
+                      {isSelecting ? 'Acessando...' : isSelected ? 'Ativo (Clique para Entrar)' : 'Acessar Workspace'}
                     </span>
                     <svg
-                      className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform"
+                      className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                      style={{ color: 'var(--brand-gradient-start)' }}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -182,11 +216,12 @@ export default function SelectTenantPage() {
         )}
 
         {/* Rodapé / Sair */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-4 border-t border-slate-900">
-          <span>Logado como: <strong className="text-slate-300">{user?.email}</strong></span>
+        <div className="flex items-center justify-between text-xs pt-4 border-t border-[var(--surface-border)]" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
+          <span>Logado como: <strong className="font-semibold" style={{ color: 'var(--brand-text-color)' }}>{user?.email}</strong></span>
           <button
             onClick={logout}
-            className="text-red-400 hover:text-red-300 transition-colors bg-transparent border-none cursor-pointer font-semibold"
+            className="hover:underline transition-colors bg-transparent border-none cursor-pointer font-semibold"
+            style={{ color: 'var(--brand-gradient-start)' }}
           >
             Sair da Conta
           </button>

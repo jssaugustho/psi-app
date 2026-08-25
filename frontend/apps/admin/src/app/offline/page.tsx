@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
+import { env } from '@/env';
 import { WifiOff, ServerCrash, Database, RefreshCw, AlertTriangle } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+const API_URL = env.NEXT_PUBLIC_API_URL;
 
 export default function OfflinePage() {
   const [checking, setChecking] = useState(false);

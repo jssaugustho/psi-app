@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { api, Workspace, User } from '@/lib/api';
+import { api, Workspace, User, WorkspaceDomain } from '@/lib/api';
 import { Card, Button, Input, Textarea } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
 import { MediaLibraryModal } from '@/components/media-library-modal';
@@ -86,6 +86,17 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
   const [logoOptionModalOpen, setLogoOptionModalOpen] = useState(false);
   const [logoBuilderModalOpen, setLogoBuilderModalOpen] = useState(false);
 
+  // Domínio do workspace
+  const [workspaceDomain, setWorkspaceDomain] = useState<WorkspaceDomain | null>(null);
+
+  useEffect(() => {
+    if (currentWorkspace.id) {
+      api.getWorkspaceDomain(currentWorkspace.id)
+        .then((d) => setWorkspaceDomain(d))
+        .catch(() => {});
+    }
+  }, [currentWorkspace.id]);
+
   const handleAddSpecialty = (item: string) => {
     const trimmed = item.trim();
     if (trimmed && !specialties.includes(trimmed)) {
@@ -157,14 +168,14 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       )}
 
       {/* Navegação por Abas */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('perfil')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none ${
             activeTab === 'perfil'
               ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
-              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              : 'text-zinc-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           }`}
         >
           <UserIcon className="w-4 h-4" />
@@ -177,7 +188,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none ${
             activeTab === 'marca'
               ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
-              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              : 'text-zinc-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           }`}
         >
           <Palette className="w-4 h-4" />
@@ -190,7 +201,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none ${
             activeTab === 'dominio'
               ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
-              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              : 'text-zinc-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           }`}
         >
           <Globe className="w-4 h-4" />
@@ -203,7 +214,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border-none ${
             activeTab === 'midias'
               ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
-              : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              : 'text-zinc-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           }`}
         >
           <ImageIcon className="w-4 h-4" />
@@ -214,36 +225,36 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       {/* Conteúdo Aba Perfil */}
       {activeTab === 'perfil' && (
         <form onSubmit={handleSave} className="space-y-6">
-          <Card className="p-6 space-y-6 bg-zinc-900/60 border-zinc-800/80">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <Card className="p-6 space-y-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
               <UserIcon className="w-4 h-4 text-violet-400" />
               Informações Gerais do Atendimento
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Nome de Exibição / Clínica</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Nome de Exibição / Clínica</label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Ex: Dra. Juliana Silva" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">CRP (Registro Profissional)</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">CRP (Registro Profissional)</label>
                 <Input value={crp} onChange={(e) => setCrp(e.target.value)} placeholder="Ex: CRP 06/123456" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Cidade / Estado</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cidade / Estado</label>
                 <Input value={cityState} onChange={(e) => setCityState(e.target.value)} placeholder="Ex: São Paulo / SP" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Instagram Profissional</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Instagram Profissional</label>
                 <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@seu.perfil" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1">Biografia Resumida</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Biografia Resumida</label>
               <Textarea
                 rows={4}
                 value={bio}
@@ -254,7 +265,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
             {/* Especialidades */}
             <div className="space-y-3">
-              <label className="block text-xs font-semibold text-zinc-300">Especialidades & Áreas de Atuação</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">Especialidades & Áreas de Atuação</label>
               <div className="flex gap-2">
                 <Input
                   value={newSpecialty}
@@ -279,7 +290,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
                     key={preset}
                     type="button"
                     onClick={() => handleAddSpecialty(preset)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-all border border-zinc-700/50 cursor-pointer"
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition-all border border-slate-200 dark:border-zinc-700/50 cursor-pointer"
                   >
                     + {preset}
                   </button>
@@ -311,8 +322,159 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       {/* Conteúdo Aba Marca */}
       {activeTab === 'marca' && (
         <form onSubmit={handleSave} className="space-y-6">
-          <Card className="p-6 space-y-6 bg-zinc-900/60 border-zinc-800/80">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          {/* Card de Logotipo do Consultório */}
+          <Card className="p-6 space-y-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-violet-400" />
+                Logotipo do Consultório
+              </h3>
+              <Button
+                type="button"
+                onClick={() => setLogoOptionModalOpen(true)}
+                className="bg-violet-600 hover:bg-violet-500 text-xs text-white"
+              >
+                Configurar Logotipo
+              </Button>
+            </div>
+
+            {/* Preview do Logotipo */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-950 flex items-center justify-center min-h-[120px] relative">
+              {logoConfig?.mode === 'image' && logoUrl ? (
+                <div className="max-w-[200px] flex flex-col items-center gap-2">
+                  <img src={logoUrl} alt="Logotipo" className="max-h-16 object-contain" />
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Modo Imagem</span>
+                </div>
+              ) : logoConfig?.mode === 'html' ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-3">
+                    {logoConfig.iconType === 'psi' ? (
+                      <div
+                        style={{
+                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                          color: contrastColor
+                        }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shadow-md"
+                      >
+                        Ψ
+                      </div>
+                    ) : logoConfig.customIconUrl ? (
+                      <div
+                        style={{
+                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                        }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center p-2 shadow-md overflow-hidden"
+                      >
+                        <img src={logoConfig.customIconUrl} alt="Ícone Custom" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                          color: contrastColor
+                        }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+                      >
+                        <ImageIcon className="w-5 h-5" />
+                      </div>
+                    )}
+                    <span
+                      style={{
+                        background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      }}
+                      className="text-xl font-bold font-serif"
+                    >
+                      {logoConfig.text || currentWorkspace.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Modo HTML</span>
+                    <button
+                      type="button"
+                      onClick={() => setLogoBuilderModalOpen(true)}
+                      className="text-[10px] text-violet-500 hover:text-violet-400 font-bold underline bg-transparent border-none cursor-pointer"
+                    >
+                      Editar Texto/Ícone
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center space-y-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum logotipo configurado.</p>
+                  <p className="text-[10px] text-slate-400">
+                    Por padrão, será exibido o símbolo Ψ com o nome do workspace:{" "}
+                    <strong>{currentWorkspace.name}</strong>
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Card de Ícone / Favicon do Site */}
+          <Card className="p-6 space-y-4 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-violet-400" />
+                  Favicon / Ícone do Site
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Ícone que aparece na aba do navegador e nos marcadores de favoritos.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  setMediaTarget('favicon');
+                  setMediaModalOpen(true);
+                }}
+                className="bg-violet-600 hover:bg-violet-500 text-xs text-white"
+              >
+                Selecionar Favicon
+              </Button>
+            </div>
+
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-950 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl glass-sm border border-slate-200 dark:border-zinc-800/60 flex items-center justify-center p-2.5 shrink-0 bg-white">
+                {faviconUrl ? (
+                  <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain" />
+                ) : (
+                  <div
+                    style={{
+                      background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                      color: contrastColor
+                    }}
+                    className="w-full h-full rounded-md flex items-center justify-center font-bold text-xs"
+                  >
+                    Ψ
+                  </div>
+                )}
+              </div>
+              <div className="truncate flex-1">
+                <span className="block text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
+                  {faviconUrl ? 'Favicon Personalizado' : 'Favicon Padrão (Ψ)'}
+                </span>
+                <span className="block text-[10px] text-slate-400 truncate mt-0.5">
+                  {faviconUrl ? faviconUrl : 'Símbolo da Psicologia Ψ com degradê da marca.'}
+                </span>
+              </div>
+              {faviconUrl && (
+                <button
+                  type="button"
+                  onClick={() => setFaviconUrl('')}
+                  className="text-[10px] text-rose-500 hover:text-rose-400 font-bold bg-transparent border-none cursor-pointer"
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-6 space-y-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
               <Palette className="w-4 h-4 text-violet-400" />
               Paleta de Cores do Consultório
             </h3>
@@ -328,20 +490,20 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
                     setSecondaryColor(preset.secondary);
                     setContrastColor(preset.contrast);
                   }}
-                  className="p-3 rounded-xl bg-zinc-800/80 border border-zinc-700/60 hover:border-violet-500 transition-all text-left group cursor-pointer"
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 hover:border-violet-500 transition-all text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: preset.primary }} />
                     <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: preset.secondary }} />
                   </div>
-                  <span className="block text-xs font-bold text-zinc-200 group-hover:text-white">{preset.name}</span>
+                  <span className="block text-xs font-bold text-slate-700 dark:text-zinc-200 group-hover:text-slate-950 dark:group-hover:text-white">{preset.name}</span>
                 </button>
               ))}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Cor Primária</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor Primária</label>
                 <div className="flex gap-2">
                   <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
                   <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
@@ -349,7 +511,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Cor Secundária</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor Secundária</label>
                 <div className="flex gap-2">
                   <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
                   <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} />
@@ -357,7 +519,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">Cor de Contraste / Texto</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor de Contraste / Texto</label>
                 <div className="flex gap-2">
                   <input type="color" value={contrastColor} onChange={(e) => setContrastColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
                   <Input value={contrastColor} onChange={(e) => setContrastColor(e.target.value)} />
@@ -376,12 +538,12 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
       {/* Conteúdo Aba Domínio */}
       {activeTab === 'dominio' && (
-        <Card className="p-6 bg-zinc-900/60 border-zinc-800/80">
+        <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
           <DomainManager
             tenantId={currentWorkspace.id}
-            subdomain={currentWorkspace.slug || ''}
+            subdomain={workspaceDomain?.subdomain || ''}
             onSubdomainChange={(val) => setName(val)}
-            customDomain={currentWorkspace.domain || ''}
+            customDomain={workspaceDomain?.customDomain || ''}
             onCustomDomainChange={(val) => {}}
           />
         </Card>
@@ -389,9 +551,9 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
       {/* Conteúdo Aba Mídias */}
       {activeTab === 'midias' && (
-        <Card className="p-6 bg-zinc-900/60 border-zinc-800/80 space-y-4">
+        <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-violet-400" />
               Biblioteca de Fotos & Logotipos
             </h3>
@@ -416,9 +578,45 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
           isOpen={mediaModalOpen}
           onClose={() => setMediaModalOpen(false)}
           onSelectImage={(asset: any) => {
-            if (mediaTarget === 'logo') setLogoUrl(asset.url);
+            if (mediaTarget === 'logo') {
+              setLogoUrl(asset.url);
+              setLogoConfig({ mode: 'image' });
+            }
             if (mediaTarget === 'favicon') setFaviconUrl(asset.url);
             setMediaModalOpen(false);
+          }}
+        />
+      )}
+
+      {logoOptionModalOpen && (
+        <LogoOptionModal
+          isOpen={logoOptionModalOpen}
+          onClose={() => setLogoOptionModalOpen(false)}
+          onSelectOption={(mode) => {
+            if (mode === 'image') {
+              setMediaTarget('logo');
+              setMediaModalOpen(true);
+            } else {
+              setLogoBuilderModalOpen(true);
+            }
+          }}
+        />
+      )}
+
+      {logoBuilderModalOpen && (
+        <LogoBuilderModal
+          isOpen={logoBuilderModalOpen}
+          onClose={() => setLogoBuilderModalOpen(false)}
+          tenantId={currentWorkspace.id}
+          initialText={logoConfig?.text || currentWorkspace.name || ''}
+          initialIconType={logoConfig?.iconType || 'psi'}
+          initialCustomIconUrl={logoConfig?.customIconUrl || ''}
+          gradientStart={primaryColor}
+          gradientEnd={secondaryColor}
+          contrastColor={contrastColor}
+          onSave={(newConfig) => {
+            setLogoConfig(newConfig);
+            setLogoUrl('');
           }}
         />
       )}

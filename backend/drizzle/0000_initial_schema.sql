@@ -1,6 +1,36 @@
 -- Baseline consolidated schema: TheraOS White-Label SaaS Architecture
 -- Workspaces, Visual Identities, Workspace Domains & Workspace Members
 
+CREATE SCHEMA IF NOT EXISTS auth;
+
+-- Registrar função e trigger de segurança no schema auth se a tabela auth.users já tiver sido criada pelo GoTrue
+CREATE OR REPLACE FUNCTION auth.set_default_user_role()
+RETURNS trigger AS $func$
+BEGIN
+  IF NEW.role IS NULL OR NEW.role = '' THEN
+    NEW.role := 'authenticated';
+  END IF;
+  IF NEW.aud IS NULL OR NEW.aud = '' THEN
+    NEW.aud := 'authenticated';
+  END IF;
+  IF NEW.instance_id IS NULL THEN
+    NEW.instance_id := '00000000-0000-0000-0000-000000000000'::uuid;
+  END IF;
+  RETURN NEW;
+END;
+$func$ LANGUAGE plpgsql;
+
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+    DROP TRIGGER IF EXISTS trg_set_default_user_role ON auth.users;
+    CREATE TRIGGER trg_set_default_user_role
+      BEFORE INSERT OR UPDATE ON auth.users
+      FOR EACH ROW
+      EXECUTE FUNCTION auth.set_default_user_role();
+  END IF;
+END $do$;
+
 CREATE TABLE IF NOT EXISTS "profiles" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"first_name" text NOT NULL,
@@ -256,3 +286,26 @@ ALTER TABLE "media_assets" ADD CONSTRAINT "media_assets_workspace_id_workspaces_
 INSERT INTO public.platform_settings (platform_name, gradient_color_start, gradient_color_end, contrast_color)
 SELECT 'TheraOS', '#7C3AED', '#A855F7', '#FFFFFF'
 WHERE NOT EXISTS (SELECT 1 FROM public.platform_settings);
+
+-- PostgREST Roles e Permissoes Schema
+DO $do$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
+END $do$;
+
+GRANT anon, authenticated, service_role TO postgres;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;

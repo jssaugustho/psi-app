@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { api, Tenant } from '@/lib/api';
+import { api, PlatformBrand } from '@/lib/api';
 import { Input } from '@psi/ui';
 import { validateImageSafety } from '@psi/image-utils';
 
 interface WhiteLabelSettingsProps {
-  tenant: Tenant;
-  onSaved: (updatedTenant: Tenant) => void;
+  tenant: PlatformBrand;
+  onSaved: (updatedTenant: PlatformBrand) => void;
 }
 
 type LogoField = 'logo_light_url' | 'logo_dark_url' | 'icon_light_url' | 'icon_dark_url';

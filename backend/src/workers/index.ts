@@ -246,6 +246,7 @@ async function main() {
         const subjectMap: Record<TemplateName, string> = {
           login_notification: 'Novo acesso detectado na sua conta',
           invite_member: 'Você foi convidado para colaborar em um espaço clínico',
+          reset_password: 'Redefinição de senha solicitada',
         };
         const subject = parsedPayload.subject ?? subjectMap[template] ?? 'Notificação';
 

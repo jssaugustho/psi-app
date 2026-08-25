@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
+import { api } from '@/lib/api';
 import { Button, Input, Card } from '@psi/ui';
 
 export default function LoginPage() {
@@ -13,6 +14,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Estados do Modal Esqueceu a Senha
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [sendingForgot, setSendingForgot] = useState(false);
 
   // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
   if (isBootReady && !authLoading && user) {
@@ -110,6 +118,22 @@ export default function LoginPage() {
             placeholder="••••••••"
           />
 
+          <div className="flex justify-between items-center text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setForgotEmail(email);
+                setForgotSuccess(null);
+                setForgotError(null);
+                setIsForgotModalOpen(true);
+              }}
+              className="text-xs hover:underline bg-transparent border-none cursor-pointer font-medium"
+              style={{ color: 'var(--brand-gradient-start)' }}
+            >
+              Esqueceu sua senha?
+            </button>
+          </div>
+
           <Button type="submit" submitting={submitting} className="w-full mt-2">
             Entrar
           </Button>
@@ -121,6 +145,110 @@ export default function LoginPage() {
             Cadastre-se
           </Link>
         </div>
+
+        {/* Modal: Esqueceu a Senha */}
+        {isForgotModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div
+              className="w-full max-w-md p-6 rounded-2xl space-y-4 shadow-2xl relative text-left"
+              style={{
+                background: 'var(--surface-input, rgba(15, 23, 42, 0.95))',
+                border: '1px solid var(--surface-border)',
+                color: 'var(--brand-text-color)',
+              }}
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <h3 className="text-lg font-bold">Recuperar Senha</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(false)}
+                  className="opacity-60 hover:opacity-100 bg-transparent border-none cursor-pointer text-slate-300 text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-xs opacity-75 leading-relaxed">
+                Digite o e-mail cadastrado na sua conta para receber as instruções de redefinição de senha.
+              </p>
+
+              {forgotError && (
+                <div
+                  className="text-xs p-3 rounded-lg text-center font-medium"
+                  style={{
+                    background: 'var(--status-error-bg)',
+                    border: '1px solid var(--status-error-border)',
+                    color: 'var(--status-error-text)',
+                  }}
+                >
+                  {forgotError}
+                </div>
+              )}
+
+              {forgotSuccess ? (
+                <div
+                  className="text-xs p-4 rounded-xl text-center space-y-3"
+                  style={{
+                    background: 'var(--status-success-bg)',
+                    border: '1px solid var(--status-success-border)',
+                    color: 'var(--status-success-text)',
+                  }}
+                >
+                  <p className="font-semibold">{forgotSuccess}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsForgotModalOpen(false)}
+                    className="w-full text-xs py-2 mt-2"
+                  >
+                    Voltar ao Login
+                  </Button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setSendingForgot(true);
+                    setForgotError(null);
+                    setForgotSuccess(null);
+                    try {
+                      const res = await api.forgotPassword(forgotEmail);
+                      setForgotSuccess(res.message);
+                    } catch (err: any) {
+                      setForgotError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+                    } finally {
+                      setSendingForgot(false);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <Input
+                    label="E-mail"
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                  />
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsForgotModalOpen(false)}
+                      className="text-xs py-2"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" submitting={sendingForgot} className="text-xs py-2">
+                      Enviar E-mail de Recuperação
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

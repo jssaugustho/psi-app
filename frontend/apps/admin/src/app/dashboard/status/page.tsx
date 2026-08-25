@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, ServiceStatus, StatusBucket, StatusHistoryResponse } from '@/lib/api';
+import { env } from '@/env';
 import { Card, Button, LoadingSpinner } from '@psi/ui';
 import { io, Socket } from 'socket.io-client';
 
@@ -50,7 +51,7 @@ export default function StatusPage() {
   useEffect(() => {
     if (!user) return;
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+    const apiBaseUrl = env.NEXT_PUBLIC_API_URL;
     const socketOrigin = apiBaseUrl.replace(/\/v1\/?$/, '');
     const socketPath = '/v1/socket.io';
 

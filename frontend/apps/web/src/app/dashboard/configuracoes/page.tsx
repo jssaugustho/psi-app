@@ -1,38 +1,14 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { WorkspaceSettingsForm } from './workspace-settings-form';
+import { Workspace } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,slug,domain,ownerId:owner_id,logoLightUrl:logo_light_url,logoDarkUrl:logo_dark_url,iconLightUrl:icon_light_url,iconDarkUrl:icon_dark_url,gradientColorStart:gradient_color_start,gradientColorEnd:gradient_color_end,contrastColor:contrast_color,bgLightColor:bg_light_color,bgDarkColor:bg_dark_color,cardLightColor:card_light_color,cardDarkColor:card_dark_color,textLightColor:text_light_color,textDarkColor:text_dark_color,emailDomain:email_domain,resendApiKey:resend_api_key,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source';
-
-interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  domain: string | null;
-  ownerId?: string | null;
-  logoLightUrl: string | null;
-  logoDarkUrl: string | null;
-  iconLightUrl: string | null;
-  iconDarkUrl: string | null;
-  gradientColorStart: string;
-  gradientColorEnd: string;
-  contrastColor: string;
-  bgLightColor?: string;
-  bgDarkColor?: string;
-  cardLightColor?: string;
-  cardDarkColor?: string;
-  textLightColor?: string;
-  textDarkColor?: string;
-  emailDomain?: string | null;
-  resendApiKey?: string | null;
-  trafficSources?: string[];
-  defaultTrafficSource?: string;
-}
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source';
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();
@@ -65,12 +41,15 @@ export default async function SettingsPage() {
 
   // 2. Resolver o tenant ativo (Cookie active_tenant_id -> Membro do Tenant -> Owner -> Fallback Admin)
   const activeTenantId = cookieStore.get('active_tenant_id')?.value;
-  let resolvedTenant: Tenant | null = null;
+  let resolvedTenant: Workspace | null = null;
 
   if (activeTenantId) {
     try {
-      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&id=eq.${activeTenantId}`, {
-        headers: { 'Accept': 'application/json' },
+      const res = await fetch(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&id=eq.${activeTenantId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         next: { revalidate: 0 }
       });
       if (res.ok) {
@@ -80,33 +59,39 @@ export default async function SettingsPage() {
         }
       }
     } catch (e) {
-      console.error('Erro ao resolver tenant por cookie active_tenant_id via SSR:', e);
+      console.error('Erro ao resolver workspace por cookie active_tenant_id via SSR:', e);
     }
   }
 
-  // Se não encontrou por cookie, tentar pelos pertencimentos do usuário em tenant_members
+  // Se não encontrou por cookie, tentar pelos pertencimentos do usuário em workspace_members
   if (!resolvedTenant && user?.id) {
     try {
-      const memberRes = await fetch(`${PGRST_BASE_URL}/tenant_members?user_id=eq.${user.id}&select=tenant:tenants(${TENANT_SELECT})&limit=1`, {
-        headers: { 'Accept': 'application/json' },
+      const memberRes = await fetch(`${PGRST_BASE_URL}/workspace_members?user_id=eq.${user.id}&select=workspace:workspaces(${TENANT_SELECT})&limit=1`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         next: { revalidate: 0 }
       });
       if (memberRes.ok) {
         const memberData = await memberRes.json();
-        if (memberData && memberData.length > 0 && memberData[0].tenant) {
-          resolvedTenant = memberData[0].tenant;
+        if (memberData && memberData.length > 0 && memberData[0].workspace) {
+          resolvedTenant = memberData[0].workspace;
         }
       }
     } catch (e) {
-      console.error('Erro ao resolver tenant por tenant_members via SSR:', e);
+      console.error('Erro ao resolver workspace por workspace_members via SSR:', e);
     }
   }
 
   // Se não encontrou por membro, tentar por owner_id
   if (!resolvedTenant && user?.id) {
     try {
-      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&owner_id=eq.${user.id}&limit=1`, {
-        headers: { 'Accept': 'application/json' },
+      const res = await fetch(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&owner_id=eq.${user.id}&limit=1`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         next: { revalidate: 0 }
       });
       if (res.ok) {
@@ -116,15 +101,18 @@ export default async function SettingsPage() {
         }
       }
     } catch (e) {
-      console.error('Erro ao carregar tenant do usuário proprietário via SSR:', e);
+      console.error('Erro ao carregar workspace do usuário proprietário via SSR:', e);
     }
   }
 
   // Fallback para administrador global da plataforma
   if (!resolvedTenant && user.role === 'admin') {
     try {
-      const res = await fetch(`${PGRST_BASE_URL}/tenants?select=${TENANT_SELECT}&order=created_at.desc&limit=1`, {
-        headers: { 'Accept': 'application/json' },
+      const res = await fetch(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&order=created_at.desc&limit=1`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         next: { revalidate: 0 }
       });
       if (res.ok) {
@@ -155,7 +143,7 @@ export default async function SettingsPage() {
   } else {
     try {
       const memberRes = await fetch(
-        `${PGRST_BASE_URL}/tenant_members?tenant_id=eq.${resolvedTenant.id}&user_id=eq.${user.id}&role=eq.admin`,
+        `${PGRST_BASE_URL}/workspace_members?workspace_id=eq.${resolvedTenant.id}&user_id=eq.${user.id}&role=eq.admin`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

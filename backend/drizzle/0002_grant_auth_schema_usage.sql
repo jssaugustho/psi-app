@@ -1,0 +1,21 @@
+-- Migration 0002_grant_auth_schema_usage.sql
+-- Concede permissao de uso (USAGE) no schema auth para as roles do PostgREST.
+--
+-- CONTEXTO:
+-- As funcoes auth.uid(), auth.role() e auth.email() ja possuem EXECUTE
+-- concedido para anon, authenticated e service_role. Porem, para que
+-- essas funcoes possam ser chamadas de dentro de politicas RLS por
+-- referencia qualificada (schema.funcao), o PostgreSQL exige tambem
+-- que a role possua USAGE no schema onde a funcao reside.
+--
+-- Sem este grant, auth.uid() retorna NULL quando chamada dentro de uma
+-- policy RLS executada como 'authenticated', quebrando todas as verificacoes
+-- de seguranca que dependem de identificar o usuario logado.
+--
+-- SEGURANCA:
+-- USAGE em schema NAO concede acesso as tabelas do schema.
+-- A role 'authenticated' continuara sem acesso a auth.users,
+-- auth.sessions, auth.refresh_tokens ou qualquer outra tabela interna.
+-- Apenas as funcoes explicitamente concedidas com EXECUTE sao acessiveis.
+
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;

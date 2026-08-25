@@ -147,15 +147,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       onEditProfile={() => setIsProfileOpen(true)}
       LinkComponent={Link}
     >
-      {!platformStatus?.is_configured ? (
-        <div className="animate-page-enter">
-          <PlatformSetupWizard
-            initialHasCloudflare={platformStatus?.has_cloudflare}
-            onComplete={loadPlatformStatus}
-          />
-        </div>
-      ) : (
-        children
+      {children}
+
+      {!platformStatus?.is_configured && (
+        <PlatformSetupWizard
+          isOpen={true}
+          initialHasCloudflare={platformStatus?.has_cloudflare}
+          onComplete={loadPlatformStatus}
+        />
       )}
     </AppShell>
   );

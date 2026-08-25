@@ -5,7 +5,7 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory } from '../../../shared/schema';
+import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles } from '../../../shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -1815,16 +1815,23 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           return reply.status(404).send({ error: 'Não Encontrado', message: 'Workspace não encontrado.' });
         }
 
-        // Permissão: apenas o dono do workspace ou um administrador global
+        // Permissão: apenas o dono do workspace, um admin do próprio workspace ou um administrador global da plataforma
         const isOwner = targetWorkspace.ownerId === decoded.sub;
-        const currentUserProfile = await db.query.workspaceMembers.findFirst({
+
+        const isWorkspaceAdmin = await db.query.workspaceMembers.findFirst({
           where: and(
             eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, id),
             eq(workspaceMembers.role, 'admin')
           ),
         });
 
-        if (!isOwner && !currentUserProfile) {
+        const platformUserProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        const isPlatformAdmin = platformUserProfile?.role === 'admin';
+
+        if (!isOwner && !isWorkspaceAdmin && !isPlatformAdmin) {
           return reply.status(403).send({ error: 'Proibido', message: 'Você não tem permissão para excluir este workspace.' });
         }
 

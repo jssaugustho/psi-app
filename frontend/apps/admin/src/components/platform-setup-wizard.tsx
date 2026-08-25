@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { api, DnsVerifierResponse } from '@/lib/api';
-import { Button, Input, Card } from '@psi/ui';
+import { Button, Input, BrandModal } from '@psi/ui';
 import { DnsVerifier } from '@/components/dns-verifier';
+import { Upload, Trash2, Loader2 } from 'lucide-react';
 
 export interface PlatformSetupWizardProps {
+  isOpen?: boolean;
   initialHasCloudflare?: boolean;
   onComplete: () => void;
 }
@@ -16,7 +18,7 @@ const STEPS = [
   { n: 3, title: '3. Tenant-Pai & Identidade Visual White-Label', desc: 'Defina as configurações do Tenant Principal da sua plataforma, faça upload dos ativos R2 e personalize as cores dos temas Claro e Escuro.' },
 ];
 
-export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }: PlatformSetupWizardProps) {
+export function PlatformSetupWizard({ isOpen = true, initialHasCloudflare = false, onComplete }: PlatformSetupWizardProps) {
   const [step, setStep] = useState<1 | 2 | 3>(initialHasCloudflare ? 2 : 1);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
@@ -53,11 +55,65 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
   const [contrastColor, setContrastColor] = useState('#FFFFFF');
   const [bgLightColor, setBgLightColor] = useState('#F8FAFC');
   const [bgDarkColor, setBgDarkColor] = useState('#020617');
-  const [cardLightColor, setCardLightColor] = useState('#FFFFFF');
-  const [cardDarkColor, setCardDarkColor] = useState('#0F172A');
-  const [textLightColor, setTextLightColor] = useState('#0F172A');
-  const [textDarkColor, setTextDarkColor] = useState('#F8FAFC');
   const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
+
+  // Carregar configurações salvas no banco ao montar o componente
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSavedSettings() {
+      try {
+        const res = await api.getPlatformSetupStatus();
+        if (!isMounted || !res) return;
+
+        if (res.cloudflare_api_token) setCfToken(res.cloudflare_api_token);
+        if (res.cloudflare_zone_id) setCfZoneId(res.cloudflare_zone_id);
+        if (res.cloudflare_account_id) setCfAccountId(res.cloudflare_account_id);
+        if (res.r2_bucket_name) setR2BucketName(res.r2_bucket_name);
+        if (res.r2_public_domain) setR2PublicDomain(res.r2_public_domain);
+        if (res.r2_access_key_id) setR2AccessKeyId(res.r2_access_key_id);
+        if (res.r2_secret_access_key) setR2SecretAccessKey(res.r2_secret_access_key);
+
+        if (res.resend_api_key) {
+          setResendApiKey(res.resend_api_key);
+          setKeySaved(true);
+        }
+        if (res.resend_from_domain) {
+          setResendFromDomain(res.resend_from_domain);
+          api.getResendDns().then((dns) => {
+            if (isMounted && dns) setDnsData(dns);
+          }).catch(() => {});
+        }
+
+        if (res.primary_tenant) {
+          if (res.primary_tenant.name) setName(res.primary_tenant.name);
+          if (res.primary_tenant.slug) setSlug(res.primary_tenant.slug);
+          if (res.primary_tenant.domain) setDomain(res.primary_tenant.domain);
+          if (res.primary_tenant.logoLightUrl) setLogoLightUrl(res.primary_tenant.logoLightUrl);
+          if (res.primary_tenant.logoDarkUrl) setLogoDarkUrl(res.primary_tenant.logoDarkUrl);
+          if (res.primary_tenant.iconLightUrl) setIconLightUrl(res.primary_tenant.iconLightUrl);
+          if (res.primary_tenant.iconDarkUrl) setIconDarkUrl(res.primary_tenant.iconDarkUrl);
+          if (res.primary_tenant.gradientColorStart) setGradientStart(res.primary_tenant.gradientColorStart);
+          if (res.primary_tenant.gradientColorEnd) setGradientEnd(res.primary_tenant.gradientColorEnd);
+          if (res.primary_tenant.contrastColor) setContrastColor(res.primary_tenant.contrastColor);
+          if (res.primary_tenant.bgLightColor) setBgLightColor(res.primary_tenant.bgLightColor);
+          if (res.primary_tenant.bgDarkColor) setBgDarkColor(res.primary_tenant.bgDarkColor);
+        }
+
+        // Seleção automática da etapa atual
+        if (!res.has_cloudflare || !res.has_r2) {
+          setStep(1);
+        } else if (!res.has_resend) {
+          setStep(2);
+        } else {
+          setStep(3);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados do setup:', err);
+      }
+    }
+    loadSavedSettings();
+    return () => { isMounted = false; };
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -116,8 +172,6 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
     }
   };
 
-  const handleSkipResend = () => { setError(null); setStep(3); };
-
   const handleFileUpload = async (field: 'logoLight' | 'logoDark' | 'iconLight' | 'iconDark', file: File) => {
     setError(null);
     setUploadingField(field);
@@ -139,7 +193,7 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
     e.preventDefault();
     setError(null); setSuccessMsg(null); setSubmitting(true);
     try {
-      await api.setupPrimaryTenant({ name, slug, domain: domain || undefined, logo_light_url: logoLightUrl || undefined, logo_dark_url: logoDarkUrl || undefined, icon_light_url: iconLightUrl || undefined, icon_dark_url: iconDarkUrl || undefined, gradient_color_start: gradientStart, gradient_color_end: gradientEnd, contrast_color: contrastColor, bg_light_color: bgLightColor, bg_dark_color: bgDarkColor, card_light_color: cardLightColor, card_dark_color: cardDarkColor, text_light_color: textLightColor, text_dark_color: textDarkColor });
+      await api.setupPrimaryTenant({ name, slug, domain: domain || undefined, logo_light_url: logoLightUrl || undefined, logo_dark_url: logoDarkUrl || undefined, icon_light_url: iconLightUrl || undefined, icon_dark_url: iconDarkUrl || undefined, gradient_color_start: gradientStart, gradient_color_end: gradientEnd, contrast_color: contrastColor, bg_light_color: bgLightColor, bg_dark_color: bgDarkColor });
       onComplete();
     } catch (err: any) {
       setError(err.message || 'Falha ao salvar o Tenant-Pai.');
@@ -165,14 +219,146 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
     <h3 className="text-xs font-bold uppercase tracking-wider pb-2" style={{ borderBottom: '1px solid var(--surface-border)', opacity: 0.55 }}>{children}</h3>
   );
 
-  const UploadBox = ({ label, url, previewBg, field }: { label: string; url: string; previewBg: string; field: 'logoLight' | 'logoDark' | 'iconLight' | 'iconDark' }) => (
-    <div className="space-y-2 p-4 rounded-xl" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }}>
-      <label className="block text-xs font-semibold uppercase" style={{ opacity: 0.65 }}>{label}</label>
-      {url && <div className="rounded-lg flex items-center justify-center h-16 mb-2" style={{ background: previewBg }}><img src={url} alt={label} className="max-h-full object-contain" /></div>}
-      <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleFileUpload(field, e.target.files[0])} className="text-xs cursor-pointer w-full" style={{ color: 'var(--brand-text-color)', opacity: 0.75 }} />
-      {uploadingField === field && <span className="text-xs block" style={{ color: 'var(--brand-gradient-start)' }}>Enviando para o R2...</span>}
-    </div>
-  );
+  const UploadBox = ({
+    label,
+    url,
+    previewBg,
+    field,
+    setUrl,
+  }: {
+    label: string;
+    url: string;
+    previewBg: string;
+    field: 'logoLight' | 'logoDark' | 'iconLight' | 'iconDark';
+    setUrl: (u: string) => void;
+  }) => {
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [isEditingUrl, setIsEditingUrl] = useState(false);
+    const isUploading = uploadingField === field;
+
+    const handleSelectFile = () => {
+      fileInputRef.current?.click();
+    };
+
+    return (
+      <div
+        className="space-y-3 p-4 rounded-xl transition-all"
+        style={{
+          background: 'var(--surface-hover)',
+          border: '1px solid var(--surface-border)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-semibold uppercase tracking-wider" style={{ opacity: 0.7 }}>
+            {label}
+          </label>
+          <button
+            type="button"
+            onClick={() => setIsEditingUrl(!isEditingUrl)}
+            className="text-[11px] underline hover:no-underline bg-transparent border-none cursor-pointer"
+            style={{ color: 'var(--brand-gradient-start)', opacity: 0.8 }}
+          >
+            {isEditingUrl ? 'Modo Upload' : 'Inserir URL'}
+          </button>
+        </div>
+
+        {/* Hidden File Input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.[0]) {
+              handleFileUpload(field, e.target.files[0]);
+              e.target.value = '';
+            }
+          }}
+        />
+
+        {isEditingUrl ? (
+          <div className="space-y-2">
+            <Input
+              type="url"
+              placeholder="https://sua-cdn.com/imagem.png"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </div>
+        ) : url ? (
+          <div className="space-y-3">
+            <div
+              className="rounded-xl flex items-center justify-center h-20 p-2 relative overflow-hidden group shadow-inner"
+              style={{ background: previewBg, border: '1px solid var(--surface-border)' }}
+            >
+              <img src={url} alt={label} className="max-h-full max-w-full object-contain" />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleSelectFile}
+                disabled={isUploading}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer bg-transparent hover:bg-slate-800/40"
+                style={{ border: '1px solid var(--surface-border)', color: 'var(--brand-text-color)' }}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Enviando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Subir Novo Arquivo</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUrl('')}
+                className="py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20"
+                title="Remover imagem"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={handleSelectFile}
+            className="border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:border-[var(--brand-gradient-start)] hover:bg-black/10 group"
+            style={{ borderColor: 'var(--surface-border)' }}
+          >
+            {isUploading ? (
+              <div className="flex items-center gap-2 py-2 text-xs font-medium" style={{ color: 'var(--brand-gradient-start)' }}>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Enviando para o Bucket R2...</span>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-all group-hover:scale-105"
+                  style={{
+                    background: 'color-mix(in srgb, var(--brand-gradient-start) 15%, transparent)',
+                    color: 'var(--brand-gradient-start)',
+                  }}
+                >
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div className="text-center">
+                  <span className="text-xs font-semibold block" style={{ color: 'var(--brand-text-color)' }}>
+                    Clique para Subir Imagem no R2
+                  </span>
+                  <span className="text-[10px] block opacity-50">PNG, JPG, SVG ou WEBP</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const ColorRow = ({ label, val, set }: { label: string; val: string; set: (v: string) => void }) => (
     <div className="space-y-1">
@@ -187,8 +373,14 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
   const currentStep = STEPS.find((s) => s.n === step)!;
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <Card className="space-y-8">
+    <BrandModal
+      isOpen={isOpen}
+      onClose={() => {}}
+      maxWidth="max-w-4xl"
+      showCloseButton={false}
+      className="max-h-[90vh] flex flex-col overflow-hidden p-6 md:p-8 space-y-0"
+    >
+      <div className="overflow-y-auto custom-scrollbar pr-1.5 space-y-6 flex-1 text-left">
 
         {/* Cabeçalho e Stepper */}
         <div className="space-y-4">
@@ -277,13 +469,8 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
                 <Input label="API Key do Resend *" type="password" required value={resendApiKey} onChange={(e) => setResendApiKey(e.target.value)} placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
                 
                 <div className="flex items-center justify-between pt-2">
-                  <button type="button" onClick={handleSkipResend} className="text-sm underline hover:no-underline bg-transparent border-none cursor-pointer" style={{ opacity: 0.55, color: 'var(--brand-text-color)' }}>
-                    Pular por agora →
-                  </button>
-                  <div className="flex gap-3">
-                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-auto">← Voltar</Button>
-                    <Button type="submit" submitting={submitting} className="w-auto px-8">Salvar API Key →</Button>
-                  </div>
+                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-auto">← Voltar</Button>
+                  <Button type="submit" submitting={submitting} className="w-auto px-8">Salvar API Key →</Button>
                 </div>
               </form>
             )}
@@ -304,12 +491,7 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
                   <button type="button" onClick={() => setKeySaved(false)} className="text-xs underline hover:no-underline bg-transparent border-none cursor-pointer" style={{ opacity: 0.55, color: 'var(--brand-text-color)' }}>
                     ← Alterar API Key
                   </button>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleSkipResend} className="px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer bg-transparent" style={{ border: '1px solid var(--surface-border)', color: 'var(--brand-text-color)', opacity: 0.7 }}>
-                      Pular por agora
-                    </button>
-                    <Button type="submit" submitting={submitting} className="w-auto px-8">Cadastrar Domínio & Gerar DNS →</Button>
-                  </div>
+                  <Button type="submit" submitting={submitting} className="w-auto px-8">Cadastrar Domínio & Gerar DNS →</Button>
                 </div>
               </form>
             )}
@@ -344,14 +526,9 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
                   <button type="button" onClick={() => { setDnsData(null); }} className="text-xs underline hover:no-underline bg-transparent border-none cursor-pointer" style={{ opacity: 0.55, color: 'var(--brand-text-color)' }}>
                     ← Alterar Domínio
                   </button>
-                  <div className="flex gap-3">
-                    <button type="button" onClick={handleSkipResend} className="px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer bg-transparent" style={{ border: '1px solid var(--surface-border)', color: 'var(--brand-text-color)', opacity: 0.7 }}>
-                      Continuar sem verificar
-                    </button>
-                    <button type="button" onClick={() => { setError(null); setStep(3); }} className="px-6 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none" style={{ background: 'var(--brand-gradient)', color: 'var(--brand-contrast-color)' }}>
-                      Avançar para o Tenant-Pai →
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => { setError(null); setStep(3); }} className="px-6 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none" style={{ background: 'var(--brand-gradient)', color: 'var(--brand-contrast-color)' }}>
+                    Avançar para o Tenant-Pai →
+                  </button>
                 </div>
               </div>
             )}
@@ -375,10 +552,10 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
             <div className="space-y-4">
               <SectionTitle>Logotipos e Ícones (Uploads em Nuvem para o R2)</SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <UploadBox label="Logotipo (Tema Claro)" url={logoLightUrl} previewBg="#F1F5F9" field="logoLight" />
-                <UploadBox label="Logotipo (Tema Escuro)" url={logoDarkUrl} previewBg="#0F172A" field="logoDark" />
-                <UploadBox label="Ícone/Favicon (Tema Claro)" url={iconLightUrl} previewBg="#F1F5F9" field="iconLight" />
-                <UploadBox label="Ícone/Favicon (Tema Escuro)" url={iconDarkUrl} previewBg="#0F172A" field="iconDark" />
+                <UploadBox label="Logotipo (Tema Claro)" url={logoLightUrl} previewBg="#F1F5F9" field="logoLight" setUrl={setLogoLightUrl} />
+                <UploadBox label="Logotipo (Tema Escuro)" url={logoDarkUrl} previewBg="#0F172A" field="logoDark" setUrl={setLogoDarkUrl} />
+                <UploadBox label="Ícone/Favicon (Tema Claro)" url={iconLightUrl} previewBg="#F1F5F9" field="iconLight" setUrl={setIconLightUrl} />
+                <UploadBox label="Ícone/Favicon (Tema Escuro)" url={iconDarkUrl} previewBg="#0F172A" field="iconDark" setUrl={setIconDarkUrl} />
               </div>
             </div>
 
@@ -402,35 +579,32 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
               </div>
             </div>
 
-            {/* Cores de Fundo e Cartões */}
+            {/* Intensidade de Fundo (Modo Claro & Modo Escuro) */}
             <div className="space-y-4">
-              <SectionTitle>Personalização de Fundo e Cartões (Modo Claro & Modo Escuro)</SectionTitle>
+              <SectionTitle>Intensidade do Tema (Fundo Claro & Fundo Escuro)</SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }}>
+                <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }}>
                   <span className="text-xs font-bold uppercase block" style={{ color: 'var(--status-warning-text)' }}>Tema Claro</span>
-                  <p className="text-[10px] opacity-50 mt-1">Cores para fundo claro e cartões claros.</p>
-                  <ColorRow label="Fundo da Página" val={bgLightColor} set={setBgLightColor} />
-                  <ColorRow label="Fundo dos Cartões" val={cardLightColor} set={setCardLightColor} />
-                  <ColorRow label="Texto Principal" val={textLightColor} set={setTextLightColor} />
+                  <p className="text-[10px] opacity-60">Cor base para a intensidade do fundo em modo claro.</p>
+                  <ColorRow label="Intensidade do Branco (Fundo)" val={bgLightColor} set={setBgLightColor} />
                 </div>
-                <div className="p-4 rounded-xl space-y-4" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }}>
+                <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--surface-hover)', border: '1px solid var(--surface-border)' }}>
                   <span className="text-xs font-bold uppercase block" style={{ color: 'var(--brand-gradient-start)' }}>Tema Escuro</span>
-                  <ColorRow label="Fundo da Página" val={bgDarkColor} set={setBgDarkColor} />
-                  <ColorRow label="Fundo dos Cartões" val={cardDarkColor} set={setCardDarkColor} />
-                  <ColorRow label="Texto Principal" val={textDarkColor} set={setTextDarkColor} />
+                  <p className="text-[10px] opacity-60">Cor base para a intensidade do fundo em modo escuro.</p>
+                  <ColorRow label="Intensidade do Preto (Fundo)" val={bgDarkColor} set={setBgDarkColor} />
                 </div>
               </div>
             </div>
 
             {/* Live Preview */}
-            <div style={{ backgroundColor: previewTheme === 'dark' ? bgDarkColor : bgLightColor, color: previewTheme === 'dark' ? textDarkColor : textLightColor, border: '1px solid var(--surface-border)' }} className="p-6 rounded-2xl transition-colors duration-300 space-y-6">
+            <div style={{ backgroundColor: previewTheme === 'dark' ? bgDarkColor : bgLightColor, color: previewTheme === 'dark' ? '#F4F4F5' : '#09090B', border: '1px solid var(--surface-border)' }} className="p-6 rounded-2xl transition-colors duration-300 space-y-6">
               <div className="flex items-center justify-between pb-3" style={{ borderBottom: '1px solid rgba(128,128,128,0.2)' }}>
                 <span className="text-xs font-bold uppercase tracking-wider opacity-80">Live Preview</span>
                 <button type="button" onClick={() => setPreviewTheme(previewTheme === 'dark' ? 'light' : 'dark')} className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer bg-transparent" style={{ border: '1px solid rgba(128,128,128,0.3)' }}>
                   Modo: {previewTheme === 'dark' ? 'Escuro' : 'Claro'}
                 </button>
               </div>
-              <div style={{ backgroundColor: previewTheme === 'dark' ? cardDarkColor : cardLightColor }} className="p-5 rounded-xl shadow-xl space-y-4">
+              <div style={{ backgroundColor: previewTheme === 'dark' ? 'color-mix(in srgb, #FFFFFF 6%, ' + bgDarkColor + ')' : '#FFFFFF', border: '1px solid rgba(128,128,128,0.2)' }} className="p-5 rounded-xl shadow-xl space-y-4">
                 <div className="flex items-center gap-3">
                   {(previewTheme === 'dark' ? logoDarkUrl || logoLightUrl : logoLightUrl || logoDarkUrl)
                     ? <img src={(previewTheme === 'dark' ? logoDarkUrl || logoLightUrl : logoLightUrl || logoDarkUrl)!} alt="Logo Preview" className="max-h-8 object-contain" />
@@ -452,7 +626,7 @@ export function PlatformSetupWizard({ initialHasCloudflare = false, onComplete }
           </form>
         )}
 
-      </Card>
-    </div>
+      </div>
+    </BrandModal>
   );
 }

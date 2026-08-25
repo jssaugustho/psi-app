@@ -1,6 +1,7 @@
 import { publishToQueue } from '../shared/queue';
 import { LoginNotificationProps } from './templates/login-notification';
 import { InviteMemberProps } from './templates/invite-member';
+import { ResetPasswordProps } from './templates/reset-password';
 
 // ── Discriminated union de todos os payloads de e-mail ───────────────────
 // `tenantId` é opcional: quando fornecido, o worker usará o emailDomain do
@@ -20,6 +21,13 @@ export type EmailPayload =
       subject?: string;
       tenantId?: string;
       props: InviteMemberProps;
+    }
+  | {
+      template: 'reset_password';
+      to: string;
+      subject?: string;
+      tenantId?: string;
+      props: ResetPasswordProps;
     };
 // Ao adicionar novos templates, basta incluir mais variantes aqui.
 

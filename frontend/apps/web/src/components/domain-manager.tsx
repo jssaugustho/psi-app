@@ -122,10 +122,6 @@ export function DomainManager({
     setRegisteringCustom(true);
     setError('');
 
-    // Salva imediatamente no banco de dados da conta se tenantId fornecido
-    if (tenantId) {
-      api.updateTenantBranding(tenantId, { domain: customDomain.trim().toLowerCase() }).catch(() => {});
-    }
 
     try {
       const res = await api.registerCustomHostname(null, customDomain.trim());

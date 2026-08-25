@@ -1,9 +1,10 @@
+import jwt from 'jsonwebtoken';
 import { env } from '../../../config/env';
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs } from '../../../shared/schema';
+import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, pipelineColumns } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest } from '../../../shared/auth';
 import { queueEmail } from '../../../emails/queue-email';
@@ -66,6 +67,15 @@ const LoginBodySchema = z.object({
   appType: z.enum(['app', 'admin']).optional(),
 });
 
+const ForgotPasswordBodySchema = z.object({
+  email: z.string().email('E-mail inválido'),
+  appType: z.enum(['app', 'admin']).optional().default('app'),
+});
+
+const ResetPasswordBodySchema = z.object({
+  password: z.string().min(6, 'A nova senha deve ter no mínimo 6 caracteres'),
+});
+
 export async function authRoutes(fastifyApp: FastifyInstance) {
   const fastify = fastifyApp.withTypeProvider<ZodTypeProvider>();
 
@@ -91,10 +101,13 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           : 'Sistema necessita de bootstrap inicial via Backoffice.',
       });
     } catch (err: any) {
-      fastify.log.error(err);
-      return reply.status(500).send({
-        error: 'Erro no servidor',
-        message: 'Não foi possível checar o status de inicialização.',
+      fastify.log.warn('Tabelas do banco ainda não inicializadas no bootstrap/status:', err);
+      return reply.send({
+        bootstrapped: false,
+        has_admin: false,
+        has_platform_settings: false,
+        admin_email: null,
+        message: 'Sistema necessita de bootstrap inicial via Backoffice.',
       });
     }
   });
@@ -122,9 +135,10 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         }
 
         const { nome, sobrenome, telefone, email, password } = request.body;
+        const cleanEmail = email.trim().toLowerCase();
 
         // 2. Criar usuário no GoTrue
-        const goTrueUser = await createGoTrueUser(email, password, {
+        const goTrueUser = await createGoTrueUser(cleanEmail, password, {
           first_name: nome,
           last_name: sobrenome,
           phone: telefone || null,
@@ -140,7 +154,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             firstName: nome,
             lastName: sobrenome,
             phone: telefone || null,
-            email,
+            email: cleanEmail,
             role: 'admin',
           })
           .onConflictDoUpdate({
@@ -149,15 +163,30 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
               firstName: nome,
               lastName: sobrenome,
               phone: telefone || null,
-              email,
+              email: cleanEmail,
               role: 'admin',
               updatedAt: new Date(),
             },
           })
           .returning();
 
-        // 4. Autenticar automaticamente o novo Admin
-        const authData = await loginGoTrueUser(email, password);
+        // 4. Autenticar automaticamente o novo Admin via GoTrue com retries progressivos
+        let authData;
+        let loginAttemptCount = 0;
+        const delays = [200, 500, 1000];
+        while (loginAttemptCount <= delays.length) {
+          try {
+            authData = await loginGoTrueUser(cleanEmail, password);
+            break;
+          } catch (loginErr: any) {
+            loginAttemptCount++;
+            if (loginAttemptCount > delays.length) {
+              fastify.log.error(`Falha no auto-login do bootstrap após ${loginAttemptCount} tentativas:`, loginErr);
+              throw loginErr;
+            }
+            await new Promise((resolve) => setTimeout(resolve, delays[loginAttemptCount - 1]));
+          }
+        }
 
         return reply.status(201).send({
           message: 'Primeiro Administrador criado com sucesso!',
@@ -210,9 +239,10 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         }
 
         const { nome, sobrenome, telefone, email, password } = request.body;
+        const cleanEmail = email.trim().toLowerCase();
 
         // 1. Criar usuário no GoTrue usando o token admin service_role
-        const goTrueUser = await createGoTrueUser(email, password, {
+        const goTrueUser = await createGoTrueUser(cleanEmail, password, {
           first_name: nome,
           last_name: sobrenome,
           phone: telefone || null,
@@ -228,7 +258,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             firstName: nome,
             lastName: sobrenome,
             phone: telefone || null,
-            email,
+            email: cleanEmail,
             role: 'user',
           })
           .onConflictDoUpdate({
@@ -237,7 +267,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
               firstName: nome,
               lastName: sobrenome,
               phone: telefone || null,
-              email,
+              email: cleanEmail,
               updatedAt: new Date(),
             },
           })
@@ -277,9 +307,10 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
     async (request, reply) => {
       try {
         const { email, password, appType } = request.body;
+        const cleanEmail = email.trim().toLowerCase();
 
         // 1. Autenticar credenciais via GoTrue
-        const authData = await loginGoTrueUser(email, password);
+        const authData = await loginGoTrueUser(cleanEmail, password);
         const userId = authData.user?.id;
 
         // 2. Buscar dados do perfil do usuário via Drizzle ORM
@@ -367,6 +398,135 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         return reply.status(401).send({
           error: 'Falha no login',
           message: err.message || 'Credenciais inválidas.',
+        });
+      }
+    }
+  );
+
+  // POST /v1/auth/forgot-password
+  fastify.post(
+    '/forgot-password',
+    {
+      schema: {
+        body: ForgotPasswordBodySchema,
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { email, appType } = request.body;
+
+        // 1. Procurar perfil no banco pelo e-mail
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.email, email.trim().toLowerCase()),
+        });
+
+        if (profile) {
+          const matchedWorkspace = await resolveWorkspaceFromRequest(request);
+          const settings = await db.query.platformSettings.findFirst();
+
+          const brandName = matchedWorkspace?.name ?? settings?.platformName ?? 'TheraOS';
+          const visualIdentity = matchedWorkspace
+            ? await db.query.visualIdentities.findFirst({
+                where: and(
+                  eq(visualIdentities.workspaceId, matchedWorkspace.id),
+                  eq(visualIdentities.isWorkspaceDefault, true)
+                ),
+              })
+            : null;
+          const gradientStart = visualIdentity?.primaryColor ?? settings?.gradientColorStart ?? '#7C3AED';
+          const gradientEnd = visualIdentity?.secondaryColor ?? settings?.gradientColorEnd ?? '#A855F7';
+          const logoUrl = visualIdentity?.logoUrl || settings?.logoDarkUrl || settings?.logoLightUrl || null;
+
+          // Determina a URL de redirecionamento para a página de redefinição
+          const origin = (request.headers['origin'] || request.headers['referer']) as string | undefined;
+          let baseUrl = origin ? origin.replace(/\/$/, '') : 'http://localhost:3000';
+          const resetUrl = `${baseUrl}/login/reset-password`;
+
+          // Gerar link de recuperação via GoTrue API Admin
+          const linkData = await generateGoTrueLink('recovery', profile.email, resetUrl);
+          const actionLink = linkData.action_link || `${resetUrl}#access_token=${linkData.hashed_token || ''}&type=recovery`;
+
+          queueEmail({
+            template: 'reset_password',
+            to: profile.email,
+            tenantId: matchedWorkspace?.id,
+            subject: `Redefinição de Senha — ${brandName}`,
+            props: {
+              userName: profile.firstName,
+              userEmail: profile.email,
+              resetUrl: actionLink,
+              brandName,
+              gradientStart,
+              gradientEnd,
+              logoUrl,
+              appType,
+            },
+          }).catch((err) => {
+            fastify.log.warn('Falha ao enfileirar e-mail de reset de senha:', err);
+          });
+        }
+
+        return reply.send({
+          message: 'Se o e-mail estiver cadastrado no sistema, você receberá as instruções para redefinir sua senha.',
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro no servidor',
+          message: 'Não foi possível processar a solicitação de redefinição de senha.',
+        });
+      }
+    }
+  );
+
+  // POST /v1/auth/reset-password
+  fastify.post(
+    '/reset-password',
+    {
+      schema: {
+        body: ResetPasswordBodySchema,
+      },
+    },
+    async (request, reply) => {
+      try {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
+          return reply.status(401).send({
+            error: 'Não autorizado',
+            message: 'Token de recuperação ausente ou inválido.',
+          });
+        }
+
+        const decoded = verifyUserJwt(token);
+        const userId = decoded.sub;
+
+        const { password } = request.body;
+
+        // Atualizar senha no GoTrue usando API Admin
+        const adminToken = generateServiceRoleJwt();
+        const targetUrl = `${env.GOTRUE_URL}/admin/users/${userId}`;
+        const updateRes = await fetch(targetUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminToken}`,
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        if (!updateRes.ok) {
+          const errData = await updateRes.json().catch(() => ({}));
+          throw new Error((errData as any)?.msg || 'Falha ao atualizar senha no GoTrue.');
+        }
+
+        return reply.send({
+          message: 'Senha redefinida com sucesso!',
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(400).send({
+          error: 'Erro ao redefinir senha',
+          message: err.message || 'Token expirado ou inválido. Solicite um novo link.',
         });
       }
     }
