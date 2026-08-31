@@ -15,8 +15,10 @@ export const config = {
 export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   
-  // Obter hostname real (injetado pelo Cloudflare Worker via X-Tenant-Domain, X-Forwarded-Host ou Host)
-  const tenantDomain = request.headers.get('x-tenant-domain');
+  // Obter hostname real (injetado pelo Cloudflare Worker via X-Tenant-Domain, X-Foxbase-Tenant, X-Forwarded-Host, query param tenant ou Host)
+  const tenantDomain = request.headers.get('x-tenant-domain') || 
+                       request.headers.get('x-foxbase-tenant') || 
+                       url.searchParams.get('tenant');
   const forwardedHost = request.headers.get('x-forwarded-host');
   const hostHeader = request.headers.get('host') || '';
   const hostname = (tenantDomain || forwardedHost || hostHeader).split(':')[0].toLowerCase();

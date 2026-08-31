@@ -245,8 +245,12 @@ export async function getCapturePageByDomain(
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           const item = data[0];
-          if (item.tenants && item.tenants.workspace_domains && item.tenants.workspace_domains.length > 0) {
-            item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
+          if (item.tenants && item.tenants.workspace_domains) {
+            if (Array.isArray(item.tenants.workspace_domains) && item.tenants.workspace_domains.length > 0) {
+              item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
+            } else if (typeof item.tenants.workspace_domains === 'object') {
+              item.tenants.slug = (item.tenants.workspace_domains as any).subdomain;
+            }
           }
           
           const isPublished = item.site_config?.status === 'published';
