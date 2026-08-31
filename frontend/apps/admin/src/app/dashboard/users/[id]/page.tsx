@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api, User } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, Select } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, Select, BrandModal } from '@psi/ui';
 import { Link } from '@/components/Link';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────
@@ -89,31 +89,19 @@ function EmailPreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/85" onClick={onClose} />
-      
-      {/* Content Container */}
-      <div
-        className="relative glass-lg w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col animate-scale-up"
-        style={{
-          color: 'var(--brand-text-color)',
-        }}
-      >
-        {/* Top Header */}
-        <div className="p-4 md:p-6 flex items-center justify-between border-b" style={{ borderColor: 'var(--surface-border)' }}>
-          <div>
-            <h3 className="text-base font-bold truncate max-w-md">{log.subject}</h3>
-            <p className="text-xs opacity-60 mt-0.5">Destinatário: {log.to_email}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-800/40 opacity-70 hover:opacity-100 transition-all cursor-pointer bg-transparent border-none"
-            style={{ color: 'var(--brand-text-color)' }}
-          >
-            <CloseIcon />
-          </button>
+    <BrandModal
+      isOpen={true}
+      onClose={onClose}
+      maxWidth="max-w-4xl"
+      className="h-[85vh] overflow-hidden flex flex-col p-0!"
+    >
+      {/* Top Header */}
+      <div className="p-4 md:p-6 flex items-center justify-between border-b flex-shrink-0" style={{ borderColor: 'var(--surface-border)' }}>
+        <div>
+          <h3 className="text-base font-bold truncate max-w-md">{log.subject}</h3>
+          <p className="text-xs opacity-60 mt-0.5">Destinatário: {log.to_email}</p>
         </div>
+      </div>
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col md:flex-row min-h-0 bg-black/10">
@@ -227,8 +215,7 @@ function EmailPreviewModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </BrandModal>
   );
 }
 

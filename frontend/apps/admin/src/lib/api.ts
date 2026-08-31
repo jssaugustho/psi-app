@@ -13,7 +13,7 @@ const PGRST_BASE_URL = env.NEXT_PUBLIC_POSTGREST_URL || (API_BASE_URL.endsWith('
 // Branding (logos, cores) fica em visual_identities — não em workspaces
 const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source,createdAt:created_at,updatedAt:updated_at';
 
-const PROFILE_SELECT = 'id,nome:first_name,sobrenome:last_name,telefone:phone,email,avatar_url,role,created_at';
+const PROFILE_SELECT = 'id,nome:first_name,sobrenome:last_name,telefone:phone,email,cpf,crp,has_no_crp,avatar_url,role,created_at';
 
 export interface User {
   id: string;
@@ -21,6 +21,9 @@ export interface User {
   sobrenome: string;
   telefone: string | null;
   email: string;
+  cpf?: string | null;
+  crp?: string | null;
+  has_no_crp?: boolean;
   role?: string;
   avatar_url?: string | null;
   created_at?: string;
@@ -117,8 +120,6 @@ export interface TenantSubscription {
 
 export interface PlatformBrand {
   name: string;
-  slug?: string;
-  domain?: string | null;
   logoLightUrl: string | null;
   logoDarkUrl: string | null;
   iconLightUrl: string | null;
@@ -137,6 +138,7 @@ export interface PlatformSetupStatusResponse {
   has_resend_key?: boolean;
   has_resend_domain?: boolean;
   has_resend: boolean;
+  has_visual_identity?: boolean;
   cloudflare_api_token?: string | null;
   cloudflare_zone_id: string | null;
   cloudflare_account_id: string | null;
@@ -145,6 +147,7 @@ export interface PlatformSetupStatusResponse {
   r2_public_domain: string | null;
   r2_access_key_id?: string | null;
   r2_secret_access_key?: string | null;
+  backup_r2_buckets?: R2BucketConfig[];
   resend_api_key?: string | null;
   resend_from_domain: string | null;
   primary_tenant: PlatformBrand | null;
@@ -505,8 +508,6 @@ export const api = {
   // Configurar Tenant-Pai Principal e Identidade Visual White-Label
   setupPrimaryTenant: (body: {
     name: string;
-    slug: string;
-    domain?: string;
     logo_light_url?: string;
     logo_dark_url?: string;
     icon_light_url?: string;
@@ -535,8 +536,6 @@ export const api = {
   // Atualizar configurações da Marca da Plataforma em platform_settings
   updatePrimaryTenant: async (body: Partial<{
     name: string;
-    slug: string;
-    domain: string | null;
     logo_light_url: string | null;
     logo_dark_url: string | null;
     icon_light_url: string | null;
@@ -655,12 +654,14 @@ export const api = {
 
   // --- SUB & RBAC METODOS ---
   getPlatformSettings: async () => {
-    const res = await fetchApi<PlatformSettings[]>(`${PGRST_BASE_URL}/platform_settings?limit=1`);
+    const selectFields = 'id,platform_name,logo_light_url,logo_dark_url,icon_light_url,icon_dark_url,gradient_color_start,gradient_color_end,contrast_color,bg_light_color,bg_dark_color,base_domain,r2_bucket_name,r2_public_domain,resend_from_domain,has_resend,base_tenant_price,additional_member_price,created_at,updated_at';
+    const res = await fetchApi<PlatformSettings[]>(`${PGRST_BASE_URL}/platform_settings?select=${selectFields}&limit=1`);
     return res[0] || null;
   },
 
   updatePlatformSettings: async (id: string, body: Partial<PlatformSettings>) => {
-    const res = await fetchApi<PlatformSettings[]>(`${PGRST_BASE_URL}/platform_settings?id=eq.${id}`, {
+    const selectFields = 'id,platform_name,logo_light_url,logo_dark_url,icon_light_url,icon_dark_url,gradient_color_start,gradient_color_end,contrast_color,bg_light_color,bg_dark_color,base_domain,r2_bucket_name,r2_public_domain,resend_from_domain,has_resend,base_tenant_price,additional_member_price,created_at,updated_at';
+    const res = await fetchApi<PlatformSettings[]>(`${PGRST_BASE_URL}/platform_settings?select=${selectFields}&id=eq.${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
       headers: {
@@ -817,7 +818,42 @@ export const api = {
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(${TENANT_SELECT})&custom_domain=eq.${domain}`);
     return res[0]?.workspace || null;
   },
+
+  // Buscar logs de erros da plataforma
+  getErrorLogs: (filters: {
+    limit?: number;
+    offset?: number;
+    serviceName?: string;
+    severity?: string;
+    name?: string;
+    message?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        params.append(key, String(val));
+      }
+    });
+    return fetchApi<{ success: boolean; logs: ErrorLog[]; total: number }>(`/platform/errors?${params.toString()}`);
+  },
 };
+
+export interface ErrorLog {
+  id: string;
+  name: string | null;
+  message: string;
+  stack: string | null;
+  url: string | null;
+  userAgent: string | null;
+  userId: string | null;
+  serviceName: string;
+  severity: string;
+  metadata: Record<string, any> | null;
+  createdAt: string;
+}
 
 export interface ServiceStatus {
   serviceName: string;

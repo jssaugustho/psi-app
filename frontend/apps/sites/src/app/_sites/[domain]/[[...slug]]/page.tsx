@@ -1,6 +1,6 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { getCapturePageByDomain, getContractTemplateContent, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../../lib/api'
+import { getCapturePageByDomain, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../../lib/api'
 import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
 import { NotFoundView } from '../../../../components/NotFoundView'
 
@@ -11,12 +11,19 @@ interface PageProps {
     domain: string;
     slug?: string[];
   }>;
+  searchParams: Promise<{
+    preview?: string;
+    staging?: string;
+    token?: string;
+  }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { domain, slug } = await params
+  const { preview, staging, token } = await searchParams
+  const isPreview = preview === 'true' || staging === 'true'
   const pathSlug = slug && slug.length > 0 ? slug.join('/') : ''
-  const pageData = await getCapturePageByDomain(domain, pathSlug)
+  const pageData = await getCapturePageByDomain(domain, pathSlug, isPreview, token)
   
   if (!pageData) {
     const tenant = await getTenantByDomain(domain);
@@ -61,8 +68,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function CustomDomainCapturePage({ params }: PageProps) {
+export default async function CustomDomainCapturePage({ params, searchParams }: PageProps) {
   const { domain, slug } = await params
+  const { preview, staging, token } = await searchParams
+  const isPreview = preview === 'true' || staging === 'true'
 
   // 0. Bloqueio se a plataforma não estiver inicializada
   const bootStatus = await getBootstrapStatus();
@@ -71,9 +80,9 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <div className="max-w-md w-full p-8 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
           <div className="text-3xl">🛠️</div>
-          <h1 className="text-xl font-bold">Plataforma em Manutenção</h1>
+          <h1 className="text-xl font-bold">Site em Manutenção</h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            A plataforma ainda não concluiu o processo de inicialização inicial.
+            O site está temporariamente indisponível para manutenção. Por favor, tente novamente em alguns instantes.
           </p>
         </div>
       </div>
@@ -83,19 +92,12 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
   const pathSlug = slug && slug.length > 0 ? slug.join('/') : ''
 
   // Resolve page and tenant by domain and path slug using PostgREST
-  const pageData = await getCapturePageByDomain(domain, pathSlug)
+  const pageData = await getCapturePageByDomain(domain, pathSlug, isPreview, token)
 
   if (!pageData) {
     const tenant = await getTenantByDomain(domain);
     const primaryTenant = tenant ? null : await getPrimaryTenant();
     return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedDomain={domain} />;
-  }
-
-  // Resolve contract template content if associated to contract step
-  let contractText: string | undefined = undefined
-  const contractNode = pageData.form_flow.nodes.find((n: any) => n.type === 'contrato')
-  if (contractNode?.data?.contractTemplateId) {
-    contractText = await getContractTemplateContent(contractNode.data.contractTemplateId) || undefined
   }
 
   return (
@@ -124,7 +126,6 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
         logoDarkUrl: pageData.tenants.logo_dark_url,
         logoLightUrl: pageData.tenants.logo_light_url
       }}
-      contractText={contractText}
     />
   )
 }

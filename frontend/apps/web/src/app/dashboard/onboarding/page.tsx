@@ -1,172 +1,167 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
-import { api } from '@/lib/api';
-import { Card, Input, Button } from '@psi/ui';
+import { api, Workspace } from '@/lib/api';
+import { Card, Input, Button, Textarea } from '@psi/ui';
+import { BrandIdentityManager } from '@/components/brand-identity-manager';
+import { DomainManager } from '@/components/domain-manager';
+import { Building2, Palette, Globe, User as UserIcon, ChevronRight, ArrowLeft } from 'lucide-react';
+
+const DEFAULT_SPECIALTIES_PRESETS = [
+  'Terapia Cognitivo-Comportamental (TCC)',
+  'Psicanálise',
+  'Ansiedade e Síndrome do Pânico',
+  'Depressão e Transtornos do Humor',
+  'Autoconhecimento e Autoestima',
+  'Terapia de Casal e Relacionamentos',
+  'Gestalt-Terapia',
+  'Psicologia Positiva',
+];
+
+const STEPS = [
+  { id: 1, label: 'Workspace',  Icon: Building2 },
+  { id: 2, label: 'Perfil',    Icon: UserIcon   },
+  { id: 3, label: 'Identidade', Icon: Palette    },
+  { id: 4, label: 'Domínio',   Icon: Globe      },
+];
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
   const { primaryTenant, theme, toggleTheme, reloadBrand } = useBrand();
 
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [subdomain, setSubdomain] = useState('');
-  
-  const [subdomainError, setSubdomainError] = useState<string | null>(null);
-  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
-  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  // ─── Stepper ────────────────────────────────────────────────────────────
+  const [step, setStep] = useState(1);
 
+  // ─── Etapa 1: Nome do Workspace ──────────────────────────────────────────
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [createdWorkspace, setCreatedWorkspace] = useState<Workspace | null>(null);
+
+  // ─── Etapa 2: Perfil do Consultório ─────────────────────────────────────
+  const [displayName, setDisplayName] = useState('');
+  const [cityState, setCityState] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [bio, setBio] = useState('');
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [newSpecialty, setNewSpecialty] = useState('');
+
+  // ─── Etapa 4: Domínio ────────────────────────────────────────────────────
+  const [subdomain, setSubdomain] = useState('');
+  const [customDomain, setCustomDomain] = useState('');
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [checkingSubdomain, setCheckingSubdomain] = useState(false);
+  const [subdomainError, setSubdomainError] = useState<string | null>(null);
+
+  // ─── Erros e loading ─────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Redireciona se o usuário não estiver autenticado
+  // ─── Auth guard ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
+    if (!authLoading && !user) router.push('/login');
   }, [user, authLoading, router]);
 
-  // Sanitizar o nome do workspace para gerar o subdomínio padrão
-  const sanitizeSlug = (name: string): string => {
-    return name
-      .toLowerCase()
-      .normalize('NFD') // remove acentos
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9-]/g, '-') // apenas letras, números e hífen
-      .replace(/-+/g, '-') // remove hífens duplicados
-      .replace(/^-+|-+$/g, ''); // remove hífens nas pontas
-  };
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setWorkspaceName(val);
-    
-    // Atualiza o subdomínio automaticamente se o usuário ainda não tiver editado manualmente
-    setSubdomain(sanitizeSlug(val));
-    setSubdomainAvailable(null);
-    setSubdomainError(null);
-  };
-
-  const handleSubdomainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = sanitizeSlug(e.target.value);
-    setSubdomain(val);
-    setSubdomainAvailable(null);
-    setSubdomainError(null);
-  };
-
-  // Efeito para verificar a disponibilidade do subdomínio
+  // ─── Pré-popular displayName ──────────────────────────────────────────────
   useEffect(() => {
-    if (!subdomain.trim() || subdomain.length < 3) {
-      setSubdomainAvailable(null);
-      return;
-    }
+    if (!displayName && workspaceName) setDisplayName(workspaceName);
+  }, [workspaceName, displayName]);
 
-    const delayDebounce = setTimeout(async () => {
-      setIsCheckingSubdomain(true);
+  // ─── Gerar slug do subdomínio ─────────────────────────────────────────────
+  const sanitizeSlug = useCallback((name: string) =>
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, ''), []);
+
+  useEffect(() => {
+    if (workspaceName && !subdomain) setSubdomain(sanitizeSlug(workspaceName));
+  }, [workspaceName, subdomain, sanitizeSlug]);
+
+  // ─── Verificar disponibilidade do subdomínio ─────────────────────────────
+  useEffect(() => {
+    if (!subdomain || subdomain.length < 3) { setSubdomainAvailable(null); return; }
+    const timer = setTimeout(async () => {
+      setCheckingSubdomain(true);
       try {
-        const isTaken = await api.checkSubdomainExists(subdomain);
-        if (isTaken) {
-          setSubdomainError('Este subdomínio já está em uso.');
-          setSubdomainAvailable(false);
-        } else {
-          setSubdomainError(null);
-          setSubdomainAvailable(true);
-        }
-      } catch (err) {
-        console.error('Erro ao checar subdomínio:', err);
-      } finally {
-        setIsCheckingSubdomain(false);
-      }
+        const taken = await api.checkSubdomainExists(subdomain);
+        if (taken) { setSubdomainError('Este subdomínio já está em uso.'); setSubdomainAvailable(false); }
+        else { setSubdomainError(null); setSubdomainAvailable(true); }
+      } catch { /* ignore */ }
+      finally { setCheckingSubdomain(false); }
     }, 500);
-
-    return () => clearTimeout(delayDebounce);
+    return () => clearTimeout(timer);
   }, [subdomain]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ─── Especialidades ───────────────────────────────────────────────────────
+  const handleAddSpecialty = (s: string) => {
+    const t = s.trim();
+    if (t && !specialties.includes(t)) setSpecialties(p => [...p, t]);
+    setNewSpecialty('');
+  };
+  const handleRemoveSpecialty = (idx: number) =>
+    setSpecialties(p => p.filter((_, i) => i !== idx));
+
+  // ─── Submit: Etapa 1 ─────────────────────────────────────────────────────
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (!user) return;
-    if (!workspaceName.trim()) {
-      setError('O nome do workspace é obrigatório.');
-      return;
-    }
-
-    if (!subdomain.trim() || subdomain.length < 3) {
-      setError('O subdomínio deve conter no mínimo 3 caracteres.');
-      return;
-    }
-
-    if (subdomainAvailable === false) {
-      setError('Por favor, escolha um subdomínio disponível.');
-      return;
-    }
-
+    if (!user || !workspaceName.trim()) { setError('O nome do workspace é obrigatório.'); return; }
     setSubmitting(true);
     try {
-      // 1. Criar o Workspace
-      const workspace = await api.createWorkspace(workspaceName.trim(), user.id);
-      
-      if (!workspace || !workspace.id) {
-        throw new Error('Falha ao instanciar o workspace.');
-      }
+      const ws = await api.createWorkspace(workspaceName.trim(), user.id);
+      if (!ws?.id) throw new Error('Falha ao instanciar o workspace.');
+      localStorage.setItem('active_workspace_id', ws.id);
+      localStorage.setItem('active_tenant_id', ws.id);
+      sessionStorage.setItem('active_workspace_id', ws.id);
+      document.cookie = `active_workspace_id=${ws.id}; path=/; max-age=31536000; SameSite=Lax`;
+      document.cookie = `active_tenant_id=${ws.id}; path=/; max-age=31536000; SameSite=Lax`;
+      setCreatedWorkspace(ws);
+      setDisplayName(ws.name);
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message || 'Ocorreu um erro ao criar o workspace.');
+    } finally { setSubmitting(false); }
+  };
 
-      // 2. Cadastrar o Subdomínio
-      await api.createWorkspaceDomain(workspace.id, subdomain.toLowerCase().trim());
-
-      // 3. Cadastrar a Identidade Visual Padrão
-      await api.createVisualIdentity({
-        workspaceId: workspace.id,
-        name: 'Identidade Padrão',
-        isWorkspaceDefault: true,
-        primaryColor: '#7C3AED',
-        secondaryColor: '#A855F7',
-        contrastColor: '#FFFFFF',
-        bgColor: '#09090B',
-        cardColor: '#18181B',
-        textColor: '#F4F4F5'
+  // ─── Submit: Etapa 2 ─────────────────────────────────────────────────────
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!createdWorkspace) return;
+    setSubmitting(true);
+    try {
+      await api.updateTenantBranding(createdWorkspace.id, {
+        name: displayName.trim() || workspaceName.trim(),
+        bio: bio.trim() || undefined,
+        specialties: specialties.length ? specialties : undefined,
+        cityState: cityState.trim() || undefined,
+        instagram: instagram.trim() || undefined,
       });
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message || 'Falha ao salvar o perfil.');
+    } finally { setSubmitting(false); }
+  };
 
-      // 4. Seed das Colunas Iniciais do CRM
-      const defaultColumns = [
-        { name: 'Triagem Pendente', slug: 'pendente', color: '#64748B', category: 'pendente', order: 1 },
-        { name: 'Acolhimento', slug: 'acolhimento', color: '#3B82F6', category: 'acolhimento', order: 2 },
-        { name: 'Em Terapia', slug: 'paciente', color: '#10B981', category: 'paciente', order: 3 },
-        { name: 'Alta', slug: 'alta', color: '#8B5CF6', category: 'alta', order: 4 },
-        { name: 'Arquivado', slug: 'negativa', color: '#EF4444', category: 'negativa', order: 5 },
-      ];
-
-      for (const col of defaultColumns) {
-        await api.createPipelineColumn({
-          tenant_id: workspace.id,
-          name: col.name,
-          order: col.order,
-          slug: col.slug,
-          color: col.color,
-          category: col.category,
-        }).catch((err) => {
-          console.warn(`Erro ao criar coluna CRM "${col.name}":`, err);
-        });
-      }
-
-      // 6. Configurar o workspace recém-criado como o ativo
-      localStorage.setItem('active_workspace_id', workspace.id);
-      localStorage.setItem('active_tenant_id', workspace.id);
-      sessionStorage.setItem('active_workspace_id', workspace.id);
-      document.cookie = `active_workspace_id=${workspace.id}; path=/; max-age=31536000; SameSite=Lax`;
-      document.cookie = `active_tenant_id=${workspace.id}; path=/; max-age=31536000; SameSite=Lax`;
-
-      // 7. Sincronizar branding e redirecionar
+  // ─── Submit: Etapa 4 ─────────────────────────────────────────────────────
+  const handleFinish = async () => {
+    setError(null);
+    if (!createdWorkspace) return;
+    if (!subdomain || subdomain.length < 3) { setError('O subdomínio deve ter ao menos 3 caracteres.'); return; }
+    if (subdomainAvailable === false) { setError('Por favor, escolha um subdomínio disponível.'); return; }
+    setSubmitting(true);
+    try {
+      await api.createWorkspaceDomain(createdWorkspace.id, subdomain.toLowerCase().trim());
       await reloadBrand();
-      
-      // Redireciona de forma definitiva recarregando o app
       window.location.href = '/dashboard/crm';
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Ocorreu um erro ao criar seu workspace. Tente novamente.');
+      setError(err.message || 'Ocorreu um erro ao salvar o domínio.');
       setSubmitting(false);
     }
   };
@@ -180,27 +175,94 @@ export default function OnboardingPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center relative">
-        <div className="animate-pulse flex items-center gap-2 brand-text-muted">
-          <span>Verificando autenticação...</span>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse brand-text-muted">Verificando autenticação...</div>
       </div>
     );
   }
 
+  // ─── Sub-componentes ──────────────────────────────────────────────────────
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-0 mb-8">
+      {STEPS.map((s, idx) => {
+        const Icon = s.Icon;
+        const isActive = s.id === step;
+        const isDone = s.id < step;
+        return (
+          <React.Fragment key={s.id}>
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
+                  : isActive ? 'text-white shadow-lg'
+                  : 'border-2 border-[var(--surface-border)] brand-text-muted'
+                }`}
+                style={isActive ? { background: 'var(--brand-gradient)' } : {}}
+              >
+                {isDone ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : <Icon className="w-4 h-4" />}
+              </div>
+              <span
+                className={`text-[10px] font-semibold transition-all ${isActive ? '' : 'brand-text-muted opacity-60'}`}
+                style={isActive ? { color: 'var(--brand-gradient-start)' } : {}}
+              >
+                {s.label}
+              </span>
+            </div>
+            {idx < STEPS.length - 1 && (
+              <div className={`w-12 h-0.5 mb-5 transition-all duration-500 ${s.id < step ? 'bg-emerald-500/60' : 'bg-[var(--surface-border)]'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+
+  const PageHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
+    <div className="text-center space-y-1.5 mb-6">
+      {logoUrl && <img src={logoUrl} alt={primaryTenant?.name || 'TheraOS'} className="max-h-10 max-w-[55%] mx-auto object-contain mb-3" />}
+      <h1
+        className="text-2xl font-bold bg-clip-text text-transparent"
+        style={{ background: 'var(--brand-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+      >
+        {title}
+      </h1>
+      <p className="text-sm brand-text-muted">{subtitle}</p>
+    </div>
+  );
+
+  const ErrorBanner = () => error ? (
+    <div
+      className="text-sm p-3 rounded-lg text-center font-medium mb-4"
+      style={{ background: 'var(--status-error-bg)', border: '1px solid var(--status-error-border)', color: 'var(--status-error-text)' }}
+    >
+      {error}
+    </div>
+  ) : null;
+
+  const BackButton = ({ toStep }: { toStep: number }) => (
+    <button
+      type="button"
+      onClick={() => setStep(toStep)}
+      className="flex items-center gap-1.5 text-sm font-medium brand-text-muted hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer"
+    >
+      <ArrowLeft className="w-4 h-4" /> Voltar
+    </button>
+  );
+
+  // ─── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative animate-page-enter">
-      {/* Botão de alternância de tema no canto superior direito */}
+      {/* Toggle de tema */}
       <div className="absolute top-4 right-4 z-10">
         <button
           type="button"
           onClick={toggleTheme}
-          style={{
-            border: '1px solid var(--surface-border)',
-            color: 'var(--brand-text-color)',
-          }}
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-all text-base cursor-pointer bg-transparent hover:bg-[var(--surface-hover)]"
-          title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+          style={{ border: '1px solid var(--surface-border)', color: 'var(--brand-text-color)' }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer bg-transparent hover:bg-[var(--surface-hover)]"
         >
           {theme === 'dark' ? (
             <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -214,109 +276,163 @@ export default function OnboardingPage() {
         </button>
       </div>
 
-      <Card className="w-full max-w-lg space-y-6 p-8">
-        <div className="text-center space-y-2">
-          {logoUrl && (
-            <img 
-              src={logoUrl} 
-              alt={primaryTenant?.name || 'TheraOS'} 
-              className="max-h-12 max-w-[60%] mx-auto object-contain mb-4" 
-            />
-          )}
+      <Card className={`w-full p-8 transition-all duration-300 ${step >= 3 ? 'max-w-3xl' : 'max-w-lg'}`}>
+        <StepIndicator />
 
-          <h1 
-            className="text-3xl font-bold bg-clip-text text-transparent" 
-            style={{ 
-              background: "var(--brand-gradient)", 
-              WebkitBackgroundClip: "text", 
-              WebkitTextFillColor: "transparent" 
-            }}
-          >
-            Configurar Workspace
-          </h1>
-          <p className="text-sm brand-text-muted max-w-md mx-auto">
-            Crie o seu espaço de trabalho profissional e personalize seu endereço de acesso na plataforma.
-          </p>
-        </div>
-
-        {error && (
-          <div
-            className="text-sm p-3 rounded-lg text-center font-medium"
-            style={{
-              background: 'var(--status-error-bg)',
-              border: '1px solid var(--status-error-border)',
-              color: 'var(--status-error-text)',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <Input
-            label="Nome do Workspace *"
-            type="text"
-            required
-            value={workspaceName}
-            onChange={handleNameChange}
-            placeholder="Ex: Consultório de Psicologia Ana"
-          />
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
-              Endereço do Workspace (Subdomínio) *
-            </label>
-            <div className="flex rounded-xl overflow-hidden border border-[var(--surface-border)] bg-[var(--surface-input)] focus-within:border-[var(--brand-gradient-start)] transition-all">
-              <input
+        {/* ──── ETAPA 1: Nome do Workspace ──── */}
+        {step === 1 && (
+          <>
+            <PageHeader title="Criar Workspace" subtitle="Defina o nome do seu espaço de trabalho profissional." />
+            <ErrorBanner />
+            <form onSubmit={handleCreateWorkspace} className="space-y-5">
+              <Input
+                label="Nome do Workspace / Consultório *"
                 type="text"
                 required
-                value={subdomain}
-                onChange={handleSubdomainChange}
-                placeholder="consultorio-ana"
-                className="flex-1 px-4 py-3 bg-transparent text-sm text-[var(--brand-text-color)] outline-none border-none"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                placeholder="Ex: Consultório de Psicologia Ana"
               />
-              <span className="flex items-center px-4 py-3 bg-white/5 border-l border-[var(--surface-border)] text-xs font-semibold brand-text-muted">
-                .{baseDomain}
-              </span>
+              <Button type="submit" submitting={submitting} className="w-full">
+                Criar & Continuar <ChevronRight className="w-4 h-4 ml-1 inline" />
+              </Button>
+            </form>
+            <div className="flex items-center justify-between text-xs pt-5 mt-4 border-t border-[var(--surface-border)]" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
+              <span>Logado como: <strong style={{ color: 'var(--brand-text-color)' }}>{user.email}</strong></span>
+              <button onClick={logout} className="hover:underline bg-transparent border-none cursor-pointer font-semibold" style={{ color: 'var(--brand-gradient-start)' }}>
+                Sair da Conta
+              </button>
             </div>
-            
-            <div className="flex items-center justify-between text-[11px] pt-1">
-              {isCheckingSubdomain ? (
-                <span className="text-slate-400">Verificando disponibilidade...</span>
-              ) : subdomainError ? (
-                <span className="text-red-400">{subdomainError}</span>
-              ) : subdomainAvailable ? (
-                <span className="text-emerald-400">✓ Este endereço está disponível!</span>
-              ) : subdomain.length > 0 && subdomain.length < 3 ? (
-                <span className="text-amber-400">Deve conter pelo menos 3 caracteres.</span>
-              ) : (
-                <span className="brand-text-muted">Apenas letras minúsculas, números e hífens.</span>
-              )}
+          </>
+        )}
+
+        {/* ──── ETAPA 2: Perfil do Consultório ──── */}
+        {step === 2 && (
+          <>
+            <PageHeader title="Perfil do Consultório" subtitle="Essas informações aparecem no seu site de captação. Você pode preencher depois." />
+            <ErrorBanner />
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Nome de Exibição / Clínica</label>
+                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={workspaceName || 'Ex: Dra. Ana Silva'} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Cidade / Estado</label>
+                  <Input value={cityState} onChange={(e) => setCityState(e.target.value)} placeholder="Ex: São Paulo / SP" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Instagram Profissional</label>
+                <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@seu.perfil" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Biografia Resumida</label>
+                <Textarea
+                  rows={3}
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Conte sobre sua trajetória, abordagem clínica e compromisso com os pacientes..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Especialidades & Áreas de Atuação</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newSpecialty}
+                    onChange={(e) => setNewSpecialty(e.target.value)}
+                    placeholder="Adicionar especialidade..."
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSpecialty(newSpecialty); } }}
+                  />
+                  <Button type="button" onClick={() => handleAddSpecialty(newSpecialty)} className="shrink-0 bg-violet-600 hover:bg-violet-500">+</Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {DEFAULT_SPECIALTIES_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleAddSpecialty(preset)}
+                      className="text-[11px] px-2.5 py-1 rounded-lg border cursor-pointer transition-all"
+                      style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--brand-text-color)', opacity: specialties.includes(preset) ? 0.4 : 0.8 }}
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+                {specialties.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {specialties.map((item, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30 text-xs font-semibold">
+                        {item}
+                        <button type="button" onClick={() => handleRemoveSpecialty(idx)} className="hover:text-rose-400 cursor-pointer bg-transparent border-none">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <BackButton toStep={1} />
+                <Button type="submit" submitting={submitting} className="flex-1">
+                  Salvar & Continuar <ChevronRight className="w-4 h-4 ml-1 inline" />
+                </Button>
+                <button type="button" onClick={() => setStep(3)} className="text-sm font-medium brand-text-muted hover:opacity-80 bg-transparent border-none cursor-pointer whitespace-nowrap">
+                  Pular etapa
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* ──── ETAPA 3: Identidade Visual ──── */}
+        {step === 3 && createdWorkspace && (
+          <>
+            <PageHeader title="Identidade Visual" subtitle="Personalize a aparência do seu site. Você pode alterar isso depois." />
+            <ErrorBanner />
+            <BrandIdentityManager
+              workspace={createdWorkspace}
+              onSaved={() => setStep(4)}
+              saveButtonLabel="Salvar & Continuar"
+              showSkip
+              onSkip={() => setStep(4)}
+            />
+            <div className="mt-4">
+              <BackButton toStep={2} />
             </div>
-          </div>
+          </>
+        )}
 
-          <div className="pt-2">
-            <Button 
-              type="submit" 
-              submitting={submitting} 
-              disabled={subdomainAvailable === false || subdomain.length < 3}
-              className="w-full"
-            >
-              Criar Workspace & Entrar
-            </Button>
-          </div>
-        </form>
-
-        <div className="flex items-center justify-between text-xs pt-4 border-t border-[var(--surface-border)]" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
-          <span>Logado como: <strong className="font-semibold" style={{ color: 'var(--brand-text-color)' }}>{user.email}</strong></span>
-          <button
-            onClick={logout}
-            className="hover:underline transition-colors bg-transparent border-none cursor-pointer font-semibold"
-            style={{ color: 'var(--brand-gradient-start)' }}
-          >
-            Sair da Conta
-          </button>
-        </div>
+        {/* ──── ETAPA 4: Domínio ──── */}
+        {step === 4 && createdWorkspace && (
+          <>
+            <PageHeader title="Endereço de Acesso" subtitle="Defina o subdomínio do seu workspace na plataforma." />
+            <ErrorBanner />
+            <DomainManager
+              subdomain={subdomain}
+              onSubdomainChange={(val) => { setSubdomain(val); setSubdomainAvailable(null); setSubdomainError(null); }}
+              customDomain={customDomain}
+              onCustomDomainChange={setCustomDomain}
+              subdomainAvailable={subdomainAvailable}
+              checkingSubdomain={checkingSubdomain}
+              tenantId={createdWorkspace.id}
+            />
+            <div className="flex gap-3 mt-6">
+              <BackButton toStep={3} />
+              <Button
+                type="button"
+                onClick={handleFinish}
+                submitting={submitting}
+                disabled={subdomainAvailable === false || !subdomain || subdomain.length < 3}
+                className="flex-1"
+              >
+                Finalizar & Entrar no Dashboard
+              </Button>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );

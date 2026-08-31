@@ -4,12 +4,13 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { usePathname } from 'next/navigation';
 import { apiConnection } from '@/lib/api';
 import { Card, Button } from '@psi/ui';
+import { WifiOff, ServerCrash, Database, RefreshCw, AlertTriangle, RotateCw } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface ApiStatusContextType {
   isOffline: boolean;
-  checkHealth: () => Promise<void>;
+  checkHealth: (silent?: boolean) => Promise<void>;
 }
 
 const ApiStatusContext = createContext<ApiStatusContextType>({
@@ -17,18 +18,6 @@ const ApiStatusContext = createContext<ApiStatusContextType>({
   checkHealth: async () => {},
 });
 
-// ── ÍCONES SVG ──────────────────────────────────────────────────────────────
-const WifiOffIcon = () => (
-  <svg className="w-10 h-10 text-rose-500 animate-pulse" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18M12 18h.01M8.5 14.5a5 5 0 017 0M5 11a10 10 0 0110.5-2M2.5 7.5A15 15 0 0118 4.5" />
-  </svg>
-);
-
-const RefreshIcon = ({ className }: { className?: string }) => (
-  <svg className={`w-4 h-4 ${className || ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-  </svg>
-);
 
 export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -43,11 +32,13 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
   const [dbStatus, setDbStatus] = useState<'checking' | 'operational' | 'down' | 'waiting'>('waiting');
   const [queueStatus, setQueueStatus] = useState<'checking' | 'operational' | 'down' | 'waiting'>('waiting');
 
-  const checkHealth = useCallback(async () => {
-    setChecking(true);
-    setApiStatus('checking');
-    setDbStatus('checking');
-    setQueueStatus('checking');
+  const checkHealth = useCallback(async (silent = false) => {
+    if (!silent) {
+      setChecking(true);
+      setApiStatus('checking');
+      setDbStatus('checking');
+      setQueueStatus('checking');
+    }
 
     try {
       const healthUrl = API_URL.endsWith('/v1')
@@ -90,7 +81,9 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
       setErrorMsg('Sem resposta do servidor de API. Verifique se o backend está rodando.');
       setIsOffline(true);
     } finally {
-      setChecking(false);
+      if (!silent) {
+        setChecking(false);
+      }
     }
   }, []);
 
@@ -111,71 +104,145 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isOffline]);
 
-  // Timer de auto-ping a cada 5 segundos enquanto estiver marcado como offline
+  // Timer de auto-ping a cada 3 segundos enquanto estiver marcado como offline
   useEffect(() => {
     if (!isOffline || isOfflinePage) return;
 
     const interval = setInterval(() => {
-      checkHealth();
-    }, 5000);
+      if (!checking) {
+        checkHealth(true);
+      }
+    }, 3000);
 
     return () => clearInterval(interval);
-  }, [isOffline, isOfflinePage, checkHealth]);
+  }, [isOffline, isOfflinePage, checking, checkHealth]);
+
+  const getStatusBadge = (status: 'checking' | 'operational' | 'down' | 'waiting') => {
+    switch (status) {
+      case 'checking':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-500/10 text-zinc-400 animate-pulse uppercase tracking-wider">
+            Verificando
+          </span>
+        );
+      case 'operational':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 uppercase tracking-wider">
+            Online
+          </span>
+        );
+      case 'down':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 uppercase tracking-wider">
+            Inativo
+          </span>
+        );
+      case 'waiting':
+      default:
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-500/10 text-zinc-500 uppercase tracking-wider">
+            Aguardando API
+          </span>
+        );
+    }
+  };
 
   return (
     <ApiStatusContext.Provider value={{ isOffline, checkHealth }}>
       {children}
 
-      {/* Modal de Sobreposição Global - Oculto na rota dedicada /offline */}
+      {/* Modal de Sobreposição Global (Z-Index Máximo) - Oculto na rota dedicada /offline */}
       {isOffline && !isOfflinePage && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <Card className="max-w-md w-full p-6 text-center space-y-6 border-rose-500/30 shadow-2xl bg-slate-950/90 text-slate-100">
-            <div className="flex justify-center">
-              <div className="p-4 rounded-full bg-rose-500/10 border border-rose-500/20">
-                <WifiOffIcon />
-              </div>
-            </div>
+        <div 
+          className="fixed inset-0 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in"
+          style={{ zIndex: 999999 }}
+        >
+          <Card className="w-full max-w-md space-y-6 relative overflow-hidden shadow-2xl border border-[var(--surface-border)]">
+            {/* Detalhe de linha de gradiente no topo */}
+            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: 'var(--brand-gradient, linear-gradient(135deg, #4f46e5, #06b6d4))' }} />
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold tracking-tight">Serviço Temporariamente Indisponível</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {errorMsg || 'Detectamos uma perda de conexão com os servidores do Backoffice.'}
+            <div className="text-center space-y-3 pt-2">
+              <div className="mx-auto w-12 h-12 rounded-full flex items-center justify-center bg-red-500/10 text-red-400">
+                <WifiOff className="w-6 h-6 animate-pulse" />
+              </div>
+              <h1 className="text-xl font-bold" style={{ color: 'var(--brand-text-color)' }}>
+                Conexão Indisponível
+              </h1>
+              <p className="text-sm max-w-xs mx-auto" style={{ color: 'var(--brand-text-color)', opacity: 0.7 }}>
+                Não conseguimos estabelecer conexão com o Backoffice no momento. Seu progresso nesta página foi preservado.
               </p>
             </div>
 
-            {/* Status individual dos serviços */}
-            <div className="grid grid-cols-3 gap-2 py-3 px-2 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
-              <div className="space-y-1">
-                <span className="text-[10px] text-slate-400 block font-medium">Gateway API</span>
-                <span className={`font-semibold ${apiStatus === 'operational' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {apiStatus === 'checking' ? '...' : apiStatus === 'operational' ? 'Online' : 'Offline'}
-                </span>
-              </div>
+            {/* Status dos Serviços Individuais em Tempo Real */}
+            <div className="space-y-2.5">
+              <label
+                className="text-[10px] font-semibold uppercase tracking-wider animate-pulse block text-center"
+                style={{ color: 'var(--brand-text-color)', opacity: 0.5 }}
+              >
+                Status dos Serviços (Tempo Real)
+              </label>
+              
+              <div className="space-y-2 text-left">
+                {/* Serviço 1: API */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
+                  <div className="flex items-center gap-2">
+                    <ServerCrash className="w-4 h-4 text-zinc-400" />
+                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Servidor de API</span>
+                  </div>
+                  {getStatusBadge(apiStatus)}
+                </div>
 
-              <div className="space-y-1 border-x border-slate-800">
-                <span className="text-[10px] text-slate-400 block font-medium">Banco Postgres</span>
-                <span className={`font-semibold ${dbStatus === 'operational' ? 'text-emerald-400' : dbStatus === 'down' ? 'text-rose-400' : 'text-slate-500'}`}>
-                  {dbStatus === 'checking' ? '...' : dbStatus === 'operational' ? 'Online' : dbStatus === 'down' ? 'Offline' : '—'}
-                </span>
-              </div>
+                {/* Serviço 2: Database */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
+                  <div className="flex items-center gap-2">
+                    <Database className="w-4 h-4 text-zinc-400" />
+                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Banco de Dados</span>
+                  </div>
+                  {getStatusBadge(dbStatus)}
+                </div>
 
-              <div className="space-y-1">
-                <span className="text-[10px] text-slate-400 block font-medium">RabbitMQ Queues</span>
-                <span className={`font-semibold ${queueStatus === 'operational' ? 'text-emerald-400' : queueStatus === 'down' ? 'text-rose-400' : 'text-slate-500'}`}>
-                  {queueStatus === 'checking' ? '...' : queueStatus === 'operational' ? 'Online' : queueStatus === 'down' ? 'Offline' : '—'}
-                </span>
+                {/* Serviço 3: Mensageria */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-hover)] border border-[var(--surface-border)]">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-zinc-400" />
+                    <span className="text-sm font-medium" style={{ color: 'var(--brand-text-color)' }}>Realtime & Fila</span>
+                  </div>
+                  {getStatusBadge(queueStatus)}
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 pt-2">
+            {errorMsg && (
+              <div className="text-xs p-3 rounded-lg text-center font-medium bg-red-500/10 border border-red-500/20 text-red-400">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="pt-2 space-y-2">
               <Button
-                onClick={checkHealth}
+                onClick={() => checkHealth()}
                 disabled={checking}
-                className="w-full flex items-center justify-center gap-2 py-2.5"
+                className="w-full flex items-center justify-center gap-2"
               >
-                <RefreshIcon className={checking ? 'animate-spin' : ''} />
-                <span>{checking ? 'Verificando serviços...' : 'Tentar Reconectar Agora'}</span>
+                <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+                {checking ? 'Verificando Conexão...' : 'Tentar Reconectar Agora'}
               </Button>
+
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-[var(--surface-border)] text-[var(--brand-text-color)] opacity-70 hover:opacity-100 hover:bg-[var(--surface-hover)] transition-all cursor-pointer bg-transparent"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                Recarregar Página (F5)
+              </button>
+            </div>
+
+            <div
+              className="text-center text-[10px]"
+              style={{ color: 'var(--brand-text-color)', opacity: 0.5 }}
+            >
+              Tentando conectar automaticamente a cada 3 segundos.
             </div>
           </Card>
         </div>

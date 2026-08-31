@@ -87,3 +87,18 @@ export async function publishRealtime(payload: any): Promise<boolean> {
     return false;
   }
 }
+
+export async function publishErrorLog(payload: {
+  name?: string | null;
+  message: string;
+  stack?: string | null;
+  url?: string | null;
+  userAgent?: string | null;
+  userId?: string | null;
+  serviceName: string;
+  severity?: 'error' | 'warning' | 'fatal';
+  metadata?: Record<string, any> | null;
+}): Promise<boolean> {
+  return publishToQueue('system.errors', payload);
+}
+

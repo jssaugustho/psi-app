@@ -5,11 +5,13 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles } from '../../../shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
-import { verifyUserJwt } from '../../../shared/auth';
+import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles, errorLogs } from '../../../shared/schema';
+import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
+import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
+import { publishErrorLog } from '../../../shared/queue';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
 
 // Schemas Zod de Validação
 const SaveCloudflareBodySchema = z.object({
@@ -49,8 +51,6 @@ const SaveStorageBodySchema = z.object({
 
 const SetupTenantBodySchema = z.object({
   name: z.string().min(1, 'Nome da plataforma é obrigatório'),
-  slug: z.string().optional().nullable(),
-  domain: z.string().optional().nullable(),
   logo_light_url: z.string().optional().nullable(),
   logo_dark_url: z.string().optional().nullable(),
   icon_light_url: z.string().optional().nullable(),
@@ -65,12 +65,22 @@ const SetupTenantBodySchema = z.object({
 export async function platformRoutes(fastifyApp: FastifyInstance) {
   const fastify = fastifyApp.withTypeProvider<ZodTypeProvider>();
 
+  function maskSecret(val?: string | null, prefix = ''): string | null {
+    if (!val) return null;
+    return `${prefix}••••••••••••••••••••••••`;
+  }
+
   // GET /v1/platform/setup/status
   fastify.get('/setup/status', async (request, reply) => {
     try {
       const settings = await db.query.platformSettings.findFirst();
 
-      const hasCloudflare = !!(settings?.cloudflareApiToken && settings?.cloudflareZoneId);
+      const hasCloudflare = !!(
+        settings?.cloudflareApiToken &&
+        settings?.cloudflareZoneId &&
+        settings?.cloudflareAccountId &&
+        settings?.baseDomain
+      );
       const hasR2 = !!(
         settings?.cloudflareAccountId &&
         settings?.r2BucketName &&
@@ -80,6 +90,14 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       const hasResendKey = !!(settings?.resendApiKey);
       const hasResendDomain = !!(settings?.resendFromDomain);
       const hasResend = hasResendKey && hasResendDomain;
+
+      const hasVisualIdentity = !!(
+        settings?.platformName &&
+        settings?.logoLightUrl &&
+        settings?.logoDarkUrl
+      );
+
+      const isConfigured = hasCloudflare && hasR2 && hasResend && hasVisualIdentity;
 
       const platformBrand = {
         name: settings?.platformName || 'TheraOS',
@@ -94,23 +112,54 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         bgDarkColor: settings?.bgDarkColor || '#09090B',
       };
 
+      let isAdmin = false;
+      const jwtToken = extractJwtFromRequest(request);
+      if (jwtToken) {
+        try {
+          const decoded = verifyUserJwt(jwtToken);
+          if (decoded && decoded.sub) {
+            const profile = await db.query.profiles.findFirst({
+              where: eq(profiles.id, decoded.sub),
+            });
+            if (profile && profile.role === 'admin') {
+              isAdmin = true;
+            }
+          }
+        } catch {
+          // Token inválido/expirado, tratar como não-admin
+        }
+      }
+
+      if (isAdmin) {
+        return reply.send({
+          is_configured: isConfigured,
+          has_cloudflare: hasCloudflare,
+          has_r2: hasR2,
+          has_resend_key: hasResendKey,
+          has_resend_domain: hasResendDomain,
+          has_resend: hasResend,
+          has_visual_identity: hasVisualIdentity,
+          cloudflare_api_token: maskSecret(settings?.cloudflareApiToken, 'cfat_'),
+          cloudflare_zone_id: settings?.cloudflareZoneId || null,
+          cloudflare_account_id: settings?.cloudflareAccountId || null,
+          base_domain: settings?.baseDomain || null,
+          r2_bucket_name: settings?.r2BucketName || null,
+          r2_public_domain: settings?.r2PublicDomain || null,
+          r2_access_key_id: maskSecret(settings?.r2AccessKeyId, 'r2ak_'),
+          r2_secret_access_key: maskSecret(settings?.r2SecretAccessKey, 'r2sk_'),
+          backup_r2_buckets: (Array.isArray(settings?.backupR2Buckets) ? (settings.backupR2Buckets as any[]) : []).map((b: any) => ({
+            ...b,
+            accessKeyId: maskSecret(b.accessKeyId, 'r2ak_'),
+            secretAccessKey: maskSecret(b.secretAccessKey, 'r2sk_'),
+          })),
+          resend_api_key: maskSecret(settings?.resendApiKey, 're_'),
+          resend_from_domain: settings?.resendFromDomain || null,
+          primary_tenant: platformBrand,
+        });
+      }
+
       return reply.send({
-        is_configured: settings ? settings.isConfigured : false,
-        has_cloudflare: hasCloudflare,
-        has_r2: hasR2,
-        has_resend_key: hasResendKey,
-        has_resend_domain: hasResendDomain,
-        has_resend: hasResend,
-        cloudflare_api_token: settings?.cloudflareApiToken || null,
-        cloudflare_zone_id: settings?.cloudflareZoneId || null,
-        cloudflare_account_id: settings?.cloudflareAccountId || null,
-        base_domain: settings?.baseDomain || null,
-        r2_bucket_name: settings?.r2BucketName || null,
-        r2_public_domain: settings?.r2PublicDomain || null,
-        r2_access_key_id: settings?.r2AccessKeyId || null,
-        r2_secret_access_key: settings?.r2SecretAccessKey || null,
-        resend_api_key: settings?.resendApiKey || null,
-        resend_from_domain: settings?.resendFromDomain || null,
+        is_configured: isConfigured,
         primary_tenant: platformBrand,
       });
     } catch (err: any) {
@@ -136,7 +185,13 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        if (!profile || profile.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+        }
 
         const {
           api_token,
@@ -151,9 +206,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const existingSettings = await db.query.platformSettings.findFirst();
 
-        const effectiveApiToken = api_token?.trim() || existingSettings?.cloudflareApiToken;
-        const effectiveAccessKeyId = r2_access_key_id?.trim() || existingSettings?.r2AccessKeyId;
-        const effectiveSecretAccessKey = r2_secret_access_key?.trim() || existingSettings?.r2SecretAccessKey;
+        const isPlaceholder = (val?: string | null) => !val || val.includes('•');
+
+        const effectiveApiToken = isPlaceholder(api_token) ? existingSettings?.cloudflareApiToken : api_token?.trim();
+        const effectiveAccessKeyId = isPlaceholder(r2_access_key_id) ? existingSettings?.r2AccessKeyId : r2_access_key_id?.trim();
+        const effectiveSecretAccessKey = isPlaceholder(r2_secret_access_key) ? existingSettings?.r2SecretAccessKey : r2_secret_access_key?.trim();
 
         if (!effectiveApiToken) {
           return reply.status(400).send({
@@ -250,7 +307,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
             r2PublicDomain: formattedDomain,
             r2AccessKeyId: effectiveAccessKeyId || '',
             r2SecretAccessKey: effectiveSecretAccessKey || '',
-            isConfigured: false,
           });
         }
 
@@ -284,11 +340,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        if (!profile || profile.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+        }
 
         const { api_token, zone_id, account_id, base_domain } = request.body;
         const existingSettings = await db.query.platformSettings.findFirst();
-        const effectiveApiToken = api_token?.trim() || existingSettings?.cloudflareApiToken || '';
+        const isPlaceholder = (val?: string | null) => !val || val.includes('•');
+        const effectiveApiToken = isPlaceholder(api_token) ? (existingSettings?.cloudflareApiToken || '') : api_token?.trim();
 
         if (!effectiveApiToken) {
           return reply.status(400).send({
@@ -335,7 +398,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
             cloudflareZoneId: zone_id.trim(),
             cloudflareAccountId: account_id.trim(),
             baseDomain: resolvedBaseDomain,
-            isConfigured: false,
           });
         }
 
@@ -368,13 +430,37 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        if (!profile || profile.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+        }
 
         const { r2_bucket_name, r2_public_domain, r2_access_key_id, r2_secret_access_key, backup_r2_buckets } = request.body;
         const existingSettings = await db.query.platformSettings.findFirst();
 
-        const effectiveAccessKeyId = r2_access_key_id?.trim() || existingSettings?.r2AccessKeyId || '';
-        const effectiveSecretAccessKey = r2_secret_access_key?.trim() || existingSettings?.r2SecretAccessKey || '';
+        const isPlaceholder = (val?: string | null) => !val || val.includes('•');
+
+        const effectiveAccessKeyId = isPlaceholder(r2_access_key_id) ? (existingSettings?.r2AccessKeyId || '') : r2_access_key_id?.trim();
+        const effectiveSecretAccessKey = isPlaceholder(r2_secret_access_key) ? (existingSettings?.r2SecretAccessKey || '') : r2_secret_access_key?.trim();
+
+        const processedBackupBuckets = (backup_r2_buckets || []).map((b: any) => {
+          const isKeyPlaceholder = isPlaceholder(b.accessKeyId);
+          const isSecretPlaceholder = isPlaceholder(b.secretAccessKey);
+          
+          let originalBucket = null;
+          if (isKeyPlaceholder || isSecretPlaceholder) {
+            originalBucket = (Array.isArray(existingSettings?.backupR2Buckets) ? (existingSettings.backupR2Buckets as any[]) : []).find((old: any) => old.id === b.id);
+          }
+
+          return {
+            ...b,
+            accessKeyId: isKeyPlaceholder ? (originalBucket?.accessKeyId || '') : b.accessKeyId.trim(),
+            secretAccessKey: isSecretPlaceholder ? (originalBucket?.secretAccessKey || '') : b.secretAccessKey.trim(),
+          };
+        });
 
         let formattedDomain = r2_public_domain.trim();
         if (!formattedDomain.startsWith('http://') && !formattedDomain.startsWith('https://')) {
@@ -392,7 +478,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
               r2PublicDomain: formattedDomain,
               r2AccessKeyId: effectiveAccessKeyId,
               r2SecretAccessKey: effectiveSecretAccessKey,
-              backupR2Buckets: backup_r2_buckets || [],
+              backupR2Buckets: processedBackupBuckets,
               updatedAt: new Date(),
             })
             .where(eq(platformSettings.id, existingSettings.id));
@@ -402,8 +488,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
             r2PublicDomain: formattedDomain,
             r2AccessKeyId: effectiveAccessKeyId,
             r2SecretAccessKey: effectiveSecretAccessKey,
-            backupR2Buckets: backup_r2_buckets || [],
-            isConfigured: false,
+            backupR2Buckets: processedBackupBuckets,
           });
         }
 
@@ -823,7 +908,12 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         const isOwner = targetWorkspace.ownerId === decoded.sub;
-        const isAdmin = decoded.role === 'admin';
+        
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        const isAdmin = profile?.role === 'admin';
+
         const member = await db.query.workspaceMembers.findFirst({
           where: and(
             eq(workspaceMembers.userId, decoded.sub),
@@ -892,7 +982,12 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         const isOwner = targetWorkspace.ownerId === decoded.sub;
-        const isAdmin = decoded.role === 'admin';
+        
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        const isAdmin = profile?.role === 'admin';
+
         const member = await db.query.workspaceMembers.findFirst({
           where: and(
             eq(workspaceMembers.userId, decoded.sub),
@@ -1112,7 +1207,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           contrastColor: body.contrast_color || '#FFFFFF',
           bgLightColor: body.bg_light_color || '#F8FAFC',
           bgDarkColor: body.bg_dark_color || '#09090B',
-          isConfigured: true,
           updatedAt: new Date(),
         };
 
@@ -1180,8 +1274,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       schema: {
         body: z.object({
           name: z.string().min(1).optional(),
-          slug: z.string().min(1).optional(),
-          domain: z.string().optional().nullable(),
           logo_light_url: z.string().optional().nullable(),
           logo_dark_url: z.string().optional().nullable(),
           icon_light_url: z.string().optional().nullable(),
@@ -1288,16 +1380,33 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        if (!profile || profile.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+        }
 
         const { resend_api_key, resend_from_domain } = request.body;
         const normalizedInput = resend_from_domain.replace(/^@/, '').toLowerCase();
+        const existingSettings = await db.query.platformSettings.findFirst();
+
+        const isPlaceholder = (val?: string | null) => !val || val.includes('•');
+        const apiKeyToUse = isPlaceholder(resend_api_key) ? existingSettings?.resendApiKey : resend_api_key.trim();
+
+        if (!apiKeyToUse) {
+          return reply.status(400).send({
+            error: 'API Key inválida',
+            message: 'API Key do Resend é obrigatória.',
+          });
+        }
 
         // 1. Validar a API key do Resend listando os domínios
         const resendRes = await fetch('https://api.resend.com/domains', {
           method: 'GET',
           headers: {
-            Authorization: `Bearer ${resend_api_key}`,
+            Authorization: `Bearer ${apiKeyToUse}`,
             'Content-Type': 'application/json',
           },
         }).catch((fetchErr) => {
@@ -1327,7 +1436,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           const createRes = await fetch('https://api.resend.com/domains', {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${resend_api_key}`,
+              Authorization: `Bearer ${apiKeyToUse}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ name: normalizedInput }),
@@ -1345,13 +1454,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 4. Salvar no banco (upsert no platformSettings)
-        const existingSettings = await db.query.platformSettings.findFirst();
-
         if (existingSettings) {
           await db
             .update(platformSettings)
             .set({
-              resendApiKey: resend_api_key,
+              resendApiKey: apiKeyToUse,
               resendFromDomain: normalizedInput,
               hasResend: true,
               updatedAt: new Date(),
@@ -1359,7 +1466,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
             .where(eq(platformSettings.id, existingSettings.id));
         } else {
           await db.insert(platformSettings).values({
-            resendApiKey: resend_api_key,
+            resendApiKey: apiKeyToUse,
             resendFromDomain: normalizedInput,
             hasResend: true,
           });
@@ -1400,13 +1507,22 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        if (!profile || profile.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+        }
 
         const { resend_api_key, resend_from_domain } = request.body;
 
         const existingSettings = await db.query.platformSettings.findFirst();
 
-        const apiKeyToUse = resend_api_key || existingSettings?.resendApiKey;
+        const isPlaceholder = (val?: string | null) => !val || val.includes('•');
+        const hasNewApiKey = resend_api_key && !isPlaceholder(resend_api_key);
+
+        const apiKeyToUse = hasNewApiKey ? resend_api_key.trim() : existingSettings?.resendApiKey;
         const domainToUse = resend_from_domain || existingSettings?.resendFromDomain;
 
         if (!apiKeyToUse) {
@@ -1417,7 +1533,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         }
 
         // Se houver nova API key ou novo domínio, realiza validação e cadastro se necessário
-        if (resend_api_key || resend_from_domain) {
+        if (hasNewApiKey || resend_from_domain) {
           const resendRes = await fetch('https://api.resend.com/domains', {
             method: 'GET',
             headers: { Authorization: `Bearer ${apiKeyToUse}` },
@@ -1464,16 +1580,16 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           await db
             .update(platformSettings)
             .set({
-              ...(resend_api_key ? { resendApiKey: resend_api_key, hasResend: true } : {}),
+              ...(apiKeyToUse ? { resendApiKey: apiKeyToUse, hasResend: true } : {}),
               ...(resend_from_domain ? { resendFromDomain: resend_from_domain.replace(/^@/, '').toLowerCase() } : {}),
               updatedAt: new Date(),
             })
             .where(eq(platformSettings.id, existingSettings.id));
         } else {
           await db.insert(platformSettings).values({
-            resendApiKey: resend_api_key || null,
+            resendApiKey: apiKeyToUse || null,
             resendFromDomain: resend_from_domain ? resend_from_domain.replace(/^@/, '').toLowerCase() : null,
-            hasResend: !!resend_api_key,
+            hasResend: !!apiKeyToUse,
           });
         }
 
@@ -1502,7 +1618,13 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      verifyUserJwt(authHeader.split(' ')[1]);
+      const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, decoded.sub),
+      });
+      if (!profile || profile.role !== 'admin') {
+        return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+      }
 
       const settings = await db.query.platformSettings.findFirst();
       if (!settings?.resendApiKey || !settings?.resendFromDomain) {
@@ -1612,7 +1734,13 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      verifyUserJwt(authHeader.split(' ')[1]);
+      const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+      const profile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, decoded.sub),
+      });
+      if (!profile || profile.role !== 'admin') {
+        return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores.' });
+      }
 
       const settings = await db.query.platformSettings.findFirst();
       if (!settings?.resendApiKey || !settings?.resendFromDomain) {
@@ -1891,4 +2019,151 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // POST /v1/platform/errors
+  // Envia log de erro para a fila do RabbitMQ
+  fastify.post(
+    '/errors',
+    {
+      schema: {
+        body: z.object({
+          name: z.string().optional().nullable(),
+          message: z.string().min(1, 'Mensagem é obrigatória'),
+          stack: z.string().optional().nullable(),
+          url: z.string().optional().nullable(),
+          userAgent: z.string().optional().nullable(),
+          severity: z.enum(['error', 'warning', 'fatal']).default('error'),
+          metadata: z.record(z.any()).optional().nullable(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        let userId: string | null = null;
+        const token = extractJwtFromRequest(request);
+        if (token) {
+          try {
+            const decoded = verifyUserJwt(token);
+            userId = decoded.sub;
+          } catch (jwtErr) {
+            // Ignora erro de JWT expirado/inválido para não quebrar a requisição
+          }
+        }
+
+        const { name, message, stack, url, userAgent, severity, metadata } = request.body;
+
+        await publishErrorLog({
+          name,
+          message,
+          stack,
+          url,
+          userAgent,
+          userId,
+          serviceName: 'frontend',
+          severity,
+          metadata: metadata || undefined,
+        });
+
+        return reply.send({ success: true, message: 'Erro enfileirado com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro interno',
+          message: err.message || 'Não foi possível enfileirar o log de erro.',
+        });
+      }
+    }
+  );
+
+  // GET /v1/platform/errors
+  // Lista logs de erro com filtros e paginação
+  fastify.get(
+    '/errors',
+    {
+      schema: {
+        querystring: z.object({
+          limit: z.coerce.number().default(100),
+          offset: z.coerce.number().default(0),
+          serviceName: z.string().optional(),
+          severity: z.string().optional(),
+          name: z.string().optional(),
+          message: z.string().optional(),
+          userId: z.string().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const platformUserProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        
+        if (platformUserProfile?.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores da plataforma.' });
+        }
+
+        const { limit, offset, serviceName, severity, name, message, userId, startDate, endDate } = request.query;
+
+        const conditions = [];
+
+        if (serviceName) {
+          conditions.push(eq(errorLogs.serviceName, serviceName));
+        }
+        if (severity) {
+          conditions.push(eq(errorLogs.severity, severity as any));
+        }
+        if (name) {
+          conditions.push(sql`${errorLogs.name} ILIKE ${'%' + name + '%'}`);
+        }
+        if (message) {
+          conditions.push(sql`${errorLogs.message} ILIKE ${'%' + message + '%'}`);
+        }
+        if (userId) {
+          conditions.push(eq(errorLogs.userId, userId));
+        }
+        if (startDate) {
+          conditions.push(gte(errorLogs.createdAt, new Date(startDate)));
+        }
+        if (endDate) {
+          conditions.push(lte(errorLogs.createdAt, new Date(endDate)));
+        }
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        // Buscar registros e total
+        const logs = await db.query.errorLogs.findMany({
+          where: whereClause,
+          limit,
+          offset,
+          orderBy: [desc(errorLogs.createdAt)],
+        });
+
+        const [totalCountResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(errorLogs)
+          .where(whereClause);
+
+        return reply.send({
+          success: true,
+          logs,
+          total: totalCountResult?.count || 0,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro interno',
+          message: err.message || 'Não foi possível listar os logs de erro.',
+        });
+      }
+    }
+  );
 }
+

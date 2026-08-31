@@ -194,6 +194,20 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, router]);
 
+  // 1b. Redirecionar para onboarding ou seleção de consultório de forma assíncrona/efeito de render
+  useEffect(() => {
+    if (loading || !user || loadingTenants) return;
+
+    const isSpecialPath = pathname === '/dashboard/selecionar-consultorio' || pathname === '/dashboard/onboarding';
+    if (isSpecialPath) return;
+
+    if (myTenants.length > 1 && !activeTenantId) {
+      router.push('/dashboard/selecionar-consultorio');
+    } else if (myTenants.length === 0 && pathname !== '/dashboard/onboarding') {
+      router.push('/dashboard/onboarding');
+    }
+  }, [loading, user, loadingTenants, myTenants, activeTenantId, pathname, router]);
+
   // Bloqueio global se o sistema não estiver inicializado (sem Admin)
   if (bootstrapped === false) {
     return (
@@ -311,16 +325,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   // 4. Barreira de Seleção: se possuir múltiplos workspaces e nenhum selecionado
   if (myTenants.length > 1 && !activeTenantId) {
-    router.push('/dashboard/selecionar-consultorio');
     return null;
   }
 
-  // 5. Se não tiver nenhum consultório vinculado, redireciona para a página de onboarding
+  // 5. Se não tiver nenhum consultório vinculado, aguarda redirecionamento para onboarding
   if (myTenants.length === 0) {
-    if (pathname !== '/dashboard/onboarding') {
-      router.push('/dashboard/onboarding');
-      return null;
-    }
+    return null;
   }
 
   const menuItems = [

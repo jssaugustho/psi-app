@@ -14,6 +14,9 @@ export interface User {
   sobrenome: string;
   telefone: string | null;
   email: string;
+  cpf?: string | null;
+  crp?: string | null;
+  has_no_crp?: boolean;
   role?: string;
   avatar_url?: string | null;
   created_at?: string;
@@ -256,10 +259,14 @@ export const apiConnection = {
   },
 };
 
+export interface FetchApiOptions extends RequestInit {
+  skipNotifyOffline?: boolean;
+}
+
 /**
  * Helper genérico de fetch para chamadas à API
  */
-async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
+async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isRetry = false): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const headers: Record<string, string> = {
@@ -284,8 +291,9 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     : `${API_BASE_URL}${resolvedEndpoint}`;
 
   const isPostgrest = url.includes('/rest/v1');
+  const { skipNotifyOffline, ...restOptions } = options;
   const fetchOptions: RequestInit = {
-    ...options,
+    ...restOptions,
     headers,
   };
   if (!isPostgrest && options.credentials === undefined) {
@@ -297,13 +305,17 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     response = await fetch(url, fetchOptions);
   } catch (err: any) {
     console.error('Falha de conexão com o backend:', err);
-    apiConnection.notifyOffline('Sem resposta do servidor de API. Verifique se o backend está rodando.');
+    if (!skipNotifyOffline) {
+      apiConnection.notifyOffline('Sem resposta do servidor de API. Verifique se o backend está rodando.');
+    }
     throw new Error('Servidor de API indisponível.');
   }
 
   // Verificar status 502, 503, 504 (erros de proxy/gateway)
   if ([502, 503, 504].includes(response.status)) {
-    apiConnection.notifyOffline(`O servidor de API retornou código de erro ${response.status}.`);
+    if (!skipNotifyOffline) {
+      apiConnection.notifyOffline(`O servidor de API retornou código de erro ${response.status}.`);
+    }
     throw new Error('Servidor de API temporariamente indisponível.');
   }
 
@@ -340,7 +352,40 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   }
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || 'Erro na requisição');
+    const errorMsg = data.message || data.error || 'Erro na requisição';
+
+    // Registrar erro no RabbitMQ se for erro de servidor (5xx) ou PostgREST (400)
+    const isPostgrest = url.includes('/rest/v1');
+    const isGoTrue = url.includes('/auth/v1');
+    const isCoreApi = !isPostgrest && !isGoTrue;
+    const serviceName = isPostgrest ? 'postgrest' : isGoTrue ? 'gotrue' : 'core-api';
+
+    if (response.status >= 500 || (isPostgrest && response.status === 400)) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      fetch(`${API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/v1' : API_BASE_URL}/platform/errors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: isPostgrest ? 'PostgrestError' : isGoTrue ? 'GoTrueError' : 'ApiError',
+          message: `${response.status} ${response.statusText}: ${errorMsg}`,
+          stack: `URL: ${url}\nMethod: ${fetchOptions.method || 'GET'}\nBody: ${fetchOptions.body ? String(fetchOptions.body).substring(0, 500) : ''}`,
+          url: typeof window !== 'undefined' ? window.location.href : null,
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : null,
+          severity: 'error',
+          metadata: {
+            status: response.status,
+            url,
+            endpoint,
+            serviceName,
+          }
+        }),
+      }).catch(err => console.error('Erro ao registrar log de erro na API:', err));
+    }
+
+    throw new Error(errorMsg);
   }
 
   return data as T;
@@ -348,7 +393,16 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
 
 export const api = {
   // Realizar cadastro
-  register: (body: { nome: string; sobrenome: string; telefone?: string; email: string; password: string }) =>
+  register: (body: {
+    nome: string;
+    sobrenome: string;
+    telefone?: string;
+    cpf?: string;
+    crp?: string;
+    hasNoCrp?: boolean;
+    email: string;
+    password: string;
+  }) =>
     fetchApi<{ message: string; user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -383,6 +437,7 @@ export const api = {
     fetchApi<RefreshTokenResponse>('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token }),
+      skipNotifyOffline: true,
     }),
 
   // Buscar perfil do usuário logado
@@ -393,6 +448,10 @@ export const api = {
     nome: string;
     sobrenome: string;
     telefone?: string | null;
+    cpf?: string | null;
+    crp?: string | null;
+    hasNoCrp?: boolean;
+    has_no_crp?: boolean;
     avatarUrl?: string | null;
     password?: string | null;
   }) =>
@@ -835,13 +894,13 @@ export const api = {
       siteConfig: item.site_config,
       dictionary: item.dictionary,
       formFlow: item.form_flow,
-      titleDraft: item.title_draft,
-      slugDraft: item.slug_draft,
-      customDomainDraft: item.custom_domain_draft,
-      seoConfigDraft: item.seo_config_draft,
-      siteConfigDraft: item.site_config_draft,
-      dictionaryDraft: item.dictionary_draft,
-      formFlowDraft: item.form_flow_draft,
+      titleDraft: item.draft_data?.title ?? item.title_draft ?? null,
+      slugDraft: item.draft_data?.slug ?? item.slug_draft ?? null,
+      customDomainDraft: item.draft_data?.customDomain ?? item.custom_domain_draft ?? null,
+      seoConfigDraft: item.draft_data?.seoConfig ?? item.seo_config_draft ?? null,
+      siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
+      dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     }));
@@ -862,13 +921,13 @@ export const api = {
       siteConfig: item.site_config,
       dictionary: item.dictionary,
       formFlow: item.form_flow,
-      titleDraft: item.title_draft,
-      slugDraft: item.slug_draft,
-      customDomainDraft: item.custom_domain_draft,
-      seoConfigDraft: item.seo_config_draft,
-      siteConfigDraft: item.site_config_draft,
-      dictionaryDraft: item.dictionary_draft,
-      formFlowDraft: item.form_flow_draft,
+      titleDraft: item.draft_data?.title ?? item.title_draft ?? null,
+      slugDraft: item.draft_data?.slug ?? item.slug_draft ?? null,
+      customDomainDraft: item.draft_data?.customDomain ?? item.custom_domain_draft ?? null,
+      seoConfigDraft: item.draft_data?.seoConfig ?? item.seo_config_draft ?? null,
+      siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
+      dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -914,13 +973,13 @@ export const api = {
         siteConfig: res.page.siteConfig || res.page.site_config,
         dictionary: res.page.dictionary,
         formFlow: res.page.formFlow || res.page.form_flow,
-        titleDraft: res.page.title_draft,
-        slugDraft: res.page.slug_draft,
-        customDomainDraft: res.page.custom_domain_draft,
-        seoConfigDraft: res.page.seo_config_draft,
-        siteConfigDraft: res.page.site_config_draft,
-        dictionaryDraft: res.page.dictionary_draft,
-        formFlowDraft: res.page.form_flow_draft,
+        titleDraft: res.page.draft_data?.title ?? res.page.title_draft ?? null,
+        slugDraft: res.page.draft_data?.slug ?? res.page.slug_draft ?? null,
+        customDomainDraft: res.page.draft_data?.customDomain ?? res.page.custom_domain_draft ?? null,
+        seoConfigDraft: res.page.draft_data?.seoConfig ?? res.page.seo_config_draft ?? null,
+        siteConfigDraft: res.page.draft_data?.siteConfig ?? res.page.site_config_draft ?? null,
+        dictionaryDraft: res.page.draft_data?.dictionary ?? res.page.dictionary_draft ?? null,
+        formFlowDraft: res.page.draft_data?.formFlow ?? res.page.form_flow_draft ?? null,
         createdAt: res.page.createdAt || res.page.created_at,
         updatedAt: res.page.updatedAt || res.page.updated_at,
       }
@@ -928,6 +987,12 @@ export const api = {
   },
 
   updateCapturePage: async (id: string, body: Partial<CapturePage>): Promise<CapturePage> => {
+    // 1. Buscamos a página atual para carregar o draft_data existente
+    const currentList = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
+    if (currentList.length === 0) throw new Error('Página não encontrada');
+    const currentItem = currentList[0];
+    const currentDraftData = currentItem.draft_data || {};
+
     const dbBody: Record<string, any> = {};
     if (body.title !== undefined) dbBody.title = body.title;
     if (body.slug !== undefined) dbBody.slug = body.slug;
@@ -938,13 +1003,81 @@ export const api = {
     if (body.dictionary !== undefined) dbBody.dictionary = body.dictionary;
     if (body.formFlow !== undefined) dbBody.form_flow = body.formFlow;
 
-    if (body.titleDraft !== undefined) dbBody.title_draft = body.titleDraft;
-    if (body.slugDraft !== undefined) dbBody.slug_draft = body.slugDraft;
-    if (body.customDomainDraft !== undefined) dbBody.custom_domain_draft = body.customDomainDraft;
-    if (body.seoConfigDraft !== undefined) dbBody.seo_config_draft = body.seoConfigDraft;
-    if (body.siteConfigDraft !== undefined) dbBody.site_config_draft = body.siteConfigDraft;
-    if (body.dictionaryDraft !== undefined) dbBody.dictionary_draft = body.dictionaryDraft;
-    if (body.formFlowDraft !== undefined) dbBody.form_flow_draft = body.formFlowDraft;
+    // 2. Mesclamos os campos de draft recebidos no body para dentro de draft_data
+    const updatedDraftData = { ...currentDraftData };
+    if (body.titleDraft !== undefined) updatedDraftData.title = body.titleDraft;
+    if (body.slugDraft !== undefined) updatedDraftData.slug = body.slugDraft;
+    if (body.customDomainDraft !== undefined) updatedDraftData.customDomain = body.customDomainDraft;
+    if (body.seoConfigDraft !== undefined) updatedDraftData.seoConfig = body.seoConfigDraft;
+    if (body.siteConfigDraft !== undefined) updatedDraftData.siteConfig = body.siteConfigDraft;
+    if (body.dictionaryDraft !== undefined) updatedDraftData.dictionary = body.dictionaryDraft;
+    if (body.formFlowDraft !== undefined) updatedDraftData.formFlow = body.formFlowDraft;
+
+    // Se houve qualquer atualização de rascunho, atualiza draft_data no DB
+    if (
+      body.titleDraft !== undefined ||
+      body.slugDraft !== undefined ||
+      body.customDomainDraft !== undefined ||
+      body.seoConfigDraft !== undefined ||
+      body.siteConfigDraft !== undefined ||
+      body.dictionaryDraft !== undefined ||
+      body.formFlowDraft !== undefined
+    ) {
+      dbBody.draft_data = updatedDraftData;
+    }
+
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+      headers: { 'Prefer': 'return=representation' }
+    });
+    const item = res[0];
+    if (!item) {
+      throw new Error('Página de captação não encontrada ou você não tem permissão para editá-la.');
+    }
+    return {
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      customDomain: item.custom_domain,
+      seoConfig: item.seo_config,
+      siteConfig: item.site_config,
+      dictionary: item.dictionary,
+      formFlow: item.form_flow,
+      titleDraft: item.draft_data?.title ?? item.title_draft ?? null,
+      slugDraft: item.draft_data?.slug ?? item.slug_draft ?? null,
+      customDomainDraft: item.draft_data?.customDomain ?? item.custom_domain_draft ?? null,
+      seoConfigDraft: item.draft_data?.seoConfig ?? item.seo_config_draft ?? null,
+      siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
+      dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  publishCapturePage: async (id: string): Promise<CapturePage> => {
+    const currentList = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
+    if (currentList.length === 0) throw new Error('Página não encontrada');
+    const currentItem = currentList[0];
+    const draft = currentItem.draft_data || {};
+
+    const dbBody: Record<string, any> = {
+      title: draft.title !== undefined && draft.title !== null ? draft.title : currentItem.title,
+      slug: draft.slug !== undefined && draft.slug !== null ? draft.slug : currentItem.slug,
+      custom_domain: draft.customDomain !== undefined ? draft.customDomain : currentItem.custom_domain,
+      seo_config: draft.seoConfig !== undefined && draft.seoConfig !== null ? draft.seoConfig : currentItem.seo_config,
+      site_config: {
+        ...(draft.siteConfig || currentItem.site_config || {}),
+        status: 'published',
+        isWizardDraft: false,
+      },
+      dictionary: draft.dictionary !== undefined && draft.dictionary !== null ? draft.dictionary : currentItem.dictionary,
+      form_flow: draft.formFlow !== undefined && draft.formFlow !== null ? draft.formFlow : currentItem.form_flow,
+      draft_data: null,
+    };
 
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
       method: 'PATCH',
@@ -963,13 +1096,13 @@ export const api = {
       siteConfig: item.site_config,
       dictionary: item.dictionary,
       formFlow: item.form_flow,
-      titleDraft: item.title_draft,
-      slugDraft: item.slug_draft,
-      customDomainDraft: item.custom_domain_draft,
-      seoConfigDraft: item.seo_config_draft,
-      siteConfigDraft: item.site_config_draft,
-      dictionaryDraft: item.dictionary_draft,
-      formFlowDraft: item.form_flow_draft,
+      titleDraft: null,
+      slugDraft: null,
+      customDomainDraft: null,
+      seoConfigDraft: null,
+      siteConfigDraft: null,
+      dictionaryDraft: null,
+      formFlowDraft: null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -1043,67 +1176,26 @@ export const api = {
     });
   },
 
-  // --- Captação: Contract Templates ---
-  getContractTemplates: async (tenantId: string): Promise<ContractTemplate[]> => {
-    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?workspace_id=eq.${tenantId}&order=created_at.desc`);
-    return list.map(item => ({
-      id: item.id,
-      tenantId: item.workspace_id || item.tenant_id,
-      title: item.title,
-      content: item.content,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    }));
-  },
-
-  createContractTemplate: async (body: { tenant_id: string; title: string; content: string }): Promise<ContractTemplate> => {
-    const { tenant_id, ...rest } = body;
-    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates`, {
-      method: 'POST',
-      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
-      headers: { 'Prefer': 'return=representation' }
-    });
-    const item = res[0];
-    return {
-      id: item.id,
-      tenantId: item.workspace_id || item.tenant_id,
-      title: item.title,
-      content: item.content,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    };
-  },
-
-  updateContractTemplate: async (id: string, body: Partial<ContractTemplate>): Promise<ContractTemplate> => {
-    const dbBody: Record<string, any> = {};
-    if (body.title !== undefined) dbBody.title = body.title;
-    if (body.content !== undefined) dbBody.content = body.content;
-
-    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/contract_templates?id=eq.${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(dbBody),
-      headers: { 'Prefer': 'return=representation' }
-    });
-    const item = res[0];
-    return {
-      id: item.id,
-      tenantId: item.tenant_id,
-      title: item.title,
-      content: item.content,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    };
-  },
-
-  deleteContractTemplate: async (id: string): Promise<void> => {
-    await fetchApi(`${PGRST_BASE_URL}/contract_templates?id=eq.${id}`, {
-      method: 'DELETE'
-    });
-  },
 
   getPlatformSetupStatus: async (): Promise<{ base_domain: string | null }> => {
     return fetchApi<{ base_domain: string | null }>('/platform/setup/status');
   },
+
+  logError: async (body: {
+    name?: string | null;
+    message: string;
+    stack?: string | null;
+    url?: string | null;
+    userAgent?: string | null;
+    severity?: 'error' | 'warning' | 'fatal';
+    metadata?: Record<string, any> | null;
+  }): Promise<{ success: boolean }> => {
+    return fetchApi<{ success: boolean }>('/platform/errors', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
 
   checkSubdomainAvailability: async (slug: string, tenantId?: string): Promise<{ available: boolean; slug: string; fullUrl: string; reason: string }> => {
     const query = tenantId 
@@ -1184,6 +1276,19 @@ export const api = {
     return res[0];
   },
 
+  updateWorkspaceDomain: async (workspaceId: string, subdomain: string): Promise<any> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        subdomain,
+      }),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    return res[0];
+  },
+
   createVisualIdentity: async (body: {
     workspaceId: string;
     name: string;
@@ -1223,6 +1328,72 @@ export const api = {
   getWorkspaceDomain: async (workspaceId: string): Promise<WorkspaceDomain | null> => {
     const res = await fetchApi<WorkspaceDomain[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}&select=id,workspaceId:workspace_id,subdomain,customDomain:custom_domain,cfHostnameId:cf_hostname_id,dnsStatus:dns_status,dnsRecords:dns_records,createdAt:created_at,updatedAt:updated_at`);
     return res[0] || null;
+  },
+
+  getVisualIdentity: async (workspaceId: string): Promise<any | null> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}`);
+    if (res && res.length > 0) {
+      const item = res[0];
+      return {
+        id: item.id,
+        workspaceId: item.workspace_id,
+        primaryColor: item.primary_color,
+        secondaryColor: item.secondary_color,
+        contrastColor: item.contrast_color,
+        logoUrl: item.logo_url,
+        faviconUrl: item.favicon_url,
+        fontHeading: item.font_heading,
+        fontBody: item.font_body,
+        logoConfig: item.logo_config,
+      };
+    }
+    return null;
+  },
+
+  saveVisualIdentity: async (workspaceId: string, body: {
+    primaryColor: string;
+    secondaryColor: string;
+    contrastColor: string;
+    bgColor?: string;
+    logoUrl?: string | null;
+    faviconUrl?: string | null;
+    fontHeading: string;
+    fontBody: string;
+  }): Promise<any> => {
+    const existing = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}`);
+    const dbPayload = {
+      workspace_id: workspaceId,
+      primary_color: body.primaryColor,
+      secondary_color: body.secondaryColor,
+      contrast_color: body.contrastColor,
+      bg_color: body.bgColor || '#09090B',
+      logo_url: body.logoUrl || null,
+      favicon_url: body.faviconUrl || null,
+      font_heading: body.fontHeading,
+      font_body: body.fontBody,
+      is_workspace_default: true,
+      name: 'Padrão',
+    };
+
+    if (existing && existing.length > 0) {
+      const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(dbPayload),
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      });
+      return res[0];
+    } else {
+      const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities`, {
+        method: 'POST',
+        body: JSON.stringify(dbPayload),
+        headers: {
+          'Prefer': 'return=representation'
+        }
+      });
+      return res[0];
+    }
   },
 };
 
@@ -1301,11 +1472,3 @@ export interface ScreeningForm {
   updatedAt: string;
 }
 
-export interface ContractTemplate {
-  id: string;
-  tenantId: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}

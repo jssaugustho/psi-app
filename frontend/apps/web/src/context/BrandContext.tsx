@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api, Tenant } from '@/lib/api';
+import { BrandLoader } from '@psi/ui';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -223,8 +224,23 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     applyBrandStyles(primaryTenant, tenant, theme);
   }, [primaryTenant, tenant, theme, applyBrandStyles]);
 
+  // Keep theme class in sync with theme state on every render to prevent Next.js layout resets
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.remove('dark');
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+      root.classList.add('dark');
+    }
+  });
+
   // Handle loading state transitions
   useEffect(() => {
+    // Prevent loader from re-triggering if the app is already loaded and theme changes
+    if (!loading && loaderState === 'done') return;
+
     if (loading) {
       setLoaderState('black');
       return;
@@ -290,88 +306,13 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <BrandContext.Provider value={{ tenant, primaryTenant, bootstrapped, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
-      {loaderState !== 'done' && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'var(--brand-bg-color, #09090B)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            transition: 'opacity 0.5s ease-in-out',
-            opacity: loaderState === 'fadeout' ? 0 : 1,
-            pointerEvents: loaderState === 'fadeout' ? 'none' : 'auto',
-          }}
-        >
-          {loaderState !== 'black' && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '32px',
-              animation: 'fadeIn 0.5s ease-out forwards',
-            }}>
-              {/* Se a API falhou e não há logo, mostra APENAS o spinner neutro sem caixas nem textos */}
-              {bootLogoUrl && (
-                <img 
-                  src={bootLogoUrl} 
-                  alt={bootBrandName} 
-                  style={{
-                    maxHeight: '64px',
-                    maxWidth: '240px',
-                    objectFit: 'contain',
-                  }}
-                />
-              )}
-
-              {/* Custom Spinner (neutro se não houver dados de marca) */}
-              <div style={{
-                position: 'relative',
-                width: '40px',
-                height: '40px',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: '50%',
-                  border: '2px solid transparent',
-                  borderTopColor: spinnerStartColor,
-                  borderRightColor: spinnerEndColor,
-                  animation: 'spin 1s linear infinite',
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  inset: '8px',
-                  borderRadius: '50%',
-                  border: theme === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.05)',
-                  backgroundColor: theme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)',
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                }} />
-              </div>
-            </div>
-          )}
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-            @keyframes pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: .5; }
-            }
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateY(4px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
-        </div>
-      )}
+      <BrandLoader
+        loaderState={loaderState}
+        logoUrl={bootLogoUrl}
+        brandName={bootBrandName}
+        gradientStart={spinnerStartColor}
+        gradientEnd={spinnerEndColor}
+      />
       {children}
     </BrandContext.Provider>
   );

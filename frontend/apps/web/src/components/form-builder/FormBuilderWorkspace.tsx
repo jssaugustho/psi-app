@@ -80,7 +80,22 @@ const CustomNode = ({ data, selected }: { data: any; selected: boolean }) => {
       )}
 
       {/* Render options preview if selector */}
-      {data.options && data.options.length > 0 && (
+      {data.type === 'seletor' && data.options && data.options.length > 0 ? (
+        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1 relative pr-4">
+          {data.options.map((opt: any, idx: number) => (
+            <div key={idx} className="text-[9px] px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 truncate relative">
+              • {opt.label || opt.value}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`opt_${idx}`}
+                style={{ top: '50%', transform: 'translateY(-50%)', right: '-12px' }}
+                className="w-2.5 h-2.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-sm"
+              />
+            </div>
+          ))}
+        </div>
+      ) : data.options && data.options.length > 0 ? (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1">
           {data.options.map((opt: any, idx: number) => (
             <div key={idx} className="text-[9px] px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 truncate">
@@ -88,13 +103,15 @@ const CustomNode = ({ data, selected }: { data: any; selected: boolean }) => {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="w-3.5 h-3.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-md"
-      />
+      {data.type !== 'seletor' && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="w-3.5 h-3.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-md"
+        />
+      )}
     </div>
   );
 };
@@ -139,11 +156,16 @@ export function FormBuilderWorkspace({
   // Staging / Conflict warnings
   const [hasRemoteConflict, setHasRemoteConflict] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [publishErrors, setPublishErrors] = useState<string[]>([]);
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  const isTemplateAdded = useCallback((type: string) => {
+    return nodes.some((n) => n.type === type);
+  }, [nodes]);
 
   // Form title and theme draft state
   const [titleDraft, setTitleDraft] = useState(initialForm?.titleDraft || initialForm?.title || '');
@@ -389,6 +411,73 @@ export function FormBuilderWorkspace({
   // Publish handler
   const handlePublish = async () => {
     if (!formId) return;
+    
+    // Validar fluxo no frontend
+    const errors: string[] = [];
+    
+    // 1. Verificar blocos obrigatórios
+    const requiredTypes = ['nome', 'celular', 'maioridade', 'contrato'];
+    for (const rType of requiredTypes) {
+      const hasNode = nodes.some((n: any) => n.type === rType);
+      if (!hasNode) {
+        errors.push(`O bloco de template '${rType.toUpperCase()}' é obrigatório no fluxo.`);
+      }
+    }
+
+    // 2. Verificar conexões de início
+    const startNode = nodes.find((n: any) => n.type === 'start');
+    if (!startNode) {
+      errors.push("O bloco de 'Início' é obrigatório.");
+    } else {
+      const hasStartEdge = edges.some((e: any) => e.source === startNode.id);
+      if (!hasStartEdge) {
+        errors.push("O bloco de 'Início' deve estar conectado a outro bloco.");
+      }
+    }
+
+    // 3. Verificar nós órfãos ou desconectados
+    for (const node of nodes) {
+      if (node.type === 'end' || node.type === 'start') continue;
+
+      const nodeData = node.data as any;
+
+      const hasIncoming = edges.some((e: any) => e.target === node.id);
+      if (!hasIncoming) {
+        errors.push(`O bloco '${nodeData?.title || node.id}' está órfão (não possui conexão de entrada).`);
+      }
+
+      const hasOutgoing = edges.some((e: any) => e.source === node.id);
+      if (!hasOutgoing) {
+        errors.push(`O bloco '${nodeData?.title || node.id}' não está conectado a nenhuma saída.`);
+      }
+
+      if (node.type === 'seletor') {
+        const options = nodeData?.options || [];
+        if (options.length === 0) {
+          errors.push(`O bloco de escolha única '${nodeData?.title || node.id}' deve conter pelo menos uma opção.`);
+        }
+      }
+
+      if (node.type === 'contrato') {
+        const contractText = nodeData?.contractText || '';
+        if (!contractText.trim()) {
+          errors.push(`O termo do bloco de contrato está em branco.`);
+        }
+      }
+
+      const isCustomField = ['texto', 'paragrafo', 'seletor'].includes(node.type || '');
+      if (isCustomField && !nodeData?.variableKey) {
+        errors.push(`O bloco personalizado '${nodeData?.title || node.id}' deve estar associado a uma variável do CRM.`);
+      }
+    }
+
+    if (errors.length > 0) {
+      setPublishErrors(errors);
+      return;
+    }
+
+    setPublishErrors([]);
+
     try {
       setPublishing(true);
       const flowPayload = {
@@ -600,59 +689,166 @@ export function FormBuilderWorkspace({
 
               <div className="space-y-2">
                 <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide block">
-                  Perguntas de Contato:
+                  Dados do Paciente (Templates):
                 </span>
                 <div className="grid grid-cols-1 gap-1.5">
                   <button
                     type="button"
+                    disabled={isTemplateAdded('nome')}
                     onClick={() => handleAddNode('nome', 'Qual é o seu nome completo?', 'Escreva seu nome completo aqui..')}
-                    className="p-2.5 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-left transition-all cursor-pointer flex items-center gap-2.5 group"
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('nome')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
                   >
                     <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
                       <User className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-[var(--brand-gradient-start)] block">
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('nome') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
                         Nome Completo
                       </span>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
-                        Campo de identificação do lead
+                        {isTemplateAdded('nome') ? 'Já adicionado' : 'Campo de identificação do lead'}
                       </span>
                     </div>
                   </button>
 
                   <button
                     type="button"
+                    disabled={isTemplateAdded('celular')}
                     onClick={() => handleAddNode('celular', 'Qual é o seu WhatsApp de contato?', '(11) 99999-9999')}
-                    className="p-2.5 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-left transition-all cursor-pointer flex items-center gap-2.5 group"
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('celular')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
                   >
                     <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
                       <Phone className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-[var(--brand-gradient-start)] block">
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('celular') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
                         WhatsApp / Celular
                       </span>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
-                        Campo de telefone formatado
+                        {isTemplateAdded('celular') ? 'Já adicionado' : 'Campo de telefone internacional'}
                       </span>
                     </div>
                   </button>
 
                   <button
                     type="button"
+                    disabled={isTemplateAdded('email')}
                     onClick={() => handleAddNode('email', 'Qual é o seu melhor e-mail?', 'seu.email@exemplo.com')}
-                    className="p-2.5 rounded-xl glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-left transition-all cursor-pointer flex items-center gap-2.5 group"
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('email')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
                   >
                     <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
                       <Mail className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-[var(--brand-gradient-start)] block">
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('email') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
                         E-mail de Contato
                       </span>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
-                        Campo de validação de e-mail
+                        {isTemplateAdded('email') ? 'Já adicionado' : 'Campo de validação de e-mail'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isTemplateAdded('cpf')}
+                    onClick={() => handleAddNode('cpf', 'Qual é o seu CPF?', '000.000.000-00')}
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('cpf')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
+                      <Sliders className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('cpf') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
+                        CPF do Paciente
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                        {isTemplateAdded('cpf') ? 'Já adicionado' : 'Validação de CPF no banco'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isTemplateAdded('maioridade')}
+                    onClick={() => handleAddNode('maioridade', 'Você é maior de idade?')}
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('maioridade')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
+                      <CheckSquare className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('maioridade') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
+                        Validação de Maioridade
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                        {isTemplateAdded('maioridade') ? 'Já adicionado' : 'Diferencia menor e maior de idade'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isTemplateAdded('emergencia')}
+                    onClick={() => handleAddNode('emergencia', 'Contato de Emergência')}
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('emergencia')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('emergencia') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
+                        Contato de Emergência
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                        {isTemplateAdded('emergencia') ? 'Já adicionado' : 'Coleta nome, parentesco e celular'}
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isTemplateAdded('contrato')}
+                    onClick={() => handleAddNode('contrato', 'Termo de Consentimento Livre e Esclarecido', '', [])}
+                    className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
+                      isTemplateAdded('contrato')
+                        ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
+                        : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('contrato') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
+                        Contrato / TCLE
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                        {isTemplateAdded('contrato') ? 'Já adicionado' : 'Termo de consentimento clínico'}
                       </span>
                     </div>
                   </button>
@@ -764,6 +960,50 @@ export function FormBuilderWorkspace({
                       onChange={(e) => updateSelectedNodeData('placeholder', e.target.value)}
                     />
                   </div>
+
+                  {selectedNode.data.type === 'contrato' && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                        Minuta do Contrato / Termo de Consentimento
+                      </label>
+                      <textarea
+                        rows={6}
+                        className="w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-800 focus:border-[var(--brand-gradient-start)] outline-none text-white placeholder:text-muted-foreground/40 resize-none font-sans"
+                        placeholder="Escreva a minuta do contrato aqui..."
+                        value={String(selectedNode.data?.contractText || '')}
+                        onChange={(e) => updateSelectedNodeData('contractText', e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {['texto', 'paragrafo', 'seletor'].includes((selectedNode.data as any).type) && (
+                    <div className="space-y-3 pt-2 border-t border-[var(--surface-border)]">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                          Nome da Variável no CRM (Sem espaços)
+                        </label>
+                        <Input
+                          type="text"
+                          className="brand-input text-xs font-mono"
+                          placeholder="ex: queixa_principal"
+                          value={String(selectedNode.data?.variableKey || '')}
+                          onChange={(e) => updateSelectedNodeData('variableKey', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                          Rótulo da Coluna no CRM
+                        </label>
+                        <Input
+                          type="text"
+                          className="brand-input text-xs"
+                          placeholder="ex: Queixa Principal"
+                          value={String(selectedNode.data?.variableLabel || '')}
+                          onChange={(e) => updateSelectedNodeData('variableLabel', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {selectedNode.data.type === 'seletor' && (
                     <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
@@ -1015,6 +1255,34 @@ export function FormBuilderWorkspace({
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {publishErrors.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-zinc-950 rounded-2xl border border-red-500/30 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-red-500">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <h3 className="text-sm font-bold uppercase tracking-wider">Erros de Validação</h3>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Corrija os problemas de fluxo abaixo antes de publicar o formulário público:
+            </p>
+            <ul className="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+              {publishErrors.map((err, i) => (
+                <li key={i} className="text-[11px] text-red-600 dark:text-red-400 leading-snug bg-red-500/5 px-2.5 py-1.5 rounded-lg border border-red-500/10">
+                  {err}
+                </li>
+              ))}
+            </ul>
+            <div className="pt-2 flex justify-end">
+              <Button
+                onClick={() => setPublishErrors([])}
+                className="h-8 px-4 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-900 dark:text-white rounded-lg border-none cursor-pointer"
+              >
+                Voltar ao Editor
+              </Button>
             </div>
           </div>
         </div>

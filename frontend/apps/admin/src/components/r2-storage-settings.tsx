@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { api, PlatformSetupStatusResponse, R2BucketConfig } from '@/lib/api';
-import { Input, Card, Button } from '@psi/ui';
+import { Input, Card, Button, BrandModal } from '@psi/ui';
 import { HardDrive, Key, Link, ShieldCheck, CheckCircle2, AlertCircle, Plus, Trash2, Database, Layers } from 'lucide-react';
 
 interface R2StorageSettingsProps {
@@ -38,6 +38,7 @@ export function R2StorageSettings({ platformStatus, onSaved }: R2StorageSettings
     if (platformStatus) {
       if (platformStatus.r2_bucket_name) setR2BucketName(platformStatus.r2_bucket_name);
       if (platformStatus.r2_public_domain) setR2PublicDomain(platformStatus.r2_public_domain);
+      if (platformStatus.backup_r2_buckets) setBackupBuckets(platformStatus.backup_r2_buckets);
     }
   }, [platformStatus]);
 
@@ -319,79 +320,77 @@ export function R2StorageSettings({ platformStatus, onSaved }: R2StorageSettings
       </form>
 
       {/* MODAL ADICIONAR / EDITAR BUCKET DE RESERVA */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg p-6 space-y-4 bg-slate-900 border-slate-800 shadow-2xl">
-            <h3 className="text-base font-bold text-slate-100">
-              {editingId ? 'Editar Bucket de Reserva' : 'Adicionar Bucket de Reserva'}
-            </h3>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Nome do Bucket *</label>
-                <Input
-                  type="text"
-                  placeholder="ex: app-aj-strategy-backup-1"
-                  value={backupForm.name}
-                  onChange={(e) => setBackupForm({ ...backupForm, name: e.target.value })}
-                  className="bg-slate-950 border-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Domínio Público do Bucket *</label>
-                <Input
-                  type="text"
-                  placeholder="https://storage2.meudominio.com.br"
-                  value={backupForm.publicDomain}
-                  onChange={(e) => setBackupForm({ ...backupForm, publicDomain: e.target.value })}
-                  className="bg-slate-950 border-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Access Key ID *</label>
-                <Input
-                  type="password"
-                  placeholder="Access Key S3"
-                  value={backupForm.accessKeyId}
-                  onChange={(e) => setBackupForm({ ...backupForm, accessKeyId: e.target.value })}
-                  className="bg-slate-950 border-slate-800 font-mono text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Secret Access Key *</label>
-                <Input
-                  type="password"
-                  placeholder="Secret Access Key S3 de 64 caracteres"
-                  value={backupForm.secretAccessKey}
-                  onChange={(e) => setBackupForm({ ...backupForm, secretAccessKey: e.target.value })}
-                  className="bg-slate-950 border-slate-800 font-mono text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setModalOpen(false)}
-                className="border-slate-700"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSaveBackupBucket}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white"
-              >
-                {editingId ? 'Atualizar' : 'Adicionar'}
-              </Button>
-            </div>
-          </Card>
+      <BrandModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+          <h3 className="text-lg font-bold text-slate-100">
+            {editingId ? 'Editar Bucket de Reserva' : 'Adicionar Bucket de Reserva'}
+          </h3>
         </div>
-      )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Nome do Bucket *</label>
+            <Input
+              type="text"
+              placeholder="ex: app-aj-strategy-backup-1"
+              value={backupForm.name}
+              onChange={(e) => setBackupForm({ ...backupForm, name: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Domínio Público do Bucket *</label>
+            <Input
+              type="text"
+              placeholder="https://storage2.meudominio.com.br"
+              value={backupForm.publicDomain}
+              onChange={(e) => setBackupForm({ ...backupForm, publicDomain: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Access Key ID *</label>
+            <Input
+              type="password"
+              placeholder="Access Key S3"
+              value={backupForm.accessKeyId}
+              onChange={(e) => setBackupForm({ ...backupForm, accessKeyId: e.target.value })}
+              className="font-mono text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Secret Access Key *</label>
+            <Input
+              type="password"
+              placeholder="Secret Access Key S3 de 64 caracteres"
+              value={backupForm.secretAccessKey}
+              onChange={(e) => setBackupForm({ ...backupForm, secretAccessKey: e.target.value })}
+              className="font-mono text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--surface-border)]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setModalOpen(false)}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSaveBackupBucket}
+          >
+            {editingId ? 'Atualizar' : 'Adicionar'}
+          </Button>
+        </div>
+      </BrandModal>
     </div>
   );
 }

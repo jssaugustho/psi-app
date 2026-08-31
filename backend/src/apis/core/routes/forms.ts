@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { screeningForms, capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, visualIdentities } from '../../../shared/schema';
+import { screeningForms, capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, visualIdentities, customFieldDefinitions } from '../../../shared/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { publishRealtime } from '../../../shared/queue';
@@ -97,6 +97,100 @@ const SubmitFormBodySchema = z.object({
   utmTerm: z.string().optional().nullable(),
   utmContent: z.string().optional().nullable(),
 });
+
+function validateCPF(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, '');
+  if (clean.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+
+  let sum = 0;
+  for (let i = 1; i <= 9; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (11 - i);
+  }
+  let rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (12 - i);
+  }
+  rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(10, 11))) return false;
+
+  return true;
+}
+
+function validateFlow(formFlow: any): string[] {
+  const errors: string[] = [];
+  const nodes = formFlow?.nodes || [];
+  const edges = formFlow?.edges || [];
+
+  if (nodes.length === 0) {
+    errors.push("O formulário não possui blocos.");
+    return errors;
+  }
+
+  // 1. Check for required template nodes
+  const requiredTypes = ['nome', 'celular', 'maioridade', 'contrato'];
+  for (const rType of requiredTypes) {
+    const hasNode = nodes.some((n: any) => n.type === rType);
+    if (!hasNode) {
+      errors.push(`O bloco de template '${rType.toUpperCase()}' é obrigatório no fluxo.`);
+    }
+  }
+
+  // 2. Check connections
+  const startNode = nodes.find((n: any) => n.type === 'start');
+  if (!startNode) {
+    errors.push("O bloco de 'Início' é obrigatório.");
+  } else {
+    const hasStartEdge = edges.some((e: any) => e.source === startNode.id);
+    if (!hasStartEdge) {
+      errors.push("O bloco de 'Início' deve estar conectado a outro bloco.");
+    }
+  }
+
+  for (const node of nodes) {
+    if (node.type === 'end' || node.type === 'start') continue;
+
+    // Check if the node has an incoming connection (except start node)
+    const hasIncoming = edges.some((e: any) => e.target === node.id);
+    if (!hasIncoming) {
+      errors.push(`O bloco '${node.data?.title || node.id}' está órfão (não possui conexão de entrada).`);
+    }
+
+    // Check if it has an outgoing connection
+    const hasOutgoing = edges.some((e: any) => e.source === node.id);
+    if (!hasOutgoing) {
+      errors.push(`O bloco '${node.data?.title || node.id}' não está conectado a nenhuma saída.`);
+    }
+
+    // Node-specific checks
+    if (node.type === 'seletor') {
+      const options = node.data?.options || [];
+      if (options.length === 0) {
+        errors.push(`O bloco de escolha única '${node.data?.title || node.id}' deve conter pelo menos uma opção.`);
+      }
+    }
+
+    if (node.type === 'contrato') {
+      const contractText = node.data?.contractText || '';
+      if (!contractText.trim()) {
+        errors.push(`O termo do bloco de contrato está em branco.`);
+      }
+    }
+
+    // Check if custom field node has a variableKey mapped
+    const isCustomField = ['texto', 'paragrafo', 'seletor'].includes(node.type);
+    if (isCustomField && !node.data?.variableKey) {
+      errors.push(`O bloco personalizado '${node.data?.title || node.id}' deve estar associado a uma variável do CRM.`);
+    }
+  }
+
+  return errors;
+}
 
 export async function formsRoutes(fastifyApp: FastifyInstance) {
   const fastify = fastifyApp.withTypeProvider<ZodTypeProvider>();
@@ -227,8 +321,8 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
           primaryStart: themeConfig?.primaryStart || visualIdentity?.primaryColor || '#7C3AED',
           primaryEnd: themeConfig?.primaryEnd || visualIdentity?.secondaryColor || '#A855F7',
           contrast: themeConfig?.contrast || visualIdentity?.contrastColor || '#FFFFFF',
-          fontHeading: themeConfig?.fontHeading || visualIdentity?.fontHeading || 'serif',
-          fontBody: themeConfig?.fontBody || visualIdentity?.fontBody || 'sans',
+          fontHeading: themeConfig?.fontHeading || visualIdentity?.fontHeading || 'Playfair Display',
+          fontBody: themeConfig?.fontBody || visualIdentity?.fontBody || 'Inter',
         };
 
         const activeFlow = formFlow || defaultFormFlow;
@@ -267,6 +361,215 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
+  // GET /v1/crm/forms/:id
+  fastify.get(
+    '/:id',
+    async (request, reply) => {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado' });
+      }
+
+      try {
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const { id } = request.params as any;
+
+        const form = await db.query.screeningForms.findFirst({
+          where: eq(screeningForms.id, id),
+        });
+
+        if (!form) {
+          return reply.status(404).send({ error: 'Formulário não encontrado' });
+        }
+
+        const member = await db.query.workspaceMembers.findFirst({
+          where: and(
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, form.workspaceId)
+          ),
+        });
+
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, form.workspaceId),
+        });
+
+        if (!member && workspace?.ownerId !== decoded.sub) {
+          return reply.status(403).send({ error: 'Acesso negado' });
+        }
+
+        return reply.send({ success: true, form });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // PUT /v1/crm/forms/:id
+  fastify.put(
+    '/:id',
+    async (request, reply) => {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado' });
+      }
+
+      try {
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const { id } = request.params as any;
+        const body = request.body as any;
+        const { titleDraft, slugDraft, themeConfigDraft, formFlowDraft, isPublish } = body;
+
+        const form = await db.query.screeningForms.findFirst({
+          where: eq(screeningForms.id, id),
+        });
+
+        if (!form) {
+          return reply.status(404).send({ error: 'Formulário não encontrado' });
+        }
+
+        const member = await db.query.workspaceMembers.findFirst({
+          where: and(
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, form.workspaceId)
+          ),
+        });
+
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, form.workspaceId),
+        });
+
+        if (!member && workspace?.ownerId !== decoded.sub) {
+          return reply.status(403).send({ error: 'Acesso negado' });
+        }
+
+        if (isPublish) {
+          const errors = validateFlow(formFlowDraft);
+          if (errors.length > 0) {
+            return reply.status(400).send({
+              error: 'Bad Request',
+              message: 'Erro de validação do formulário.',
+              validationErrors: errors,
+            });
+          }
+        }
+
+        // Auto-register custom fields
+        const draftNodes = formFlowDraft?.nodes || [];
+        for (const node of draftNodes) {
+          if (node.data?.variableKey) {
+            const key = node.data.variableKey;
+            const name = node.data.variableLabel || node.data.title || key;
+            const type = node.data.variableType || (node.type === 'seletor' ? 'select' : 'text');
+            const options = node.data.options ? node.data.options.map((o: any) => o.value || o.label) : null;
+
+            const existing = await db.query.customFieldDefinitions.findFirst({
+              where: and(
+                eq(customFieldDefinitions.workspaceId, form.workspaceId),
+                eq(customFieldDefinitions.key, key)
+              ),
+            });
+
+            if (!existing) {
+              await db.insert(customFieldDefinitions).values({
+                workspaceId: form.workspaceId,
+                key,
+                name,
+                type,
+                options,
+              });
+            }
+          }
+        }
+
+        const currentDraft = (form.draftData as any) || {};
+        const newDraft = {
+          title: titleDraft !== undefined ? titleDraft : currentDraft.title,
+          slug: slugDraft !== undefined ? slugDraft : currentDraft.slug,
+          themeConfig: themeConfigDraft !== undefined ? themeConfigDraft : currentDraft.themeConfig,
+          formFlow: formFlowDraft !== undefined ? formFlowDraft : currentDraft.formFlow,
+        };
+
+        const updatePayload: Record<string, any> = {
+          draftData: newDraft,
+          updatedAt: new Date(),
+        };
+
+        if (isPublish) {
+          updatePayload.title = newDraft.title || form.title;
+          updatePayload.slug = newDraft.slug || form.slug;
+          updatePayload.themeConfig = newDraft.themeConfig || form.themeConfig;
+          updatePayload.formFlow = newDraft.formFlow || form.formFlow;
+          updatePayload.isActive = true;
+        }
+
+        const [updatedForm] = await db
+          .update(screeningForms)
+          .set(updatePayload)
+          .where(eq(screeningForms.id, id))
+          .returning();
+
+        publishRealtime({
+          entity: 'form',
+          action: 'updated',
+          tenantId: form.workspaceId,
+          data: updatedForm,
+        });
+
+        return reply.send({ success: true, form: updatedForm });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // DELETE /v1/crm/forms/:id
+  fastify.delete(
+    '/:id',
+    async (request, reply) => {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Não autorizado' });
+      }
+
+      try {
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const { id } = request.params as any;
+
+        const form = await db.query.screeningForms.findFirst({
+          where: eq(screeningForms.id, id),
+        });
+
+        if (!form) {
+          return reply.status(404).send({ error: 'Formulário não encontrado' });
+        }
+
+        const member = await db.query.workspaceMembers.findFirst({
+          where: and(
+            eq(workspaceMembers.userId, decoded.sub),
+            eq(workspaceMembers.workspaceId, form.workspaceId)
+          ),
+        });
+
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, form.workspaceId),
+        });
+
+        if (!member && workspace?.ownerId !== decoded.sub) {
+          return reply.status(403).send({ error: 'Acesso negado' });
+        }
+
+        await db.delete(screeningForms).where(eq(screeningForms.id, id));
+
+        return reply.send({ success: true, message: 'Formulário removido com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
   // POST /v1/crm/forms/public/submit
   fastify.post(
     '/public/submit',
@@ -290,6 +593,13 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
+        if (rawCpf && !validateCPF(rawCpf)) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'O CPF informado é inválido.',
+          });
+        }
+
         const firstColumn = await db.query.pipelineColumns.findFirst({
           where: and(
             eq(pipelineColumns.workspaceId, targetWorkspaceId),
@@ -299,6 +609,53 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
         });
 
         const initialStatus = firstColumn ? firstColumn.name : 'Triagem Pendente';
+
+        // Mapeamento de variáveis personalizadas (Typebot-like variables mapping)
+        let formFlow = null;
+        if (formId) {
+          const formRecord = await db.query.screeningForms.findFirst({
+            where: eq(screeningForms.id, formId),
+          });
+          if (formRecord) {
+            formFlow = formRecord.formFlow;
+          }
+        } else if (pageId) {
+          const pageRecord = await db.query.capturePages.findFirst({
+            where: eq(capturePages.id, pageId),
+          });
+          if (pageRecord) {
+            formFlow = pageRecord.formFlow;
+          }
+        }
+
+        const customFieldValues: Record<string, any> = {};
+        const flowNodes = (formFlow as any)?.nodes || [];
+        
+        let signedContractContent = null;
+        const contratoNode = flowNodes.find((n: any) => n.type === 'contrato');
+        if (contratoNode) {
+          signedContractContent = contratoNode.data?.contractText || 'Termo de Consentimento aceito pelo paciente.';
+        }
+
+        for (const [key, val] of Object.entries(responses)) {
+          if (['nome', 'celular', 'email', 'cpf', 'maioridade', 'emergencia', 'contrato', 'responsavelNome', 'responsavelCpf', 'responsavelTelefone'].includes(key)) {
+            continue;
+          }
+          const node = flowNodes.find((n: any) => n.id === key);
+          if (node && node.data?.variableKey) {
+            customFieldValues[node.data.variableKey] = val;
+          } else {
+            customFieldValues[key] = val;
+          }
+        }
+
+        // Responsável Legal
+        const parentName = responses.responsavelNome || null;
+        const parentCpf = responses.responsavelCpf || null;
+        const parentPhone = responses.responsavelTelefone || null;
+
+        const cleanParentCpf = parentCpf ? parentCpf.replace(/\D/g, '') : null;
+        const cleanParentPhone = parentPhone ? ('+' + parentPhone.replace(/\D/g, '')) : null;
 
         let screeningNotes = '=== RESPOSTAS DA TRIAGEM ===\n';
         for (const [key, val] of Object.entries(responses)) {
@@ -318,16 +675,24 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
             workspaceId: targetWorkspaceId,
             pipelineColumnId: firstColumn?.id || null,
             name: rawName,
-            phone: rawPhone || null,
+            phone: rawPhone ? ('+' + rawPhone.replace(/\D/g, '')) : null,
             email: rawEmail || null,
             status: initialStatus,
             source: pageId ? 'Landing Page (Triagem)' : 'Formulário Direto (Link)',
             screeningNotes,
             isMinor: rawIsMinor,
             acceptedContractAt: responses.contrato ? new Date() : null,
+            ageConfirmedAt: responses.maioridade ? new Date() : null,
+            signedContractContent,
+            consentIp: request.ip,
+            consentUserAgent: request.headers['user-agent'] || null,
+            parentName,
+            parentCpf: cleanParentCpf,
+            parentPhone: cleanParentPhone,
             emergencyContactName: emergencyObj.nome || null,
             emergencyContactRelation: emergencyObj.relacao || null,
-            emergencyContactPhone: emergencyObj.telefone || null,
+            emergencyContactPhone: emergencyObj.telefone ? ('+' + emergencyObj.telefone.replace(/\D/g, '')) : null,
+            customFieldValues,
             formId: formId || null,
             capturePageId: pageId || null,
             utmSource: utmSource || null,

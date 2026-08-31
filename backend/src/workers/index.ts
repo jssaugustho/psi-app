@@ -1,7 +1,7 @@
 import { env } from '../config/env';
-import { getChannel, assertQuorumQueue } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishErrorLog } from '../shared/queue';
 import { db } from '../shared/db';
-import { systemStatusLogs, emailLogs, platformSettings, workspaces, workspaceDomains } from '../shared/schema';
+import { systemStatusLogs, emailLogs, platformSettings, workspaces, workspaceDomains, errorLogs } from '../shared/schema';
 import { lt, sql, eq, gt, and } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { renderEmailTemplate, TemplateName, TemplatePropsMap } from '../emails/render';
@@ -62,8 +62,16 @@ async function main() {
         );
 
         channel.ack(msg);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Erro ao processar evento de status:', error);
+        await publishErrorLog({
+          name: error.name || 'WorkerStatusError',
+          message: error.message || String(error),
+          stack: error.stack,
+          serviceName: 'workers',
+          severity: 'error',
+          metadata: { queue: 'system.status', rawPayload: msg.content.toString() }
+        }).catch(pubErr => console.error('Erro ao reportar erro do worker:', pubErr));
         channel.nack(msg, false, false);
       }
     });
@@ -308,6 +316,16 @@ async function main() {
         channel.ack(msg);
       } catch (error: any) {
         console.error('❌ Erro crítico ao processar e-mail:', error);
+
+        await publishErrorLog({
+          name: error.name || 'WorkerEmailError',
+          message: error.message || String(error),
+          stack: error.stack,
+          serviceName: 'workers',
+          severity: 'error',
+          metadata: { queue: 'email.transactional', payload: parsedPayload }
+        }).catch(pubErr => console.error('Erro ao reportar erro do worker:', pubErr));
+
         // Tentar salvar log de falha se temos dados suficientes
         if (parsedPayload?.to) {
           try {
@@ -326,8 +344,59 @@ async function main() {
       }
     });
 
+    // ── Consumidor: Fila de Erros do Sistema ──────────────────────────────────
+    const errorQueue = 'system.errors';
+    await assertQuorumQueue(errorQueue, errorQueue);
+    console.log(`📥 Fila [${errorQueue}] declarada e vinculada.`);
+
+    await channel.consume(errorQueue, async (msg) => {
+      if (!msg) return;
+
+      try {
+        const content = JSON.parse(msg.content.toString()) as {
+          name?: string | null;
+          message: string;
+          stack?: string | null;
+          url?: string | null;
+          userAgent?: string | null;
+          userId?: string | null;
+          serviceName: string;
+          severity?: 'error' | 'warning' | 'fatal' | null;
+          metadata?: Record<string, any> | null;
+        };
+
+        console.log(`❌ Erro recebido do serviço [${content.serviceName}]: ${content.message}`);
+
+        // Gravar log de erro no banco de dados
+        await db.insert(errorLogs).values({
+          name: content.name ?? null,
+          message: content.message,
+          stack: content.stack ?? null,
+          url: content.url ?? null,
+          userAgent: content.userAgent ?? null,
+          userId: content.userId ?? null,
+          serviceName: content.serviceName,
+          severity: content.severity ?? 'error',
+          metadata: content.metadata ?? null,
+        });
+
+        // Notificar via WebSocket global que houveram novos erros
+        channel.publish(
+          realtimeExchange,
+          '',
+          Buffer.from(JSON.stringify({ type: 'system_error', data: { serviceName: content.serviceName, createdAt: new Date().toISOString() } }))
+        );
+
+        channel.ack(msg);
+      } catch (error) {
+        console.error('❌ Erro ao processar log de erro da fila:', error);
+        channel.nack(msg, false, false);
+      }
+    });
+
     // Envia primeiro heartbeat em 5s e depois a cada 60s
     startWorkerHeartbeats(channel);
+
 
     console.log('🚀 Worker ativo e consumindo filas.');
 
@@ -364,6 +433,14 @@ function startWorkerHeartbeats(channel: any) {
       );
     } catch (e: any) {
       console.error('❌ Erro ao enviar heartbeat do Worker:', e);
+      publishErrorLog({
+        name: e.name || 'WorkerHeartbeatError',
+        message: e.message || String(e),
+        stack: e.stack,
+        serviceName: 'workers',
+        severity: 'error',
+        metadata: { context: 'worker-heartbeat' }
+      }).catch(pubErr => console.error('Erro ao reportar falha de heartbeat no RabbitMQ:', pubErr));
     }
   };
 

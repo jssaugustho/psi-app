@@ -14,8 +14,6 @@ type LogoField = 'logo_light_url' | 'logo_dark_url' | 'icon_light_url' | 'icon_d
 
 interface FormState {
   name: string;
-  slug: string;
-  domain: string;
   logo_light_url: string;
   logo_dark_url: string;
   icon_light_url: string;
@@ -23,6 +21,8 @@ interface FormState {
   gradient_color_start: string;
   gradient_color_end: string;
   contrast_color: string;
+  bg_light_color: string;
+  bg_dark_color: string;
 }
 
 const ColorPicker = ({
@@ -166,8 +166,6 @@ const UploadBox = ({
 export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps) {
   const [form, setForm] = useState<FormState>({
     name: tenant.name ?? '',
-    slug: tenant.slug ?? '',
-    domain: tenant.domain ?? '',
     logo_light_url: tenant.logoLightUrl ?? '',
     logo_dark_url: tenant.logoDarkUrl ?? '',
     icon_light_url: tenant.iconLightUrl ?? '',
@@ -175,14 +173,14 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
     gradient_color_start: tenant.gradientColorStart ?? '#4F46E5',
     gradient_color_end: tenant.gradientColorEnd ?? '#06B6D4',
     contrast_color: tenant.contrastColor ?? '#FFFFFF',
+    bg_light_color: tenant.bgLightColor ?? '#FFFFFF',
+    bg_dark_color: tenant.bgDarkColor ?? '#09090B',
   });
 
   useEffect(() => {
     if (tenant) {
       setForm({
         name: tenant.name ?? '',
-        slug: tenant.slug ?? '',
-        domain: tenant.domain ?? '',
         logo_light_url: tenant.logoLightUrl ?? '',
         logo_dark_url: tenant.logoDarkUrl ?? '',
         icon_light_url: tenant.iconLightUrl ?? '',
@@ -190,6 +188,8 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
         gradient_color_start: tenant.gradientColorStart ?? '#4F46E5',
         gradient_color_end: tenant.gradientColorEnd ?? '#06B6D4',
         contrast_color: tenant.contrastColor ?? '#FFFFFF',
+        bg_light_color: tenant.bgLightColor ?? '#FFFFFF',
+        bg_dark_color: tenant.bgDarkColor ?? '#09090B',
       });
     }
   }, [tenant]);
@@ -233,8 +233,6 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
     try {
       const { tenant: updated } = await api.updatePrimaryTenant({
         name: form.name,
-        slug: form.slug,
-        domain: form.domain || null,
         logo_light_url: form.logo_light_url || null,
         logo_dark_url: form.logo_dark_url || null,
         icon_light_url: form.icon_light_url || null,
@@ -242,6 +240,8 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
         gradient_color_start: form.gradient_color_start,
         gradient_color_end: form.gradient_color_end,
         contrast_color: form.contrast_color,
+        bg_light_color: form.bg_light_color,
+        bg_dark_color: form.bg_dark_color,
       });
       setSuccess('Configurações salvas com sucesso!');
       onSaved(updated);
@@ -262,24 +262,12 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
       {/* ─────────────────────────────── Identidade */}
       <section className="space-y-4">
         <h3 className="text-xs font-bold uppercase tracking-widest opacity-50">Identidade da Plataforma</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="max-w-md">
           <Input
             label="Nome da Plataforma"
             value={form.name}
             onChange={(e) => set('name')(e.target.value)}
             placeholder="Minha Plataforma"
-          />
-          <Input
-            label="Slug (URL amigável)"
-            value={form.slug}
-            onChange={(e) => set('slug')(e.target.value)}
-            placeholder="minha-plataforma"
-          />
-          <Input
-            label="Domínio personalizado (opcional)"
-            value={form.domain}
-            onChange={(e) => set('domain')(e.target.value)}
-            placeholder="app.meudominio.com.br"
           />
         </div>
       </section>
@@ -324,12 +312,17 @@ export function WhiteLabelSettings({ tenant, onSaved }: WhiteLabelSettingsProps)
       </section>
 
       {/* ─────────────────────────────── Cores */}
-      <section className="space-y-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 pb-1 border-b border-slate-800">Botões & Gradiente</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2 pb-1 border-b border-slate-800">Botões & Gradiente</p>
           <ColorPicker label="Cor Inicial" value={form.gradient_color_start} onChange={set('gradient_color_start')} />
           <ColorPicker label="Cor Final" value={form.gradient_color_end} onChange={set('gradient_color_end')} />
           <ColorPicker label="Contraste (texto em botões)" value={form.contrast_color} onChange={set('contrast_color')} />
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2 pb-1 border-b border-slate-800">Fundo dos Temas</p>
+          <ColorPicker label="Fundo Tema Claro" value={form.bg_light_color} onChange={set('bg_light_color')} />
+          <ColorPicker label="Fundo Tema Escuro" value={form.bg_dark_color} onChange={set('bg_dark_color')} />
         </div>
       </section>
 

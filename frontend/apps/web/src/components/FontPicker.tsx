@@ -41,7 +41,7 @@ interface FontPickerProps {
   onChange: (fontName: string) => void;
   type: 'heading' | 'body';
   customFontName?: string;
-  onOpenCustomFontModal: () => void;
+  onOpenCustomFontModal?: () => void;
 }
 
 export function FontPicker({
@@ -186,14 +186,14 @@ export function FontPicker({
 
           {/* Plus Button: Upload Custom Font Trigger */}
           <div className="pt-2 border-t border-[var(--surface-border)]">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                onOpenCustomFontModal();
-              }}
-              className="w-full py-2 px-3 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-[var(--brand-gradient-start)] hover:text-slate-900 dark:hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-            >
+             <button
+               type="button"
+               onClick={() => {
+                 setIsOpen(false);
+                 onOpenCustomFontModal?.();
+               }}
+               className="w-full py-2 px-3 rounded-lg glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] text-[var(--brand-gradient-start)] hover:text-slate-900 dark:hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+             >
               <Plus className="h-3.5 w-3.5" />
               <span>Subir Fonte Personalizada (.ttf / .otf)</span>
             </button>

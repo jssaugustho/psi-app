@@ -24,106 +24,13 @@ export default function CaptacaoPage() {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  // Load all drafts from localStorage with legacy key migration
-  const loadDrafts = useCallback(() => {
-    if (typeof window === 'undefined') return;
-
-    const tenantId = tenant?.id;
-    const draftsStorageKey = tenantId ? `psi_page_drafts_${tenantId}` : 'psi_page_drafts_global';
-    const legacyKey = tenantId ? `psi_page_creation_draft_${tenantId}` : 'psi_page_creation_draft_global';
-
-    let draftsList: any[] = [];
-
-    // 1. Read multi-draft key
+  const handleDeleteDraft = async (draftId: string) => {
     try {
-      const raw = localStorage.getItem(draftsStorageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          draftsList = parsed;
-        }
-      }
-    } catch {}
-
-    // 2. Check legacy key for existing tenant
-    try {
-      const legacyRaw = localStorage.getItem(legacyKey);
-      if (legacyRaw) {
-        const legacyParsed = JSON.parse(legacyRaw);
-        if (legacyParsed && typeof legacyParsed === 'object') {
-          const legacyId = legacyParsed.id || 'draft_legacy';
-          if (!draftsList.some((d) => d.id === legacyId)) {
-            const legacyDraft = {
-              id: legacyId,
-              tenantId: tenantId,
-              updatedAt: legacyParsed.updatedAt || new Date().toISOString(),
-              currentStep: legacyParsed.currentStep || 1,
-              newTitle: legacyParsed.newTitle || 'Rascunho de Página',
-              newLogoUrl: legacyParsed.newLogoUrl,
-              newFaviconUrl: legacyParsed.newFaviconUrl,
-              isCustomColor: legacyParsed.isCustomColor,
-              selectedPaletteId: legacyParsed.selectedPaletteId,
-              customPrimaryStart: legacyParsed.customPrimaryStart,
-              customPrimaryEnd: legacyParsed.customPrimaryEnd,
-              customContrast: legacyParsed.customContrast,
-              fontHeading: legacyParsed.fontHeading,
-              fontBody: legacyParsed.fontBody,
-              domainMode: legacyParsed.domainMode,
-              subdomainInput: legacyParsed.subdomainInput,
-              customDomainInput: legacyParsed.customDomainInput,
-              newSlug: legacyParsed.newSlug,
-            };
-            draftsList.unshift(legacyDraft);
-            localStorage.setItem(draftsStorageKey, JSON.stringify(draftsList));
-          }
-        }
-      }
-    } catch {}
-
-    // 3. Also check global legacy key
-    try {
-      const globalLegacy = localStorage.getItem('psi_page_creation_draft_global');
-      if (globalLegacy) {
-        const globalParsed = JSON.parse(globalLegacy);
-        if (globalParsed && typeof globalParsed === 'object' && (globalParsed.newTitle || globalParsed.currentStep)) {
-          const globalId = globalParsed.id || 'draft_legacy_global';
-          if (!draftsList.some((d) => d.id === globalId)) {
-            draftsList.unshift({
-              ...globalParsed,
-              id: globalId,
-              updatedAt: globalParsed.updatedAt || new Date().toISOString(),
-            });
-            localStorage.setItem(draftsStorageKey, JSON.stringify(draftsList));
-          }
-        }
-      }
-    } catch {}
-
-    setDrafts(draftsList);
-  }, [tenant?.id]);
-
-  useEffect(() => {
-    loadDrafts();
-  }, [loadDrafts]);
-
-  const handleDeleteDraft = (draftId: string) => {
-    if (typeof window === 'undefined') return;
-    const tenantId = tenant?.id;
-    const draftsStorageKey = tenantId ? `psi_page_drafts_${tenantId}` : 'psi_page_drafts_global';
-    const legacyKey = tenantId ? `psi_page_creation_draft_${tenantId}` : 'psi_page_creation_draft_global';
-
-    try {
-      localStorage.removeItem(legacyKey);
-      localStorage.removeItem('psi_page_creation_draft_global');
-
-      const raw = localStorage.getItem(draftsStorageKey);
-      let list: any[] = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(list)) {
-        list = list.filter((d) => d.id !== draftId);
-        localStorage.setItem(draftsStorageKey, JSON.stringify(list));
-        setDrafts(list);
-      }
-    } catch {}
+      await api.deleteCapturePage(draftId);
+      await loadPages();
+    } catch (err: any) {
+      setError('Erro ao excluir rascunho: ' + err.message);
+    }
   };
 
   const handleNewPageClick = () => {
@@ -143,7 +50,34 @@ export default function CaptacaoPage() {
         api.getCapturePages(tenant.id),
         api.getWorkspaceDomain(tenant.id).catch(() => null),
       ]);
-      setPages(data);
+
+      const regularPages = data.filter((p) => {
+        const sc = p.siteConfig || {};
+        const scd = p.siteConfigDraft || {};
+        return sc.isWizardDraft !== true && scd.isWizardDraft !== true;
+      });
+      const wizardDrafts = data
+        .filter((p) => {
+          const sc = p.siteConfig || {};
+          const scd = p.siteConfigDraft || {};
+          return sc.isWizardDraft === true || scd.isWizardDraft === true;
+        })
+        .map((p) => {
+          const d = p.siteConfigDraft || p.siteConfig || {};
+          return {
+            id: p.id,
+            tenantId: p.tenantId,
+            updatedAt: p.updatedAt,
+            currentStep: d.currentStep || 1,
+            newTitle: p.titleDraft || p.title || 'Rascunho de Página',
+            fontHeading: d.fontHeading || 'Playfair Display',
+            customPrimaryStart: d.customPrimaryStart || d.theme?.colors?.primaryStart || '#CC8667',
+            customPrimaryEnd: d.customPrimaryEnd || d.theme?.colors?.primaryEnd || '#E6A88A',
+          };
+        });
+
+      setPages(regularPages);
+      setDrafts(wizardDrafts);
       setWorkspaceDomain(domainData);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar as páginas de captação.');
@@ -290,7 +224,12 @@ export default function CaptacaoPage() {
   };
 
   const getVerSiteUrl = (page: CapturePage) => {
-    return getPageProductionUrl(page);
+    const prodUrl = getPageProductionUrl(page);
+    if (page.siteConfig?.status !== 'published') {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+      return `${prodUrl}?staging=true&token=${token}`;
+    }
+    return prodUrl;
   };
 
   return (
@@ -438,18 +377,37 @@ export default function CaptacaoPage() {
                     <h3 className="text-lg text-slate-900 dark:text-white font-medium truncate mb-0.5">{page.title}</h3>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tracking-wider uppercase">/{page.slug}</span>
                   </div>
-                  {/* Status Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleActive(page.id, page.isActive)}
-                    className={`h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all cursor-pointer ${
-                      page.isActive 
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                        : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300 dark:border-zinc-700/50'
-                    }`}
-                  >
-                    {page.isActive ? 'Ativa' : 'Pausada'}
-                  </button>
+                  {/* Status Badge & Toggle Switch */}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {!page.isActive ? (
+                      <span className="h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all flex items-center justify-center bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-400 border border-slate-300 dark:border-zinc-700/50">
+                        Inativa
+                      </span>
+                    ) : page.siteConfig?.status !== 'published' ? (
+                      <span className="h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all flex items-center justify-center bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                        Rascunho
+                      </span>
+                    ) : (
+                      <span className="h-6 px-2.5 rounded-full text-[9px] font-bold uppercase transition-all flex items-center justify-center bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Ativa
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(page.id, page.isActive)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        page.isActive ? 'bg-emerald-500/80 hover:bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-700'
+                      }`}
+                      title={page.isActive ? "Desativar Página" : "Ativar Página"}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          page.isActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
                   <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">

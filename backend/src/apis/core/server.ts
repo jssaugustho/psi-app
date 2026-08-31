@@ -5,7 +5,8 @@ import multipart from '@fastify/multipart';
 import socketio from 'socket.io';
 import cookie from '@fastify/cookie';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import { getChannel, publishRealtime } from '../../shared/queue';
+import { getChannel, publishRealtime, publishErrorLog } from '../../shared/queue';
+import { extractJwtFromRequest, verifyUserJwt } from '../../shared/auth';
 import { authRoutes } from './routes/auth';
 import { platformRoutes } from './routes/platform';
 import { statusRoutes, startSystemStatusHeartbeats } from './routes/status';
@@ -13,6 +14,7 @@ import { crmRoutes } from './routes/crm';
 import { captacaoRoutes } from './routes/captacao';
 import { formsRoutes } from './routes/forms';
 import { sql } from '../../shared/db';
+
 
 const port = env.PORT;
 
@@ -76,6 +78,58 @@ fastify.get('/health', async () => {
       queue: queueStatus
     }
   };
+});
+
+// Manipulador global de erros da API (Fastify)
+fastify.setErrorHandler(async (error, request, reply) => {
+  request.log.error(error);
+
+  let userId: string | null = null;
+  const token = extractJwtFromRequest(request);
+  if (token) {
+    try {
+      const decoded = verifyUserJwt(token);
+      userId = decoded.sub;
+    } catch {
+      // Ignora erro de JWT inválido/expirado para o log
+    }
+  }
+
+  // Detecta se é erro de banco de dados/Postgres
+  let serviceName = 'core-api';
+  if (
+    error.name === 'PostgresError' ||
+    (error as any).code ||
+    error.stack?.includes('drizzle-orm') ||
+    error.stack?.includes('postgres-js')
+  ) {
+    serviceName = 'postgres';
+  }
+
+  // Enfileira o erro no RabbitMQ
+  await publishErrorLog({
+    name: error.name || 'FastifyError',
+    message: error.message || 'Erro interno na API',
+    stack: error.stack,
+    url: request.url,
+    userAgent: request.headers['user-agent'] || null,
+    userId,
+    serviceName,
+    severity: 'error',
+    metadata: {
+      method: request.method,
+      statusCode: error.statusCode || 500,
+    },
+  }).catch((pubErr) => {
+    request.log.error('Erro ao publicar log de erro no RabbitMQ:', pubErr);
+  });
+
+  // Retorna resposta amigável ao cliente
+  const statusCode = error.statusCode || 500;
+  return reply.status(statusCode).send({
+    error: error.name || 'InternalServerError',
+    message: error.message || 'Ocorreu um erro interno no servidor.',
+  });
 });
 
 // Registrar rotas

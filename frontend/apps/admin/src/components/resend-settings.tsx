@@ -7,11 +7,12 @@ import { DnsVerifier } from '@/components/dns-verifier';
 
 interface ResendSettingsProps {
   currentFromDomain: string | null;
-  hasResend: boolean;
+  hasResendKey: boolean;
   onSaved: () => void;
 }
 
-export function ResendSettings({ currentFromDomain, hasResend, onSaved }: ResendSettingsProps) {
+export function ResendSettings({ currentFromDomain, hasResendKey, onSaved }: ResendSettingsProps) {
+  const hasResend = hasResendKey && !!currentFromDomain;
   const [apiKey, setApiKey] = useState('');
   const [fromDomain, setFromDomain] = useState(currentFromDomain ?? '');
   
@@ -125,12 +126,12 @@ export function ResendSettings({ currentFromDomain, hasResend, onSaved }: Resend
           <div
             className="flex items-center gap-3 p-4 rounded-xl"
             style={{
-              background: hasResend ? 'var(--status-success-bg)' : 'var(--surface-hover)',
-              border: `1px solid ${hasResend ? 'var(--status-success-border)' : 'var(--surface-border)'}`,
+              background: hasResendKey ? 'var(--status-success-bg)' : 'var(--surface-hover)',
+              border: `1px solid ${hasResendKey ? 'var(--status-success-border)' : 'var(--surface-border)'}`,
             }}
           >
             <span className="flex-shrink-0">
-              {hasResend ? (
+              {hasResendKey ? (
                 <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -146,9 +147,9 @@ export function ResendSettings({ currentFromDomain, hasResend, onSaved }: Resend
               </p>
               <p
                 className="text-sm font-semibold"
-                style={{ color: hasResend ? 'var(--status-success-text)' : 'var(--brand-text-color)' }}
+                style={{ color: hasResendKey ? 'var(--status-success-text)' : 'var(--brand-text-color)' }}
               >
-                {hasResend ? 'Chave salva de forma segura' : 'Não configurada'}
+                {hasResendKey ? 'Chave salva de forma segura' : 'Não configurada'}
               </p>
             </div>
           </div>

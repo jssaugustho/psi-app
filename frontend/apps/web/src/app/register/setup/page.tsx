@@ -15,6 +15,9 @@ export default function RegisterSetupPage() {
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [crp, setCrp] = useState('');
+  const [hasNoCrp, setHasNoCrp] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
@@ -27,6 +30,9 @@ export default function RegisterSetupPage() {
       setNome(user.nome === 'Colaborador' ? '' : user.nome);
       setSobrenome(user.sobrenome || '');
       setTelefone(user.telefone || '');
+      setCpf(user.cpf || '');
+      setCrp(user.crp || '');
+      setHasNoCrp(user.has_no_crp ?? false);
     }
   }, [user]);
 
@@ -63,6 +69,9 @@ export default function RegisterSetupPage() {
         nome: nome.trim(),
         sobrenome: sobrenome.trim(),
         telefone: telefone.trim() || null,
+        cpf: cpf.trim() || null,
+        crp: hasNoCrp ? null : (crp.trim() || null),
+        hasNoCrp: hasNoCrp,
         password: password,
       });
 
@@ -182,6 +191,42 @@ export default function RegisterSetupPage() {
             onChange={(e) => setTelefone(e.target.value)}
             placeholder="(11) 99999-9999"
           />
+
+          <Input
+            label="CPF (Opcional)"
+            type="text"
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value)}
+            placeholder="000.000.000-00"
+          />
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
+                CRP (Registro Profissional)
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
+                <input
+                  type="checkbox"
+                  checked={hasNoCrp}
+                  onChange={(e) => {
+                    setHasNoCrp(e.target.checked);
+                    if (e.target.checked) setCrp('');
+                  }}
+                  className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer"
+                />
+                <span>Não tenho CRP</span>
+              </label>
+            </div>
+            <Input
+              type="text"
+              disabled={hasNoCrp}
+              value={hasNoCrp ? '' : crp}
+              onChange={(e) => setCrp(e.target.value)}
+              placeholder={hasNoCrp ? 'Dispensado de CRP' : 'Ex: CRP 06/123456'}
+              className={hasNoCrp ? 'opacity-50 cursor-not-allowed' : ''}
+            />
+          </div>
 
           <Input
             label="Definir Senha *"

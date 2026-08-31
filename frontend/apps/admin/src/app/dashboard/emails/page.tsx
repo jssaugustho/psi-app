@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import { env } from '@/env';
-import { LoadingSpinner, Select } from '@psi/ui';
+import { LoadingSpinner, Select, BrandModal } from '@psi/ui';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────
 interface EmailLog {
@@ -186,42 +186,27 @@ function EmailPreviewModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    <BrandModal
+      isOpen={true}
+      onClose={onClose}
+      maxWidth="max-w-5xl"
+      className="overflow-hidden flex flex-col max-h-[90vh]"
     >
+      {/* Modal Header */}
       <div
-        className="w-full max-w-5xl rounded-2xl overflow-hidden flex flex-col glass-lg"
-        style={{
-          boxShadow: '0 25px 80px rgba(0,0,0,0.5)',
-          maxHeight: '90vh',
-        }}
+        className="flex items-center justify-between pb-4 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--surface-border)' }}
       >
-        {/* Modal Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--surface-border)' }}
-        >
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold" style={{ color: 'var(--brand-text-color)' }}>
-              {log.subject}
-            </h2>
-            <p className="text-xs" style={{ color: 'var(--brand-text-color)', opacity: 0.5 }}>
-              Para: {log.to_email} &nbsp;·&nbsp; {formatDate(log.sent_at)}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-colors cursor-pointer border-none"
-            style={{
-              background: 'var(--surface-glass)',
-              color: 'var(--brand-text-color)',
-            }}
-          >
-            <CloseIcon />
-          </button>
+        <div className="space-y-0.5">
+          <h2 className="text-base font-semibold" style={{ color: 'var(--brand-text-color)' }}>
+            {log.subject}
+          </h2>
+          <p className="text-xs" style={{ color: 'var(--brand-text-color)', opacity: 0.5 }}>
+            Para: {log.to_email} &nbsp;·&nbsp; {formatDate(log.sent_at)}
+          </p>
         </div>
+      </div>
+
 
         {/* Body: Split — iframe + metadata */}
         <div className="flex flex-1 overflow-hidden">
@@ -300,8 +285,7 @@ function EmailPreviewModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </BrandModal>
   );
 }
 

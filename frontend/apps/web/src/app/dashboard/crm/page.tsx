@@ -64,7 +64,7 @@ const PRESETS = [
 
 const normalizeTrafficSources = (sources: any[] | undefined | null): TrafficSourceObj[] => {
   if (!sources || !Array.isArray(sources)) {
-    sources = ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook'];
+    sources = ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Indicação', 'TikTok', 'Site / Orgânico', 'Webhook'];
   }
   return sources.map((src, idx) => {
     if (typeof src === 'string') {
@@ -337,7 +337,7 @@ export default function CrmPage() {
       }
     });
     if (list.size === 0) {
-      ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook'].forEach(s => list.add(s));
+      ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Indicação', 'TikTok', 'Site / Orgânico', 'Webhook'].forEach(s => list.add(s));
     }
     contacts.forEach((c) => {
       if (c.source) list.add(c.source);
@@ -945,7 +945,7 @@ export default function CrmPage() {
                   <Select
                     value={newLeadForm.source}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, source: e.target.value })}
-                    options={tenant?.traffic_sources || ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook']}
+                    options={tenant?.traffic_sources || ['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Indicação', 'TikTok', 'Site / Orgânico', 'Webhook']}
                     variant="glass"
                   />
                 </div>

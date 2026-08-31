@@ -217,7 +217,7 @@ export default function SettingsPage() {
               {activeTab === 'email' && (
                 <ResendSettings
                   currentFromDomain={platformStatus?.resend_from_domain ?? null}
-                  hasResend={platformStatus?.has_resend ?? false}
+                  hasResendKey={platformStatus?.has_resend_key ?? false}
                   onSaved={loadTenant}
                 />
               )}

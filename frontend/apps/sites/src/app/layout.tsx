@@ -1,5 +1,6 @@
 import React from 'react';
 import './globals.css';
+import { IframeNavigationBlocker } from '../components/IframeNavigationBlocker';
 
 export const metadata = {
   title: 'Consultório de Psicologia | Triagem',
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body className="antialiased bg-[#000000] text-[#F4F4F5]" suppressHydrationWarning>
+        <IframeNavigationBlocker />
         {children}
       </body>
     </html>

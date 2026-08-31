@@ -4,11 +4,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api, Workspace, User, WorkspaceDomain } from '@/lib/api';
 import { Card, Button, Input, Textarea } from '@psi/ui';
 import { useBrand } from '@/context/BrandContext';
-import { MediaLibraryModal } from '@/components/media-library-modal';
-import { LogoOptionModal } from '@/components/logo-option-modal';
-import { LogoBuilderModal } from '@/components/logo-builder-modal';
 import { DomainManager } from '@/components/domain-manager';
 import { getWorkspaceVisualIdentity } from '@/lib/visual-identity';
+import { BrandIdentityForm } from '@/components/BrandIdentityForm';
+import { COLOR_PALETTES } from '@/components/ColorPaletteSelector';
+import { MediaLibraryModal } from '@/components/media-library-modal';
 import {
   User as UserIcon,
   Palette,
@@ -23,7 +23,9 @@ import {
   Upload,
   AlertCircle,
   Camera,
-  RefreshCw
+  RefreshCw,
+  Type,
+  Smartphone
 } from 'lucide-react';
 
 interface WorkspaceSettingsFormProps {
@@ -31,16 +33,6 @@ interface WorkspaceSettingsFormProps {
   workspace?: Workspace;
   initialUser: User;
 }
-
-const COLOR_PRESETS = [
-  { name: 'Terracota Nude', primary: '#CC8667', secondary: '#E6A88A', bg: '#FAFAFA', contrast: '#FFFFFF' },
-  { name: 'Azul Sereno', primary: '#4F46E5', secondary: '#06B6D4', bg: '#F8FAFC', contrast: '#FFFFFF' },
-  { name: 'Verde Botânico', primary: '#059669', secondary: '#34D399', bg: '#F0FDF4', contrast: '#FFFFFF' },
-  { name: 'Rosa Fúcsia', primary: '#E11D48', secondary: '#FB7185', bg: '#FFF1F2', contrast: '#FFFFFF' },
-  { name: 'Violeta Calmo', primary: '#7C3AED', secondary: '#A78BFA', bg: '#F5F3FF', contrast: '#FFFFFF' },
-  { name: 'Âmbar Quente', primary: '#D97706', secondary: '#FBBF24', bg: '#FFFBEB', contrast: '#FFFFFF' },
-  { name: 'Escuro Elegante', primary: '#CC8667', secondary: '#E6A88A', bg: '#09090B', contrast: '#FFFFFF' },
-];
 
 const DEFAULT_SPECIALTIES_PRESETS = [
   'Terapia Cognitivo-Comportamental (TCC)',
@@ -73,29 +65,76 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
   const [newSpecialty, setNewSpecialty] = useState('');
 
   // Identidade Visual
-  const [primaryColor, setPrimaryColor] = useState(visualIdentity.primaryColor);
-  const [secondaryColor, setSecondaryColor] = useState(visualIdentity.secondaryColor);
-  const [contrastColor, setContrastColor] = useState(visualIdentity.contrastColor);
+  const [primaryColor, setPrimaryColor] = useState(visualIdentity.primaryColor || '#458270');
+  const [secondaryColor, setSecondaryColor] = useState(visualIdentity.secondaryColor || '#A64E2B');
+  const [contrastColor, setContrastColor] = useState(visualIdentity.contrastColor || '#FFFFFF');
+  const [bgColor, setBgColor] = useState(visualIdentity.bgColor || '#09090B');
   const [logoUrl, setLogoUrl] = useState(visualIdentity.logoUrl || '');
   const [faviconUrl, setFaviconUrl] = useState(visualIdentity.faviconUrl || '');
-  const [logoConfig, setLogoConfig] = useState(visualIdentity.logoConfig);
+  const [fontHeading, setFontHeading] = useState(visualIdentity.fontHeading || 'Playfair Display');
+  const [fontBody, setFontBody] = useState(visualIdentity.fontBody || 'Plus Jakarta Sans');
+
+  const [selectedPalette, setSelectedPalette] = useState(COLOR_PALETTES[0]);
+  const [isCustomColor, setIsCustomColor] = useState(false);
+
 
   // Modais
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [mediaTarget, setMediaTarget] = useState<'logo' | 'favicon' | 'avatar' | null>(null);
-  const [logoOptionModalOpen, setLogoOptionModalOpen] = useState(false);
-  const [logoBuilderModalOpen, setLogoBuilderModalOpen] = useState(false);
+
+  // Carrega Identidade Visual da tabela
+  useEffect(() => {
+    if (currentWorkspace.id) {
+      api.getVisualIdentity(currentWorkspace.id)
+        .then((vi) => {
+          if (vi) {
+            setPrimaryColor(vi.primaryColor || '#458270');
+            setSecondaryColor(vi.secondaryColor || '#A64E2B');
+            setContrastColor(vi.contrastColor || '#FFFFFF');
+            setBgColor(vi.bgColor || '#09090B');
+            setLogoUrl(vi.logoUrl || '');
+            setFaviconUrl(vi.faviconUrl || '');
+            setFontHeading(vi.fontHeading || 'Playfair Display');
+            setFontBody(vi.fontBody || 'Plus Jakarta Sans');
+
+            // Determina se a paleta é customizada ou bate com algum preset
+            const matchingPalette = COLOR_PALETTES.find(
+              p => p.primaryStart.toLowerCase() === (vi.primaryColor || '').toLowerCase()
+            );
+            if (matchingPalette) {
+              setSelectedPalette(matchingPalette);
+              setIsCustomColor(false);
+            } else {
+              setIsCustomColor(true);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentWorkspace.id]);
 
   // Domínio do workspace
   const [workspaceDomain, setWorkspaceDomain] = useState<WorkspaceDomain | null>(null);
+  const [subdomainInput, setSubdomainInput] = useState('');
+  const [customDomainInput, setCustomDomainInput] = useState('');
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [checkingSubdomain, setCheckingSubdomain] = useState(false);
 
   useEffect(() => {
     if (currentWorkspace.id) {
       api.getWorkspaceDomain(currentWorkspace.id)
-        .then((d) => setWorkspaceDomain(d))
+        .then((d) => {
+          setWorkspaceDomain(d);
+          if (d) {
+            setSubdomainInput(d.subdomain || '');
+            setCustomDomainInput(d.customDomain || '');
+          }
+        })
         .catch(() => {});
     }
   }, [currentWorkspace.id]);
+
+
 
   const handleAddSpecialty = (item: string) => {
     const trimmed = item.trim();
@@ -117,19 +156,23 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
     try {
       await api.updateTenantBranding(currentWorkspace.id, {
         name,
-        crp,
         bio,
         specialties,
         cityState,
         instagram,
         isOnlineService,
-        gradientColorStart: primaryColor,
-        gradientColorEnd: secondaryColor,
-        contrastColor,
         defaultSiteAvatarUrl: logoUrl || null,
-        defaultSiteLogoUrl: logoUrl || null,
-        defaultSiteFaviconUrl: faviconUrl || null,
-        defaultSiteLogoConfig: logoConfig,
+      });
+
+      await api.saveVisualIdentity(currentWorkspace.id, {
+        primaryColor,
+        secondaryColor,
+        contrastColor,
+        bgColor,
+        logoUrl: logoUrl || null,
+        faviconUrl: faviconUrl || null,
+        fontHeading,
+        fontBody,
       });
 
       await reloadBrand();
@@ -141,6 +184,47 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       setSaving(false);
     }
   };
+
+  const handleSaveDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const cleanSub = subdomainInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (!cleanSub || cleanSub.length < 3) {
+        throw new Error('O subdomínio deve ter ao menos 3 caracteres.');
+      }
+
+      if (cleanSub !== workspaceDomain?.subdomain) {
+        if (subdomainAvailable === false) {
+          throw new Error('Por favor, escolha um subdomínio disponível.');
+        }
+        if (!workspaceDomain?.subdomain) {
+          await api.createWorkspaceDomain(currentWorkspace.id, cleanSub);
+        } else {
+          await api.updateWorkspaceDomain(currentWorkspace.id, cleanSub);
+        }
+      }
+
+      const updatedDomain = await api.getWorkspaceDomain(currentWorkspace.id);
+      setWorkspaceDomain(updatedDomain);
+      if (updatedDomain) {
+        setSubdomainInput(updatedDomain.subdomain || '');
+        setCustomDomainInput(updatedDomain.customDomain || '');
+      }
+
+      await reloadBrand();
+      setMessage({ type: 'success', text: 'Configurações de domínio salvas com sucesso!' });
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Falha ao salvar domínio.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
@@ -238,11 +322,6 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">CRP (Registro Profissional)</label>
-                <Input value={crp} onChange={(e) => setCrp(e.target.value)} placeholder="Ex: CRP 06/123456" />
-              </div>
-
-              <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cidade / Estado</label>
                 <Input value={cityState} onChange={(e) => setCityState(e.target.value)} placeholder="Ex: São Paulo / SP" />
               </div>
@@ -322,210 +401,31 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       {/* Conteúdo Aba Marca */}
       {activeTab === 'marca' && (
         <form onSubmit={handleSave} className="space-y-6">
-          {/* Card de Logotipo do Consultório */}
           <Card className="p-6 space-y-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-violet-400" />
-                Logotipo do Consultório
-              </h3>
-              <Button
-                type="button"
-                onClick={() => setLogoOptionModalOpen(true)}
-                className="bg-violet-600 hover:bg-violet-500 text-xs text-white"
-              >
-                Configurar Logotipo
-              </Button>
-            </div>
-
-            {/* Preview do Logotipo */}
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-950 flex items-center justify-center min-h-[120px] relative">
-              {logoConfig?.mode === 'image' && logoUrl ? (
-                <div className="max-w-[200px] flex flex-col items-center gap-2">
-                  <img src={logoUrl} alt="Logotipo" className="max-h-16 object-contain" />
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Modo Imagem</span>
-                </div>
-              ) : logoConfig?.mode === 'html' ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex items-center gap-3">
-                    {logoConfig.iconType === 'psi' ? (
-                      <div
-                        style={{
-                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                          color: contrastColor
-                        }}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shadow-md"
-                      >
-                        Ψ
-                      </div>
-                    ) : logoConfig.customIconUrl ? (
-                      <div
-                        style={{
-                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                        }}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center p-2 shadow-md overflow-hidden"
-                      >
-                        <img src={logoConfig.customIconUrl} alt="Ícone Custom" className="w-full h-full object-contain" />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                          color: contrastColor
-                        }}
-                        className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                      </div>
-                    )}
-                    <span
-                      style={{
-                        background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                      }}
-                      className="text-xl font-bold font-serif"
-                    >
-                      {logoConfig.text || currentWorkspace.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Modo HTML</span>
-                    <button
-                      type="button"
-                      onClick={() => setLogoBuilderModalOpen(true)}
-                      className="text-[10px] text-violet-500 hover:text-violet-400 font-bold underline bg-transparent border-none cursor-pointer"
-                    >
-                      Editar Texto/Ícone
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center space-y-1">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Nenhum logotipo configurado.</p>
-                  <p className="text-[10px] text-slate-400">
-                    Por padrão, será exibido o símbolo Ψ com o nome do workspace:{" "}
-                    <strong>{currentWorkspace.name}</strong>
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Card de Ícone / Favicon do Site */}
-          <Card className="p-6 space-y-4 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-violet-400" />
-                  Favicon / Ícone do Site
-                </h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Ícone que aparece na aba do navegador e nos marcadores de favoritos.
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => {
-                  setMediaTarget('favicon');
-                  setMediaModalOpen(true);
-                }}
-                className="bg-violet-600 hover:bg-violet-500 text-xs text-white"
-              >
-                Selecionar Favicon
-              </Button>
-            </div>
-
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-950 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl glass-sm border border-slate-200 dark:border-zinc-800/60 flex items-center justify-center p-2.5 shrink-0 bg-white">
-                {faviconUrl ? (
-                  <img src={faviconUrl} alt="Favicon" className="w-full h-full object-contain" />
-                ) : (
-                  <div
-                    style={{
-                      background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                      color: contrastColor
-                    }}
-                    className="w-full h-full rounded-md flex items-center justify-center font-bold text-xs"
-                  >
-                    Ψ
-                  </div>
-                )}
-              </div>
-              <div className="truncate flex-1">
-                <span className="block text-xs font-bold text-slate-800 dark:text-zinc-200 truncate">
-                  {faviconUrl ? 'Favicon Personalizado' : 'Favicon Padrão (Ψ)'}
-                </span>
-                <span className="block text-[10px] text-slate-400 truncate mt-0.5">
-                  {faviconUrl ? faviconUrl : 'Símbolo da Psicologia Ψ com degradê da marca.'}
-                </span>
-              </div>
-              {faviconUrl && (
-                <button
-                  type="button"
-                  onClick={() => setFaviconUrl('')}
-                  className="text-[10px] text-rose-500 hover:text-rose-400 font-bold bg-transparent border-none cursor-pointer"
-                >
-                  Remover
-                </button>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-6 space-y-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <Palette className="w-4 h-4 text-violet-400" />
-              Paleta de Cores do Consultório
-            </h3>
-
-            {/* Presets de Cores */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset.name}
-                  type="button"
-                  onClick={() => {
-                    setPrimaryColor(preset.primary);
-                    setSecondaryColor(preset.secondary);
-                    setContrastColor(preset.contrast);
-                  }}
-                  className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 hover:border-violet-500 transition-all text-left group cursor-pointer"
-                >
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: preset.primary }} />
-                    <span className="w-4 h-4 rounded-full shadow-sm" style={{ background: preset.secondary }} />
-                  </div>
-                  <span className="block text-xs font-bold text-slate-700 dark:text-zinc-200 group-hover:text-slate-950 dark:group-hover:text-white">{preset.name}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor Primária</label>
-                <div className="flex gap-2">
-                  <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
-                  <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor Secundária</label>
-                <div className="flex gap-2">
-                  <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
-                  <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Cor de Contraste / Texto</label>
-                <div className="flex gap-2">
-                  <input type="color" value={contrastColor} onChange={(e) => setContrastColor(e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none" />
-                  <Input value={contrastColor} onChange={(e) => setContrastColor(e.target.value)} />
-                </div>
-              </div>
-            </div>
+            <BrandIdentityForm
+              previewTitle={name}
+              tenantId={currentWorkspace.id}
+              logoUrl={logoUrl}
+              setLogoUrl={setLogoUrl}
+              faviconUrl={faviconUrl}
+              setFaviconUrl={setFaviconUrl}
+              primaryColor={primaryColor}
+              setPrimaryColor={setPrimaryColor}
+              secondaryColor={secondaryColor}
+              setSecondaryColor={setSecondaryColor}
+              contrastColor={contrastColor}
+              setContrastColor={setContrastColor}
+              bgColor={bgColor}
+              setBgColor={setBgColor}
+              fontHeading={fontHeading}
+              setFontHeading={setFontHeading}
+              fontBody={fontBody}
+              setFontBody={setFontBody}
+              isCustomColor={isCustomColor}
+              setIsCustomColor={setIsCustomColor}
+              selectedPalette={selectedPalette}
+              setSelectedPalette={setSelectedPalette}
+            />
 
             <div className="pt-4 flex justify-end">
               <Button type="submit" disabled={saving} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold">
@@ -538,15 +438,44 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
       {/* Conteúdo Aba Domínio */}
       {activeTab === 'dominio' && (
-        <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80">
-          <DomainManager
-            tenantId={currentWorkspace.id}
-            subdomain={workspaceDomain?.subdomain || ''}
-            onSubdomainChange={(val) => setName(val)}
-            customDomain={workspaceDomain?.customDomain || ''}
-            onCustomDomainChange={(val) => {}}
-          />
-        </Card>
+        <form onSubmit={handleSaveDomain} className="space-y-6">
+          <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80 space-y-4">
+            <DomainManager
+              tenantId={currentWorkspace.id}
+              subdomain={subdomainInput}
+              onSubdomainChange={(val) => {
+                setSubdomainInput(val);
+                setSubdomainAvailable(null);
+              }}
+              customDomain={customDomainInput}
+              onCustomDomainChange={(val) => setCustomDomainInput(val)}
+              readOnlySubdomain={Boolean(workspaceDomain?.subdomain)}
+              readOnlyCustomDomain={Boolean(workspaceDomain?.customDomain)}
+              subdomainAvailable={subdomainAvailable}
+              checkingSubdomain={checkingSubdomain}
+              onCheckSubdomain={async (sub) => {
+                setCheckingSubdomain(true);
+                try {
+                  const res = await api.checkSubdomainAvailability(sub, currentWorkspace.id);
+                  setSubdomainAvailable(res.available);
+                } catch {
+                  setSubdomainAvailable(null);
+                } finally {
+                  setCheckingSubdomain(false);
+                }
+              }}
+            />
+            <div className="pt-4 flex justify-end">
+              <Button
+                type="submit"
+                disabled={saving || (subdomainInput !== workspaceDomain?.subdomain && subdomainAvailable === false)}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold"
+              >
+                {saving ? 'Salvando...' : 'Salvar Domínio'}
+              </Button>
+            </div>
+          </Card>
+        </form>
       )}
 
       {/* Conteúdo Aba Mídias */}
@@ -577,47 +506,19 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
           tenantId={currentWorkspace.id}
           isOpen={mediaModalOpen}
           onClose={() => setMediaModalOpen(false)}
+          resolution={mediaTarget === 'favicon' ? { width: 128, height: 128 } : { width: 400, height: 120 }}
+          type={mediaTarget === 'logo' || mediaTarget === 'favicon' ? 'logotipo' : 'imagem'}
           onSelectImage={(asset: any) => {
+            const url = typeof asset === 'string' ? asset : (asset?.url || asset || '');
             if (mediaTarget === 'logo') {
-              setLogoUrl(asset.url);
-              setLogoConfig({ mode: 'image' });
+              setLogoUrl(url);
             }
-            if (mediaTarget === 'favicon') setFaviconUrl(asset.url);
+            if (mediaTarget === 'favicon') {
+              setFaviconUrl(url);
+            }
             setMediaModalOpen(false);
           }}
-        />
-      )}
-
-      {logoOptionModalOpen && (
-        <LogoOptionModal
-          isOpen={logoOptionModalOpen}
-          onClose={() => setLogoOptionModalOpen(false)}
-          onSelectOption={(mode) => {
-            if (mode === 'image') {
-              setMediaTarget('logo');
-              setMediaModalOpen(true);
-            } else {
-              setLogoBuilderModalOpen(true);
-            }
-          }}
-        />
-      )}
-
-      {logoBuilderModalOpen && (
-        <LogoBuilderModal
-          isOpen={logoBuilderModalOpen}
-          onClose={() => setLogoBuilderModalOpen(false)}
-          tenantId={currentWorkspace.id}
-          initialText={logoConfig?.text || currentWorkspace.name || ''}
-          initialIconType={logoConfig?.iconType || 'psi'}
-          initialCustomIconUrl={logoConfig?.customIconUrl || ''}
-          gradientStart={primaryColor}
-          gradientEnd={secondaryColor}
-          contrastColor={contrastColor}
-          onSave={(newConfig) => {
-            setLogoConfig(newConfig);
-            setLogoUrl('');
-          }}
+          uploadType={mediaTarget === 'favicon' ? 'icon' : mediaTarget === 'logo' ? 'logo' : 'asset'}
         />
       )}
     </div>

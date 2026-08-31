@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BrandModal } from '@psi/ui';
+import { BrandModal, BrandLogo } from '@psi/ui';
 import { api } from '@/lib/api';
+
 import { Sparkles, Upload, Trash2, Loader2, Share2 } from 'lucide-react';
 
 export interface SocialCoverBannerProps {
   logoUrl?: string;
   faviconUrl?: string;
+  logoConfig?: any;
   title: string;
   description: string;
   domainUrl: string;
@@ -23,6 +25,7 @@ export interface SocialCoverBannerProps {
 export function SocialCoverBanner({
   logoUrl,
   faviconUrl,
+  logoConfig,
   title,
   description,
   domainUrl,
@@ -54,44 +57,19 @@ export function SocialCoverBanner({
 
         {/* Prominent Main Logo / Brand Name */}
         <div className="flex items-center z-10 pt-0.5">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Logo"
-              className={`object-contain object-left ${compact ? 'h-8 sm:h-10 max-w-[80%]' : 'h-12 sm:h-18 max-w-[360px] sm:max-w-[420px]'}`}
-            />
-          ) : faviconUrl ? (
-            <div className="flex items-center gap-2 sm:gap-3">
-              <img
-                src={faviconUrl}
-                alt="Ícone"
-                className={`object-contain rounded-lg border border-slate-200 dark:border-zinc-700 bg-white p-0.5 shadow-xs shrink-0 ${compact ? 'h-6 w-6 sm:h-8 sm:w-8' : 'h-9 w-9 sm:h-12 sm:w-12 p-1'}`}
-              />
-              <span
-                className={`font-bold tracking-tight text-zinc-900 uppercase truncate ${compact ? 'text-xs sm:text-base max-w-[240px]' : 'text-base sm:text-2xl max-w-[340px]'}`}
-                style={{ fontFamily: `'${fontHeading}', serif` }}
-              >
-                {title || 'SUA CLÍNICA'}
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div
-                className={`rounded-lg flex items-center justify-center font-bold text-white shadow-xs shrink-0 ${compact ? 'h-6 w-6 text-xs sm:h-8 sm:w-8 sm:text-sm' : 'h-9 w-9 sm:h-12 sm:w-12 text-sm sm:text-lg'}`}
-                style={{
-                  background: `linear-gradient(135deg, ${activePrimaryStart} 0%, ${activePrimaryEnd} 100%)`
-                }}
-              >
-                Ψ
-              </div>
-              <span
-                className={`font-bold tracking-tight text-zinc-900 uppercase truncate ${compact ? 'text-xs sm:text-base max-w-[240px]' : 'text-base sm:text-2xl max-w-[340px]'}`}
-                style={{ fontFamily: `'${fontHeading}', serif` }}
-              >
-                {title || 'SUA CLÍNICA'}
-              </span>
-            </div>
-          )}
+          <BrandLogo
+            logoUrl={logoUrl}
+            logoConfig={logoConfig}
+            faviconUrl={faviconUrl}
+            title={title}
+            fallbackText="Psicologia"
+            primaryStart={activePrimaryStart}
+            primaryEnd={activePrimaryEnd}
+            contrastColor="#FFFFFF"
+            fontHeading={fontHeading}
+            textColor="#18181B"
+            size={compact ? 'social-compact' : 'social'}
+          />
         </div>
 
         {/* Subtitle Description */}
@@ -193,7 +171,6 @@ export function SocialImageModal({
       ctx.save();
       ctx.fillStyle = 'rgba(24, 24, 27, 0.04)';
       ctx.font = 'bold 360px sans-serif';
-      ctx.fillText('Ψ', 840, 410);
       ctx.restore();
 
       // 4. Logo / Favicon / Title
@@ -213,8 +190,8 @@ export function SocialImageModal({
           ctx.drawImage(img, 80, 55, logoW, logoH);
         } catch {
           ctx.fillStyle = textDarkColor;
-          ctx.font = `bold 44px '${fontHeading}', serif`;
-          ctx.fillText((title || 'SUA CLÍNICA').toUpperCase(), 80, 115);
+          ctx.font = `normal 44px '${fontHeading}', serif`;
+          ctx.fillText(title || 'Psicologia', 80, 115);
         }
       } else if (faviconUrl) {
         try {
@@ -227,30 +204,59 @@ export function SocialImageModal({
           });
           ctx.drawImage(iconImg, 80, 55, 80, 80);
           ctx.fillStyle = textDarkColor;
-          ctx.font = `bold 44px '${fontHeading}', serif`;
-          ctx.fillText((title || 'SUA CLÍNICA').toUpperCase(), 180, 112);
+          ctx.font = `normal 44px '${fontHeading}', serif`;
+          ctx.fillText(title || 'Psicologia', 180, 112);
         } catch {
-          ctx.fillStyle = startColor;
-          ctx.fillRect(80, 55, 80, 80);
+          const iconGradient = ctx.createLinearGradient(80, 135, 160, 55);
+          iconGradient.addColorStop(0, startColor);
+          iconGradient.addColorStop(1, endColor);
+          ctx.fillStyle = iconGradient;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(80, 55, 80, 80, 16);
+          } else {
+            ctx.rect(80, 55, 80, 80);
+          }
+          ctx.fill();
+
           ctx.fillStyle = '#FFFFFF';
           ctx.font = 'bold 44px sans-serif';
-          ctx.fillText('Ψ', 104, 112);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Ψ', 120, 95);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
 
           ctx.fillStyle = textDarkColor;
-          ctx.font = `bold 44px '${fontHeading}', serif`;
-          ctx.fillText((title || 'SUA CLÍNICA').toUpperCase(), 180, 112);
+          ctx.font = `normal 44px '${fontHeading}', serif`;
+          ctx.fillText(title || 'Psicologia', 180, 112);
         }
       } else {
-        ctx.fillStyle = startColor;
-        ctx.fillRect(80, 55, 80, 80);
+        const iconGradient = ctx.createLinearGradient(80, 135, 160, 55);
+        iconGradient.addColorStop(0, startColor);
+        iconGradient.addColorStop(1, endColor);
+        ctx.fillStyle = iconGradient;
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(80, 55, 80, 80, 16);
+        } else {
+          ctx.rect(80, 55, 80, 80);
+        }
+        ctx.fill();
+
         ctx.fillStyle = '#FFFFFF';
         ctx.font = 'bold 44px sans-serif';
-        ctx.fillText('Ψ', 104, 112);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Ψ', 120, 95);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
 
         ctx.fillStyle = textDarkColor;
-        ctx.font = `bold 44px '${fontHeading}', serif`;
-        ctx.fillText((title || 'SUA CLÍNICA').toUpperCase(), 180, 112);
+        ctx.font = `normal 44px '${fontHeading}', serif`;
+        ctx.fillText(title || 'Psicologia', 180, 112);
       }
+
 
       // 5. Subheadline Description Text
       ctx.fillStyle = textMutedColor;

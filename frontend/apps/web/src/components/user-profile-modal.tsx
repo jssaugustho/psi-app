@@ -293,7 +293,8 @@ export function UserProfileModal() {
           isOpen={mediaModalOpen}
           onClose={() => setMediaModalOpen(false)}
           onSelectImage={(asset: any) => {
-            setAvatarUrl(asset.url);
+            const url = typeof asset === 'string' ? asset : (asset?.url || asset || '');
+            setAvatarUrl(url);
             setMediaModalOpen(false);
           }}
         />

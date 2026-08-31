@@ -32,6 +32,7 @@ export interface FormNode {
     isRequired: boolean;
     options?: Array<{ label: string; value: string; nextId?: string }>;
     contractTemplateId?: string;
+    contractText?: string;
   };
 }
 
@@ -60,6 +61,30 @@ interface TypeformModalProps {
   contractText?: string;   // Minuta do contrato resolved
 }
 
+const validateCPFHelper = (cpf: string): boolean => {
+  const clean = cpf.replace(/\D/g, '');
+  if (clean.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+
+  let sum = 0;
+  for (let i = 1; i <= 9; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (11 - i);
+  }
+  let rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (12 - i);
+  }
+  rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(10, 11))) return false;
+
+  return true;
+};
+
 export function TypeformModal({
   open,
   onOpenChange,
@@ -86,6 +111,9 @@ export function TypeformModal({
   const [emergenciaRelacao, setEmergenciaRelacao] = useState("")
   const [emergenciaTelefone, setEmergenciaTelefone] = useState("")
   const [contratoAceito, setContratoAceito] = useState(false)
+  const [responsavelNome, setResponsavelNome] = useState("")
+  const [responsavelCpf, setResponsavelCpf] = useState("")
+  const [responsavelTelefone, setResponsavelTelefone] = useState("")
 
   // Custom steps states: dictionary mapping node ID to answer
   const [customAnswers, setCustomAnswers] = useState<Record<string, any>>({})
@@ -131,12 +159,18 @@ export function TypeformModal({
   const resolveNextNodeId = () => {
     if (!currentNode) return null
 
-    // 1. If selector step, check if the chosen option redirects to a specific node
-    if (currentNode.type === "seletor" || currentNode.type === "maioridade") {
-      const selectedValue = customAnswers[currentNode.id] || maioridade;
-      const matchingOption = currentNode.data.options?.find(o => o.value === selectedValue || o.label === selectedValue);
-      if (matchingOption?.nextId) {
-        return matchingOption.nextId;
+    // 1. If selector step (seletor), resolve based on edges with specific option handles (opt_idx)
+    if (currentNode.type === "seletor") {
+      const selectedValue = customAnswers[currentNode.id];
+      const options = currentNode.data.options || [];
+      const optionIndex = options.findIndex((o: any) => o.value === selectedValue || o.label === selectedValue);
+      
+      if (optionIndex !== -1) {
+        const handleId = `opt_${optionIndex}`;
+        const matchingEdge = edges.find(e => e.source === currentNode.id && e.sourceHandle === handleId);
+        if (matchingEdge) {
+          return matchingEdge.target;
+        }
       }
     }
 
@@ -175,14 +209,32 @@ export function TypeformModal({
         return false
       }
     } else if (type === "cpf") {
-      const cleanCpf = cpf.replace(/\D/g, "")
-      if (isRequired && cleanCpf.length !== 11) {
-        setErrorMsg("Por favor, informe um CPF válido (11 dígitos).")
+      if (isRequired && !validateCPFHelper(cpf)) {
+        setErrorMsg("Por favor, informe um CPF válido.")
         return false
       }
     } else if (type === "maioridade") {
       if (isRequired && !maioridade) {
         setErrorMsg("Por favor, selecione uma opção.")
+        return false
+      }
+      if (maioridade === "Não") {
+        if (!responsavelNome.trim()) {
+          setErrorMsg("Por favor, preencha o nome do responsável.")
+          return false
+        }
+        if (!validateCPFHelper(responsavelCpf)) {
+          setErrorMsg("Por favor, informe um CPF válido para o responsável.")
+          return false
+        }
+        if (responsavelTelefone.replace(/\D/g, '').length < 8) {
+          setErrorMsg("Por favor, informe um telefone válido para o responsável.")
+          return false
+        }
+      }
+    } else if (type === "contrato") {
+      if (!contratoAceito) {
+        setErrorMsg("Por favor, você precisa aceitar os termos do contrato para continuar.")
         return false
       }
     } else if (type === "emergencia") {
@@ -251,6 +303,10 @@ export function TypeformModal({
       celular: `${selectedPhoneCountry.dialCode} ${formatPhoneNumber(rawPhone, selectedPhoneCountry.mask)}`,
       cpf: cpf.replace(/\D/g, ""),
       maioridade,
+      responsavelNome,
+      responsavelCpf: responsavelCpf.replace(/\D/g, ""),
+      responsavelTelefone: responsavelTelefone.replace(/\D/g, ""),
+      contrato: contratoAceito,
       emergencia: {
         nome: emergenciaNome,
         relacao: emergenciaRelacao,
@@ -538,29 +594,92 @@ export function TypeformModal({
 
                 {/* MAIORIDADE */}
                 {currentNode.type === "maioridade" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button
-                      onClick={() => handleSelectChoice("Sim", "Sim")}
-                      className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                        maioridade === "Sim"
-                          ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
-                          : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <span>Sim, sou maior de idade</span>
-                      <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">A</span>
-                    </button>
-                    <button
-                      onClick={() => handleSelectChoice("Não", "Não")}
-                      className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                        maioridade === "Não"
-                          ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
-                          : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <span>Não, sou menor de idade</span>
-                      <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">B</span>
-                    </button>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button
+                        onClick={() => { setMaioridade("Sim"); setErrorMsg(""); }}
+                        className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                          maioridade === "Sim"
+                            ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
+                            : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span>Sim, sou maior de idade</span>
+                        <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">A</span>
+                      </button>
+                      <button
+                        onClick={() => { setMaioridade("Não"); setErrorMsg(""); }}
+                        className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                          maioridade === "Não"
+                            ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
+                            : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span>Não, sou menor de idade</span>
+                        <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">B</span>
+                      </button>
+                    </div>
+
+                    {maioridade === "Não" && (
+                      <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/30 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <span className="text-xs font-bold text-[var(--brand-gradient-start,#CC8667)] uppercase tracking-wider block">
+                          Dados do Responsável Legal:
+                        </span>
+                        <div>
+                          <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Nome do Responsável:</label>
+                          <input
+                            type="text"
+                            value={responsavelNome}
+                            onChange={(e) => { setResponsavelNome(e.target.value); setErrorMsg(""); }}
+                            placeholder="Ex: Carlos Silva"
+                            className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">CPF do Responsável:</label>
+                            <input
+                              type="text"
+                              value={responsavelCpf}
+                              onChange={(e) => { setResponsavelCpf(formatCPF(e.target.value)); setErrorMsg(""); }}
+                              placeholder="000.000.000-00"
+                              className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Telefone do Responsável:</label>
+                            <input
+                              type="tel"
+                              value={responsavelTelefone}
+                              onChange={(e) => { setResponsavelTelefone(e.target.value); setErrorMsg(""); }}
+                              placeholder="(11) 99999-9999"
+                              className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* CONTRATO / TCLE */}
+                {currentNode.type === "contrato" && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 text-xs text-muted-foreground max-h-60 overflow-y-auto custom-scrollbar font-sans whitespace-pre-wrap leading-relaxed">
+                      {currentNode.data.contractText || contractText || "Ao assinar este termo você concorda com o atendimento clínico e triagem."}
+                    </div>
+                    <div className="flex items-start gap-2.5 pt-2">
+                      <input
+                        type="checkbox"
+                        id="check-contrato"
+                        checked={contratoAceito}
+                        onChange={(e) => { setContratoAceito(e.target.checked); setErrorMsg(""); }}
+                        className="mt-0.5 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start,#CC8667)] cursor-pointer"
+                      />
+                      <label htmlFor="check-contrato" className="text-xs text-slate-300 cursor-pointer select-none leading-relaxed">
+                        Li, compreendo e concordo com todos os termos do contrato/TCLE e autorizo a coleta dos dados para fins de triagem (LGPD).
+                      </label>
+                    </div>
                   </div>
                 )}
 

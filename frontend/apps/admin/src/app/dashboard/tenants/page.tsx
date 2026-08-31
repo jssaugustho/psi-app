@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api, Tenant, User } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, Select } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, Select, BrandModal } from '@psi/ui';
 
 // ── Ícones SVG ────────────────────────────────────────────────────────────
 
@@ -229,69 +229,61 @@ export default function TenantsPage() {
         </Card>
 
       {/* ── MODAL: NOVO WORKSPACE ── */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
-          <div className="glass-lg w-full max-w-md rounded-2xl border border-slate-800 p-6 space-y-6 animate-scale-up">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-slate-100">Criar Espaço de Trabalho</h3>
-                <p className="text-xs text-slate-400">Insira o nome e proprietário do novo workspace.</p>
-              </div>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="opacity-55 hover:opacity-100 bg-transparent border-none text-slate-400 cursor-pointer"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            {createError && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg text-center">
-                {createError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateTenant} className="space-y-4">
-              <Input
-                label="Nome do Espaço *"
-                required
-                value={createForm.name}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Consultório Psi"
-              />
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-300">Proprietário (Owner)</label>
-                <Select
-                  value={createForm.ownerId}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, ownerId: e.target.value }))}
-                  options={[
-                    { value: 'none', label: 'Selecione o proprietário...' },
-                    ...users.map((u) => ({
-                      value: u.id,
-                      label: `${u.nome} ${u.sobrenome} (${u.email})`,
-                    })),
-                  ]}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800/40">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="text-xs py-2"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" submitting={creatingTenant} className="text-xs py-2">
-                  Criar Workspace
-                </Button>
-              </div>
-            </form>
-          </div>
+      <BrandModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+          <h3 className="text-lg font-bold text-slate-100">Criar Espaço de Trabalho</h3>
+          <p className="text-xs text-slate-400">Insira o nome e proprietário do novo workspace.</p>
         </div>
-      )}
+
+        {createError && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg text-center">
+            {createError}
+          </div>
+        )}
+
+        <form onSubmit={handleCreateTenant} className="space-y-4">
+          <Input
+            label="Nome do Espaço *"
+            required
+            value={createForm.name}
+            onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+            placeholder="Ex: Consultório Psi"
+          />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-slate-300 mb-1">Proprietário (Owner)</label>
+            <Select
+              value={createForm.ownerId}
+              onChange={(e) => setCreateForm(prev => ({ ...prev, ownerId: e.target.value }))}
+              options={[
+                { value: 'none', label: 'Selecione o proprietário...' },
+                ...users.map((u) => ({
+                  value: u.id,
+                  label: `${u.nome} ${u.sobrenome} (${u.email})`,
+                })),
+              ]}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-[var(--surface-border)]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateModalOpen(false)}
+              className="text-xs py-2"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" submitting={creatingTenant} className="text-xs py-2">
+              Criar Workspace
+            </Button>
+          </div>
+        </form>
+      </BrandModal>
       </>
       )}
     </div>

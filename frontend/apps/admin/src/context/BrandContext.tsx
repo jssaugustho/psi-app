@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api, PlatformBrand } from '@/lib/api';
+import { BrandLoader } from '@psi/ui';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -160,8 +161,23 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     applyBrandStyles(tenant, theme);
   }, [tenant, theme, applyBrandStyles]);
 
+  // Keep theme class in sync with theme state on every render to prevent Next.js layout resets
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.remove('dark');
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+      root.classList.add('dark');
+    }
+  });
+
   // Handle two-stage premium brand loader (black screen -> spinner + logo (min 1s) -> fade out)
   useEffect(() => {
+    // Prevent loader from re-triggering if the app is already loaded and theme/tenant changes
+    if (!loading && loaderState === 'done') return;
+
     if (loading) {
       setLoaderState('black');
       return;
@@ -213,114 +229,23 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   const isBootReady = loaderState === 'done';
 
+  const bootLogoUrl =
+    theme === 'light'
+      ? (tenant?.logoLightUrl || tenant?.logoDarkUrl)
+      : (tenant?.logoDarkUrl || tenant?.logoLightUrl);
+  const bootBrandName = tenant?.name || '';
+  const spinnerStartColor = tenant?.gradientColorStart || '#4F46E5';
+  const spinnerEndColor = tenant?.gradientColorEnd || '#06B6D4';
+
   return (
     <BrandContext.Provider value={{ tenant, theme, loading, isBootReady, toggleTheme, reloadBrand: loadBrand }}>
-      {loaderState !== 'done' && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: '#000000',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            transition: 'opacity 0.5s ease-in-out',
-            opacity: loaderState === 'fadeout' ? 0 : 1,
-            pointerEvents: loaderState === 'fadeout' ? 'none' : 'auto',
-          }}
-        >
-          {loaderState !== 'black' && (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '32px',
-              animation: 'fadeIn 0.5s ease-out forwards',
-            }}>
-              {/* Logo */}
-              {(tenant?.logoDarkUrl || tenant?.logoLightUrl) ? (
-                <img 
-                  src={tenant.logoDarkUrl || tenant.logoLightUrl || ''} 
-                  alt={tenant.name} 
-                  style={{
-                    maxHeight: '64px',
-                    maxWidth: '240px',
-                    objectFit: 'contain',
-                  }}
-                />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '16px',
-                    background: `linear-gradient(135deg, ${tenant?.gradientColorStart || '#4F46E5'}, ${tenant?.gradientColorEnd || '#06B6D4'})`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 'bold',
-                    color: '#FFFFFF',
-                    fontSize: '24px',
-                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                  }}>
-                    Ψ
-                  </div>
-                  <span style={{
-                    fontFamily: 'serif',
-                    fontSize: '18px',
-                    letterSpacing: '0.05em',
-                    color: '#F4F4F5',
-                  }}>{tenant?.name || 'Psi App'}</span>
-                </div>
-              )}
-
-              {/* Custom Spinner */}
-              <div style={{
-                position: 'relative',
-                width: '40px',
-                height: '40px',
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: '50%',
-                  border: '2px solid transparent',
-                  borderTopColor: tenant?.gradientColorStart || '#4F46E5',
-                  borderRightColor: tenant?.gradientColorEnd || '#06B6D4',
-                  animation: 'spin 1s linear infinite',
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  inset: '8px',
-                  borderRadius: '50%',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                }} />
-              </div>
-            </div>
-          )}
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-            @keyframes pulse {
-              0%, 100% { opacity: 1; }
-              50% { opacity: .5; }
-            }
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateY(4px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
-        </div>
-      )}
+      <BrandLoader
+        loaderState={loaderState}
+        logoUrl={bootLogoUrl}
+        brandName={bootBrandName}
+        gradientStart={spinnerStartColor}
+        gradientEnd={spinnerEndColor}
+      />
       {children}
     </BrandContext.Provider>
   );

@@ -9,3 +9,7 @@ export * from './brand-modal';
 export * from './confirm-modal';
 export * from './dns-instructions';
 export * from './textarea';
+export * from './brand-loader';
+export * from './brand-logo';
+
+

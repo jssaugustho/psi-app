@@ -44,8 +44,6 @@ export function PlatformSetupWizard({ isOpen = true, initialHasCloudflare = fals
 
   // Step 3 — Tenant
   const [name, setName] = useState('Plataforma Principal');
-  const [slug, setSlug] = useState('plataforma-principal');
-  const [domain, setDomain] = useState('');
   const [logoLightUrl, setLogoLightUrl] = useState('');
   const [logoDarkUrl, setLogoDarkUrl] = useState('');
   const [iconLightUrl, setIconLightUrl] = useState('');
@@ -86,8 +84,6 @@ export function PlatformSetupWizard({ isOpen = true, initialHasCloudflare = fals
 
         if (res.primary_tenant) {
           if (res.primary_tenant.name) setName(res.primary_tenant.name);
-          if (res.primary_tenant.slug) setSlug(res.primary_tenant.slug);
-          if (res.primary_tenant.domain) setDomain(res.primary_tenant.domain);
           if (res.primary_tenant.logoLightUrl) setLogoLightUrl(res.primary_tenant.logoLightUrl);
           if (res.primary_tenant.logoDarkUrl) setLogoDarkUrl(res.primary_tenant.logoDarkUrl);
           if (res.primary_tenant.iconLightUrl) setIconLightUrl(res.primary_tenant.iconLightUrl);
@@ -191,9 +187,25 @@ export function PlatformSetupWizard({ isOpen = true, initialHasCloudflare = fals
 
   const handleSaveTenant = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!logoLightUrl || !logoDarkUrl) {
+      setError('Por favor, faça upload dos logotipos para os temas Claro e Escuro para concluir o setup.');
+      setSubmitting(false);
+      return;
+    }
     setError(null); setSuccessMsg(null); setSubmitting(true);
     try {
-      await api.setupPrimaryTenant({ name, slug, domain: domain || undefined, logo_light_url: logoLightUrl || undefined, logo_dark_url: logoDarkUrl || undefined, icon_light_url: iconLightUrl || undefined, icon_dark_url: iconDarkUrl || undefined, gradient_color_start: gradientStart, gradient_color_end: gradientEnd, contrast_color: contrastColor, bg_light_color: bgLightColor, bg_dark_color: bgDarkColor });
+      await api.setupPrimaryTenant({
+        name,
+        logo_light_url: logoLightUrl || undefined,
+        logo_dark_url: logoDarkUrl || undefined,
+        icon_light_url: iconLightUrl || undefined,
+        icon_dark_url: iconDarkUrl || undefined,
+        gradient_color_start: gradientStart,
+        gradient_color_end: gradientEnd,
+        contrast_color: contrastColor,
+        bg_light_color: bgLightColor,
+        bg_dark_color: bgDarkColor
+      });
       onComplete();
     } catch (err: any) {
       setError(err.message || 'Falha ao salvar o Tenant-Pai.');
@@ -541,11 +553,7 @@ export function PlatformSetupWizard({ isOpen = true, initialHasCloudflare = fals
             {/* Informações Básicas */}
             <div className="space-y-4">
               <SectionTitle>Informações da Plataforma</SectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input label="Nome da Plataforma *" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Psi App" />
-                <Input label="Slug Único *" type="text" required value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="Ex: psi-app" />
-              </div>
-              <Input label="Domínio Principal (opcional)" type="text" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="Ex: psi.app" />
+              <Input label="Nome da Plataforma *" type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Psi App" />
             </div>
 
             {/* Logotipos e Ícones */}

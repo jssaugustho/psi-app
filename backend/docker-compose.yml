@@ -32,6 +32,8 @@ services:
       GOTRUE_DB_SEARCH_PATH: auth,public
       GOTRUE_JWT_SECRET: ${JWT_SECRET:?A variável JWT_SECRET é obrigatória no .env}
       GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: ${GOTRUE_JWT_DEFAULT_GROUP_NAME}
+      GOTRUE_JWT_AUD: ${GOTRUE_JWT_AUD}
       GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
       GOTRUE_URI_ALLOW_LIST: ${GOTRUE_SITE_URL:-http://localhost:3000}/*
       API_EXTERNAL_URL: ${GOTRUE_API_EXTERNAL_URL:-http://localhost:8000/auth/v1}

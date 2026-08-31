@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api, User } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, Select } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, Select, BrandModal } from '@psi/ui';
 import { Link } from '@/components/Link';
 const SearchIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -377,199 +377,165 @@ export default function UsersListPage() {
         )}
 
         {/* ── MODAL: EDICAO DE USUARIO ── */}
-        {isEditModalOpen && selectedUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-black/85 transition-opacity duration-300"
-              onClick={() => setIsEditModalOpen(false)}
-            />
-            <div
-              className="relative glass-lg w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 animate-scale-up text-left"
-              style={{
-                color: 'var(--brand-text-color)',
-              }}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <h3 className="text-lg font-bold">Editar Usuário</h3>
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="p-1 rounded-lg opacity-60 hover:opacity-100 transition-all cursor-pointer bg-transparent border-none"
-                  style={{ color: 'var(--brand-text-color)' }}
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSaveEdit} className="space-y-4">
-                {editError && (
-                  <div
-                    className="p-3 rounded-lg text-xs"
-                    style={{
-                      background: 'var(--status-error-bg)',
-                      color: 'var(--status-error-text)',
-                      border: '1px solid var(--status-error-border)',
-                    }}
-                  >
-                    {editError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Nome"
-                    value={editForm.nome}
-                    onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
-                    required
-                  />
-                  <Input
-                    label="Sobrenome"
-                    value={editForm.sobrenome}
-                    onChange={(e) => setEditForm({ ...editForm, sobrenome: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <Input
-                  label="Telefone"
-                  value={editForm.telefone}
-                  onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })}
-                  placeholder="(00) 00000-0000"
-                />
-
-                {/* Role Switcher */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold uppercase tracking-wide opacity-75">
-                    Permissão / Cargo
-                  </label>
-                  <Select
-                    value={editForm.role}
-                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                    options={[
-                      { value: 'user', label: 'User (Usuário Padrão)' },
-                      { value: 'admin', label: 'Admin (Administrador Global)' },
-                    ]}
-                  />
-                </div>
-
-                {/* Footer Buttons */}
-                <div className="flex justify-end gap-2 pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => setIsEditModalOpen(false)}
-                    disabled={savingEdit}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={savingEdit}>
-                    {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
-                  </Button>
-                </div>
-              </form>
-            </div>
+        <BrandModal
+          isOpen={isEditModalOpen && selectedUser !== null}
+          onClose={() => setIsEditModalOpen(false)}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+            <h3 className="text-lg font-bold">Editar Usuário</h3>
+            <p className="text-xs text-slate-400">Modifique os dados cadastrais ou permissões.</p>
           </div>
-        )}
+
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            {editError && (
+              <div
+                className="p-3 rounded-lg text-xs"
+                style={{
+                  background: 'var(--status-error-bg)',
+                  color: 'var(--status-error-text)',
+                  border: '1px solid var(--status-error-border)',
+                }}
+              >
+                {editError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Nome"
+                value={editForm.nome}
+                onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
+                required
+              />
+              <Input
+                label="Sobrenome"
+                value={editForm.sobrenome}
+                onChange={(e) => setEditForm({ ...editForm, sobrenome: e.target.value })}
+                required
+              />
+            </div>
+
+            <Input
+              label="Telefone"
+              value={editForm.telefone}
+              onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })}
+              placeholder="(00) 00000-0000"
+            />
+
+            {/* Role Switcher */}
+            <div className="space-y-1.5 text-left">
+              <label className="block text-xs font-semibold uppercase tracking-wide opacity-75">
+                Permissão / Cargo
+              </label>
+              <Select
+                value={editForm.role}
+                onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                options={[
+                  { value: 'user', label: 'User (Usuário Padrão)' },
+                  { value: 'admin', label: 'Admin (Administrador Global)' },
+                ]}
+              />
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end gap-2 pt-4 border-t border-[var(--surface-border)]">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={savingEdit}>
+                {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+            </div>
+          </form>
+        </BrandModal>
 
         {/* ── MODAL: CRIACAO DE USUARIO ── */}
-        {isCreateModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-black/85 transition-opacity duration-300"
-              onClick={() => setIsCreateModalOpen(false)}
-            />
-            <div
-              className="relative glass-lg w-full max-w-md rounded-2xl overflow-hidden shadow-2xl p-6 space-y-4 animate-scale-up text-left"
-              style={{
-                color: 'var(--brand-text-color)',
-              }}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between pb-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <h3 className="text-lg font-bold">Adicionar Usuário</h3>
-                <button
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="p-1 rounded-lg opacity-60 hover:opacity-100 transition-all cursor-pointer bg-transparent border-none"
-                  style={{ color: 'var(--brand-text-color)' }}
-                >
-                  <CloseIcon />
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleCreateUser} className="space-y-4">
-                {createError && (
-                  <div
-                    className="p-3 rounded-lg text-xs"
-                    style={{
-                      background: 'var(--status-error-bg)',
-                      color: 'var(--status-error-text)',
-                      border: '1px solid var(--status-error-border)',
-                    }}
-                  >
-                    {createError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Nome"
-                    value={createForm.nome}
-                    onChange={(e) => setCreateForm({ ...createForm, nome: e.target.value })}
-                    required
-                  />
-                  <Input
-                    label="Sobrenome"
-                    value={createForm.sobrenome}
-                    onChange={(e) => setCreateForm({ ...createForm, sobrenome: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <Input
-                  label="E-mail"
-                  type="email"
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  required
-                  placeholder="exemplo@email.com"
-                />
-
-                <Input
-                  label="Senha"
-                  type="password"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  required
-                  placeholder="Mínimo 6 caracteres"
-                />
-
-                <Input
-                  label="Telefone"
-                  value={createForm.telefone}
-                  onChange={(e) => setCreateForm({ ...createForm, telefone: e.target.value })}
-                  placeholder="(00) 00000-0000"
-                />
-
-                {/* Footer Buttons */}
-                <div className="flex justify-end gap-2 pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => setIsCreateModalOpen(false)}
-                    disabled={creatingUser}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={creatingUser}>
-                    {creatingUser ? 'Adicionando...' : 'Adicionar Usuário'}
-                  </Button>
-                </div>
-              </form>
-            </div>
+        <BrandModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+            <h3 className="text-lg font-bold">Adicionar Usuário</h3>
+            <p className="text-xs text-slate-400">Preencha os dados do novo usuário administrador.</p>
           </div>
-        )}
+
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            {createError && (
+              <div
+                className="p-3 rounded-lg text-xs"
+                style={{
+                  background: 'var(--status-error-bg)',
+                  color: 'var(--status-error-text)',
+                  border: '1px solid var(--status-error-border)',
+                }}
+              >
+                {createError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Nome"
+                value={createForm.nome}
+                onChange={(e) => setCreateForm({ ...createForm, nome: e.target.value })}
+                required
+              />
+              <Input
+                label="Sobrenome"
+                value={createForm.sobrenome}
+                onChange={(e) => setCreateForm({ ...createForm, sobrenome: e.target.value })}
+                required
+              />
+            </div>
+
+            <Input
+              label="E-mail"
+              type="email"
+              value={createForm.email}
+              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              required
+              placeholder="exemplo@email.com"
+            />
+
+            <Input
+              label="Senha"
+              type="password"
+              value={createForm.password}
+              onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              required
+              placeholder="Mínimo 6 caracteres"
+            />
+
+            <Input
+              label="Telefone"
+              value={createForm.telefone}
+              onChange={(e) => setCreateForm({ ...createForm, telefone: e.target.value })}
+              placeholder="(00) 00000-0000"
+            />
+
+            {/* Footer Buttons */}
+            <div className="flex justify-end gap-2 pt-4 border-t border-[var(--surface-border)]">
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setIsCreateModalOpen(false)}
+                disabled={creatingUser}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={creatingUser}>
+                {creatingUser ? 'Adicionando...' : 'Adicionar Usuário'}
+              </Button>
+            </div>
+          </form>
+        </BrandModal>
         </>
       )}
     </div>

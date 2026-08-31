@@ -42,8 +42,11 @@ export function getWorkspaceVisualIdentity(
   const cardColor = vi?.cardColor || workspace?.cardDarkColor || '#18181B';
   const textColor = vi?.textColor || workspace?.textDarkColor || '#F4F4F5';
 
-  const fontHeading = vi?.fontHeading || 'Playfair Display';
-  const fontBody = vi?.fontBody || 'Inter';
+  let fontHeading = vi?.fontHeading || 'Playfair Display';
+  if (fontHeading === 'serif') fontHeading = 'Playfair Display';
+
+  let fontBody = vi?.fontBody || 'Inter';
+  if (fontBody === 'sans') fontBody = 'Inter';
 
   return {
     logoUrl,

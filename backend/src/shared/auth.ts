@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import { publishErrorLog } from './queue';
+
 
 const JWT_SECRET = env.JWT_SECRET;
 const GOTRUE_URL = env.GOTRUE_URL;
@@ -101,6 +103,16 @@ export async function createGoTrueUser(
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as any)?.msg || (errorBody as any)?.error_description || (errorBody as any)?.message || 'Erro ao criar usuário no GoTrue';
+    
+    await publishErrorLog({
+      name: 'GoTrueCreateUserError',
+      message: `GoTrue: ${message}`,
+      stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
+      serviceName: 'gotrue',
+      severity: 'error',
+      metadata: { status: response.status, url: targetUrl, email }
+    }).catch(err => console.error('Erro ao reportar falha do GoTrue:', err));
+
     throw new Error(message);
   }
 
@@ -126,6 +138,18 @@ export async function loginGoTrueUser(email: string, password: string, baseUrl?:
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as any)?.error_description || (errorBody as any)?.msg || 'Credenciais inválidas';
+
+    if (response.status >= 500) {
+      await publishErrorLog({
+        name: 'GoTrueLoginError',
+        message: `GoTrue: ${message}`,
+        stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
+        serviceName: 'gotrue',
+        severity: 'error',
+        metadata: { status: response.status, url: targetUrl, email }
+      }).catch(err => console.error('Erro ao reportar falha do GoTrue:', err));
+    }
+
     throw new Error(message);
   }
 
@@ -155,6 +179,18 @@ export async function refreshGoTrueToken(refreshToken: string, baseUrl?: string)
       (errorBody as any)?.error_description ||
       (errorBody as any)?.msg ||
       'Refresh token inválido ou expirado';
+
+    if (response.status >= 500) {
+      await publishErrorLog({
+        name: 'GoTrueRefreshTokenError',
+        message: `GoTrue: ${message}`,
+        stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
+        serviceName: 'gotrue',
+        severity: 'error',
+        metadata: { status: response.status, url: targetUrl }
+      }).catch(err => console.error('Erro ao reportar falha do GoTrue:', err));
+    }
+
     throw new Error(message);
   }
 
@@ -198,6 +234,16 @@ export async function generateGoTrueLink(
       (errorBody as any)?.error_description ||
       (errorBody as any)?.message ||
       'Erro ao gerar link no GoTrue';
+
+    await publishErrorLog({
+      name: 'GoTrueGenerateLinkError',
+      message: `GoTrue: ${message}`,
+      stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
+      serviceName: 'gotrue',
+      severity: 'error',
+      metadata: { status: response.status, url: targetUrl, email, type }
+    }).catch(err => console.error('Erro ao reportar falha do GoTrue:', err));
+
     throw new Error(message);
   }
 

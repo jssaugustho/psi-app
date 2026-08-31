@@ -10,7 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface ApiStatusContextType {
   isOffline: boolean;
-  checkHealth: () => Promise<void>;
+  checkHealth: (silent?: boolean) => Promise<void>;
 }
 
 const ApiStatusContext = createContext<ApiStatusContextType>({
@@ -31,11 +31,13 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
   const [dbStatus, setDbStatus] = useState<'checking' | 'operational' | 'down' | 'waiting'>('waiting');
   const [queueStatus, setQueueStatus] = useState<'checking' | 'operational' | 'down' | 'waiting'>('waiting');
 
-  const checkHealth = useCallback(async () => {
-    setChecking(true);
-    setApiStatus('checking');
-    setDbStatus('checking');
-    setQueueStatus('checking');
+  const checkHealth = useCallback(async (silent = false) => {
+    if (!silent) {
+      setChecking(true);
+      setApiStatus('checking');
+      setDbStatus('checking');
+      setQueueStatus('checking');
+    }
 
     try {
       const response = await fetch(`${API_URL}/health`, {
@@ -75,7 +77,9 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
       setErrorMsg('Sem resposta do servidor de API. Verifique se o backend está rodando.');
       setIsOffline(true);
     } finally {
-      setChecking(false);
+      if (!silent) {
+        setChecking(false);
+      }
     }
   }, []);
 
@@ -103,7 +107,7 @@ export function ApiStatusProvider({ children }: { children: React.ReactNode }) {
 
     const interval = setInterval(() => {
       if (!checking) {
-        checkHealth();
+        checkHealth(true);
       }
     }, 3000);
 

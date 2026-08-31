@@ -16,6 +16,7 @@
     "db:reset": "node -e \"require('dotenv').config(); const postgres = require('postgres'); const url = process.env.DATABASE_URL; if (!url) { console.error('❌ DATABASE_URL ausente no .env'); process.exit(1); } const sql = postgres(url); async function run() { await sql.unsafe('TRUNCATE TABLE auth.users CASCADE; TRUNCATE TABLE public.profiles CASCADE;'); console.log('✅ Banco de dados limpo com sucesso!'); process.exit(0); } run();\"",
     "db:reset-all": "ts-node src/scripts/reset-all.ts",
     "bootstrap": "ts-node src/scripts/bootstrap.ts",
+    "bootstrap:auto": "ts-node src/scripts/bootstrap.ts --auto",
     "test-leads-webhook": "ts-node src/scripts/test-leads-webhook.ts",
     "reset-crm": "ts-node src/scripts/reset-crm.ts"
   },

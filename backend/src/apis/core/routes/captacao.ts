@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities } from '../../../shared/schema';
+import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities, profiles } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 
@@ -24,6 +24,7 @@ const CreatePageBodySchema = z.object({
   primaryEnd: z.string().optional(),
   contrast: z.string().optional(),
   logoUrl: z.string().optional(),
+  siteConfig: z.any().optional(),
 });
 
 const SubmitFormBodySchema = z.object({
@@ -235,7 +236,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         const decoded = verifyUserJwt(authHeader.split(' ')[1]);
         const body = request.body as any;
         const targetWorkspaceId = body.workspaceId || body.tenantId;
-        const { title, slug, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl } = body;
+        const { title, slug, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl, siteConfig } = body;
 
         // 1. Resolver workspace e verificar permissão
         const targetWorkspace = await db.query.workspaces.findFirst({
@@ -258,7 +259,12 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           ),
         });
 
-        const hasAccess = isOwner || member;
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        const isAdmin = profile?.role === 'admin';
+
+        const hasAccess = isOwner || member || isAdmin;
 
         if (!hasAccess) {
           return reply.status(403).send({
@@ -303,8 +309,16 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           iconType: 'psi',
         };
 
+        const ownerProfile = targetWorkspace.ownerId ? await db.query.profiles.findFirst({
+          where: eq(profiles.id, targetWorkspace.ownerId)
+        }) : null;
+        const resolvedCrp = ownerProfile?.hasNoCrp ? '' : (ownerProfile?.crp || (targetWorkspace as any).crp || '');
+
         const customSiteConfig = {
           ...defaultSiteConfig,
+          status: siteConfig?.status || 'active',
+          isWizardDraft: siteConfig?.isWizardDraft || false,
+          currentStep: siteConfig?.currentStep || 1,
           logoUrl: activeLogoUrl,
           faviconUrl: activeFaviconUrl,
           logoConfig: activeLogoConfig,
@@ -318,7 +332,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           professional: {
             ...defaultSiteConfig.professional,
             name: logoText || targetWorkspace.name || title,
-            crp: crp || targetWorkspace.crp || defaultSiteConfig.professional.crp,
+            crp: crp || resolvedCrp || defaultSiteConfig.professional.crp,
             approach: approach || defaultSiteConfig.professional.approach,
             address: address || defaultSiteConfig.professional.address,
           }
@@ -372,6 +386,30 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
+function validateCPF(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, '');
+  if (clean.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+
+  let sum = 0;
+  for (let i = 1; i <= 9; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (11 - i);
+  }
+  let rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(9, 10))) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) {
+    sum += parseInt(clean.substring(i - 1, i)) * (12 - i);
+  }
+  rest = (sum * 10) % 11;
+  if (rest === 10 || rest === 11) rest = 0;
+  if (rest !== parseInt(clean.substring(10, 11))) return false;
+
+  return true;
+}
+
   // POST /v1/crm/captacao/public/submit
   // Rota pública para submissão da triagem do paciente
   fastify.post(
@@ -401,6 +439,13 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
+        if (rawCpf && !validateCPF(rawCpf)) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'O CPF informado é inválido.',
+          });
+        }
+
         // 2. Resolver o estágio clínico inicial do workspace (categoria "pendente")
         const firstColumn = await db.query.pipelineColumns.findFirst({
           where: and(
@@ -411,6 +456,40 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
         });
 
         const initialStatus = firstColumn ? firstColumn.name : 'Triagem Pendente';
+
+        // Mapeamento de variáveis personalizadas (Typebot-like variables mapping)
+        const pageRecord = await db.query.capturePages.findFirst({
+          where: eq(capturePages.id, pageId),
+        });
+        const formFlow = pageRecord?.formFlow;
+        const flowNodes = (formFlow as any)?.nodes || [];
+
+        let signedContractContent = null;
+        const contratoNode = flowNodes.find((n: any) => n.type === 'contrato');
+        if (contratoNode) {
+          signedContractContent = contratoNode.data?.contractText || 'Termo de Consentimento aceito pelo paciente.';
+        }
+
+        const customFieldValues: Record<string, any> = {};
+        for (const [key, val] of Object.entries(responses)) {
+          if (['nome', 'celular', 'email', 'cpf', 'maioridade', 'emergencia', 'contrato', 'responsavelNome', 'responsavelCpf', 'responsavelTelefone'].includes(key)) {
+            continue;
+          }
+          const node = flowNodes.find((n: any) => n.id === key);
+          if (node && node.data?.variableKey) {
+            customFieldValues[node.data.variableKey] = val;
+          } else {
+            customFieldValues[key] = val;
+          }
+        }
+
+        // Responsável Legal
+        const parentName = responses.responsavelNome || null;
+        const parentCpf = responses.responsavelCpf || null;
+        const parentPhone = responses.responsavelTelefone || null;
+
+        const cleanParentCpf = parentCpf ? parentCpf.replace(/\D/g, '') : null;
+        const cleanParentPhone = parentPhone ? ('+' + parentPhone.replace(/\D/g, '')) : null;
 
         // 3. Montar as anotações consolidadas do caso clínico (screeningNotes)
         let screeningNotes = '=== RESPOSTAS DA TRIAGEM ===\n';
@@ -436,16 +515,25 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
             workspaceId: targetWorkspaceId,
             pipelineColumnId: firstColumn?.id || null,
             name: rawName,
-            phone: rawPhone || null,
+            phone: rawPhone ? ('+' + rawPhone.replace(/\D/g, '')) : null,
             email: rawEmail || null,
             status: initialStatus,
             source: 'Landing Page (Triagem)',
             screeningNotes,
             isMinor: rawIsMinor,
             acceptedContractAt: responses.contrato ? new Date() : null,
+            ageConfirmedAt: responses.maioridade ? new Date() : null,
+            signedContractContent,
+            consentIp: request.ip,
+            consentUserAgent: request.headers['user-agent'] || null,
+            parentName,
+            parentCpf: cleanParentCpf,
+            parentPhone: cleanParentPhone,
             emergencyContactName: emergencyName,
             emergencyContactRelation: emergencyRelation,
-            emergencyContactPhone: emergencyPhone,
+            emergencyContactPhone: emergencyPhone ? ('+' + emergencyPhone.replace(/\D/g, '')) : null,
+            customFieldValues,
+            capturePageId: pageId || null,
             utmSource: 'Landing Page',
           })
           .returning();
@@ -593,7 +681,12 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
         const isOwner = workspace?.ownerId === decoded.sub;
 
-        if (!member && !isOwner) {
+        const profile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+        const isAdmin = profile?.role === 'admin';
+
+        if (!member && !isOwner && !isAdmin) {
           return reply.status(403).send({ error: 'Proibido', message: 'Sem permissão para excluir esta página.' });
         }
 

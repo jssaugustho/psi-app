@@ -46,7 +46,7 @@ export default function AdminDashboardPage() {
             <strong style={{ color: 'var(--brand-gradient-start)' }}>
               {primaryTenant?.name}
             </strong>{' '}
-            ({primaryTenant?.domain || primaryTenant?.slug})
+            {platformStatus?.base_domain ? `(${platformStatus.base_domain})` : ''}
           </p>
         </div>
         {/* Badge "Configurada" */}

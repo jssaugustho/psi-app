@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
-import { Button, Input, Card } from '@psi/ui';
+import { Button, Input, Card, BrandModal } from '@psi/ui';
 
 export default function AdminLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -213,108 +213,93 @@ export default function AdminLoginPage() {
         </form>
 
         {/* Modal: Esqueceu a Senha */}
-        {isForgotModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+        <BrandModal
+          isOpen={isForgotModalOpen}
+          onClose={() => setIsForgotModalOpen(false)}
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+            <h3 className="text-lg font-bold">Recuperar Senha</h3>
+            <p className="text-xs opacity-60">
+              Digite o seu e-mail cadastrado de administrador para receber as instruções e o link de redefinição de senha.
+            </p>
+          </div>
+
+          {forgotError && (
             <div
-              className="w-full max-w-md p-6 rounded-2xl space-y-4 shadow-2xl relative"
+              className="text-xs p-3 rounded-lg text-center"
               style={{
-                background: 'var(--surface-input, rgba(15, 23, 42, 0.95))',
-                border: '1px solid var(--surface-border)',
-                color: 'var(--brand-text-color)',
+                background: 'var(--status-error-bg)',
+                border: '1px solid var(--status-error-border)',
+                color: 'var(--status-error-text)',
               }}
             >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h3 className="text-lg font-bold">Recuperar Senha</h3>
-                <button
-                  type="button"
-                  onClick={() => setIsForgotModalOpen(false)}
-                  className="opacity-60 hover:opacity-100 bg-transparent border-none cursor-pointer text-slate-300 text-lg"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <p className="text-xs opacity-75 leading-relaxed">
-                Digite o seu e-mail cadastrado de administrador para receber as instruções e o link de redefinição de senha.
-              </p>
-
-              {forgotError && (
-                <div
-                  className="text-xs p-3 rounded-lg text-center"
-                  style={{
-                    background: 'var(--status-error-bg)',
-                    border: '1px solid var(--status-error-border)',
-                    color: 'var(--status-error-text)',
-                  }}
-                >
-                  {forgotError}
-                </div>
-              )}
-
-              {forgotSuccess ? (
-                <div
-                  className="text-xs p-4 rounded-xl text-center space-y-3"
-                  style={{
-                    background: 'var(--status-success-bg)',
-                    border: '1px solid var(--status-success-border)',
-                    color: 'var(--status-success-text)',
-                  }}
-                >
-                  <p className="font-semibold">{forgotSuccess}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsForgotModalOpen(false)}
-                    className="w-full text-xs py-2 mt-2"
-                  >
-                    Voltar ao Login
-                  </Button>
-                </div>
-              ) : (
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setSendingForgot(true);
-                    setForgotError(null);
-                    setForgotSuccess(null);
-                    try {
-                      const res = await api.forgotPassword(forgotEmail);
-                      setForgotSuccess(res.message);
-                    } catch (err: any) {
-                      setForgotError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
-                    } finally {
-                      setSendingForgot(false);
-                    }
-                  }}
-                  className="space-y-4"
-                >
-                  <Input
-                    label="E-mail Cadastrado"
-                    type="email"
-                    required
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="admin@exemplo.com"
-                  />
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsForgotModalOpen(false)}
-                      className="text-xs py-2"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button type="submit" submitting={sendingForgot} className="text-xs py-2">
-                      Enviar E-mail de Recuperação
-                    </Button>
-                  </div>
-                </form>
-              )}
+              {forgotError}
             </div>
-          </div>
-        )}
+          )}
+
+          {forgotSuccess ? (
+            <div
+              className="text-xs p-4 rounded-xl text-center space-y-3"
+              style={{
+                background: 'var(--status-success-bg)',
+                border: '1px solid var(--status-success-border)',
+                color: 'var(--status-success-text)',
+              }}
+            >
+              <p className="font-semibold">{forgotSuccess}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsForgotModalOpen(false)}
+                className="w-full text-xs py-2 mt-2"
+              >
+                Voltar ao Login
+              </Button>
+            </div>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setSendingForgot(true);
+                setForgotError(null);
+                setForgotSuccess(null);
+                try {
+                  const res = await api.forgotPassword(forgotEmail);
+                  setForgotSuccess(res.message);
+                } catch (err: any) {
+                  setForgotError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+                } finally {
+                  setSendingForgot(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <Input
+                label="E-mail Cadastrado"
+                type="email"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="admin@exemplo.com"
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsForgotModalOpen(false)}
+                  className="text-xs py-2"
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" submitting={sendingForgot} className="text-xs py-2">
+                  Enviar E-mail de Recuperação
+                </Button>
+              </div>
+            </form>
+          )}
+        </BrandModal>
       </Card>
     </div>
   );

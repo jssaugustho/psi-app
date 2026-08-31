@@ -72,6 +72,10 @@ export function DomainManager({
 
   const [baseDomain, setBaseDomain] = useState(process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app');
 
+  // Inline edit toggle states
+  const [forceEditSubdomain, setForceEditSubdomain] = useState(false);
+  const [forceEditCustomDomain, setForceEditCustomDomain] = useState(false);
+
   // Internal Subdomain states if external handlers not provided
   const [internalCheckingSubdomain, setInternalCheckingSubdomain] = useState(false);
   const [internalSubdomainAvailable, setInternalSubdomainAvailable] = useState<boolean | null>(null);
@@ -79,8 +83,8 @@ export function DomainManager({
   const isCheckingSubdomain = externalCheckingSubdomain !== undefined ? externalCheckingSubdomain : internalCheckingSubdomain;
   const isSubdomainAvailable = externalSubdomainAvailable !== undefined ? externalSubdomainAvailable : internalSubdomainAvailable;
 
-  const isSubdomainLocked = propReadOnlySubdomain !== undefined ? propReadOnlySubdomain : readOnly;
-  const isCustomDomainLocked = (domainVerified === true || domainStatus === 'active' || domainStatus === 'verified') && Boolean(customDomain);
+  const isSubdomainLocked = (propReadOnlySubdomain !== undefined ? propReadOnlySubdomain : readOnly) && !forceEditSubdomain;
+  const isCustomDomainLocked = (domainVerified === true || domainStatus === 'active' || domainStatus === 'verified') && Boolean(customDomain) && !forceEditCustomDomain;
 
   // Fetch platform base domain on mount
   useEffect(() => {
@@ -199,15 +203,25 @@ export function DomainManager({
                 </h3>
               </div>
 
-              <a
-                href="/dashboard/configuracoes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-[var(--brand-gradient-start)] hover:text-white bg-[var(--brand-gradient-start)]/10 hover:bg-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/20 transition-all shadow-xs shrink-0"
-              >
-                <span>Gerenciar nas Configurações</span>
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setForceEditSubdomain(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-violet-600 hover:text-white bg-violet-600/10 hover:bg-violet-600 border border-violet-600/20 transition-all shadow-xs shrink-0 cursor-pointer"
+                >
+                  Editar Subdomínio
+                </button>
+
+                <a
+                  href="/dashboard/configuracoes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-[var(--brand-gradient-start)] hover:text-white bg-[var(--brand-gradient-start)]/10 hover:bg-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/20 transition-all shadow-xs shrink-0"
+                >
+                  <span>Gerenciar nas Configurações</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -293,9 +307,18 @@ export function DomainManager({
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Domínio Próprio Customizado
               </span>
-              <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                Conectado
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  Conectado
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForceEditCustomDomain(true)}
+                  className="px-2 py-0.5 rounded text-[9px] font-bold text-violet-600 hover:text-white bg-violet-600/10 hover:bg-violet-600 border border-violet-600/20 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  Editar Domínio
+                </button>
+              </div>
             </div>
             <span className="text-xs font-mono font-bold text-slate-900 dark:text-white block truncate">
               https://{customDomain}

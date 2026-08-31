@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react'
 import { Sparkles, Check, ChevronDown, MapPin, Phone, MessageSquare, ArrowRight, Menu, X, Image as ImageIcon } from 'lucide-react'
 import { TypeformModal } from './TypeformModal'
+import { BrandLogo } from '@psi/ui'
+
 
 interface CapturePageRendererProps {
   page: {
@@ -34,10 +36,9 @@ interface CapturePageRendererProps {
     defaultSiteFaviconUrl?: string | null;
     defaultSiteLogoConfig?: any;
   };
-  contractText?: string;
 }
 
-export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, contractText }: CapturePageRendererProps) {
+export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }: CapturePageRendererProps) {
   const [page, setPage] = useState(initialPage)
   const [tenant, setTenant] = useState(initialTenant)
   const [modalOpen, setModalOpen] = useState(false)
@@ -222,6 +223,12 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
   const effectiveFaviconUrl = cfg.faviconUrl || tenant.defaultSiteFaviconUrl || tenant.iconLightUrl || tenant.iconDarkUrl || '';
   const effectiveLogoConfig = cfg.logoConfig || tenant.defaultSiteLogoConfig;
 
+  let headingFont = theme?.typography?.headingFont || 'Playfair Display';
+  if (headingFont === 'serif') headingFont = 'Playfair Display';
+
+  let bodyFont = theme?.typography?.bodyFont || 'Inter';
+  if (bodyFont === 'sans') bodyFont = 'Inter';
+
   const themeStyles = {
     '--brand-gradient-start': theme?.colors?.primaryStart || tenant.gradientColorStart || '#52525B',
     '--brand-gradient-end': theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#27272A',
@@ -231,8 +238,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
     '--brand-text-color': textCol,
     '--mix-base': mixBaseCol,
     '--brand-gradient': `linear-gradient(135deg, ${theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'}, ${theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'})`,
-    '--brand-heading-font': theme?.typography?.headingFont ? `'${theme.typography.headingFont}', serif` : 'var(--font-serif)',
-    '--brand-body-font': theme?.typography?.bodyFont ? `'${theme.typography.bodyFont}', sans-serif` : 'var(--font-sans)',
+    '--brand-heading-font': headingFont ? `'${headingFont}', serif` : 'var(--font-serif)',
+    '--brand-body-font': bodyFont ? `'${bodyFont}', sans-serif` : 'var(--font-sans)',
   } as React.CSSProperties;
 
   const scrollToSection = (id: string) => {
@@ -358,7 +365,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
       {theme?.typography?.headingFont || theme?.typography?.bodyFont ? (
         <link
           rel="stylesheet"
-          href={`https://fonts.googleapis.com/css2?family=${(theme?.typography?.headingFont || 'Playfair Display').replace(/\s+/g, '+')}:wght@300;400;500;600;700;800&family=${(theme?.typography?.bodyFont || 'Inter').replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`}
+          href={`https://fonts.googleapis.com/css2?family=${(headingFont || 'Playfair Display').replace(/\s+/g, '+')}:wght@300;400;500;600;700;800&family=${(bodyFont || 'Inter').replace(/\s+/g, '+')}:wght@300;400;500;600;700&display=swap`}
         />
       ) : (
         <link
@@ -476,37 +483,20 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
 
           {loaderState !== 'black' && (
             <div className="relative z-10 flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-500 ease-out">
-              {/* Logo/Icon */}
-              {cfg.logoUrl ? (
-                <img 
-                  src={cfg.logoUrl} 
-                  alt={cfg.professional?.name || 'Psicologia'} 
-                  className="max-h-16 max-w-[200px] object-contain"
-                  style={{ 
-                    animation: 'fadeIn 0.6s ease-out forwards',
-                  }}
-                />
-              ) : (
-                <div className="flex items-center gap-3 font-serif">
-                  {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
-                    <img 
-                      src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
-                      alt="Ícone" 
-                      className="h-10 w-10 object-contain shrink-0" 
-                    />
-                  ) : (
-                    <div 
-                      className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-xl shrink-0 logo-icon-box"
-                      style={{ color: 'var(--brand-contrast-color)' }}
-                    >
-                      <span className="font-bold text-xl leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
-                    </div>
-                  )}
-                  <span className="font-serif text-xl tracking-wide text-[#F4F4F5] font-normal">
-                    {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
-                  </span>
-                </div>
-              )}
+              <BrandLogo
+                logoUrl={cfg.logoUrl}
+                logoConfig={cfg.logoConfig}
+                faviconUrl={cfg.faviconUrl}
+                title={cfg.professional?.name}
+                fallbackText="Psicologia"
+                primaryStart={theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'}
+                primaryEnd={theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'}
+                contrastColor={tenant.contrastColor || '#FFFFFF'}
+                textColor="#F4F4F5"
+                size="lg"
+                imgClassName="max-h-16 max-w-[200px] object-contain"
+              />
+
 
               {/* Spinner */}
               <div className="relative h-10 w-10">
@@ -555,33 +545,18 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
               isPreview ? 'hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2 rounded-lg p-1' : ''
             }`}
           >
-            {effectiveLogoUrl ? (
-              <img 
-                src={effectiveLogoUrl} 
-                alt={cfg.professional?.name || 'Psicologia'} 
-                className="max-h-11 max-w-[220px] object-contain"
-              />
-            ) : (
-              <div className="flex items-center gap-2.5 font-serif select-none">
-                {(effectiveFaviconUrl || (effectiveLogoConfig?.iconType === 'custom' && effectiveLogoConfig?.customIconUrl)) ? (
-                  <img 
-                    src={effectiveFaviconUrl || effectiveLogoConfig?.customIconUrl} 
-                    alt="Ícone" 
-                    className="h-8 w-8 object-contain shrink-0" 
-                  />
-                ) : (
-                  <div 
-                    className="h-9 w-9 rounded-xl bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-md shrink-0 logo-icon-box"
-                    style={{ color: 'var(--brand-contrast-color)' }}
-                  >
-                    <span className="font-bold text-base leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
-                  </div>
-                )}
-                <span className="font-serif text-lg tracking-wide text-[var(--brand-text-color)] font-normal">
-                  {page.title || cfg.professional?.name || effectiveLogoConfig?.text || 'Psicologia'}
-                </span>
-              </div>
-            )}
+            <BrandLogo
+              logoUrl={effectiveLogoUrl}
+              logoConfig={effectiveLogoConfig}
+              faviconUrl={effectiveFaviconUrl}
+              title={cfg.professional?.name || 'Psicologia'}
+              fallbackText="Psicologia"
+              primaryStart={theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'}
+              primaryEnd={theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'}
+              contrastColor={tenant.contrastColor || '#FFFFFF'}
+              textColor="var(--brand-text-color)"
+              size="md"
+            />
           </div>
 
           {/* Desktop Navigation */}
@@ -1436,33 +1411,18 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
                 isPreview ? 'hover:outline hover:outline-2 hover:outline-blue-500 hover:outline-offset-2 rounded-lg p-1' : ''
               }`}
             >
-              {cfg.logoUrl ? (
-                <img 
-                  src={cfg.logoUrl} 
-                  alt={cfg.professional?.name || 'Psicologia'} 
-                  className="max-h-9 max-w-[180px] object-contain"
-                />
-              ) : (
-                <div className="flex items-center gap-2.5 font-serif select-none">
-                  {(cfg.faviconUrl || (cfg.logoConfig?.iconType === 'custom' && cfg.logoConfig?.customIconUrl)) ? (
-                    <img 
-                      src={cfg.faviconUrl || cfg.logoConfig?.customIconUrl} 
-                      alt="Ícone" 
-                      className="h-6 w-6 object-contain shrink-0" 
-                    />
-                  ) : (
-                    <div 
-                      className="h-7 w-7 rounded-lg bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] flex items-center justify-center shadow-sm shrink-0 logo-icon-box"
-                      style={{ color: 'var(--brand-contrast-color)' }}
-                    >
-                      <span className="font-bold text-xs leading-none" style={{ color: 'var(--brand-contrast-color)' }}>Ψ</span>
-                    </div>
-                  )}
-                  <span className="font-serif text-base tracking-wide text-[var(--brand-text-color)] font-normal">
-                    {page.title || cfg.professional?.name || cfg.logoConfig?.text || 'Psicologia'}
-                  </span>
-                </div>
-              )}
+            <BrandLogo
+              logoUrl={cfg.logoUrl}
+              logoConfig={cfg.logoConfig}
+              faviconUrl={cfg.faviconUrl}
+              title={cfg.professional?.name || 'Psicologia'}
+              fallbackText="Psicologia"
+              primaryStart={theme?.colors?.primaryStart || tenant.gradientColorStart || '#CC8667'}
+              primaryEnd={theme?.colors?.primaryEnd || tenant.gradientColorEnd || '#AA5533'}
+              contrastColor={tenant.contrastColor || '#FFFFFF'}
+              textColor="var(--brand-text-color)"
+              size="sm"
+            />
             </div>
             <p className="leading-relaxed font-light">
               {renderEditableText('footer.description', dict.footer?.description, 'Espaço clínico ético focado na sua regulação emocional.')}
@@ -1552,7 +1512,6 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant, 
         pageId={page.id}
         formFlow={page.formFlow}
         whatsappNumber={tenant.phone || ""}
-        contractText={contractText}
       />
     </div>
   )

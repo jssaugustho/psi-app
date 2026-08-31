@@ -6,7 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, Tenant, User } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, BrandModal } from '@psi/ui';
 import { Link } from '@/components/Link';
 
 const BackIcon = () => (
@@ -396,62 +396,55 @@ export default function TenantBrandingPage() {
         </Card>
 
       {/* ── MODAL: CONFIRMAR EXCLUSÃO DEFINITIVA ── */}
-      {isDeleteModalOpen && tenant && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="glass-lg w-full max-w-md rounded-2xl border border-red-500/20 p-6 space-y-6 animate-scale-up shadow-2xl">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-red-400">Confirmar Exclusão</h3>
-                <p className="text-xs text-slate-400">Esta ação é estritamente irreversível.</p>
-              </div>
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="opacity-55 hover:opacity-100 bg-transparent border-none text-slate-400 cursor-pointer"
-              >
-                <CloseIcon />
-              </button>
-            </div>
+      {tenant && (
+        <BrandModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          maxWidth="max-w-md"
+        >
+        <div className="space-y-1 pb-3 border-b border-[var(--surface-border)]">
+          <h3 className="text-lg font-bold text-red-400">Confirmar Exclusão</h3>
+          <p className="text-xs text-slate-400">Esta ação é estritamente irreversível.</p>
+        </div>
 
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg leading-relaxed">
-              ⚠️ **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste workspace após esta operação.
-            </div>
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs p-3 rounded-lg leading-relaxed">
+          ⚠️ **Atenção**: Todos os dados do espaço de trabalho serão excluídos para sempre. Não é possível recuperar os agendamentos, equipe ou dados clínicos deste workspace após esta operação.
+        </div>
 
-            <div className="space-y-3">
-              <p className="text-xs text-slate-300 leading-normal">
-                Para confirmar a exclusão definitiva, digite o nome exato do workspace <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
-              </p>
-              <input
-                type="text"
-                placeholder={tenant.name}
-                value={deleteConfirmationText}
-                onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                className="w-full rounded-xl py-2.5 px-4 text-sm outline-none transition-colors brand-input focus:border-red-500/50 font-medium"
-              />
-            </div>
+        <div className="space-y-3">
+          <p className="text-xs text-slate-300 leading-normal">
+            Para confirmar a exclusão definitiva, digite o nome exato do workspace <strong className="text-slate-100">{tenant.name}</strong> no campo abaixo:
+          </p>
+          <input
+            type="text"
+            placeholder={tenant.name}
+            value={deleteConfirmationText}
+            onChange={(e) => setDeleteConfirmationText(e.target.value)}
+            className="w-full rounded-xl py-2.5 px-4 text-sm outline-none transition-colors brand-input focus:border-red-500/50 font-medium"
+          />
+        </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t border-slate-800/40">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="text-xs py-2"
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="danger"
-                type="button"
-                onClick={handleDeleteTenant}
-                submitting={deleting}
-                disabled={deleteConfirmationText !== tenant.name}
-                className="text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Excluir Definitivamente
-              </Button>
-            </div>
-          </div>
-        </div>,
-        document.body
+        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--surface-border)]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="text-xs py-2"
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            type="button"
+            onClick={handleDeleteTenant}
+            submitting={deleting}
+            disabled={deleteConfirmationText !== tenant.name}
+            className="text-xs py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Excluir Definitivamente
+          </Button>
+        </div>
+      </BrandModal>
       )}
       </>
       )}

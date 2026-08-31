@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { api, User } from '@/lib/api';
-import { Input } from '@psi/ui';
+import { Input, BrandModal } from '@psi/ui';
 import { validateImageSafety } from '@psi/image-utils';
 
 interface EditProfileModalProps {
@@ -123,38 +123,12 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop escurecido */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--brand-bg-color) 85%, transparent)',
-        }}
-        onClick={onClose}
-      />
-
-      {/* Modal Container */}
-      <div
-        className="brand-modal w-full max-w-md rounded-2xl p-6 shadow-2xl relative z-10 overflow-y-auto max-h-[90vh] space-y-6"
-        style={{
-          color: 'var(--brand-text-color)',
-        }}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 bg-transparent border-none cursor-pointer p-1 transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Title */}
-        <div className="text-center space-y-1">
-          <h2 className="text-lg font-bold">Editar Perfil</h2>
-          <p className="text-xs opacity-60">Atualize suas informações pessoais e credenciais.</p>
-        </div>
+    <BrandModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-md" className="overflow-y-auto max-h-[90vh]">
+      {/* Title */}
+      <div className="text-center space-y-1">
+        <h2 className="text-lg font-bold">Editar Perfil</h2>
+        <p className="text-xs opacity-60">Atualize suas informações pessoais e credenciais.</p>
+      </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Avatar Upload Slot */}
@@ -333,7 +307,6 @@ export function EditProfileModal({ isOpen, onClose, user, onUserUpdated }: EditP
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </BrandModal>
   );
 }

@@ -52,11 +52,14 @@ async function resolveWorkspaceFromRequest(request: any) {
   return null;
 }
 
-// Schemas Zod de Validação
 const RegisterBodySchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
   sobrenome: z.string().min(1, 'Sobrenome é obrigatório'),
   telefone: z.string().optional().nullable(),
+  cpf: z.string().optional().nullable(),
+  crp: z.string().optional().nullable(),
+  hasNoCrp: z.boolean().optional(),
+  has_no_crp: z.boolean().optional(),
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres'),
 });
@@ -88,7 +91,29 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
       const settings = await db.query.platformSettings.findFirst();
 
       const hasAdmin = !!existingAdmin;
-      const hasPlatformSettings = !!settings && settings.isConfigured === true;
+      const hasCloudflare = !!(
+        settings?.cloudflareApiToken &&
+        settings?.cloudflareZoneId &&
+        settings?.cloudflareAccountId &&
+        settings?.baseDomain
+      );
+      const hasR2 = !!(
+        settings?.cloudflareAccountId &&
+        settings?.r2BucketName &&
+        settings?.r2AccessKeyId &&
+        settings?.r2SecretAccessKey
+      );
+      const hasResend = !!(
+        settings?.resendApiKey &&
+        settings?.resendFromDomain
+      );
+      const hasVisualIdentity = !!(
+        settings?.platformName &&
+        settings?.logoLightUrl &&
+        settings?.logoDarkUrl
+      );
+
+      const hasPlatformSettings = hasCloudflare && hasR2 && hasResend && hasVisualIdentity;
       const bootstrapped = hasAdmin && hasPlatformSettings;
 
       return reply.send({
@@ -98,7 +123,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         admin_email: existingAdmin ? existingAdmin.email : null,
         message: bootstrapped
           ? 'Sistema inicializado e pronto para uso.'
-          : 'Sistema necessita de bootstrap inicial via Backoffice.',
+          : 'Sistema necessita de bootstrap inicial.',
       });
     } catch (err: any) {
       fastify.log.warn('Tabelas do banco ainda não inicializadas no bootstrap/status:', err);
@@ -107,7 +132,7 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         has_admin: false,
         has_platform_settings: false,
         admin_email: null,
-        message: 'Sistema necessita de bootstrap inicial via Backoffice.',
+        message: 'Sistema necessita de bootstrap inicial.',
       });
     }
   });
@@ -238,8 +263,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        const { nome, sobrenome, telefone, email, password } = request.body;
+        const { nome, sobrenome, telefone, cpf, crp, hasNoCrp, has_no_crp, email, password } = request.body;
         const cleanEmail = email.trim().toLowerCase();
+        const noCrpFlag = hasNoCrp ?? has_no_crp ?? false;
 
         // 1. Criar usuário no GoTrue usando o token admin service_role
         const goTrueUser = await createGoTrueUser(cleanEmail, password, {
@@ -259,6 +285,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             lastName: sobrenome,
             phone: telefone || null,
             email: cleanEmail,
+            cpf: cpf || null,
+            crp: noCrpFlag ? null : (crp || null),
+            hasNoCrp: noCrpFlag,
             role: 'user',
           })
           .onConflictDoUpdate({
@@ -268,6 +297,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
               lastName: sobrenome,
               phone: telefone || null,
               email: cleanEmail,
+              cpf: cpf || null,
+              crp: noCrpFlag ? null : (crp || null),
+              hasNoCrp: noCrpFlag,
               updatedAt: new Date(),
             },
           })
@@ -281,6 +313,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             sobrenome: profile.lastName,
             telefone: profile.phone,
             email: profile.email,
+            cpf: profile.cpf,
+            crp: profile.crp,
+            has_no_crp: profile.hasNoCrp,
             role: profile.role,
             avatar_url: profile.avatarUrl,
             created_at: profile.createdAt,
@@ -565,6 +600,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           sobrenome: profile.lastName,
           telefone: profile.phone,
           email: profile.email,
+          cpf: profile.cpf,
+          crp: profile.crp,
+          has_no_crp: profile.hasNoCrp,
           role: profile.role,
           avatar_url: profile.avatarUrl,
           created_at: profile.createdAt,
@@ -589,6 +627,10 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           nome: z.string().min(1, 'Nome é obrigatório'),
           sobrenome: z.string().min(1, 'Sobrenome é obrigatório'),
           telefone: z.string().optional().nullable(),
+          cpf: z.string().optional().nullable(),
+          crp: z.string().optional().nullable(),
+          hasNoCrp: z.boolean().optional(),
+          has_no_crp: z.boolean().optional(),
           avatarUrl: z.string().optional().nullable(),
           password: z.string().min(6, 'A senha deve ter no mínimo 6 caracteres').optional().nullable(),
         }),
@@ -608,7 +650,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         const payload = verifyUserJwt(token);
         const userId = payload.sub;
 
-        const { nome, sobrenome, telefone, avatarUrl, password } = request.body;
+        const { nome, sobrenome, telefone, cpf, crp, hasNoCrp, has_no_crp, avatarUrl, password } = request.body;
+        const noCrpFlag = hasNoCrp ?? has_no_crp ?? false;
 
         // 1. Se fornecida senha, atualiza no GoTrue via Admin API
         if (password && password.trim()) {
@@ -632,15 +675,21 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         }
 
         // 2. Atualizar perfil no Drizzle ORM
+        const updateData: Record<string, any> = {
+          firstName: nome,
+          lastName: sobrenome,
+          phone: telefone || null,
+          avatarUrl: avatarUrl || null,
+          hasNoCrp: noCrpFlag,
+          updatedAt: new Date(),
+        };
+
+        if (cpf !== undefined) updateData.cpf = cpf || null;
+        if (crp !== undefined) updateData.crp = noCrpFlag ? null : (crp || null);
+
         const [profile] = await db
           .update(profiles)
-          .set({
-            firstName: nome,
-            lastName: sobrenome,
-            phone: telefone || null,
-            avatarUrl: avatarUrl || null,
-            updatedAt: new Date(),
-          })
+          .set(updateData)
           .where(eq(profiles.id, userId))
           .returning();
 
@@ -659,6 +708,9 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             sobrenome: profile.lastName,
             telefone: profile.phone,
             email: profile.email,
+            cpf: profile.cpf,
+            crp: profile.crp,
+            has_no_crp: profile.hasNoCrp,
             role: profile.role,
             avatar_url: profile.avatarUrl,
             created_at: profile.createdAt,

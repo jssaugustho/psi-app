@@ -8,7 +8,16 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (nome: string, sobrenome: string, telefone: string, email: string, password: string) => Promise<void>;
+  register: (
+    nome: string,
+    sobrenome: string,
+    telefone: string,
+    email: string,
+    password: string,
+    cpf?: string,
+    crp?: string,
+    hasNoCrp?: boolean
+  ) => Promise<void>;
   logout: () => void;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   isProfileOpen: boolean;
@@ -49,18 +58,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/login');
   }, [router]);
 
-  // ─── renovação proativa ──────────────────────────────────────────────────
+  // ─── agendamento de refresh proativo do JWT ─────────────────────────────
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
-    const delay = msUntilExpiry();
-
-    if (delay <= 0) {
+    const msLeft = msUntilExpiry();
+    if (msLeft <= 0) {
       performRefresh();
       return;
     }
 
-    refreshTimerRef.current = setTimeout(performRefresh, delay);
+    refreshTimerRef.current = setTimeout(performRefresh, msLeft);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -134,8 +142,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/dashboard');
   };
 
-  const register = async (nome: string, sobrenome: string, telefone: string, email: string, password: string) => {
-    await api.register({ nome, sobrenome, telefone, email, password });
+  const register = async (
+    nome: string,
+    sobrenome: string,
+    telefone: string,
+    email: string,
+    password: string,
+    cpf?: string,
+    crp?: string,
+    hasNoCrp?: boolean
+  ) => {
+    await api.register({ nome, sobrenome, telefone, email, password, cpf, crp, hasNoCrp });
     await login(email, password);
   };
 

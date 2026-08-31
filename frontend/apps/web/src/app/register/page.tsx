@@ -12,6 +12,9 @@ export default function RegisterPage() {
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [crp, setCrp] = useState('');
+  const [hasNoCrp, setHasNoCrp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      await register(nome, sobrenome, telefone, email, password);
+      await register(nome, sobrenome, telefone, email, password, cpf || undefined, hasNoCrp ? undefined : (crp || undefined), hasNoCrp);
     } catch (err: any) {
       setError(err.message || 'Ocorreu um erro ao cadastrar.');
     } finally {
@@ -132,6 +135,42 @@ export default function RegisterPage() {
               onChange={(e) => setTelefone(e.target.value)}
               placeholder="(11) 99999-9999"
             />
+
+            <Input
+              label="CPF (Opcional)"
+              type="text"
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+            />
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
+                  CRP (Registro Profissional)
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer select-none" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>
+                  <input
+                    type="checkbox"
+                    checked={hasNoCrp}
+                    onChange={(e) => {
+                      setHasNoCrp(e.target.checked);
+                      if (e.target.checked) setCrp('');
+                    }}
+                    className="w-3.5 h-3.5 rounded accent-indigo-600 cursor-pointer"
+                  />
+                  <span>Não tenho CRP</span>
+                </label>
+              </div>
+              <Input
+                type="text"
+                disabled={hasNoCrp}
+                value={hasNoCrp ? '' : crp}
+                onChange={(e) => setCrp(e.target.value)}
+                placeholder={hasNoCrp ? 'Dispensado de CRP' : 'Ex: CRP 06/123456'}
+                className={hasNoCrp ? 'opacity-50 cursor-not-allowed' : ''}
+              />
+            </div>
 
             <Input
               label="E-mail *"

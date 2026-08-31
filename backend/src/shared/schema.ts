@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, jsonb, unique, index } from 'drizzle-orm/pg-core';
 
 // ── 1. Contas de Usuário (Pessoa Física) ───────────────────────────────────
 export const profiles = pgTable('profiles', {
@@ -8,6 +8,9 @@ export const profiles = pgTable('profiles', {
   phone: text('phone'),
   email: text('email').notNull().unique(),
   avatarUrl: text('avatar_url'),
+  cpf: text('cpf'),
+  crp: text('crp'),
+  hasNoCrp: boolean('has_no_crp').default(false).notNull(),
   role: text('role').$type<'admin' | 'user'>().default('user').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -32,7 +35,7 @@ export const workspaces = pgTable('workspaces', {
   defaultSiteAvatarUrl: text('default_site_avatar_url'),
 
   // Configurações do CRM (Fontes de Tráfego)
-  trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Webhook']).notNull(),
+  trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Indicação', 'TikTok', 'Site / Orgânico', 'Webhook']).notNull(),
   defaultTrafficSource: text('default_traffic_source').default('Manual').notNull(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -62,9 +65,8 @@ export const visualIdentities = pgTable('visual_identities', {
   cardColor: text('card_color').default('#FFFFFF').notNull(),
   textColor: text('text_color').default('#0F172A').notNull(),
 
-  // Tipografia (Fontes da Marca)
-  fontHeading: text('font_heading').default('serif').notNull(),
-  fontBody: text('font_body').default('sans').notNull(),
+  fontHeading: text('font_heading').default('Playfair Display').notNull(),
+  fontBody: text('font_body').default('Inter').notNull(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -136,7 +138,6 @@ export const platformSettings = pgTable('platform_settings', {
   resendApiKey: text('resend_api_key'),
   resendFromDomain: text('resend_from_domain'),
   hasResend: boolean('has_resend').default(false).notNull(),
-  isConfigured: boolean('is_configured').default(false).notNull(),
   baseTenantPrice: integer('base_tenant_price').default(0).notNull(),
   additionalMemberPrice: integer('additional_member_price').default(0).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -246,6 +247,23 @@ export const capturePages = pgTable('capture_pages', {
 export type CapturePage = typeof capturePages.$inferSelect;
 export type NewCapturePage = typeof capturePages.$inferInsert;
 
+// ── 10.5 Definições de Campos Personalizados ────────────────────────────────
+export const customFieldDefinitions = pgTable('custom_field_definitions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  key: text('key').notNull(), // Nome da variável (ex: "queixa_principal")
+  name: text('name').notNull(), // Label do CRM (ex: "Queixa Principal")
+  type: text('type').$type<'text' | 'number' | 'select' | 'boolean' | 'date'>().default('text').notNull(),
+  options: jsonb('options').$type<string[]>(), // Opções se tipo 'select'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique('custom_field_def_workspace_key_unique').on(t.workspaceId, t.key)
+]);
+
+export type CustomFieldDefinition = typeof customFieldDefinitions.$inferSelect;
+export type NewCustomFieldDefinition = typeof customFieldDefinitions.$inferInsert;
+
 // ── 11. CRM: Contatos (Leads / Pacientes) ──────────────────────────────────
 export const contacts = pgTable('contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -267,6 +285,20 @@ export const contacts = pgTable('contacts', {
   isMinor: boolean('is_minor').default(false).notNull(),
   acceptedContractAt: timestamp('accepted_contract_at', { withTimezone: true }),
 
+  // Metadados de Auditoria de Consentimento (LGPD / TCLE)
+  ageConfirmedAt: timestamp('age_confirmed_at', { withTimezone: true }),
+  signedContractContent: text('signed_contract_content'),
+  consentIp: text('consent_ip'),
+  consentUserAgent: text('consent_user_agent'),
+
+  // Responsável Legal (caso menor de idade)
+  parentName: text('parent_name'),
+  parentCpf: text('parent_cpf'),
+  parentPhone: text('parent_phone'),
+
+  // Campos Personalizados e Variáveis
+  customFieldValues: jsonb('custom_field_values').$type<Record<string, any>>().default({}).notNull(),
+
   // Parâmetros de Rastreamento UTM
   utmSource: text('utm_source'),
   utmMedium: text('utm_medium'),
@@ -280,7 +312,9 @@ export const contacts = pgTable('contacts', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index('idx_contacts_custom_fields').using('gin', t.customFieldValues),
+]);
 
 export type Contact = typeof contacts.$inferSelect;
 export type NewContact = typeof contacts.$inferInsert;
@@ -319,3 +353,22 @@ export const mediaAssets = pgTable('media_assets', {
 
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type NewMediaAsset = typeof mediaAssets.$inferInsert;
+
+// ── 14. Logs de Erro do Sistema ─────────────────────────────────────────────
+export const errorLogs = pgTable('error_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name'),
+  message: text('message').notNull(),
+  stack: text('stack'),
+  url: text('url'),
+  userAgent: text('user_agent'),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+  serviceName: text('service_name').notNull(),
+  severity: text('severity').$type<'error' | 'warning' | 'fatal'>().default('error').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type NewErrorLog = typeof errorLogs.$inferInsert;
+

@@ -1,7 +1,7 @@
 import React from 'react'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getCapturePageByDomain, getContractTemplateContent, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../lib/api'
+import { getCapturePageByDomain, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../lib/api'
 import { CapturePageRenderer } from '../../../components/CapturePageRenderer'
 import { NotFoundView } from '../../../components/NotFoundView'
 
@@ -69,9 +69,9 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <div className="max-w-md w-full p-8 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
           <div className="text-3xl">🛠️</div>
-          <h1 className="text-xl font-bold">Plataforma em Manutenção</h1>
+          <h1 className="text-xl font-bold">Site em Manutenção</h1>
           <p className="text-xs text-slate-400 leading-relaxed">
-            A plataforma ainda não concluiu o processo de inicialização inicial.
+            O site está temporariamente indisponível para manutenção. Por favor, tente novamente em alguns instantes.
           </p>
         </div>
       </div>
@@ -85,13 +85,6 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
     const tenant = await getTenantByDomain(domain);
     const primaryTenant = tenant ? null : await getPrimaryTenant();
     return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedDomain={domain} />;
-  }
-
-  // Resolve contract template content if associated to contract step
-  let contractText: string | undefined = undefined
-  const contractNode = pageData.form_flow.nodes.find((n: any) => n.type === 'contrato')
-  if (contractNode?.data?.contractTemplateId) {
-    contractText = await getContractTemplateContent(contractNode.data.contractTemplateId) || undefined
   }
 
   return (
@@ -120,7 +113,6 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
         logoDarkUrl: pageData.tenants.logo_dark_url,
         logoLightUrl: pageData.tenants.logo_light_url
       }}
-      contractText={contractText}
     />
   )
 }
