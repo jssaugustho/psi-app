@@ -153,64 +153,86 @@ const defaultFormFlow = {
     {
       id: "start",
       type: "start",
-      position: { x: 100, y: 100 },
-      data: { title: "Iniciar Triagem", subtitle: "Leva apenas alguns minutos", isRequired: true }
+      position: { x: 80, y: 150 },
+      data: {
+        title: "Triagem Clínica Inicial",
+        subtitle: "Preencha as informações abaixo para agendarmos sua primeira sessão.",
+        isRequired: true,
+        buttonText: "Iniciar Triagem"
+      }
     },
     {
       id: "nome",
       type: "nome",
-      position: { x: 480, y: 100 },
-      data: { title: "Qual é o seu nome completo?", placeholder: "Escreva seu nome aqui...", isRequired: true }
-    },
-    {
-      id: "celular",
-      type: "celular",
-      position: { x: 860, y: 100 },
-      data: { title: "Qual o seu número de WhatsApp?", placeholder: "(11) 99999-9999", isRequired: true }
-    },
-    {
-      id: "email",
-      type: "email",
-      position: { x: 1240, y: 100 },
-      data: { title: "Qual o seu e-mail?", placeholder: "exemplo@email.com", isRequired: true }
-    },
-    {
-      id: "cpf",
-      type: "cpf",
-      position: { x: 1620, y: 100 },
-      data: { title: "Qual é o seu CPF?", placeholder: "000.000.000-00", isRequired: true }
+      position: { x: 460, y: 150 },
+      data: {
+        title: "Qual é o seu nome completo?",
+        placeholder: "Escreva seu nome completo...",
+        isRequired: true,
+        buttonText: "Avançar"
+      }
     },
     {
       id: "maioridade",
       type: "maioridade",
-      position: { x: 2000, y: 100 },
-      data: { title: "Você é maior de idade?", isRequired: true }
+      position: { x: 840, y: 150 },
+      data: {
+        title: "Você é maior de idade?",
+        subtitle: "Caso seja menor de 18 anos, solicitaremos os dados do responsável legal.",
+        isRequired: true,
+        options: [
+          { label: "Sim, sou maior de 18 anos", value: "Sim" },
+          { label: "Não, sou menor de idade", value: "Não" }
+        ],
+        buttonText: "Avançar"
+      }
+    },
+    {
+      id: "celular",
+      type: "celular",
+      position: { x: 1220, y: 150 },
+      data: {
+        title: "Qual é o seu WhatsApp para contato?",
+        subtitle: "Usaremos para confirmar o horário e enviar o link da sessão.",
+        placeholder: "(11) 99999-9999",
+        isRequired: true,
+        buttonText: "Avançar"
+      }
     },
     {
       id: "emergencia",
       type: "emergencia",
-      position: { x: 2380, y: 100 },
-      data: { title: "Informe um contato de emergência", isRequired: true }
+      position: { x: 1600, y: 150 },
+      data: {
+        title: "Contato de Emergência",
+        subtitle: "Informe nome, telefone e parentesco de uma pessoa de confiança para suporte em caso de necessidade.",
+        isRequired: false,
+        buttonText: "Avançar"
+      }
     },
     {
       id: "contrato",
       type: "contrato",
-      position: { x: 2760, y: 100 },
-      data: { title: "Termo de Consentimento Terapêutico", isRequired: true }
+      position: { x: 1980, y: 150 },
+      data: {
+        title: "Termo de Consentimento e Sigilo Profissional",
+        subtitle: "Leia e confirme para concluir sua solicitação de agendamento.",
+        contractText: "Ao prosseguir, você declara estar ciente de que os atendimentos psicológicos são realizados em conformidade com o Código de Ética Profissional do Psicólogo e as diretrizes do Conselho Federal de Psicologia (CFP). As informações fornecidas são confidenciais, protegidas por sigilo profissional e tratadas nos termos da Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).",
+        isRequired: true,
+        buttonText: "Concluir Triagem"
+      }
     }
   ],
   edges: [
     { id: "start-nome", source: "start", target: "nome" },
-    { id: "nome-celular", source: "nome", target: "celular" },
-    { id: "celular-email", source: "celular", target: "email" },
-    { id: "email-cpf", source: "email", target: "cpf" },
-    { id: "cpf-maioridade", source: "cpf", target: "maioridade" },
-    { id: "maioridade-emergencia", source: "maioridade", target: "emergencia" },
+    { id: "nome-maioridade", source: "nome", target: "maioridade" },
+    { id: "maioridade-celular", source: "maioridade", target: "celular", sourceHandle: "source-maior" },
+    { id: "celular-emergencia", source: "celular", target: "emergencia" },
     { id: "emergencia-contrato", source: "emergencia", target: "contrato" }
   ],
   settings: {
     successAction: "whatsapp" as const,
-    whatsappMessageTemplate: "Olá, acabei de enviar minha triagem inicial no seu site. Meu nome é {{nome}}."
+    whatsappMessageTemplate: "Olá! Preenchi a triagem inicial pelo seu site e gostaria de agendar minha sessão. Meu nome é {{nome}}."
   }
 };
 

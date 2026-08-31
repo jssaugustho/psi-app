@@ -33,6 +33,7 @@ export interface FormNode {
     options?: Array<{ label: string; value: string; nextId?: string }>;
     contractTemplateId?: string;
     contractText?: string;
+    buttonText?: string;
   };
 }
 
@@ -51,14 +52,28 @@ interface TypeformModalProps {
   formFlow: {
     nodes: FormNode[];
     edges: FormEdge[];
-    settings: {
-      successAction: 'whatsapp' | 'redirect';
+    settings?: {
+      successAction?: 'whatsapp' | 'redirect';
       successRedirectUrl?: string;
       whatsappMessageTemplate?: string;
     };
   };
   whatsappNumber?: string; // Number of the psychologist
   contractText?: string;   // Minuta do contrato resolved
+  theme?: {
+    colors?: {
+      primaryStart?: string;
+      primaryEnd?: string;
+      contrast?: string;
+      bgDark?: string;
+      textDark?: string;
+    };
+    typography?: {
+      headingFont?: string;
+      bodyFont?: string;
+    };
+  };
+  isDark?: boolean;
 }
 
 const validateCPFHelper = (cpf: string): boolean => {
@@ -92,8 +107,17 @@ export function TypeformModal({
   pageId,
   formFlow,
   whatsappNumber = "",
-  contractText = "Ao assinar este termo você concorda com o atendimento clínico."
+  contractText = "Ao assinar este termo você concorda com o atendimento clínico.",
+  theme,
+  isDark
 }: TypeformModalProps) {
+  const isLight = isDark === false;
+  const primaryStart = theme?.colors?.primaryStart || 'var(--brand-gradient-start, #CC8667)';
+  const primaryEnd = theme?.colors?.primaryEnd || 'var(--brand-gradient-end, #AA5533)';
+  const contrast = theme?.colors?.contrast || 'var(--brand-contrast-color, #FFFFFF)';
+  const headingFont = theme?.typography?.headingFont || 'var(--brand-heading-font, serif)';
+  const bodyFont = theme?.typography?.bodyFont || 'var(--brand-body-font, sans-serif)';
+
   const [currentNodeId, setCurrentNodeId] = useState<string>("start")
   const [history, setHistory] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
@@ -159,22 +183,35 @@ export function TypeformModal({
   const resolveNextNodeId = () => {
     if (!currentNode) return null
 
-    // 1. If selector step (seletor), resolve based on edges with specific option handles (opt_idx)
-    if (currentNode.type === "seletor") {
+    // 1. If selector step (seletor), resolve based on edges with specific option handles (opt_idx or option-idx)
+    if (currentNode.type === "seletor" || currentNode.type === "escolha" || currentNode.type === "escolha_multipla") {
       const selectedValue = customAnswers[currentNode.id];
       const options = currentNode.data.options || [];
       const optionIndex = options.findIndex((o: any) => o.value === selectedValue || o.label === selectedValue);
       
       if (optionIndex !== -1) {
-        const handleId = `opt_${optionIndex}`;
-        const matchingEdge = edges.find(e => e.source === currentNode.id && e.sourceHandle === handleId);
+        const handle1 = `opt_${optionIndex}`;
+        const handle2 = `option-${optionIndex}`;
+        const matchingEdge = edges.find(e => e.source === currentNode.id && (e.sourceHandle === handle1 || e.sourceHandle === handle2));
         if (matchingEdge) {
           return matchingEdge.target;
         }
       }
     }
 
-    // 2. Fallback to normal connected edge
+    // 2. If maioridade step, resolve based on handles: 'source-maior' vs 'source-menor'
+    if (currentNode.type === "maioridade") {
+      const isMaior = maioridade === "Sim" || maioridade === "sim" || maioridade === "true";
+      const targetHandles = isMaior
+        ? ["source-maior", "source-sim", "opt_0", "option-0"]
+        : ["source-menor", "source-nao", "opt_1", "option-1"];
+      const matchingEdge = edges.find(e => e.source === currentNode.id && targetHandles.includes(e.sourceHandle || ''));
+      if (matchingEdge) {
+        return matchingEdge.target;
+      }
+    }
+
+    // 3. Fallback to normal connected edge
     const outgoingEdge = edges.find(e => e.source === currentNode.id)
     return outgoingEdge ? outgoingEdge.target : null
   }
@@ -392,7 +429,7 @@ export function TypeformModal({
   const getWhatsAppLink = () => {
     if (!whatsappNumber) return null
     const cleanNum = whatsappNumber.replace(/\D/g, "")
-    const textTemplate = settings.whatsappMessageTemplate || "Olá, preenchi a triagem pelo site."
+    const textTemplate = settings?.whatsappMessageTemplate || "Olá, preenchi a triagem pelo site."
     const resolvedText = textTemplate.replace("{{nome}}", nome)
     return `https://wa.me/${cleanNum}?text=${encodeURIComponent(resolvedText)}`
   }
@@ -400,26 +437,46 @@ export function TypeformModal({
   const progressPercent = getProgressPercent()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/85 animate-in fade-in duration-300">
-      <div className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl bg-[#0F0F12] text-foreground sm:rounded-2xl border-0 sm:border border-border/20 shadow-2xl flex flex-col justify-between overflow-hidden relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+      <div 
+        className={`w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl border-0 sm:border shadow-2xl flex flex-col justify-between overflow-hidden relative transition-colors duration-200 ${
+          isLight
+            ? 'bg-white text-slate-900 border-slate-200 shadow-slate-900/15'
+            : 'bg-[#0c0c0e] text-zinc-100 border-zinc-800 shadow-black/80'
+        }`}
+        style={{
+          '--brand-gradient-start': primaryStart,
+          '--brand-gradient-end': primaryEnd,
+          '--brand-contrast-color': contrast,
+        } as React.CSSProperties}
+      >
         
         {/* Progress Bar */}
-        <div className="w-full bg-muted/20 h-1.5 relative">
+        <div className={`w-full h-1.5 relative ${isLight ? 'bg-slate-100' : 'bg-zinc-800'}`}>
           <div 
-            className="bg-[var(--brand-gradient-start,#CC8667)] h-full transition-all duration-300 ease-out"
-            style={{ width: `${isSubmitted ? 100 : progressPercent}%` }}
+            className="h-full transition-all duration-300 ease-out"
+            style={{ 
+              width: `${isSubmitted ? 100 : progressPercent}%`,
+              background: `linear-gradient(90deg, ${primaryStart}, ${primaryEnd})`
+            }}
           />
         </div>
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/10">
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-            <Sparkles className="h-3.5 w-3.5 text-[var(--brand-gradient-start,#CC8667)]" />
-            <span>Triagem Clínica</span>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${
+          isLight ? 'border-slate-100 bg-slate-50/60' : 'border-zinc-800/80 bg-zinc-900/40'
+        }`}>
+          <div className="flex items-center gap-2 text-xs font-bold tracking-wider uppercase">
+            <Sparkles className="h-3.5 w-3.5" style={{ color: primaryStart }} />
+            <span className={isLight ? 'text-slate-600' : 'text-zinc-400'}>Triagem Clínica</span>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/10 transition-colors cursor-pointer"
+            className={`p-2 rounded-full transition-colors cursor-pointer ${
+              isLight 
+                ? 'text-slate-400 hover:text-slate-900 hover:bg-slate-100' 
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+            }`}
           >
             <X className="h-5 w-5" />
           </button>
@@ -430,13 +487,13 @@ export function TypeformModal({
           {isSubmitted ? (
             /* Success View */
             <div className="flex flex-col items-center text-center space-y-6 animate-in zoom-in-95 duration-300">
-              <div className="h-16 w-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <div className="h-16 w-16 rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
                 <Check className="h-8 w-8 stroke-[2.5]" />
               </div>
-              <h3 className="text-2xl font-serif text-foreground font-normal">
+              <h3 className={`text-2xl font-bold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`} style={{ fontFamily: headingFont }}>
                 Triagem Enviada com Sucesso!
               </h3>
-              <p className="text-muted-foreground max-w-md leading-relaxed text-sm sm:text-base">
+              <p className={`max-w-md leading-relaxed text-sm sm:text-base ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                 Seus dados foram consolidados no prontuário. Clique no botão abaixo para iniciar nosso contato e agendar sua sessão.
               </p>
               <div className="pt-4 flex flex-col sm:flex-row gap-3 items-center justify-center">
@@ -445,7 +502,11 @@ export function TypeformModal({
                     href={getWhatsAppLink() || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-6 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl cursor-pointer font-medium text-sm sm:text-base transition-colors flex items-center gap-2 decoration-0"
+                    className="px-6 h-12 rounded-xl font-bold text-sm sm:text-base transition-all flex items-center gap-2 decoration-0 shadow-lg hover:opacity-95 active:scale-[0.98]"
+                    style={{
+                      background: `linear-gradient(135deg, ${primaryStart}, ${primaryEnd})`,
+                      color: contrast,
+                    }}
                   >
                     <MessageSquare className="h-4 w-4" />
                     Falar no WhatsApp
@@ -453,7 +514,11 @@ export function TypeformModal({
                 )}
                 <button
                   onClick={handleClose}
-                  className="px-6 h-12 bg-zinc-800 hover:bg-zinc-700 text-foreground rounded-xl cursor-pointer font-medium text-sm sm:text-base transition-all border border-border/10"
+                  className={`px-6 h-12 rounded-xl font-semibold text-sm sm:text-base transition-all border cursor-pointer ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200' 
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border-zinc-700'
+                  }`}
                 >
                   Fechar
                 </button>
@@ -465,18 +530,20 @@ export function TypeformModal({
               {currentNode.type !== "start" && (
                 <button
                   onClick={handleBack}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer font-medium ${
+                    isLight ? 'text-slate-400 hover:text-slate-900' : 'text-zinc-400 hover:text-zinc-100'
+                  }`}
                 >
                   <ArrowLeft className="h-3 w-3" /> Voltar
                 </button>
               )}
 
               <div className="space-y-2">
-                <h2 className="text-xl sm:text-2xl font-serif text-foreground font-normal leading-snug">
+                <h2 className={`text-xl sm:text-2xl font-bold leading-snug ${isLight ? 'text-slate-900' : 'text-zinc-100'}`} style={{ fontFamily: headingFont }}>
                   {currentNode.data.title}
                 </h2>
                 {currentNode.data.subtitle && (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className={`text-sm leading-relaxed ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                     {currentNode.data.subtitle}
                   </p>
                 )}
@@ -486,15 +553,19 @@ export function TypeformModal({
               <div className="pt-2">
                 {/* START NODE */}
                 {currentNode.type === "start" && (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground mb-6">
-                      Preencha os dados e siga as etapas para iniciarmos o acompanhamento.
+                  <div className="text-center py-6 space-y-6">
+                    <p className={`text-sm max-w-md mx-auto leading-relaxed ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                      {currentNode.data.subtitle || "Preencha os dados e siga as etapas para iniciarmos o acompanhamento."}
                     </p>
                     <button
                       onClick={handleNext}
-                      className="px-6 h-12 brand-accent rounded-xl text-sm font-semibold flex items-center gap-2 mx-auto"
+                      className="px-6 h-12 rounded-xl text-sm font-bold flex items-center gap-2 mx-auto shadow-lg transition-all cursor-pointer hover:opacity-95 active:scale-[0.98]"
+                      style={{
+                        background: `linear-gradient(135deg, ${primaryStart}, ${primaryEnd})`,
+                        color: contrast,
+                      }}
                     >
-                      Iniciar <ArrowRight className="h-4 w-4" />
+                      {currentNode.data?.buttonText || "Iniciar"} <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
                 )}
@@ -511,7 +582,11 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "Escreva aqui..."}
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none transition-all ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white focus:ring-2 focus:ring-[var(--brand-gradient-start)]/15'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950 focus:ring-2 focus:ring-[var(--brand-gradient-start)]/15'
+                    }`}
                   />
                 )}
 
@@ -526,24 +601,32 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "Digite sua resposta..."}
-                    className="w-full text-base p-3 bg-zinc-900 rounded-xl border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors resize-none"
+                    className={`w-full text-sm sm:text-base p-3.5 rounded-xl border outline-none transition-all resize-none ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                    }`}
                   />
                 )}
 
                 {/* CELULAR */}
                 {currentNode.type === "celular" && (
-                  <div className="flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="flex flex-col sm:flex-row gap-2.5 items-center">
                     <select
                       value={selectedPhoneCountry.code}
                       onChange={(e) => {
                         const match = countriesList.find(c => c.code === e.target.value)
                         if (match) setSelectedPhoneCountry(match)
                       }}
-                      className="h-12 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-foreground text-sm focus:border-[var(--brand-gradient-start,#CC8667)] outline-none w-full sm:w-32"
+                      className={`h-12 px-3 rounded-xl border text-sm outline-none w-full sm:w-36 shrink-0 cursor-pointer ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-200 text-slate-800 focus:border-[var(--brand-gradient-start)]'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-200 focus:border-[var(--brand-gradient-start)]'
+                      }`}
                     >
                       {countriesList.map(c => (
                         <option key={c.code} value={c.code}>
-                          {c.flag} {c.code}
+                          {c.flag} {c.code} ({c.dialCode})
                         </option>
                       ))}
                     </select>
@@ -557,7 +640,11 @@ export function TypeformModal({
                         setErrorMsg("")
                       }}
                       placeholder={selectedPhoneCountry.placeholder}
-                      className="flex-1 h-12 px-4 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors w-full"
+                      className={`flex-1 h-12 px-4 rounded-xl border outline-none transition-all w-full text-base ${
+                        isLight
+                          ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                      }`}
                     />
                   </div>
                 )}
@@ -573,7 +660,11 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder={currentNode.data.placeholder || "exemplo@email.com"}
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none transition-all ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                    }`}
                   />
                 )}
 
@@ -588,72 +679,94 @@ export function TypeformModal({
                       setErrorMsg("")
                     }}
                     placeholder="000.000.000-00"
-                    className="w-full text-lg p-3 bg-zinc-900 border-b border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none font-mono transition-all ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                    }`}
                   />
                 )}
 
                 {/* MAIORIDADE */}
                 {currentNode.type === "maioridade" && (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
                         onClick={() => { setMaioridade("Sim"); setErrorMsg(""); }}
-                        className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                        className={`h-14 px-5 text-left rounded-xl border text-sm font-bold flex items-center justify-between transition-all cursor-pointer ${
                           maioridade === "Sim"
-                            ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
-                            : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
+                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20"
+                            : isLight
+                            ? "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                            : "border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100"
                         }`}
                       >
                         <span>Sim, sou maior de idade</span>
-                        <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">A</span>
+                        <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">A</span>
                       </button>
                       <button
                         onClick={() => { setMaioridade("Não"); setErrorMsg(""); }}
-                        className={`h-16 px-6 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                        className={`h-14 px-5 text-left rounded-xl border text-sm font-bold flex items-center justify-between transition-all cursor-pointer ${
                           maioridade === "Não"
-                            ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
-                            : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
+                            ? "border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-2 ring-amber-500/20"
+                            : isLight
+                            ? "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                            : "border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100"
                         }`}
                       >
                         <span>Não, sou menor de idade</span>
-                        <span className="w-5 h-5 rounded-full border border-border/30 flex items-center justify-center text-[10px]">B</span>
+                        <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">B</span>
                       </button>
                     </div>
 
                     {maioridade === "Não" && (
-                      <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/30 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                        <span className="text-xs font-bold text-[var(--brand-gradient-start,#CC8667)] uppercase tracking-wider block">
+                      <div className={`p-4 rounded-xl border space-y-3 animate-in slide-in-from-top-2 duration-200 ${
+                        isLight ? 'border-amber-200 bg-amber-50/50' : 'border-amber-500/30 bg-amber-500/5'
+                      }`}>
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
                           Dados do Responsável Legal:
                         </span>
                         <div>
-                          <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Nome do Responsável:</label>
+                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                            Nome do Responsável:
+                          </label>
                           <input
                             type="text"
                             value={responsavelNome}
                             onChange={(e) => { setResponsavelNome(e.target.value); setErrorMsg(""); }}
                             placeholder="Ex: Carlos Silva"
-                            className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                            className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                              isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                            }`}
                           />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">CPF do Responsável:</label>
+                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                              CPF do Responsável:
+                            </label>
                             <input
                               type="text"
                               value={responsavelCpf}
                               onChange={(e) => { setResponsavelCpf(formatCPF(e.target.value)); setErrorMsg(""); }}
                               placeholder="000.000.000-00"
-                              className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                              className={`w-full h-11 px-3 rounded-xl border text-sm outline-none font-mono ${
+                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                              }`}
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Telefone do Responsável:</label>
+                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                              Telefone do Responsável:
+                            </label>
                             <input
                               type="tel"
                               value={responsavelTelefone}
                               onChange={(e) => { setResponsavelTelefone(e.target.value); setErrorMsg(""); }}
                               placeholder="(11) 99999-9999"
-                              className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                              className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                              }`}
                             />
                           </div>
                         </div>
@@ -665,7 +778,9 @@ export function TypeformModal({
                 {/* CONTRATO / TCLE */}
                 {currentNode.type === "contrato" && (
                   <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 text-xs text-muted-foreground max-h-60 overflow-y-auto custom-scrollbar font-sans whitespace-pre-wrap leading-relaxed">
+                    <div className={`p-4 rounded-xl border text-xs max-h-60 overflow-y-auto custom-scrollbar font-sans whitespace-pre-wrap leading-relaxed ${
+                      isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-zinc-900/60 border-zinc-800 text-zinc-300'
+                    }`}>
                       {currentNode.data.contractText || contractText || "Ao assinar este termo você concorda com o atendimento clínico e triagem."}
                     </div>
                     <div className="flex items-start gap-2.5 pt-2">
@@ -674,9 +789,9 @@ export function TypeformModal({
                         id="check-contrato"
                         checked={contratoAceito}
                         onChange={(e) => { setContratoAceito(e.target.checked); setErrorMsg(""); }}
-                        className="mt-0.5 w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-[var(--brand-gradient-start,#CC8667)] cursor-pointer"
+                        className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[var(--brand-gradient-start)] cursor-pointer"
                       />
-                      <label htmlFor="check-contrato" className="text-xs text-slate-300 cursor-pointer select-none leading-relaxed">
+                      <label htmlFor="check-contrato" className={`text-xs cursor-pointer select-none leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                         Li, compreendo e concordo com todos os termos do contrato/TCLE e autorizo a coleta dos dados para fins de triagem (LGPD).
                       </label>
                     </div>
@@ -685,37 +800,49 @@ export function TypeformModal({
 
                 {/* CONTATO DE EMERGENCIA */}
                 {currentNode.type === "emergencia" && (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Nome do Contato:</label>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                        Nome do Contato:
+                      </label>
                       <input
                         type="text"
                         autoFocus
                         value={emergenciaNome}
                         onChange={(e) => { setEmergenciaNome(e.target.value); setErrorMsg(""); }}
                         placeholder="Ex: Maria Silva"
-                        className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                        className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                          isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                        }`}
                       />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Relação/Parentesco:</label>
+                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                          Relação/Parentesco:
+                        </label>
                         <input
                           type="text"
                           value={emergenciaRelacao}
                           onChange={(e) => { setEmergenciaRelacao(e.target.value); setErrorMsg(""); }}
                           placeholder="Ex: Cônjuge, Mãe, Amigo"
-                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                          className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                          }`}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Telefone Celular:</label>
+                        <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                          Telefone Celular:
+                        </label>
                         <input
                           type="tel"
                           value={emergenciaTelefone}
                           onChange={(e) => { setEmergenciaTelefone(e.target.value); setErrorMsg(""); }}
                           placeholder="(11) 99999-9999"
-                          className="w-full h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 focus:border-[var(--brand-gradient-start,#CC8667)] outline-none text-foreground text-sm"
+                          className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
+                          }`}
                         />
                       </div>
                     </div>
@@ -733,12 +860,20 @@ export function TypeformModal({
                           onClick={() => handleSelectChoice(opt.value, opt.label)}
                           className={`h-12 px-4 text-left rounded-xl border text-sm font-semibold flex items-center justify-between transition-all cursor-pointer ${
                             isSelected
-                              ? "border-[var(--brand-gradient-start,#CC8667)] bg-[var(--brand-gradient-start,#CC8667)]/10 text-white"
-                              : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900 text-muted-foreground hover:text-foreground"
+                              ? "border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-slate-900 dark:text-white ring-2 ring-[var(--brand-gradient-start)]/20"
+                              : isLight
+                              ? "border-slate-200 bg-slate-50/80 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+                              : "border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100"
                           }`}
                         >
                           <span>{opt.label}</span>
-                          <span className="w-5 h-5 rounded bg-zinc-800 border border-border/20 text-muted-foreground/60 text-[9px] flex items-center justify-center font-bold">
+                          <span className={`w-5 h-5 rounded border text-[10px] flex items-center justify-center font-bold ${
+                            isSelected
+                              ? "border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)] text-white"
+                              : isLight
+                              ? "border-slate-200 bg-white text-slate-400"
+                              : "border-zinc-700 bg-zinc-800 text-zinc-500"
+                          }`}>
                             {idx + 1}
                           </span>
                         </button>
@@ -750,14 +885,18 @@ export function TypeformModal({
 
               {/* Bottom Actions */}
               {currentNode.type !== "start" && (
-                <div className="flex items-center justify-between pt-4 border-t border-border/10">
-                  <span className="text-xs text-red-400 font-semibold min-h-[16px]">{errorMsg}</span>
+                <div className={`flex items-center justify-between pt-5 border-t ${isLight ? 'border-slate-100' : 'border-zinc-800/80'}`}>
+                  <span className="text-xs text-red-500 font-semibold min-h-[16px]">{errorMsg}</span>
                   <button
                     onClick={handleNext}
                     disabled={isPending}
-                    className="px-5 h-11 bg-zinc-800 hover:bg-zinc-700 text-foreground rounded-xl cursor-pointer font-semibold text-sm transition-all border border-border/10 flex items-center gap-1.5"
+                    className="px-6 h-12 rounded-xl cursor-pointer font-bold text-sm transition-all shadow-md flex items-center gap-2 hover:opacity-95 active:scale-[0.98]"
+                    style={{
+                      background: `linear-gradient(135deg, ${primaryStart}, ${primaryEnd})`,
+                      color: contrast,
+                    }}
                   >
-                    {isPending ? "Processando..." : (resolveNextNodeId() ? "Avançar" : "Concluir")}
+                    {isPending ? "Processando..." : (currentNode.data?.buttonText || (resolveNextNodeId() ? "Avançar" : "Concluir"))}
                     {!isPending && <ArrowRight className="h-4 w-4" />}
                   </button>
                 </div>

@@ -87,6 +87,14 @@ export default function PublicFormPage() {
         tenantId={formData.tenantId}
         pageId=""
         formFlow={formData.formFlow}
+        theme={{
+          colors: {
+            primaryStart,
+            primaryEnd,
+            contrast,
+          }
+        }}
+        isDark={true}
       />
     </div>
   );

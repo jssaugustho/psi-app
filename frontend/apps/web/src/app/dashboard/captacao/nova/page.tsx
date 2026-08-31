@@ -107,70 +107,89 @@ const DEFAULT_TEMPLATE_MODEL = {
   formFlow: {
     nodes: [
       {
-        id: 'welcome',
-        type: 'step',
-        position: { x: 50, y: 150 },
+        id: 'start',
+        type: 'start',
+        position: { x: 80, y: 150 },
         data: {
-          stepType: 'welcome',
-          title: 'Bem-vinda(o) ao Atendimento Psicológico',
-          description: 'Responda a algumas perguntas simples para iniciarmos o seu atendimento de forma segura.',
-          buttonText: 'Começar Agora'
+          title: 'Triagem Clínica Inicial',
+          subtitle: 'Preencha as informações abaixo para agendarmos sua primeira sessão.',
+          isRequired: true,
+          buttonText: 'Iniciar Triagem'
         }
       },
       {
-        id: 'name',
-        type: 'step',
-        position: { x: 350, y: 150 },
+        id: 'nome',
+        type: 'nome',
+        position: { x: 460, y: 150 },
         data: {
-          stepType: 'question',
-          questionType: 'text',
           title: 'Qual é o seu nome completo?',
-          placeholder: 'Digite seu nome...',
-          required: true
+          placeholder: 'Escreva seu nome completo...',
+          isRequired: true,
+          buttonText: 'Avançar'
         }
       },
       {
-        id: 'phone',
-        type: 'step',
-        position: { x: 650, y: 150 },
+        id: 'maioridade',
+        type: 'maioridade',
+        position: { x: 840, y: 150 },
         data: {
-          stepType: 'question',
-          questionType: 'phone',
+          title: 'Você é maior de idade?',
+          subtitle: 'Caso seja menor de 18 anos, solicitaremos os dados do responsável legal.',
+          isRequired: true,
+          options: [
+            { label: 'Sim, sou maior de 18 anos', value: 'Sim' },
+            { label: 'Não, sou menor de idade', value: 'Não' }
+          ],
+          buttonText: 'Avançar'
+        }
+      },
+      {
+        id: 'celular',
+        type: 'celular',
+        position: { x: 1220, y: 150 },
+        data: {
           title: 'Qual é o seu WhatsApp para contato?',
+          subtitle: 'Usaremos para confirmar o horário e enviar o link da sessão.',
           placeholder: '(11) 99999-9999',
-          required: true
+          isRequired: true,
+          buttonText: 'Avançar'
         }
       },
       {
-        id: 'reason',
-        type: 'step',
-        position: { x: 950, y: 150 },
+        id: 'emergencia',
+        type: 'emergencia',
+        position: { x: 1600, y: 150 },
         data: {
-          stepType: 'question',
-          questionType: 'textarea',
-          title: 'Qual o principal motivo da sua busca por atendimento neste momento?',
-          placeholder: 'Descreva brevemente o que você está sentindo...',
-          required: false
+          title: 'Contato de Emergência',
+          subtitle: 'Informe nome, telefone e parentesco de uma pessoa de confiança para suporte em caso de necessidade.',
+          isRequired: false,
+          buttonText: 'Avançar'
         }
       },
       {
-        id: 'thankyou',
-        type: 'step',
-        position: { x: 1250, y: 150 },
+        id: 'contrato',
+        type: 'contrato',
+        position: { x: 1980, y: 150 },
         data: {
-          stepType: 'thankyou',
-          title: 'Obrigado por responder!',
-          description: 'Sua solicitação foi recebida. Entraremos em contato via WhatsApp em breve.',
-          buttonText: 'Concluir'
+          title: 'Termo de Consentimento e Sigilo Profissional',
+          subtitle: 'Leia e confirme para concluir sua solicitação de agendamento.',
+          contractText: 'Ao prosseguir, você declara estar ciente de que os atendimentos psicológicos são realizados em conformidade com o Código de Ética Profissional do Psicólogo e as diretrizes do Conselho Federal de Psicologia (CFP). As informações fornecidas são confidenciais, protegidas por sigilo profissional e tratadas nos termos da Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).',
+          isRequired: true,
+          buttonText: 'Concluir Triagem'
         }
       }
     ],
     edges: [
-      { id: 'e-welcome-name', source: 'welcome', target: 'name' },
-      { id: 'e-name-phone', source: 'name', target: 'phone' },
-      { id: 'e-phone-reason', source: 'phone', target: 'reason' },
-      { id: 'e-reason-thankyou', source: 'reason', target: 'thankyou' }
-    ]
+      { id: 'e-start-nome', source: 'start', target: 'nome' },
+      { id: 'e-nome-maioridade', source: 'nome', target: 'maioridade' },
+      { id: 'e-maioridade-celular', source: 'maioridade', target: 'celular', sourceHandle: 'source-maior' },
+      { id: 'e-celular-emergencia', source: 'celular', target: 'emergencia' },
+      { id: 'e-emergencia-contrato', source: 'emergencia', target: 'contrato' }
+    ],
+    settings: {
+      successAction: 'whatsapp',
+      whatsappMessageTemplate: 'Olá! Preenchi a triagem inicial pelo seu site e gostaria de agendar minha sessão. Meu nome é {{nome}}.'
+    }
   }
 };
 
@@ -434,7 +453,7 @@ export default function NovaPaginaCaptacaoPage() {
           ]
         },
         dictionary: {},
-        formFlow: { nodes: [], edges: [] },
+        formFlow: JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_MODEL.formFlow)),
       });
 
       if (res && res.success && res.page?.id) {

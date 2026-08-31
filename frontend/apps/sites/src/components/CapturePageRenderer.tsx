@@ -1512,6 +1512,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
         pageId={page.id}
         formFlow={page.formFlow}
         whatsappNumber={tenant.phone || ""}
+        theme={page.siteConfig?.theme}
+        isDark={!isLightBg}
       />
     </div>
   )

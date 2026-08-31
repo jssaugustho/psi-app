@@ -415,12 +415,17 @@ export function FormBuilderWorkspace({
     // Validar fluxo no frontend
     const errors: string[] = [];
     
-    // 1. Verificar blocos obrigatórios
-    const requiredTypes = ['nome', 'celular', 'maioridade', 'contrato'];
+    // 1. Verificar blocos obrigatórios (Nome, WhatsApp e Maioridade)
+    const requiredTypes = ['nome', 'celular', 'maioridade'];
     for (const rType of requiredTypes) {
       const hasNode = nodes.some((n: any) => n.type === rType);
       if (!hasNode) {
-        errors.push(`O bloco de template '${rType.toUpperCase()}' é obrigatório no fluxo.`);
+        const labelMap: Record<string, string> = {
+          nome: 'Nome Completo',
+          celular: 'WhatsApp / Celular',
+          maioridade: 'Maioridade'
+        };
+        errors.push(`O bloco obrigatório '${labelMap[rType] || rType.toUpperCase()}' é obrigatório no fluxo.`);
       }
     }
 
@@ -444,11 +449,6 @@ export function FormBuilderWorkspace({
       const hasIncoming = edges.some((e: any) => e.target === node.id);
       if (!hasIncoming) {
         errors.push(`O bloco '${nodeData?.title || node.id}' está órfão (não possui conexão de entrada).`);
-      }
-
-      const hasOutgoing = edges.some((e: any) => e.source === node.id);
-      if (!hasOutgoing) {
-        errors.push(`O bloco '${nodeData?.title || node.id}' não está conectado a nenhuma saída.`);
       }
 
       if (node.type === 'seletor') {

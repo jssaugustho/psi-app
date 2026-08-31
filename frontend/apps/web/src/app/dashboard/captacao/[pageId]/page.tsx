@@ -9,12 +9,14 @@ import { MediaLibraryModal } from '@/components/media-library-modal';
 import { LogoOptionModal } from '@/components/logo-option-modal';
 import { LogoBuilderModal } from '@/components/logo-builder-modal';
 import { FontPicker } from '@/components/FontPicker';
+import { TypeformPreviewModal } from '@/components/TypeformPreviewModal';
 import {
   ArrowLeft, Save, Sparkles, AlertCircle, Layout, GitBranch, Settings, Palette,
   Plus, Trash2, ExternalLink, RefreshCw, Eye, HelpCircle, Check, Play, Maximize2, Minimize2, Globe,
   Monitor, Smartphone, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Undo, Redo,
   Upload, Image as ImageIcon, Loader2, MapPin, ArrowUp, ArrowDown, GripVertical,
-  PanelLeft, PanelLeftClose, Sun, Moon
+  PanelLeft, PanelLeftClose, Sun, Moon, User, Phone, Mail, CheckSquare, FileText, MessageSquare,
+  ShieldCheck, Sliders, AlignLeft, X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -50,6 +52,7 @@ import {
   type Connection,
   type Edge,
   type Node,
+  type EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -723,106 +726,573 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   );
 };
 
-// React Flow Custom Node Components
-const CustomStartNode = ({ data }: any) => (
-  <div className="w-56 glass-md border border-emerald-500/30 rounded-xl p-3 shadow-lg relative">
-    <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
-      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-        Início
-      </span>
-      <Play className="h-3.5 w-3.5 text-emerald-500" />
-    </div>
-    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{data.title}</div>
-    <Handle
-      type="source"
-      position={Position.Right}
-      id="source"
-      className="!bg-emerald-500 !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
-    />
-  </div>
-);
+// React Flow Custom Node Compon// Helper to get Typebot block configuration & theme
+const getNodeConfig = (type: string) => {
+  switch (type) {
+    case 'start':
+      return {
+        label: 'Início do Formulário',
+        accentBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        icon: Sparkles,
+        isStrictRequired: true,
+      };
+    case 'nome':
+      return {
+        label: 'Nome Completo',
+        accentBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        icon: User,
+        isStrictRequired: true,
+      };
+    case 'celular':
+    case 'contato':
+      return {
+        label: 'WhatsApp / Celular',
+        accentBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        icon: Phone,
+        isStrictRequired: true,
+      };
+    case 'maioridade':
+      return {
+        label: 'Validação de Maioridade',
+        accentBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        icon: ShieldCheck,
+        isStrictRequired: true,
+      };
+    case 'email':
+      return {
+        label: 'E-mail de Contato',
+        accentBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
+        icon: Mail,
+        isStrictRequired: false,
+      };
+    case 'cpf':
+      return {
+        label: 'CPF do Paciente',
+        accentBg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+        icon: Sliders,
+        isStrictRequired: false,
+      };
+    case 'contrato':
+      return {
+        label: 'Termo de Consentimento / Contrato',
+        accentBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+        icon: FileText,
+        isStrictRequired: false,
+      };
+    case 'emergencia':
+      return {
+        label: 'Contato de Emergência',
+        accentBg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
+        icon: AlertCircle,
+        isStrictRequired: false,
+      };
+    case 'seletor':
+    case 'escolha':
+    case 'escolha_multipla':
+      return {
+        label: 'Escolha de Opção',
+        accentBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        icon: CheckSquare,
+        isStrictRequired: false,
+      };
+    case 'paragrafo':
+      return {
+        label: 'Parágrafo Longo',
+        accentBg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
+        icon: AlignLeft,
+        isStrictRequired: false,
+      };
+    default:
+      return {
+        label: 'Texto Curto',
+        accentBg: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
+        icon: MessageSquare,
+        isStrictRequired: false,
+      };
+  }
+};
 
-const CustomInputNode = ({ data }: any) => {
+// React Flow Custom Node Components (Estilo Typebot)
+const CustomStartNode = ({ data }: any) => {
+  const config = getNodeConfig('start');
+  const IconComp = config.icon;
   const isSelected = data.isSelected;
-  const isEmergency = data.node.type === 'emergencia';
-  const isCpf = data.node.type === 'cpf';
-  const isNome = data.node.type === 'nome';
-  const isCelular = data.node.type === 'celular';
-  
+
   return (
     <div 
-      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
+      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+        isSelected 
+          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
+            <IconComp className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {config.label}
+          </span>
+        </div>
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+          Início
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="p-3.5 space-y-3">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-emerald-500" />
+            Mensagem de Boas-vindas
+          </label>
+          <input
+            type="text"
+            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+            value={data.node?.data?.title || data.title || ''}
+            onChange={(e) => data.onUpdate('title', e.target.value)}
+            placeholder="Ex: Bem-vinda(o) ao Atendimento Psicológico"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <input
+            type="text"
+            className="nodrag nopan w-full text-[11px] px-3 py-1.5 rounded-lg bg-slate-50/50 dark:bg-zinc-900/50 border border-slate-200/70 dark:border-zinc-800/70 text-slate-600 dark:text-slate-300 placeholder:text-slate-400/80 outline-none focus:border-purple-500 transition-all"
+            placeholder="Subtítulo ou mensagem de apoio (opcional)..."
+            value={data.node?.data?.subtitle || ''}
+            onChange={(e) => data.onUpdate('subtitle', e.target.value)}
+          />
+        </div>
+
+        {/* CTA Button Label */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <span className="text-[10px] text-slate-400 font-medium">Botão Inicial:</span>
+          <input
+            type="text"
+            className="nodrag nopan text-right text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-purple-600 dark:text-purple-400 focus:border-purple-500 outline-none w-28"
+            placeholder="Iniciar ➔"
+            value={data.node?.data?.buttonText || ''}
+            onChange={(e) => data.onUpdate('buttonText', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="source"
+        className="!w-3.5 !h-3.5 !bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-md -right-[7px]"
+      />
+    </div>
+  );
+};
+
+const CustomStepNode = ({ data }: any) => {
+  const isSelected = data.isSelected;
+  const nodeType = data.node?.type || 'texto';
+  const config = getNodeConfig(nodeType);
+  const IconComp = config.icon;
+  const isStrictRequired = config.isStrictRequired;
+
+  return (
+    <div 
+      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+        isSelected 
+          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -left-[7px]"
       />
-      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
-          Etapa: {data.node.type}
-        </span>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
-          title="Excluir Etapa"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
+            <IconComp className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {config.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isStrictRequired ? (
+            <span 
+              className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 uppercase tracking-wide flex items-center gap-1 select-none"
+              title="Este campo é obrigatório na triagem clínica e não pode ser excluído"
+            >
+              <ShieldCheck className="w-3 h-3" />
+              Obrigatório
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
+              className="nodrag p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+              title="Excluir Etapa"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
-      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-1">{data.node.data.title}</div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-        {isEmergency ? 'Contato emergencial' : isCpf ? 'Cadastro CPF' : isNome ? 'Nome Completo' : isCelular ? 'WhatsApp com país' : 'Campo de texto'}
+
+      {/* Body */}
+      <div className="p-3.5 space-y-3">
+        {/* Title */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <MessageSquare className="w-3 h-3 text-purple-500" />
+            Pergunta da Etapa
+          </label>
+          <input
+            type="text"
+            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+            value={data.node.data.title || ''}
+            onChange={(e) => data.onUpdate('title', e.target.value)}
+            placeholder="Digite a pergunta da etapa..."
+          />
+        </div>
+
+        {/* Subtitle */}
+        <div className="space-y-1">
+          <input
+            type="text"
+            className="nodrag nopan w-full text-[11px] px-3 py-1.5 rounded-lg bg-slate-50/50 dark:bg-zinc-900/50 border border-slate-200/70 dark:border-zinc-800/70 text-slate-600 dark:text-slate-300 placeholder:text-slate-400/80 outline-none focus:border-purple-500 transition-all"
+            placeholder="Instrução adicional (opcional)..."
+            value={data.node.data.subtitle || ''}
+            onChange={(e) => data.onUpdate('subtitle', e.target.value)}
+          />
+        </div>
+
+        {/* Specific Input Previews */}
+        {nodeType === 'celular' || nodeType === 'contato' ? (
+          <div className="space-y-1 pt-1">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Formato de Coleta</label>
+            <div className="px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 flex items-center gap-2">
+              <span className="text-sm">🇧🇷</span>
+              <span className="text-xs font-mono text-slate-500 font-semibold">+55</span>
+              <input
+                type="text"
+                className="nodrag nopan flex-1 text-xs bg-transparent outline-none text-slate-800 dark:text-slate-200 font-mono"
+                placeholder="(11) 99999-9999"
+                value={data.node.data.placeholder || '(11) 99999-9999'}
+                onChange={(e) => data.onUpdate('placeholder', e.target.value)}
+              />
+            </div>
+          </div>
+        ) : nodeType === 'maioridade' ? (
+          <div className="space-y-1.5 pt-1">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Opções de Triagem</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block">Sim (18+)</span>
+                <span className="text-[9px] text-slate-500 block">Avança fluxo</span>
+              </div>
+              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block">Não (Menor)</span>
+                <span className="text-[9px] text-slate-500 block">Coleta Responsável</span>
+              </div>
+            </div>
+          </div>
+        ) : nodeType === 'emergencia' ? (
+          <div className="space-y-1.5 pt-1">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Campos Inclusos</label>
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-1.5">• Nome do Contato</div>
+              <div className="flex items-center gap-1.5">• Grau de Parentesco</div>
+              <div className="flex items-center gap-1.5">• Telefone com WhatsApp</div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1 pt-1">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Placeholder (Texto sugerido)</label>
+            <input
+              type="text"
+              className="nodrag nopan w-full text-xs px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500"
+              placeholder="Ex: Digite sua resposta..."
+              value={data.node.data.placeholder || ''}
+              onChange={(e) => data.onUpdate('placeholder', e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="flex-1 mr-2">
+            <input
+              type="text"
+              className="nodrag nopan w-full text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-slate-600 dark:text-slate-400 focus:border-purple-500 outline-none"
+              placeholder="Texto do botão (ex: Continuar)"
+              value={data.node.data.buttonText || ''}
+              onChange={(e) => data.onUpdate('buttonText', e.target.value)}
+            />
+          </div>
+          {!isStrictRequired && (
+            <label className="nodrag nopan flex items-center gap-1 cursor-pointer text-[10px] text-slate-500 select-none">
+              <input
+                type="checkbox"
+                checked={data.node.data.isRequired ?? true}
+                onChange={(e) => data.onUpdate('isRequired', e.target.checked)}
+                className="w-3 h-3 rounded border-slate-300 text-purple-600"
+              />
+              Obrigatório
+            </label>
+          )}
+        </div>
       </div>
+
       <Handle
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -right-[7px]"
       />
+    </div>
+  );
+};
+
+const CustomMaioridadeNode = ({ data }: any) => {
+  const isSelected = data.isSelected;
+  const config = getNodeConfig('maioridade');
+  const IconComp = config.icon;
+
+  return (
+    <div 
+      className={`w-[340px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+        isSelected 
+          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
+      }`}
+    >
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="target"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -left-[7px]"
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
+            <IconComp className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {config.label}
+          </span>
+        </div>
+        <span 
+          className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 uppercase tracking-wide flex items-center gap-1 select-none"
+          title="Este campo é obrigatório na triagem clínica e não pode ser excluído"
+        >
+          <ShieldCheck className="w-3 h-3" />
+          Obrigatório
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="p-3.5 space-y-3">
+        {/* Title */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <MessageSquare className="w-3 h-3 text-amber-500" />
+            Pergunta de Maioridade
+          </label>
+          <input
+            type="text"
+            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+            value={data.node?.data?.title || ''}
+            onChange={(e) => data.onUpdate('title', e.target.value)}
+            placeholder="Você é maior de idade?"
+          />
+        </div>
+
+        {/* Subtitle */}
+        <div className="space-y-1">
+          <input
+            type="text"
+            className="nodrag nopan w-full text-[11px] px-3 py-1.5 rounded-lg bg-slate-50/50 dark:bg-zinc-900/50 border border-slate-200/70 dark:border-zinc-800/70 text-slate-600 dark:text-slate-300 placeholder:text-slate-400/80 outline-none focus:border-purple-500 transition-all"
+            placeholder="Subtítulo ou orientação da etapa..."
+            value={data.node?.data?.subtitle || ''}
+            onChange={(e) => data.onUpdate('subtitle', e.target.value)}
+          />
+        </div>
+
+        {/* 2 Saídas Lógicas: Maior de Idade & Menor de Idade */}
+        <div className="space-y-2 pt-1">
+          <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+            Saídas Lógicas de Resposta
+          </label>
+
+          {/* Saída 1: Maior de Idade (Sim) */}
+          <div className="relative p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block truncate">
+                  Sim, sou maior de 18 anos
+                </span>
+                <span className="text-[9px] text-slate-500 dark:text-slate-400 block">
+                  Segue fluxo padrão
+                </span>
+              </div>
+            </div>
+            <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0 mr-1">
+              Saída 1 ➔
+            </span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="source-maior"
+              className="!w-3.5 !h-3.5 !bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-md"
+              style={{ top: '50%', transform: 'translateY(-50%)', right: '-18px' }}
+            />
+          </div>
+
+          {/* Saída 2: Menor de Idade (Não) */}
+          <div className="relative p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block truncate">
+                  Não, sou menor de idade
+                </span>
+                <span className="text-[9px] text-slate-500 dark:text-slate-400 block">
+                  Coleta responsável legal
+                </span>
+              </div>
+            </div>
+            <span className="text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 shrink-0 mr-1">
+              Saída 2 ➔
+            </span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="source-menor"
+              className="!w-3.5 !h-3.5 !bg-amber-500 border-2 border-white dark:border-zinc-950 shadow-md"
+              style={{ top: '50%', transform: 'translateY(-50%)', right: '-18px' }}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <input
+            type="text"
+            className="nodrag nopan w-full text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-slate-600 dark:text-slate-400 focus:border-purple-500 outline-none"
+            placeholder="Texto do botão (ex: Avançar)"
+            value={data.node?.data?.buttonText || ''}
+            onChange={(e) => data.onUpdate('buttonText', e.target.value)}
+          />
+        </div>
+      </div>
     </div>
   );
 };
 
 const CustomContractNode = ({ data }: any) => {
   const isSelected = data.isSelected;
+  const config = getNodeConfig('contrato');
+  const IconComp = config.icon;
+
   return (
     <div 
-      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
+      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+        isSelected 
+          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -left-[7px]"
       />
-      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400">
-          Contrato Aceite
-        </span>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
+            <IconComp className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {config.label}
+          </span>
+        </div>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
+          className="nodrag p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+          title="Excluir Etapa"
         >
-          <Trash2 className="h-3 w-3" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-1">{data.node.data.title}</div>
-      <div className="text-[9px] text-violet-600 dark:text-violet-400 font-medium truncate">
-        Modelo: {data.contractTitle || <span className="italic">Nenhum associado</span>}
+
+      {/* Body */}
+      <div className="p-3.5 space-y-3">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <FileText className="w-3 h-3 text-rose-500" />
+            Título do Termo / Contrato
+          </label>
+          <input
+            type="text"
+            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+            value={data.node.data.title || ''}
+            onChange={(e) => data.onUpdate('title', e.target.value)}
+            placeholder="Termo de Consentimento Livre e Esclarecido"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Minuta Jurídica do Termo</label>
+          <textarea
+            rows={4}
+            className="nodrag nopan w-full text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none font-sans"
+            placeholder="Escreva os termos de aceite legal do contrato aqui..."
+            value={data.node.data.contractText || ''}
+            onChange={(e) => data.onUpdate('contractText', e.target.value)}
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="flex-1 mr-2">
+            <input
+              type="text"
+              className="nodrag nopan w-full text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-slate-600 dark:text-slate-400 focus:border-purple-500 outline-none"
+              placeholder="Texto do botão (ex: Aceitar e Continuar)"
+              value={data.node.data.buttonText || ''}
+              onChange={(e) => data.onUpdate('buttonText', e.target.value)}
+            />
+          </div>
+          <label className="nodrag nopan flex items-center gap-1 cursor-pointer text-[10px] text-slate-500 select-none">
+            <input
+              type="checkbox"
+              checked={data.node.data.isRequired ?? true}
+              onChange={(e) => data.onUpdate('isRequired', e.target.checked)}
+              className="w-3 h-3 rounded border-slate-300 text-purple-600"
+            />
+            Obrigatório
+          </label>
+        </div>
       </div>
+
       <Handle
         type="source"
         position={Position.Right}
         id="source"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -right-[7px]"
       />
     </div>
   );
@@ -831,49 +1301,162 @@ const CustomContractNode = ({ data }: any) => {
 const CustomSelectorNode = ({ data }: any) => {
   const isSelected = data.isSelected;
   const options = data.node.data.options || [];
+  const config = getNodeConfig('seletor');
+  const IconComp = config.icon;
 
   return (
     <div 
-      className={`w-64 glass-md border rounded-xl p-3 shadow-lg relative transition-all ${
-        isSelected ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]' : 'border-[var(--surface-border)]'
+      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+        isSelected 
+          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id="target"
-        className="!bg-[var(--brand-gradient-start)] !w-3 !h-3 !border-2 !border-[var(--brand-bg-color)]"
+        className="!w-3.5 !h-3.5 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md -left-[7px]"
       />
-      <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-1.5 mb-1.5">
-        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          Seletor Condicional
-        </span>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
+            <IconComp className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+            {data.node.data.isMultiple ? 'Múltipla Escolha' : 'Escolha Única'}
+          </span>
+        </div>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); data.onDelete(data.node.id); }}
-          className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
+          className="nodrag p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+          title="Excluir Etapa"
         >
-          <Trash2 className="h-3 w-3" />
+          <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="text-xs font-semibold text-slate-900 dark:text-white truncate mb-2">{data.node.data.title}</div>
-      
-      <div className="space-y-1.5">
-        {options.map((opt: any, idx: number) => (
-          <div key={idx} className="relative flex items-center justify-between text-[10px] glass-sm border border-[var(--surface-border)] p-1.5 rounded text-slate-700 dark:text-slate-300">
-            <span className="truncate pr-4">{opt.label}</span>
-            <Handle
-              type="source"
-              position={Position.Right}
-              id={`option-${idx}`}
-              className="!bg-[var(--brand-gradient-start)] !w-2.5 !h-2.5 !border-2 !border-[var(--brand-bg-color)]"
-              style={{ top: '50%', transform: 'translateY(-50%)', right: '-6px' }}
+
+      {/* Body */}
+      <div className="p-3.5 space-y-3">
+        {/* Title */}
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <MessageSquare className="w-3 h-3 text-purple-500" />
+            Pergunta ao Paciente
+          </label>
+          <input
+            type="text"
+            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+            value={data.node.data.title || ''}
+            onChange={(e) => data.onUpdate('title', e.target.value)}
+            placeholder="Qual é o seu objetivo principal?"
+          />
+        </div>
+
+        {/* Subtitle */}
+        <div className="space-y-1">
+          <input
+            type="text"
+            className="nodrag nopan w-full text-[11px] px-3 py-1.5 rounded-lg bg-slate-50/50 dark:bg-zinc-900/50 border border-slate-200/70 dark:border-zinc-800/70 text-slate-600 dark:text-slate-300 placeholder:text-slate-400/80 outline-none focus:border-purple-500 transition-all"
+            placeholder="Instrução adicional (opcional)..."
+            value={data.node.data.subtitle || ''}
+            onChange={(e) => data.onUpdate('subtitle', e.target.value)}
+          />
+        </div>
+
+        {/* Options List */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Opções de Resposta
+            </label>
+            <label className="nodrag nopan flex items-center gap-1.5 cursor-pointer text-[10px] text-purple-600 dark:text-purple-400 font-semibold select-none">
+              <input
+                type="checkbox"
+                checked={data.node.data.isMultiple || false}
+                onChange={(e) => data.onUpdate('isMultiple', e.target.checked)}
+                className="w-3 h-3 rounded border-slate-300 text-purple-600"
+              />
+              Múltipla Escolha
+            </label>
+          </div>
+
+          <div className="space-y-1.5">
+            {options.map((opt: any, idx: number) => (
+              <div key={idx} className="relative flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {idx + 1}
+                </div>
+                <input
+                  type="text"
+                  className="nodrag nopan flex-1 text-xs px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500"
+                  placeholder={`Opção ${idx + 1}`}
+                  value={opt.label || ''}
+                  onChange={(e) => {
+                    const updatedOptions = [...options];
+                    updatedOptions[idx] = { ...opt, label: e.target.value, value: e.target.value || `op_${idx + 1}` };
+                    data.onUpdate('options', updatedOptions);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updatedOptions = options.filter((_: any, oIdx: number) => oIdx !== idx);
+                    data.onUpdate('options', updatedOptions);
+                  }}
+                  className="nodrag p-1 text-slate-400 hover:text-red-500 cursor-pointer shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                {/* Individual Source Handle for Branching */}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={`option-${idx}`}
+                  className="!w-3 !h-3 !bg-purple-600 border-2 border-white dark:border-zinc-950 shadow-md"
+                  style={{ top: '50%', transform: 'translateY(-50%)', right: '-18px' }}
+                />
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                const updatedOptions = [...options, { label: `Opção ${options.length + 1}`, value: `op_${options.length + 1}` }];
+                data.onUpdate('options', updatedOptions);
+              }}
+              className="nodrag nopan w-full py-1.5 px-3 rounded-xl border border-dashed border-slate-300 dark:border-zinc-750 hover:border-purple-500 text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-slate-50/50 dark:bg-zinc-900/50"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Adicionar Opção</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <div className="flex-1 mr-2">
+            <input
+              type="text"
+              className="nodrag nopan w-full text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-slate-600 dark:text-slate-400 focus:border-purple-500 outline-none"
+              placeholder="Texto do botão (ex: Avançar)"
+              value={data.node.data.buttonText || ''}
+              onChange={(e) => data.onUpdate('buttonText', e.target.value)}
             />
           </div>
-        ))}
-        {options.length === 0 && (
-          <div className="text-[9px] italic text-slate-500 text-center py-1">Sem opções cadastradas</div>
-        )}
+          <label className="nodrag nopan flex items-center gap-1 cursor-pointer text-[10px] text-slate-500 select-none">
+            <input
+              type="checkbox"
+              checked={data.node.data.isRequired ?? true}
+              onChange={(e) => data.onUpdate('isRequired', e.target.checked)}
+              className="w-3 h-3 rounded border-slate-300 text-purple-600"
+            />
+            Obrigatório
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -1085,6 +1668,9 @@ export default function PageEditor({ params }: PageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isFormPreviewOpen, setIsFormPreviewOpen] = useState(false);
+  const [isMissingStepsModalOpen, setIsMissingStepsModalOpen] = useState(false);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
   // Live preview refresh counter
   const [previewKey, setPreviewKey] = useState(0);
@@ -3076,8 +3662,38 @@ export default function PageEditor({ params }: PageProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // Node Drag Stop helper to force push position history
-  const onNodeDragStop = useCallback(() => {
+  // Node Drag Stop helper to sync new positions immediately into page.formFlow.nodes and record history
+  const onNodeDragStop = useCallback((_: any, draggedNode: Node) => {
+    setPage(prev => {
+      if (!prev) return prev;
+      const updatedNodes = (prev.formFlow?.nodes || []).map((n: any) => {
+        if (n.id === draggedNode.id) {
+          return {
+            ...n,
+            position: {
+              x: Math.round(draggedNode.position.x),
+              y: Math.round(draggedNode.position.y)
+            }
+          };
+        }
+        return n;
+      });
+      return {
+        ...prev,
+        formFlow: {
+          ...prev.formFlow,
+          nodes: updatedNodes,
+          edges: prev.formFlow?.edges || edges.map(e => ({
+            id: e.id,
+            source: e.source,
+            target: e.target,
+            sourceHandle: e.sourceHandle || 'source',
+            targetHandle: e.targetHandle || 'target'
+          }))
+        }
+      };
+    });
+    setHasUnsavedChanges(true);
     if (page) {
       recordHistory(page, nodes, edges, true);
     }
@@ -3360,46 +3976,165 @@ export default function PageEditor({ params }: PageProps) {
   const formFlowNodes = page?.formFlow?.nodes;
   const formFlowEdges = page?.formFlow?.edges;
 
-  // Sync state dictionary/configs to React Flow states when page is loaded (optimized to ignore text edits)
+  // Compute missing required nodes for validation & lock UI
+  const missingRequiredNodes = useMemo(() => {
+    if (!page?.formFlow?.nodes) return [];
+    const requiredSpecs = [
+      { type: 'start', label: 'Início do Formulário', desc: 'Boas-vindas e início da triagem' },
+      { type: 'nome', label: 'Nome Completo', desc: 'Identificação do paciente' },
+      { type: 'maioridade', label: 'Maioridade (18+)', desc: 'Validação de maioridade e responsável legal' },
+      { type: 'celular', label: 'WhatsApp / Celular', desc: 'Contato telefônico com DDD' },
+    ];
+    return requiredSpecs.filter(spec => {
+      if (spec.type === 'start') {
+        return !page.formFlow.nodes.some((n: any) => n.type === 'start' || n.id === 'start');
+      }
+      if (spec.type === 'celular') {
+        return !page.formFlow.nodes.some((n: any) => n.type === 'celular' || n.type === 'contato' || n.id === 'celular');
+      }
+      return !page.formFlow.nodes.some((n: any) => n.type === spec.type || n.id === spec.type);
+    });
+  }, [page?.formFlow?.nodes]);
+
+  // Sync state dictionary/configs to React Flow states when page is loaded (preserves canvas positions & prevents jumping)
   useEffect(() => {
     if (!page) return;
 
+    // Detect if saved database nodes have overlaps (e.g. legacy data with overlapping x coordinates)
+    const rawPositions = (formFlowNodes || []).map((n: any) => n.position?.x);
+    const hasOverlaps = rawPositions.some((x: any, i: number) => {
+      if (x === undefined || x === null || x === 0) return true;
+      return rawPositions.some((otherX: any, j: number) => i !== j && otherX !== undefined && Math.abs(x - otherX) < 260);
+    });
+
     // Build flow nodes for React Flow canvas
-    const flowNodes = (formFlowNodes || []).map((node: any) => {
+    const flowNodes = (formFlowNodes || []).map((node: any, idx: number) => {
+      let nodeType = 'stepNode';
+      if (node.type === 'start') nodeType = 'startNode';
+      else if (node.type === 'maioridade') nodeType = 'maioridadeNode';
+      else if (node.type === 'seletor' || node.type === 'escolha' || node.type === 'escolha_multipla') nodeType = 'selectorNode';
+      else if (node.type === 'contrato') nodeType = 'contractNode';
+
+      // Preserve existing position from canvas state if already present, or use clean horizontal layout
+      const existing = nodes.find(n => n.id === node.id);
+      const defaultX = idx * 380 + 80;
+      
+      let pos = { x: defaultX, y: 150 };
+      if (existing) {
+        pos = existing.position;
+      } else if (!hasOverlaps && node.position && node.position.x !== undefined && node.position.x !== 0) {
+        pos = node.position;
+      }
+
       return {
         id: node.id,
-        type: node.type === 'start' ? 'start' : node.type === 'seletor' ? 'seletor' : node.type === 'contrato' ? 'contrato' : 'input',
-        position: node.position || { x: 100, y: 100 },
+        type: nodeType,
+        position: pos,
         data: {
           node,
           isSelected: selectedNodeId === node.id,
           contractTitle: undefined,
           onDelete: handleDeleteNode,
+          onUpdate: (field: string, value: any) => updateNodeData(node.id, field, value),
         }
       };
     });
 
-    const flowEdges = (formFlowEdges || []).map((edge: any) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle || 'source',
-      targetHandle: 'target',
-      type: 'default',
-      style: { stroke: 'var(--brand-gradient-start)', strokeWidth: 2 }
-    }));
-
     setNodes(flowNodes);
-    setEdges(flowEdges);
+
+    // Only update edges if canvas edges are empty or when formFlowEdges has different connections
+    setEdges(prevEdges => {
+      if (prevEdges.length > 0 && formFlowEdges && formFlowEdges.length > 0) {
+        const isSame = prevEdges.length === formFlowEdges.length &&
+          prevEdges.every((pe, i) => 
+            pe.source === formFlowEdges[i]?.source && 
+            pe.target === formFlowEdges[i]?.target &&
+            (pe.sourceHandle || 'source') === (formFlowEdges[i]?.sourceHandle || 'source')
+          );
+        if (isSame) return prevEdges;
+      }
+      if (formFlowEdges && formFlowEdges.length > 0) {
+        return formFlowEdges.map((edge: any, idx: number) => {
+          const handleSuffix = edge.sourceHandle ? `-${edge.sourceHandle}` : '';
+          return {
+            id: edge.id || `e-${edge.source}${handleSuffix}-${edge.target}-${idx}`,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle || 'source',
+            targetHandle: edge.targetHandle || 'target',
+            type: 'default',
+            style: { stroke: 'var(--brand-gradient-start, #9333ea)', strokeWidth: 2 }
+          };
+        });
+      }
+      return prevEdges;
+    });
   }, [formFlowNodes, formFlowEdges, selectedNodeId]);
 
-  // Connect visual nodes in React Flow
+  // Connect visual nodes in React Flow & sync immediately to page.formFlow.edges
   const onConnect = useCallback((params: Connection) => {
-    setEdges((eds) => addEdge({
-      ...params,
-      style: { stroke: 'var(--brand-gradient-start)', strokeWidth: 2 }
-    }, eds));
+    setEdges((eds) => {
+      const handleSuffix = params.sourceHandle ? `-${params.sourceHandle}` : '';
+      const edgeId = `e-${params.source}${handleSuffix}-${params.target}`;
+
+      // Remove previous edge originating from the EXACT same source AND sourceHandle
+      const filteredEds = eds.filter(e => !(e.source === params.source && (e.sourceHandle || 'source') === (params.sourceHandle || 'source')));
+
+      const nextEdges = addEdge({
+        ...params,
+        id: edgeId,
+        type: 'default',
+        style: { stroke: 'var(--brand-gradient-start, #9333ea)', strokeWidth: 2 }
+      }, filteredEds);
+
+      // Sync immediately into page.formFlow.edges
+      setPage(prev => {
+        if (!prev) return prev;
+        const mappedEdges = nextEdges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle || 'source',
+          targetHandle: e.targetHandle || 'target'
+        }));
+        return {
+          ...prev,
+          formFlow: {
+            ...prev.formFlow,
+            edges: mappedEdges
+          }
+        };
+      });
+      return nextEdges;
+    });
+    setHasUnsavedChanges(true);
   }, [setEdges]);
+
+  // Edge changes handler syncing edge removals into page.formFlow.edges
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+    setEdges(currentEdges => {
+      setPage(prev => {
+        if (!prev) return prev;
+        const mappedEdges = currentEdges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle || 'source',
+          targetHandle: e.targetHandle || 'target'
+        }));
+        return {
+          ...prev,
+          formFlow: {
+            ...prev.formFlow,
+            edges: mappedEdges
+          }
+        };
+      });
+      return currentEdges;
+    });
+    setHasUnsavedChanges(true);
+  }, [onEdgesChange, setEdges]);
 
   const handleToggleActive = async (id: string, currentVal: boolean) => {
     if (!page) return;
@@ -3414,6 +4149,13 @@ export default function PageEditor({ params }: PageProps) {
   // Publish changes to database
   const handlePublish = async () => {
     if (!page) return;
+
+    // Check mandatory required nodes and open resolution popup
+    if (missingRequiredNodes.length > 0) {
+      setIsMissingStepsModalOpen(true);
+      return;
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -3486,18 +4228,71 @@ export default function PageEditor({ params }: PageProps) {
   };
 
   // Node modifications inside graph editor
-  const handleAddNode = (type: string) => {
+  const handleAddNode = (type: string, customPosition?: { x: number; y: number }) => {
     if (!page) return;
     const id = `${type}_${Math.random().toString(36).substring(2, 6)}`;
+    
+    let title = 'Escreva a pergunta da etapa...';
+    let placeholder = 'Responda aqui...';
+    let options: any[] | undefined = undefined;
+
+    if (type === 'start') {
+      title = 'Triagem Clínica Inicial';
+      placeholder = '';
+    } else if (type === 'nome') {
+      title = 'Qual é o seu nome completo?';
+      placeholder = 'Escreva seu nome completo aqui...';
+    } else if (type === 'celular' || type === 'contato') {
+      title = 'Qual é o seu WhatsApp de contato?';
+      placeholder = '(11) 99999-9999';
+    } else if (type === 'email') {
+      title = 'Qual é o seu melhor e-mail?';
+      placeholder = 'seu.email@exemplo.com';
+    } else if (type === 'cpf') {
+      title = 'Qual é o seu CPF?';
+      placeholder = '000.000.000-00';
+    } else if (type === 'maioridade') {
+      title = 'Você é maior de idade?';
+      placeholder = '';
+      options = [{ label: 'Sim', value: 'Sim' }, { label: 'Não', value: 'Não' }];
+    } else if (type === 'emergencia') {
+      title = 'Contato de Emergência';
+      placeholder = '';
+    } else if (type === 'contrato') {
+      title = 'Termo de Consentimento Livre e Esclarecido';
+      placeholder = '';
+    } else if (type === 'seletor' || type === 'escolha' || type === 'escolha_multipla') {
+      title = 'Selecione uma opção...';
+      placeholder = '';
+      options = [
+        { label: 'Opção 1', value: 'op1' },
+        { label: 'Opção 2', value: 'op2' }
+      ];
+    } else if (type === 'paragrafo') {
+      title = 'Descreva seu momento atual...';
+      placeholder = 'Digite aqui...';
+    }
+
+    // Calculate position: custom drop position or next position to the right with 380px spacing
+    const currentNodes = page.formFlow?.nodes || [];
+    const maxX = currentNodes.reduce((max: number, n: any) => {
+      const x = n.position?.x ?? 0;
+      return Math.max(max, x);
+    }, 0);
+    const nextX = currentNodes.length === 0 ? 80 : Math.max(maxX + 380, currentNodes.length * 380 + 80);
+    const targetPosition = customPosition || { x: nextX, y: 150 };
+
     const newNodeData = {
       id,
-      type,
-      position: { x: 300, y: 150 },
+      type: type === 'escolha' ? 'seletor' : type === 'escolha_multipla' ? 'seletor' : type === 'contato' ? 'celular' : type,
+      position: targetPosition,
       data: {
-        title: type === 'contrato' ? 'Termo de Aceite Legal' : type === 'emergencia' ? 'Contato de Emergência' : 'Escreva a pergunta da etapa...',
+        title,
         isRequired: true,
-        placeholder: type === 'celular' ? '(11) 99999-9999' : 'Responda aqui...',
-        options: type === 'seletor' ? [{ label: 'Opção A', value: 'a' }] : undefined
+        placeholder,
+        options,
+        isMultiple: type === 'escolha_multipla',
+        contractText: type === 'contrato' ? 'Ao assinar este termo você concorda com o atendimento clínico.' : undefined,
       }
     };
 
@@ -3507,19 +4302,79 @@ export default function PageEditor({ params }: PageProps) {
       formFlow: { ...page.formFlow, nodes: updatedNodes }
     });
     setSelectedNodeId(id);
+    setHasUnsavedChanges(true);
   };
 
+  // Drag and Drop from Sidebar into React Flow Canvas
+  const onDragStart = (event: React.DragEvent, nodeType: string) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const type = event.dataTransfer.getData('application/reactflow');
+      if (!type) return;
+
+      let position = { x: 200, y: 150 };
+
+      if (reactFlowInstance) {
+        if (typeof reactFlowInstance.screenToFlowPosition === 'function') {
+          position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          });
+        } else if (typeof reactFlowInstance.project === 'function') {
+          const reactFlowBounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+          position = reactFlowInstance.project({
+            x: event.clientX - reactFlowBounds.left,
+            y: event.clientY - reactFlowBounds.top,
+          });
+        }
+      }
+
+      // Offset position slightly so node center aligns comfortably with cursor
+      const adjustedPosition = {
+        x: Math.round(position.x - 170),
+        y: Math.round(position.y - 40),
+      };
+
+      handleAddNode(type, adjustedPosition);
+    },
+    [reactFlowInstance, handleAddNode]
+  );
+
   const handleDeleteNode = (id: string) => {
-    if (!page || id === 'start') return;
+    if (!page) return;
+    const nodeToDelete = page.formFlow?.nodes?.find((n: any) => n.id === id);
+    if (!nodeToDelete) return;
+    
+    // Trava para campos estritamente obrigatórios da triagem clínica
+    const isStrict = ['start', 'nome', 'maioridade', 'celular', 'contato'].includes(nodeToDelete.type) || 
+                     id === 'start' || id === 'nome' || id === 'maioridade' || id === 'celular';
+    if (isStrict) {
+      const config = getNodeConfig(nodeToDelete.type);
+      setError(`O campo '${config.label || nodeToDelete.id}' é obrigatório para o funcionamento da triagem clínica e não pode ser excluído.`);
+      return;
+    }
     
     const updatedNodes = page.formFlow.nodes.filter((n: any) => n.id !== id);
-    const updatedEdges = page.formFlow.edges.filter((e: any) => e.source !== id && e.target !== id);
+    const updatedEdges = (page.formFlow.edges || []).filter((e: any) => e.source !== id && e.target !== id);
 
     setPage({
       ...page,
       formFlow: { ...page.formFlow, nodes: updatedNodes, edges: updatedEdges }
     });
+    setEdges(prev => prev.filter(e => e.source !== id && e.target !== id));
     if (selectedNodeId === id) setSelectedNodeId(null);
+    setHasUnsavedChanges(true);
   };
 
   // Selected node config field editor helpers
@@ -3545,12 +4400,75 @@ export default function PageEditor({ params }: PageProps) {
       ...page,
       formFlow: { ...page.formFlow, nodes: updatedNodes }
     });
+    setHasUnsavedChanges(true);
   };
+
+  const updateNodeData = useCallback((nodeId: string, field: string, value: any) => {
+    // 1. Direct update to React Flow nodes state for instant responsiveness
+    setNodes((prevNodes) =>
+      prevNodes.map((n) => {
+        if (n.id === nodeId) {
+          const currentData = (n.data || {}) as any;
+          const innerNode = currentData.node || {};
+          return {
+            ...n,
+            data: {
+              ...currentData,
+              node: {
+                ...innerNode,
+                data: {
+                  ...(innerNode.data || {}),
+                  [field]: value
+                }
+              }
+            }
+          };
+        }
+        return n;
+      })
+    );
+
+    // 2. Update page state preserving current positions from React Flow canvas
+    setPage(prev => {
+      if (!prev) return prev;
+      const currentFlowNodes = prev.formFlow?.nodes || [];
+      const updatedNodes = currentFlowNodes.map((n: any) => {
+        const flowNode = nodes.find((fn) => fn.id === n.id);
+        const currentPos = flowNode ? flowNode.position : n.position;
+        if (n.id === nodeId) {
+          return {
+            ...n,
+            position: currentPos || n.position,
+            data: {
+              ...n.data,
+              [field]: value
+            }
+          };
+        }
+        return {
+          ...n,
+          position: currentPos || n.position
+        };
+      });
+      return {
+        ...prev,
+        formFlow: { ...prev.formFlow, nodes: updatedNodes }
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, [nodes]);
 
   // Memoize nodeTypes mapping to avoid canvas issues
   const nodeTypes = useMemo(() => ({
+    startNode: CustomStartNode,
+    stepNode: CustomStepNode,
+    maioridadeNode: CustomMaioridadeNode,
+    contractNode: CustomContractNode,
+    selectorNode: CustomSelectorNode,
+    // Keep legacy fallback mappings if needed
     start: CustomStartNode,
-    input: CustomInputNode,
+    input: CustomStepNode,
+    maioridade: CustomMaioridadeNode,
     contrato: CustomContractNode,
     seletor: CustomSelectorNode,
   }), []);
@@ -3804,12 +4722,29 @@ export default function PageEditor({ params }: PageProps) {
                 <Moon className="h-3.5 w-3.5" />
               )}
             </button>
-            {error && (
-              <div className="h-9 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-400 text-xs flex items-center gap-1.5 max-w-[240px] animate-fade-in" title={error}>
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{error}</span>
+            {missingRequiredNodes.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsMissingStepsModalOpen(true)}
+                className="h-8 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all animate-pulse shadow-sm"
+                title="Clique para ver e adicionar as etapas obrigatórias que faltam no formulário"
+              >
+                <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="truncate">{missingRequiredNodes.length} {missingRequiredNodes.length === 1 ? 'etapa obrigatória ausente' : 'etapas obrigatórias ausentes'}</span>
+              </button>
+            ) : error ? (
+              <div className="h-8 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-1.5 max-w-[240px] animate-fade-in" title={error}>
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                <span className="truncate flex-1">{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setError('')}
+                  className="text-red-400 hover:text-red-600 dark:hover:text-red-200 cursor-pointer p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
-            )}
+            ) : null}
             <div
               className={`h-7 px-2.5 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center justify-center whitespace-nowrap border transition-all ${
                 hasUnsavedChanges 
@@ -3819,6 +4754,17 @@ export default function PageEditor({ params }: PageProps) {
             >
               {hasUnsavedChanges ? 'Pendente' : 'Salvo'}
             </div>
+            {activeTab === 'flow' && (
+              <button
+                type="button"
+                onClick={() => setIsFormPreviewOpen(true)}
+                className="h-7 px-2.5 rounded-lg bg-purple-600/15 border border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-600/25 cursor-pointer transition-all flex items-center justify-center gap-1.5 shrink-0"
+                title="Testar Formulário em Modal Popup"
+              >
+                <Sparkles className="h-3 w-3" />
+                <span className="text-[10px] font-bold">Testar Formulário</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => window.open(previewUrlWithToken, '_blank')}
@@ -4297,149 +5243,117 @@ export default function PageEditor({ params }: PageProps) {
 
           {/* TAB 2: TRIAGEM GRAPH FLOW EDITOR */}
           {activeTab === 'flow' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Estrutura de Etapas</h3>
-                <span className="text-[10px] glass-sm border border-[var(--surface-border)] text-[var(--brand-gradient-start)] font-bold px-2 py-0.5 rounded-lg">
+            <div className="space-y-5">
+              <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2.5">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Estrutura de Etapas</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Arraste para o fluxo ou clique para adicionar</p>
+                </div>
+                <span className="text-[10px] glass-sm border border-[var(--surface-border)] text-purple-600 dark:text-purple-400 font-bold px-2.5 py-1 rounded-lg">
                   {page.formFlow.nodes.length} blocos
                 </span>
               </div>
 
-              {/* Node Spawner Toolbar */}
+              {/* Step Templates */}
               <div className="space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Adicionar Bloco de Coleta</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={() => handleAddNode('texto')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
-                  >
-                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
-                    Texto Curto
-                  </Button>
-                  <Button
-                    onClick={() => handleAddNode('paragrafo')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
-                  >
-                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
-                    Parágrafo Longo
-                  </Button>
-                  <Button
-                    onClick={() => handleAddNode('seletor')}
-                    className="cursor-pointer h-9 text-[10px] font-semibold glass-sm border border-[var(--surface-border)] hover:bg-[var(--surface-hover)] text-slate-800 dark:text-white flex items-center justify-start gap-1"
-                  >
-                    <Plus className="h-3 w-3 text-[var(--brand-gradient-start)]" />
-                    Seletor Múltiplo
-                  </Button>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block px-1">
+                  Templates de Triagem (Arraste para o fluxo)
+                </span>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {[
+                    { type: 'nome', label: 'Nome Completo', desc: 'Identificação do paciente', icon: User, required: true, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' },
+                    { type: 'celular', label: 'WhatsApp / Celular', desc: 'Contato com DDI e DDD', icon: Phone, required: true, color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
+                    { type: 'maioridade', label: 'Maioridade (18+)', desc: 'Triagem maior/menor de idade', icon: ShieldCheck, required: true, color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' },
+                    { type: 'email', label: 'E-mail de Contato', desc: 'Validação de e-mail', icon: Mail, required: false, color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30' },
+                    { type: 'cpf', label: 'CPF do Paciente', desc: 'Validação de documento', icon: Sliders, required: false, color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30' },
+                    { type: 'contrato', label: 'Contrato / TCLE', desc: 'Termo de consentimento clínico', icon: FileText, required: false, color: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' },
+                    { type: 'emergencia', label: 'Contato de Emergência', desc: 'Nome, parentesco e celular', icon: AlertCircle, required: false, color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30' },
+                  ].map((tmpl) => {
+                    const IconComp = tmpl.icon;
+                    const isAdded = page.formFlow.nodes.some((n: any) => n.type === tmpl.type || (tmpl.type === 'celular' && n.type === 'contato'));
+                    return (
+                      <div
+                        key={tmpl.type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, tmpl.type)}
+                        onClick={() => handleAddNode(tmpl.type)}
+                        className="p-2.5 rounded-xl text-left transition-all flex items-center justify-between glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-purple-500/50 cursor-grab active:cursor-grabbing hover:scale-[1.01] active:scale-[0.99] select-none group w-full"
+                        title="Arraste para a posição desejada no fluxo ou clique para adicionar"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <GripVertical className="h-3.5 w-3.5 text-slate-400 opacity-40 group-hover:opacity-100 group-hover:text-purple-500 shrink-0 transition-opacity" />
+                          <div className={`p-1.5 rounded-lg shrink-0 border ${tmpl.color}`}>
+                            <IconComp className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold block text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 truncate">
+                              {tmpl.label}
+                            </span>
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 block leading-tight truncate">
+                              {tmpl.desc}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          {tmpl.required && (
+                            <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                              isAdded 
+                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' 
+                                : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40'
+                            }`}>
+                              {isAdded ? 'Obrigatório' : 'Ausente (Obrigatório)'}
+                            </span>
+                          )}
+                          <Plus className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-500" />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Selected Node Editor Form */}
-              {selectedNode ? (
-                <div className="space-y-4 border-t border-[var(--surface-border)] pt-4 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase text-slate-900 dark:text-white">Editar Bloco: {selectedNode.id}</span>
-                    <button
-                      onClick={() => setSelectedNodeId(null)}
-                      className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white"
-                    >
-                      Limpar Seleção
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Pergunta / Título do Campo</label>
-                      <Input
-                        type="text"
-                        className="brand-input"
-                        value={selectedNode.data.title || ''}
-                        onChange={(e) => updateSelectedNodeData('title', e.target.value)}
-                      />
-                    </div>
-
-                    {selectedNode.type !== 'start' && selectedNode.type !== 'contrato' && selectedNode.type !== 'maioridade' && (
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">Placeholder de Escrita</label>
-                        <Input
-                          type="text"
-                          className="brand-input"
-                          value={selectedNode.data.placeholder || ''}
-                          onChange={(e) => updateSelectedNodeData('placeholder', e.target.value)}
-                        />
-                      </div>
-                    )}
-
-
-                    {/* Options list editor for selector node */}
-                    {selectedNode.type === 'seletor' && (
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider block">Opções de Seleção</label>
-                        <div className="space-y-2">
-                          {(selectedNode.data.options || []).map((opt: any, idx: number) => (
-                            <div key={idx} className="flex gap-2 items-center">
-                              <Input
-                                type="text"
-                                className="brand-input flex-1 text-xs h-8"
-                                value={opt.label}
-                                onChange={(e) => {
-                                  const updatedOptions = [...(selectedNode.data.options || [])];
-                                  updatedOptions[idx] = { ...opt, label: e.target.value, value: e.target.value.toLowerCase() };
-                                  updateSelectedNodeData('options', updatedOptions);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updatedOptions = (selectedNode.data.options || []).filter((_: any, oIdx: number) => oIdx !== idx);
-                                  updateSelectedNodeData('options', updatedOptions);
-                                }}
-                                className="text-slate-500 hover:text-red-500 dark:hover:text-red-400 cursor-pointer"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              const updatedOptions = [...(selectedNode.data.options || []), { label: `Opção ${(selectedNode.data.options || []).length + 1}`, value: `op_${Math.random().toString(36).substring(2, 5)}` }];
-                              updateSelectedNodeData('options', updatedOptions);
-                            }}
-                            className="w-full cursor-pointer h-7 text-[10px] glass-sm border border-[var(--surface-border)] text-slate-800 dark:text-white"
-                          >
-                            + Adicionar Opção
-                          </Button>
+              {/* Custom Input Types */}
+              <div className="space-y-2 border-t border-[var(--surface-border)] pt-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block px-1">
+                  Perguntas Personalizadas (Arraste para o fluxo)
+                </span>
+                <div className="grid grid-cols-1 gap-1.5">
+                  {[
+                    { type: 'escolha', label: 'Escolha Única', desc: 'Botões com ramificação individual', icon: CheckSquare, color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
+                    { type: 'escolha_multipla', label: 'Múltipla Escolha', desc: 'Seleção de várias opções', icon: CheckSquare, color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
+                    { type: 'texto', label: 'Texto Curto', desc: 'Linha única de resposta livre', icon: MessageSquare, color: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30' },
+                    { type: 'paragrafo', label: 'Parágrafo Longo', desc: 'Área de texto para queixa principal', icon: AlignLeft, color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30' },
+                  ].map((inType) => {
+                    const IconComp = inType.icon;
+                    return (
+                      <div
+                        key={inType.type}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, inType.type)}
+                        onClick={() => handleAddNode(inType.type)}
+                        className="p-2.5 rounded-xl text-left transition-all flex items-center justify-between glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-purple-500/50 cursor-grab active:cursor-grabbing hover:scale-[1.01] active:scale-[0.99] select-none group w-full"
+                        title="Arraste para a posição desejada no fluxo ou clique para adicionar"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <GripVertical className="h-3.5 w-3.5 text-slate-400 opacity-40 group-hover:opacity-100 group-hover:text-purple-500 shrink-0 transition-opacity" />
+                          <div className={`p-1.5 rounded-lg shrink-0 border ${inType.color}`}>
+                            <IconComp className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold block text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 truncate">
+                              {inType.label}
+                            </span>
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 block leading-tight truncate">
+                              {inType.desc}
+                            </span>
+                          </div>
                         </div>
+                        <Plus className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-500 shrink-0 ml-2" />
                       </div>
-                    )}
-
-                    <label className="flex items-center gap-2 pt-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={selectedNode.data.isRequired ?? true}
-                        onChange={(e) => updateSelectedNodeData('isRequired', e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-[var(--surface-border)] text-[var(--brand-gradient-start)]"
-                      />
-                      <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Resposta Obrigatória</span>
-                    </label>
-
-                    {selectedNode.type !== 'start' && (
-                      <div className="pt-4">
-                        <Button
-                          onClick={() => handleDeleteNode(selectedNode.id)}
-                          className="w-full cursor-pointer h-9 text-xs font-bold uppercase bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/25 hover:bg-red-500/20"
-                        >
-                          Excluir Etapa
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              ) : (
-                <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] text-center text-xs text-slate-600 dark:text-slate-400 italic">
-                  Selecione um bloco no fluxograma ao lado para editar seus dados detalhadamente.
-                </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -5096,21 +6010,75 @@ export default function PageEditor({ params }: PageProps) {
 
           {/* TAB 2: REACT FLOW WORKSPACE */}
           {activeTab === 'flow' && (
-            <div className="w-full h-full relative" style={{ height: '100%' }}>
-              <div className="absolute top-4 left-4 z-10 glass-md border border-[var(--surface-border)] rounded-xl p-3 max-w-xs space-y-1 shadow-xl">
-                <h4 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-wider">Editor de Fluxograma</h4>
-                <p className="text-[9px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Crie blocos e arraste as conexões do lado direito (Handles vermelhos) para o lado esquerdo de outros blocos para definir a ordem das perguntas.
-                </p>
+            <div 
+              className="w-full h-full relative" 
+              style={{ height: '100%' }}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+            >
+              <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
+                <div className="glass-md border border-[var(--surface-border)] rounded-xl p-3 max-w-xs space-y-1 shadow-xl bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md">
+                  <h4 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5 text-purple-500" />
+                    Editor de Fluxo
+                  </h4>
+                  <p className="text-[9px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Arraste etapas da barra lateral para a posição desejada no fluxo e ligue os pontos.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFormPreviewOpen(true)}
+                  className="px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer border border-purple-400/30 hover:scale-[1.02] active:scale-[0.98]"
+                  title="Abrir simulação interativa do formulário popup"
+                >
+                  <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
+                  <span>Testar Formulário Popup</span>
+                </button>
               </div>
+
+              {/* Floating Alert Banner if required nodes are missing */}
+              {missingRequiredNodes.length > 0 && (
+                <div className="absolute top-4 right-4 z-20 max-w-sm p-3.5 rounded-2xl bg-amber-500/15 dark:bg-amber-950/90 border border-amber-500/40 text-amber-900 dark:text-amber-200 backdrop-blur-md shadow-2xl space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold">Campos Obrigatórios Ausentes</h4>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug mt-0.5">
+                        O formulário exige as seguintes etapas para funcionar corretamente:
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {missingRequiredNodes.map(m => (
+                      <button
+                        key={m.type}
+                        type="button"
+                        draggable
+                        onDragStart={(e) => onDragStart(e, m.type)}
+                        onClick={() => handleAddNode(m.type)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all cursor-grab active:cursor-grabbing hover:scale-[1.02] active:scale-[0.98]"
+                        title="Arraste para a posição no fluxo ou clique para adicionar"
+                      >
+                        <GripVertical className="w-3 h-3 opacity-60" />
+                        <span>Adicionar {m.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
+                onEdgesChange={handleEdgesChange}
                 onConnect={onConnect}
                 onNodeDragStop={onNodeDragStop}
+                onInit={setReactFlowInstance}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
                 nodeTypes={nodeTypes}
                 onNodeClick={(_, node) => setSelectedNodeId(node.id)}
                 fitView
@@ -5234,6 +6202,109 @@ export default function PageEditor({ params }: PageProps) {
         cancelText="Cancelar"
         variant="danger"
       />
+
+      {/* Interactive Typeform Popup Preview Modal */}
+      <TypeformPreviewModal
+        open={isFormPreviewOpen}
+        onClose={() => setIsFormPreviewOpen(false)}
+        formFlow={page?.formFlow || { nodes: [], edges: [] }}
+        brandColors={page?.siteConfig?.theme?.colors}
+        whatsappNumber={page?.siteConfig?.whatsappNumber}
+      />
+
+      {/* Modal Popup de Etapas Obrigatórias Ausentes com Ações Diretas */}
+      <BrandModal
+        isOpen={isMissingStepsModalOpen}
+        onClose={() => setIsMissingStepsModalOpen(false)}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-5 text-left p-1">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b border-[var(--surface-border)] pb-4">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Etapas Obrigatórias Ausentes
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                O formulário precisa conter as etapas essenciais para estar em conformidade clínica e poder ser publicado.
+              </p>
+            </div>
+          </div>
+
+          {/* Missing Steps List */}
+          <div className="space-y-2.5">
+            {missingRequiredNodes.map((item) => {
+              const config = getNodeConfig(item.type);
+              const IconComp = config.icon;
+              return (
+                <div
+                  key={item.type}
+                  className="p-3.5 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] flex items-center justify-between gap-3 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-2 rounded-xl shrink-0 border ${config.accentBg}`}>
+                      <IconComp className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
+                        {item.label}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                        {item.desc}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      handleAddNode(item.type);
+                      setActiveTab('flow');
+                      if (missingRequiredNodes.length <= 1) {
+                        setIsMissingStepsModalOpen(false);
+                      }
+                    }}
+                    className="brand-accent text-xs font-bold h-8 px-3 flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Adicionar</span>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="pt-3 border-t border-[var(--surface-border)] flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsMissingStepsModalOpen(false)}
+              className="text-xs h-9 px-4 cursor-pointer"
+            >
+              Fechar
+            </Button>
+
+            {missingRequiredNodes.length > 1 && (
+              <Button
+                type="button"
+                onClick={() => {
+                  missingRequiredNodes.forEach(m => handleAddNode(m.type));
+                  setActiveTab('flow');
+                  setIsMissingStepsModalOpen(false);
+                }}
+                className="brand-accent text-xs font-bold h-9 px-4 flex items-center gap-2 cursor-pointer shadow-md"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Adicionar Todas as Etapas</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </BrandModal>
 
     </div>
   );

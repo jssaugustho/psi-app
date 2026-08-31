@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api, CapturePage, WorkspaceDomain } from '@/lib/api';
-import { Card, Button, LoadingSpinner, ConfirmModal } from '@psi/ui';
+import { Card, Button, LoadingSpinner, ConfirmModal, BrandModal } from '@psi/ui';
 import { Globe, Plus, Trash2, Edit, ExternalLink, Sparkles, AlertCircle, Copy, Loader2, Clock, ArrowRight, Edit3, X, ChevronRight } from 'lucide-react';
 import { Link } from '@/components/Link';
 
@@ -545,67 +545,67 @@ export default function CaptacaoPage() {
         variant="danger"
       />
 
-      {/* Modal de Escolha / Lista de Rascunhos */}
-      {showDraftModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-[var(--surface-border)] rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl text-white animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold">Nova Página de Captação</h3>
-                  <p className="text-xs text-slate-400">Escolha um rascunho salvo ou comece do zero.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDraftModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* Modal de Escolha / Lista de Rascunhos com BrandModal Oficial */}
+      <BrandModal
+        isOpen={showDraftModal}
+        onClose={() => setShowDraftModal(false)}
+        maxWidth="max-w-lg"
+      >
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b border-[var(--surface-border)] pb-4">
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+              <Sparkles className="h-5 w-5" />
             </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Nova Página de Captação</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Escolha um rascunho salvo ou comece do zero.</p>
+            </div>
+          </div>
 
-            {/* Ação: Criar Nova do Zero */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowDraftModal(false);
-                router.push('/dashboard/captacao/nova?fresh=true');
-              }}
-              className="w-full p-4 rounded-xl border border-dashed border-emerald-500/40 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 font-bold text-xs flex items-center justify-between transition-all cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Plus className="h-4 w-4" />
-                </div>
-                <div className="text-left">
-                  <span className="block text-sm font-bold text-white">Criar Nova Página do Zero</span>
-                  <span className="text-[11px] text-slate-400 font-normal">Iniciar com um modelo em branco sem rascunho</span>
-                </div>
+          {/* Ação: Criar Nova do Zero */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowDraftModal(false);
+              router.push('/dashboard/captacao/nova?fresh=true');
+            }}
+            className="w-full p-4 rounded-xl border border-dashed border-purple-500/40 hover:border-purple-500 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-between transition-all cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                <Plus className="h-5 w-5" />
               </div>
-              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </button>
+              <div className="text-left">
+                <span className="block text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                  Criar Nova Página do Zero
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
+                  Iniciar com o modelo clínico padrão sem rascunho
+                </span>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all shrink-0" />
+          </button>
 
-            {/* Lista de Rascunhos Existentes */}
-            <div className="space-y-2 pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+          {/* Lista de Rascunhos Existentes */}
+          {drafts.length > 0 && (
+            <div className="space-y-2.5 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block px-1">
                 Ou continue um rascunho em andamento ({drafts.length})
               </span>
-              <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {drafts.map((d) => (
                   <div
                     key={d.id}
-                    className="p-3.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-between gap-3 transition-all"
+                    className="p-3.5 rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] flex items-center justify-between gap-3 transition-all"
                   >
-                    <div className="truncate flex-1">
-                      <h4 className="text-xs font-bold text-white truncate">
+                    <div className="truncate flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
                         {d.newTitle || 'Página Sem Título'}
                       </h4>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                        <span className="text-amber-400 font-semibold">Etapa {d.currentStep || 1} de 4</span>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        <span className="text-purple-600 dark:text-purple-400 font-semibold">Etapa {d.currentStep || 1} de 4</span>
                         <span>•</span>
                         <span>{new Date(d.updatedAt).toLocaleDateString()} às {new Date(d.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
@@ -615,30 +615,30 @@ export default function CaptacaoPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteDraft(d.id)}
-                        className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors cursor-pointer"
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 border border-red-500/20 transition-colors cursor-pointer"
                         title="Excluir Rascunho"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
+                      <Button
                         type="button"
                         onClick={() => {
                           setShowDraftModal(false);
                           router.push(`/dashboard/captacao/nova?draftId=${d.id}`);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                        className="brand-accent text-xs font-bold h-8 px-3 flex items-center gap-1 cursor-pointer"
                       >
                         <span>Continuar</span>
                         <ArrowRight className="w-3 h-3" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </BrandModal>
     </div>
   );
 }
