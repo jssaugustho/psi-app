@@ -220,6 +220,15 @@ export async function getCapturePageByDomain(
     }
   } else if (!cleanDomain.includes('.')) {
     tenantData = await getTenantBySlug(cleanDomain);
+  } else {
+    // Tenta extrair subdomínio de qualquer domínio customizado com subdomínio (ex: thera-os.ajstrategy.digital)
+    const parts = cleanDomain.split('.');
+    if (parts.length >= 3) {
+      const candidateSlug = parts[0];
+      if (candidateSlug && !['www', 'app', 'sites', 'custom'].includes(candidateSlug)) {
+        tenantData = await getTenantBySlug(candidateSlug);
+      }
+    }
   }
 
   if (!tenantData) {
