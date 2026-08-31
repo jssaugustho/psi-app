@@ -294,9 +294,10 @@ export async function getCapturePageByDomain(
     }
   }
 
+  const altCleanDomain = cleanDomain.startsWith('www.') ? cleanDomain.replace('www.', '') : `www.${cleanDomain}`;
   const legacyUrl = (isPreview || token)
-    ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&custom_domain=eq.${cleanDomain}&limit=1`
-    : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&custom_domain=eq.${cleanDomain}&is_active=eq.true&limit=1`;
+    ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&or=(custom_domain.eq.${cleanDomain},custom_domain.eq.${altCleanDomain})&limit=1`
+    : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&or=(custom_domain.eq.${cleanDomain},custom_domain.eq.${altCleanDomain})&is_active=eq.true&limit=1`;
   try {
     const res = await fetch(legacyUrl, { cache: 'no-store' });
     if (res.ok) {
@@ -423,8 +424,11 @@ export async function getTenantBySlug(slug: string): Promise<TenantData | null> 
  * Fetch tenant details by domain (directly or via page)
  */
 export async function getTenantByDomain(domain: string): Promise<TenantData | null> {
+  const clean = domain.split(':')[0].toLowerCase();
+  const altClean = clean.startsWith('www.') ? clean.replace('www.', '') : `www.${clean}`;
+
   // Check if workspace has this domain directly in workspace_domains table
-  const url = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&domain=eq.${domain}`;
+  const url = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&or=(custom_domain.eq.${clean},custom_domain.eq.${altClean})`;
   try {
     const res = await fetch(url, { cache: 'no-store' });
     if (res.ok) {
@@ -435,16 +439,16 @@ export async function getTenantByDomain(domain: string): Promise<TenantData | nu
           id: t.id,
           name: t.name,
           slug: t.name,
-          domain: t.domain,
-          phone: t.phone,
-          gradientColorStart: t.gradient_color_start,
-          gradientColorEnd: t.gradient_color_end,
-          contrastColor: t.contrast_color,
-          bgDarkColor: t.bg_dark_color,
-          cardDarkColor: t.card_dark_color,
-          textDarkColor: t.text_dark_color,
-          logoLightUrl: t.logo_light_url,
-          logoDarkUrl: t.logo_dark_url,
+          domain: data[0].custom_domain || null,
+          phone: t.phone || null,
+          gradientColorStart: t.gradient_color_start || null,
+          gradientColorEnd: t.gradient_color_end || null,
+          contrastColor: t.contrast_color || null,
+          bgDarkColor: t.bg_dark_color || null,
+          cardDarkColor: t.card_dark_color || null,
+          textDarkColor: t.text_dark_color || null,
+          logoLightUrl: t.logo_light_url || null,
+          logoDarkUrl: t.logo_dark_url || null,
         };
       }
     }
@@ -460,7 +464,7 @@ export async function getTenantByDomain(domain: string): Promise<TenantData | nu
       id: t.id,
       name: t.name,
       slug: t.slug,
-      domain: t.domain,
+      domain: pageData.custom_domain || null,
       phone: t.phone,
       gradientColorStart: t.gradient_color_start,
       gradientColorEnd: t.gradient_color_end,

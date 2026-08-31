@@ -1,25 +1,34 @@
 import React from 'react'
-import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getCapturePageByDomain, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../lib/api'
-import { CapturePageRenderer } from '../../../components/CapturePageRenderer'
-import { NotFoundView } from '../../../components/NotFoundView'
+import { getCapturePageByDomain, getTenantByDomain, getPrimaryTenant, getBootstrapStatus } from '../../../../lib/api'
+import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
+import { NotFoundView } from '../../../../components/NotFoundView'
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{
     domain: string;
+    slug?: string[];
+  }>;
+  searchParams: Promise<{
+    preview?: string;
+    staging?: string;
+    token?: string;
   }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { domain } = await params
-  const pageData = await getCapturePageByDomain(domain)
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const { domain, slug } = await params
+  const { preview, staging, token } = await searchParams
+  const isPreview = preview === 'true' || staging === 'true'
+  const pathSlug = slug && slug.length > 0 ? slug.filter(Boolean).join('/') : ''
+  const pageData = await getCapturePageByDomain(domain, pathSlug, isPreview, token)
+  
   if (!pageData) {
     const tenant = await getTenantByDomain(domain);
     const primaryTenant = tenant ? null : await getPrimaryTenant();
-    const activeTenantName = tenant?.name || primaryTenant?.name || 'Psi App';
+    const activeTenantName = tenant?.name || primaryTenant?.name || 'TheraOS';
     return {
       title: `Página Não Encontrada | ${activeTenantName}`,
       description: 'A página procurada não foi encontrada.',
@@ -59,8 +68,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function CustomDomainCapturePage({ params }: PageProps) {
-  const { domain } = await params
+export default async function CustomDomainCapturePage({ params, searchParams }: PageProps) {
+  const { domain, slug } = await params
+  const { preview, staging, token } = await searchParams
+  const isPreview = preview === 'true' || staging === 'true'
 
   // 0. Bloqueio se a plataforma não estiver inicializada
   const bootStatus = await getBootstrapStatus();
@@ -78,13 +89,15 @@ export default async function CustomDomainCapturePage({ params }: PageProps) {
     );
   }
 
-  // Resolve page and tenant by custom hostname search using PostgREST
-  const pageData = await getCapturePageByDomain(domain)
+  const pathSlug = slug && slug.length > 0 ? slug.filter(Boolean).join('/') : ''
+
+  // Resolve page and tenant by domain and path slug using PostgREST
+  const pageData = await getCapturePageByDomain(domain, pathSlug, isPreview, token)
 
   if (!pageData) {
     const tenant = await getTenantByDomain(domain);
     const primaryTenant = tenant ? null : await getPrimaryTenant();
-    return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedDomain={domain} />;
+    return <NotFoundView tenant={tenant} primaryTenant={primaryTenant} requestedDomain={domain} requestedSlug={pathSlug} />;
   }
 
   return (

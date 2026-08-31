@@ -26,8 +26,8 @@ export function middleware(request: NextRequest) {
   const isLocal = hostname.includes('localhost');
   const mainAppUrl = process.env.NEXT_PUBLIC_MAIN_APP_URL || (isLocal ? 'http://localhost:3000' : 'https://app.theraos.app');
 
-  // Permitir rotas de teste local e preview direto em /p/[tenant]/[slug]
-  if (url.pathname.startsWith('/p/')) {
+  // Permitir rotas de teste local e preview direto em /p/[tenant]/[slug] ou /sites/
+  if (url.pathname.startsWith('/p/') || url.pathname.startsWith('/sites/')) {
     return NextResponse.next();
   }
 
@@ -40,7 +40,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Rewrite interno para a rota dinâmica por subdomínio/domínio: /_sites/[hostname]/[path]
-  url.pathname = `/_sites/${hostname}${url.pathname}`;
+  // Rewrite interno para a rota dinâmica por subdomínio/domínio: /sites/[hostname]/[path]
+  const normalizedPath = url.pathname.startsWith('/') ? url.pathname : `/${url.pathname}`;
+  url.pathname = `/sites/${hostname}${normalizedPath === '/' ? '' : normalizedPath}`;
   return NextResponse.rewrite(url);
 }
+
