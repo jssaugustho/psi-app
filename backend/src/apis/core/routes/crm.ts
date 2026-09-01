@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../../../shared/db';
 import { contacts, pipelineColumns, interactionHistory, workspaces } from '../../../shared/schema';
 import { eq, and, or } from 'drizzle-orm';
+import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
 
 const WebhookQuerySchema = z.object({
   workspace_id: z.string().uuid('ID do Workspace inválido').optional(),
@@ -21,6 +22,7 @@ const WebhookBodySchema = z.object({
   utm_campaign: z.string().optional().nullable(),
   utm_term: z.string().optional().nullable(),
   utm_content: z.string().optional().nullable(),
+  custom_field_values: z.record(z.any()).optional().default({}),
 });
 
 export async function crmRoutes(fastifyApp: FastifyInstance) {
@@ -53,6 +55,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         utm_campaign,
         utm_term,
         utm_content,
+        custom_field_values,
       } = request.body;
 
       try {
@@ -119,51 +122,10 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        // 4. Mapear e resolver origem do lead com base nas UTMs enviadas
-        let resolvedSource = source;
-        const utmSource = utm_source;
 
-        const rawSources = workspace.trafficSources || [];
-        type SourceObj = { id?: string; name: string; utm_source?: string; utm_medium?: string; utm_campaign?: string; };
-        const sourcesNormalized: SourceObj[] = rawSources.map((s: string | SourceObj) =>
-          typeof s === 'string' ? { name: s } : s
-        );
+        // 4. Resolver origem do lead com base nas UTMs enviadas
+        const resolvedSource = resolveTrafficSource(workspace as any, utm_source, 'Webhook') || source || 'Webhook';
 
-        if (utmSource) {
-          const utmLower = utmSource.toLowerCase();
-
-          const byUtmField = sourcesNormalized.find(
-            (s) => s.utm_source && s.utm_source.toLowerCase() === utmLower
-          );
-
-          if (byUtmField) {
-            resolvedSource = byUtmField.name;
-          } else {
-            const byName = sourcesNormalized.find((s) => {
-              const sLower = s.name.toLowerCase();
-              return sLower.includes(utmLower) || utmLower.includes(sLower);
-            });
-
-            if (byName) {
-              resolvedSource = byName.name;
-            } else {
-              if (utmLower === 'ig' || utmLower === 'instagram') {
-                const igSource = sourcesNormalized.find((s) => s.name.toLowerCase().includes('instagram'));
-                resolvedSource = igSource ? igSource.name : 'Instagram';
-              } else if (utmLower === 'fb' || utmLower === 'facebook' || utmLower === 'meta') {
-                const fbSource = sourcesNormalized.find((s) => s.name.toLowerCase().includes('facebook'));
-                resolvedSource = fbSource ? fbSource.name : 'Facebook Ads';
-              } else if (utmLower === 'google' || utmLower === 'gads') {
-                const gSource = sourcesNormalized.find((s) => s.name.toLowerCase().includes('google'));
-                resolvedSource = gSource ? gSource.name : 'Google Ads';
-              } else {
-                resolvedSource = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);
-              }
-            }
-          }
-        } else if (!resolvedSource) {
-          resolvedSource = workspace.defaultTrafficSource || 'Webhook';
-        }
 
         // 5. Lead Novo: busca primeiro estágio do funil do workspace
         const firstColumn = await db.query.pipelineColumns.findFirst({
@@ -190,6 +152,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
             utmCampaign: utm_campaign || null,
             utmTerm: utm_term || null,
             utmContent: utm_content || null,
+            customFieldValues: custom_field_values || {},
           })
           .returning();
 

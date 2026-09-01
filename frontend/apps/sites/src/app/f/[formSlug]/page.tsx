@@ -3,10 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { TypeformModal } from '@/components/TypeformModal';
+import { useUTMParams } from '@/hooks/useUTMParams';
 
 export default function PublicFormPage() {
   const params = useParams();
   const formSlug = params?.formSlug as string;
+  const utms = useUTMParams();
 
   const [formData, setFormData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -14,17 +16,13 @@ export default function PublicFormPage() {
 
   useEffect(() => {
     if (!formSlug) return;
-
     async function loadPublicForm() {
       try {
         setLoading(true);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/v1';
-        const res = await fetch(`${apiUrl}/crm/forms/${formSlug}`);
-        
-        if (!res.ok) {
-          throw new Error('Formulário não encontrado');
-        }
-
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+        // Usar nova rota pública que retorna workspaceId
+        const res = await fetch(`${apiUrl}/crm/forms/public/${formSlug}`);
+        if (!res.ok) throw new Error('Formulário não encontrado');
         const data = await res.json();
         if (data.success && data.form) {
           setFormData(data.form);
@@ -32,13 +30,11 @@ export default function PublicFormPage() {
           throw new Error('Formulário não encontrado');
         }
       } catch (err: any) {
-        console.error('Erro ao carregar formulário público:', err);
         setError(err.message || 'Formulário não encontrado');
       } finally {
         setLoading(false);
       }
     }
-
     loadPublicForm();
   }, [formSlug]);
 
@@ -66,7 +62,6 @@ export default function PublicFormPage() {
     );
   }
 
-  // Inject theme variables for public form
   const theme = formData.themeConfig || {};
   const primaryStart = theme.primaryStart || '#CC8667';
   const primaryEnd = theme.primaryEnd || '#AA5533';
@@ -84,15 +79,13 @@ export default function PublicFormPage() {
       <TypeformModal
         open={true}
         onOpenChange={() => {}}
-        tenantId={formData.tenantId}
+        workspaceId={formData.workspaceId}
+        formId={formData.id}
         pageId=""
+        utmParams={utms}
         formFlow={formData.formFlow}
         theme={{
-          colors: {
-            primaryStart,
-            primaryEnd,
-            contrast,
-          }
+          colors: { primaryStart, primaryEnd, contrast },
         }}
         isDark={true}
       />

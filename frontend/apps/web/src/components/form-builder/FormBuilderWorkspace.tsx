@@ -167,6 +167,22 @@ export function FormBuilderWorkspace({
     return nodes.some((n) => n.type === type);
   }, [nodes]);
 
+  const [crmCustomFields, setCrmCustomFields] = useState<Array<{ key: string; name: string; type: string; options?: string[] | null }>>([]);
+
+  // Buscar variáveis do CRM ao montar
+  useEffect(() => {
+    const workspaceId = tenant?.id;
+    if (!workspaceId) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${workspaceId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => { if (data.fields) setCrmCustomFields(data.fields); })
+      .catch(() => {});
+  }, [tenant?.id]);
+
   // Form title and theme draft state
   const [titleDraft, setTitleDraft] = useState(initialForm?.titleDraft || initialForm?.title || '');
   const [themeConfigDraft, setThemeConfigDraft] = useState<any>(
@@ -917,6 +933,59 @@ export function FormBuilderWorkspace({
               </div>
             </div>
 
+              {/* Painel de Variáveis do CRM */}
+              <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+                <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide block">
+                  Variáveis do CRM:
+                </span>
+                <div className="space-y-1.5">
+                  {/* Campos de Sistema */}
+                  <p className="text-[8px] text-slate-500 uppercase tracking-wider font-bold">Sistema (obrigatórios):</p>
+                  {[
+                    { key: 'nome', label: 'Nome Completo', required: true },
+                    { key: 'celular', label: 'WhatsApp / Celular', required: true },
+                    { key: 'maioridade', label: 'Maioridade', required: true },
+                    { key: 'contrato', label: 'TCLE / Consentimento', required: true },
+                    { key: 'email', label: 'E-mail', required: false },
+                    { key: 'cpf', label: 'CPF', required: false },
+                    { key: 'emergencia', label: 'Contato de Emergência', required: false },
+                  ].map(sysField => {
+                    const inUse = nodes.some(n => n.type === sysField.key);
+                    return (
+                      <div key={sysField.key} className={`flex items-center justify-between px-2 py-1 rounded-lg text-[10px] ${
+                        inUse ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-slate-400 border border-white/10'
+                      }`}>
+                        <span className="font-mono">{sysField.key}</span>
+                        <div className="flex items-center gap-1">
+                          {sysField.required && <span className="text-amber-400 text-[8px] font-bold">OBRIG.</span>}
+                          {inUse && <span className="text-emerald-400 text-[8px]">✓ Em uso</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Campos Personalizados */}
+                  {crmCustomFields.length > 0 && (
+                    <>
+                      <p className="text-[8px] text-slate-500 uppercase tracking-wider font-bold mt-2">Personalizados:</p>
+                      {crmCustomFields.map(f => {
+                        const inUse = nodes.some(n => (n.data as any)?.variableKey === f.key);
+                        return (
+                          <div key={f.key} className={`flex items-center justify-between px-2 py-1 rounded-lg text-[10px] ${
+                            inUse ? 'bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/20' : 'bg-white/5 text-slate-400 border border-white/10'
+                          }`}>
+                            <span className="font-mono truncate max-w-[100px]">{f.key}</span>
+                            <span className="text-[8px] text-slate-500 truncate">{f.name}</span>
+                            {inUse && <span className="text-[8px] text-[var(--brand-gradient-start)]">✓</span>}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Selected Node Editor Inspector */}
             {selectedNode ? (
               <div className="space-y-4 pt-4 border-t border-[var(--surface-border)]">
@@ -980,7 +1049,28 @@ export function FormBuilderWorkspace({
                     <div className="space-y-3 pt-2 border-t border-[var(--surface-border)]">
                       <div className="space-y-1">
                         <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                          Nome da Variável no CRM (Sem espaços)
+                          Variável do CRM
+                        </label>
+                        {/* Combobox: existentes do CRM + digitar nova */}
+                        <select
+                          className="w-full text-xs bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-slate-200 focus:border-[var(--brand-gradient-start)] outline-none cursor-pointer"
+                          value={String(selectedNode.data?.variableKey || '')}
+                          onChange={(e) => {
+                            const chosen = e.target.value;
+                            updateSelectedNodeData('variableKey', chosen);
+                            const def = crmCustomFields.find(f => f.key === chosen);
+                            if (def) updateSelectedNodeData('variableLabel', def.name);
+                          }}
+                        >
+                          <option value="">— Selecionar ou criar nova —</option>
+                          {crmCustomFields.map(f => (
+                            <option key={f.key} value={f.key}>{f.name} ({f.key})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                          Chave da Variável (se nova)
                         </label>
                         <Input
                           type="text"
@@ -992,7 +1082,7 @@ export function FormBuilderWorkspace({
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                          Rótulo da Coluna no CRM
+                          Rótulo no CRM
                         </label>
                         <Input
                           type="text"

@@ -6,6 +6,7 @@ import { screeningForms, capturePages, contacts, pipelineColumns, interactionHis
 import { eq, and, count } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { publishRealtime } from '../../../shared/queue';
+import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
 
 const defaultFormFlow = {
   nodes: [
@@ -588,13 +589,68 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
     }
   );
 
+  // GET /v1/crm/forms/public/:slug — busca formulário por slug sem autenticação
+  fastify.get('/public/:slug', async (request, reply) => {
+    const { slug } = request.params as any;
+    try {
+      const form = await db.query.screeningForms.findFirst({
+        where: and(
+          eq(screeningForms.slug, slug),
+          eq(screeningForms.isActive, true)
+        ),
+      });
+      if (!form) {
+        return reply.status(404).send({ error: 'Formulário não encontrado' });
+      }
+      // Retorna apenas dados necessários para o frontend público (sem dados sensíveis)
+      return reply.send({
+        success: true,
+        form: {
+          id: form.id,
+          workspaceId: form.workspaceId,
+          title: form.title,
+          slug: form.slug,
+          formFlow: form.formFlow,
+          themeConfig: form.themeConfig,
+          isActive: form.isActive,
+        },
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro interno', message: err.message });
+    }
+  });
+
+  // GET /v1/crm/forms/custom-fields?workspaceId=...
+  fastify.get('/custom-fields', async (request, reply) => {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.status(401).send({ error: 'Não autorizado' });
+    }
+    try {
+      verifyUserJwt(authHeader.split(' ')[1]);
+      const queryWorkspaceId = (request.query as any)?.workspaceId || (request.query as any)?.tenantId;
+      if (!queryWorkspaceId) {
+        return reply.status(400).send({ error: 'workspaceId é obrigatório' });
+      }
+      const fields = await db.query.customFieldDefinitions.findMany({
+        where: eq(customFieldDefinitions.workspaceId, queryWorkspaceId),
+        orderBy: (customFieldDefinitions, { asc }) => [asc(customFieldDefinitions.name)],
+      });
+      return reply.send({ success: true, fields });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro interno', message: err.message });
+    }
+  });
+
   // POST /v1/crm/forms/public/submit
   fastify.post(
     '/public/submit',
     { schema: { body: SubmitFormBodySchema } },
     async (request, reply) => {
       const body = request.body as any;
-      const targetWorkspaceId = body.workspaceId || body.tenantId;
+      let targetWorkspaceId = body.workspaceId || body.tenantId;
       const { formId, pageId, responses, utmSource, utmMedium, utmCampaign, utmTerm, utmContent } = body;
 
       try {
@@ -617,6 +673,18 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
             message: 'O CPF informado é inválido.',
           });
         }
+
+        // Resolver workspaceId a partir do formId quando não informado diretamente
+        if (!targetWorkspaceId && formId) {
+          const formRecord = await db.query.screeningForms.findFirst({
+            where: eq(screeningForms.id, formId),
+          });
+          if (formRecord) targetWorkspaceId = formRecord.workspaceId;
+        }
+        if (!targetWorkspaceId) {
+          return reply.status(400).send({ error: 'workspaceId é obrigatório' });
+        }
+
 
         const firstColumn = await db.query.pipelineColumns.findFirst({
           where: and(
@@ -687,6 +755,19 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
 
         const emergencyObj = responses.emergencia || {};
 
+        // Buscar workspace e resolver fonte de tráfego
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
+        });
+        if (!workspace) {
+          return reply.status(404).send({ error: 'Workspace não encontrado' });
+        }
+        const resolvedSource = resolveTrafficSource(
+          workspace as any,
+          utmSource,
+          pageId ? 'Landing Page (Triagem)' : 'Formulário Direto (Link)'
+        );
+
         const [newContact] = await db
           .insert(contacts)
           .values({
@@ -696,7 +777,7 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
             phone: rawPhone ? ('+' + rawPhone.replace(/\D/g, '')) : null,
             email: rawEmail || null,
             status: initialStatus,
-            source: pageId ? 'Landing Page (Triagem)' : 'Formulário Direto (Link)',
+            source: resolvedSource,
             screeningNotes,
             isMinor: rawIsMinor,
             acceptedContractAt: responses.contrato ? new Date() : null,

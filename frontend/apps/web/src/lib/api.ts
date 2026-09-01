@@ -180,6 +180,20 @@ export interface Contact {
   emergency_contact_phone: string | null;
   is_minor: boolean;
   accepted_contract_at: string | null;
+  age_confirmed_at: string | null;
+  signed_contract_content: string | null;
+  consent_ip: string | null;
+  consent_user_agent: string | null;
+  // Responsável legal (quando menor de idade)
+  parent_name: string | null;
+  parent_cpf: string | null;
+  parent_phone: string | null;
+  // Campos personalizados vindos do formulário
+  custom_field_values: Record<string, any>;
+  // Origem
+  form_id: string | null;
+  capture_page_id: string | null;
+  // UTMs
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;

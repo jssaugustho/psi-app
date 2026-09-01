@@ -5,7 +5,7 @@ import { useCrmStore } from '@/stores/crmStore';
 import { Contact, PipelineColumn } from '@/lib/api';
 import { 
   User, Phone, Mail, Globe, GitBranch, Shield, 
-  AlertTriangle, Check, StickyNote 
+  AlertTriangle, Check, StickyNote, UserCheck, Layers
 } from 'lucide-react';
 import { Select, Textarea } from '@psi/ui';
 
@@ -14,6 +14,7 @@ interface ContactFieldsPanelProps {
   columns: PipelineColumn[];
   sources: string[];
   tenantId: string;
+  customFieldDefs?: Array<{ key: string; name: string; type: string; options?: string[] | null }>;
 }
 
 // Helper para formatar a hora/minuto do salvamento
@@ -21,7 +22,7 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function ContactFieldsPanel({ contact, columns, sources, tenantId }: ContactFieldsPanelProps) {
+export function ContactFieldsPanel({ contact, columns, sources, tenantId, customFieldDefs = [] }: ContactFieldsPanelProps) {
   const { updateContactOptimistic, moveContactOptimistic } = useCrmStore();
   
   // Estados dos inputs locais
@@ -40,6 +41,14 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
   // Maior de idade
   const [isMinor, setIsMinor] = useState(contact.is_minor || false);
 
+  // Responsável Legal
+  const [parentName, setParentName] = useState(contact.parent_name || '');
+  const [parentCpf, setParentCpf] = useState(contact.parent_cpf || '');
+  const [parentPhone, setParentPhone] = useState(contact.parent_phone || '');
+
+  // Campos personalizados — estado local do JSONB
+  const [customFields, setCustomFields] = useState<Record<string, any>>(contact.custom_field_values || {});
+
   // Estados de salvamento
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -52,6 +61,9 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
   const emergencyNameRef = useRef<HTMLInputElement>(null);
   const emergencyRelationRef = useRef<HTMLInputElement>(null);
   const emergencyPhoneRef = useRef<HTMLInputElement>(null);
+  const parentNameRef = useRef<HTMLInputElement>(null);
+  const parentCpfRef = useRef<HTMLInputElement>(null);
+  const parentPhoneRef = useRef<HTMLInputElement>(null);
 
   // Sincronizar com mudanças do contato vindo de fora
   useEffect(() => {
@@ -66,6 +78,10 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
     setSource(contact.source || '');
     setStatus(contact.status || '');
     setIsMinor(contact.is_minor || false);
+    if (document.activeElement !== parentNameRef.current) setParentName(contact.parent_name || '');
+    if (document.activeElement !== parentCpfRef.current) setParentCpf(contact.parent_cpf || '');
+    if (document.activeElement !== parentPhoneRef.current) setParentPhone(contact.parent_phone || '');
+    setCustomFields(contact.custom_field_values || {});
   }, [contact]);
 
   // Função de persistência
@@ -306,6 +322,53 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
           </div>
         </div>
 
+        {/* Responsável Legal (somente se menor de idade) */}
+        {isMinor && (
+          <div className="grid grid-cols-3 items-start min-h-[44px] py-2">
+            <div className="pl-4 text-slate-400 flex items-center gap-2 mt-1.5">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Responsável</span>
+            </div>
+            <div className="col-span-2 pr-4 space-y-2">
+              <input
+                ref={parentNameRef}
+                type="text"
+                value={parentName}
+                onChange={(e) => {
+                  setParentName(e.target.value);
+                  triggerAutoSave({ parent_name: e.target.value });
+                }}
+                className="w-full bg-white/[0.02] border border-[var(--surface-border)] rounded-lg text-slate-200 focus:outline-none px-3 py-1.5 text-xs"
+                placeholder="Nome do responsável"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  ref={parentCpfRef}
+                  type="text"
+                  value={parentCpf}
+                  onChange={(e) => {
+                    setParentCpf(e.target.value);
+                    triggerAutoSave({ parent_cpf: e.target.value });
+                  }}
+                  className="w-full bg-white/[0.02] border border-[var(--surface-border)] rounded-lg text-slate-200 focus:outline-none px-3 py-1.5 text-xs"
+                  placeholder="CPF"
+                />
+                <input
+                  ref={parentPhoneRef}
+                  type="tel"
+                  value={parentPhone}
+                  onChange={(e) => {
+                    setParentPhone(e.target.value);
+                    triggerAutoSave({ parent_phone: e.target.value });
+                  }}
+                  className="w-full bg-white/[0.02] border border-[var(--surface-border)] rounded-lg text-slate-200 focus:outline-none px-3 py-1.5 text-xs"
+                  placeholder="Telefone"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Notas de Triagem */}
         <div className="grid grid-cols-3 items-start min-h-[70px] py-2.5">
           <div className="pl-4 text-slate-400 flex items-center gap-2 mt-1">
@@ -324,6 +387,73 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId }: Cont
             />
           </div>
         </div>
+
+        {/* Dados da Triagem — Campos Personalizados do Formulário */}
+        {customFieldDefs.length > 0 && (
+          <>
+            <div className="px-4 py-2 bg-white/[0.02] border-t border-[var(--surface-border)]">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3 h-3" /> Dados da Triagem
+              </span>
+            </div>
+            {customFieldDefs.map((fieldDef) => {
+              const val = customFields[fieldDef.key];
+              return (
+                <div key={fieldDef.key} className="grid grid-cols-3 items-center min-h-[44px]">
+                  <div className="pl-4 text-slate-400 text-xs truncate pr-2">
+                    {fieldDef.name}
+                  </div>
+                  <div className="col-span-2 pr-4">
+                    {fieldDef.type === 'select' && fieldDef.options && fieldDef.options.length > 0 ? (
+                      <select
+                        value={val || ''}
+                        onChange={(e) => {
+                          const newVal = e.target.value;
+                          const updated = { ...customFields, [fieldDef.key]: newVal };
+                          setCustomFields(updated);
+                          triggerAutoSave({ custom_field_values: updated });
+                        }}
+                        className="w-full bg-transparent border-none text-slate-200 focus:outline-none py-2 text-sm cursor-pointer"
+                      >
+                        <option value="">—</option>
+                        {fieldDef.options.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : fieldDef.type === 'boolean' ? (
+                      <label className="relative inline-flex items-center cursor-pointer my-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(val)}
+                          onChange={(e) => {
+                            const updated = { ...customFields, [fieldDef.key]: e.target.checked };
+                            setCustomFields(updated);
+                            triggerAutoSave({ custom_field_values: updated });
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--brand-gradient-start)]"></div>
+                        <span className="ml-2 text-xs text-slate-300">{val ? 'Sim' : 'Não'}</span>
+                      </label>
+                    ) : (
+                      <input
+                        type="text"
+                        value={val || ''}
+                        onChange={(e) => {
+                          const updated = { ...customFields, [fieldDef.key]: e.target.value };
+                          setCustomFields(updated);
+                          triggerAutoSave({ custom_field_values: updated });
+                        }}
+                        className="w-full bg-transparent border-none text-slate-200 focus:outline-none py-2 text-sm"
+                        placeholder="—"
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );

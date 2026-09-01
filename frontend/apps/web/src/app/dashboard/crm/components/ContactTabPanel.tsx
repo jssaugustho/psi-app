@@ -11,9 +11,10 @@ interface ContactTabPanelProps {
   columns: PipelineColumn[];
   sources: string[];
   tenantId: string;
+  customFieldDefs?: Array<{ key: string; name: string; type: string; options?: string[] | null }>;
 }
 
-export function ContactTabPanel({ contact, columns, sources, tenantId }: ContactTabPanelProps) {
+export function ContactTabPanel({ contact, columns, sources, tenantId, customFieldDefs }: ContactTabPanelProps) {
   const [history, setHistory] = useState<InteractionHistory[]>([]);
   const [newComment, setNewComment] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -79,6 +80,7 @@ export function ContactTabPanel({ contact, columns, sources, tenantId }: Contact
           columns={columns}
           sources={sources}
           tenantId={tenantId}
+          customFieldDefs={customFieldDefs}
         />
       </div>
 

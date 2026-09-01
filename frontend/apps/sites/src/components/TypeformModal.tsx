@@ -44,10 +44,20 @@ export interface FormEdge {
   sourceHandle?: string;
 }
 
+export interface UTMParams {
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
+}
+
 interface TypeformModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tenantId: string;
+  tenantId?: string;
+  workspaceId?: string;  // workspaceId do formulário ou da landing page
+  formId?: string;       // ID do formulário standalone (se vier de /f/[slug])
   pageId: string;
   formFlow: {
     nodes: FormNode[];
@@ -60,6 +70,7 @@ interface TypeformModalProps {
   };
   whatsappNumber?: string; // Number of the psychologist
   contractText?: string;   // Minuta do contrato resolved
+  utmParams?: UTMParams; // Parâmetros UTM capturados da URL
   theme?: {
     colors?: {
       primaryStart?: string;
@@ -75,6 +86,7 @@ interface TypeformModalProps {
   };
   isDark?: boolean;
 }
+
 
 const validateCPFHelper = (cpf: string): boolean => {
   const clean = cpf.replace(/\D/g, '');
@@ -104,8 +116,11 @@ export function TypeformModal({
   open,
   onOpenChange,
   tenantId,
+  workspaceId,
+  formId,
   pageId,
   formFlow,
+  utmParams,
   whatsappNumber = "",
   contractText = "Ao assinar este termo você concorda com o atendimento clínico.",
   theme,
@@ -352,15 +367,33 @@ export function TypeformModal({
       ...customAnswers
     }
 
+    // workspaceId pode vir de prop direta ou de tenantId (compatibilidade retroativa)
+    const resolvedWorkspaceId = workspaceId || tenantId;
+
+    // Escolher endpoint correto:
+    //   formId presente → formulário standalone → /crm/forms/public/submit
+    //   sem formId        → landing page       → /crm/captacao/public/submit
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
+    const endpoint = formId
+      ? `${apiUrl}/crm/forms/public/submit`
+      : `${apiUrl}/crm/captacao/public/submit`;
+
     const payload = {
-      tenantId,
-      pageId,
-      responses: compiledResponses
+      workspaceId: resolvedWorkspaceId,
+      tenantId: resolvedWorkspaceId,
+      formId: formId || undefined,
+      pageId: pageId || undefined,
+      responses: compiledResponses,
+      utmSource:   utmParams?.utm_source   || null,
+      utmMedium:   utmParams?.utm_medium   || null,
+      utmCampaign: utmParams?.utm_campaign || null,
+      utmTerm:     utmParams?.utm_term     || null,
+      utmContent:  utmParams?.utm_content  || null,
     }
 
     startTransition(async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/v1'}/crm/captacao/public/submit`, {
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -375,6 +408,7 @@ export function TypeformModal({
       }
     })
   }
+
 
   // Keybindings for Enter
   useEffect(() => {

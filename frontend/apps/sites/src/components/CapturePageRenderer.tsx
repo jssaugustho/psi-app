@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Sparkles, Check, ChevronDown, MapPin, Phone, MessageSquare, ArrowRight, Menu, X, Image as ImageIcon } from 'lucide-react'
 import { TypeformModal } from './TypeformModal'
 import { BrandLogo } from '@psi/ui'
+import { useUTMParams } from '../hooks/useUTMParams'
 
 
 interface CapturePageRendererProps {
@@ -46,6 +47,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isPreview, setIsPreview] = useState(false)
   const [loaderState, setLoaderState] = useState<'black' | 'spinner' | 'fadeout' | 'done'>('black')
+
+  // Capturar UTMs da URL para atribuição de fonte de tráfego
+  const utmParams = useUTMParams()
 
   // Sync state when props change
   useEffect(() => {
@@ -1509,7 +1513,9 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
         open={modalOpen}
         onOpenChange={setModalOpen}
         tenantId={page.tenantId}
+        workspaceId={page.tenantId}
         pageId={page.id}
+        utmParams={utmParams}
         formFlow={page.formFlow}
         whatsappNumber={tenant.phone || ""}
         theme={page.siteConfig?.theme}

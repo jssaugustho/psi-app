@@ -173,6 +173,9 @@ export default function CrmPage() {
   const [draggedSourceIndex, setDraggedSourceIndex] = useState<number | null>(null);
   const [dragOverSourceIndex, setDragOverSourceIndex] = useState<number | null>(null);
 
+  // Campos personalizados do formulário para exibir no painel do CRM
+  const [customFieldDefs, setCustomFieldDefs] = useState<any[]>([]);
+
   // Handlers para Drag and Drop de Colunas (Estágios)
   const handleColumnDragStart = (e: React.DragEvent, index: number) => {
     setDraggedColumnIndex(index);
@@ -295,6 +298,19 @@ export default function CrmPage() {
       initTabs(tenantId);
     }
   }, [tenantId, fetchCrmData, initTabs]);
+
+  // Buscar campos personalizados do formulário
+  useEffect(() => {
+    if (!tenantId) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${tenantId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => { if (data.fields) setCustomFieldDefs(data.fields); })
+      .catch(() => {});
+  }, [tenantId]);
 
   // Inscrição em tempo real para leads/contatos
   const { subscribe } = useRealtime();
@@ -594,6 +610,7 @@ export default function CrmPage() {
           columns={columns}
           sources={sources}
           tenantId={tenantId || ''}
+          customFieldDefs={customFieldDefs}
         />
       ) : (
         <>
