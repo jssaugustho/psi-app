@@ -2,6 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import postgres from 'postgres';
 import dotenv from 'dotenv';
+import { execSync } from 'child_process';
+import {
+  calculateChecksum,
+  ensureMigrationTables,
+  getCurrentVersionName,
+  notifyPostgrest,
+} from '../shared/migrations';
 
 dotenv.config();
 
@@ -12,164 +19,169 @@ if (!process.env.DATABASE_URL) {
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-/**
- * Divide o conteúdo SQL em instruções individuais respeitando blocos de strings
- * delimitados por $$ (funções PL/pgSQL, blocos DO $$, etc.) para evitar corrupção
- * por divisão ingênua em ponto-e-vírgula (;).
- */
-function splitSqlStatements(sql: string): string[] {
-  const statements: string[] = [];
-  let current = '';
-  let inDollarQuote = false;
-  let dollarTag = '';
-
-  let i = 0;
-  while (i < sql.length) {
-    if (sql[i] === '$') {
-      const match = sql.slice(i).match(/^(\$[A-Za-z0-9_]*\$)/);
-      if (match) {
-        const tag = match[1];
-        if (!inDollarQuote) {
-          inDollarQuote = true;
-          dollarTag = tag;
-          current += tag;
-          i += tag.length;
-          continue;
-        } else if (dollarTag === tag) {
-          inDollarQuote = false;
-          dollarTag = '';
-          current += tag;
-          i += tag.length;
-          continue;
-        }
-      }
-    }
-
-    if (sql[i] === ';' && !inDollarQuote) {
-      if (current.trim()) {
-        statements.push(current.trim());
-      }
-      current = '';
-      i++;
-      continue;
-    }
-
-    current += sql[i];
-    i++;
-  }
-
-  if (current.trim()) {
-    statements.push(current.trim());
-  }
-
-  return statements;
-}
-
 async function migrate() {
-  console.log('📦 Executando migrações SQL do banco de dados...');
+  console.log('----------------------------------------------------');
+  console.log('📦 Executando Sistema de Migrações PSI App');
+  console.log('----------------------------------------------------');
+
+  const backendDir = path.join(__dirname, '../..');
   const sql = postgres(DATABASE_URL);
 
   try {
-    const drizzleDir = path.join(__dirname, '../../drizzle');
-    const files = fs.readdirSync(drizzleDir).filter((f) => f.endsWith('.sql')).sort();
-
-    for (const file of files) {
-      console.log(`⏳ Aplicando migração: ${file}`);
-      const filePath = path.join(drizzleDir, file);
-      const sqlContent = fs.readFileSync(filePath, 'utf8');
-
-      const statements = splitSqlStatements(sqlContent);
-      let successCount = 0;
-      let ignoredCount = 0;
-
-      for (const stmt of statements) {
-        if (!stmt) continue;
-        try {
-          await sql.unsafe(stmt);
-          successCount++;
-        } catch (err: any) {
-          // Códigos do Postgres que indicam objetos/roles já existentes ou drops de objetos ausentes
-          if (['42P07', '42701', '42710', '42P06', '42704', '42P01', '00000'].includes(err.code)) {
-            ignoredCount++;
-          } else {
-            console.warn(`  ⚠️ Alerta na instrução SQL: ${err.message || err}`);
-          }
-        }
-      }
-
-      console.log(`✅ ${file} processada (${successCount} executadas, ${ignoredCount} já existentes/ignoradas)!`);
+    // 1. Executar automaticamente o Drizzle Kit Generate se houver alterações no schema.ts
+    console.log('⏳ 1. Verificando alterações no schema TypeScript (drizzle-kit generate)...');
+    try {
+      execSync('npx drizzle-kit generate', {
+        cwd: backendDir,
+        stdio: 'inherit',
+      });
+    } catch (genErr: any) {
+      console.warn('⚠️ Alerta ao executar drizzle-kit generate:', genErr.message || genErr);
     }
 
-    // Pós-migração: Garantir roles e trigger do schema auth se a tabela auth.users existir
-    try {
-      const postAuthSql = `
-        CREATE SCHEMA IF NOT EXISTS auth;
+    // 2. Garantir que as tabelas de controle de versão existam
+    await ensureMigrationTables(sql);
+    const currentVersion = await getCurrentVersionName(sql);
+    console.log(`\n📌 Versão Ativa do App: \x1b[36m${currentVersion}\x1b[0m`);
 
-        DO $do$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
-            CREATE ROLE anon NOLOGIN;
-          END IF;
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-            CREATE ROLE authenticated NOLOGIN;
-          END IF;
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-            CREATE ROLE service_role NOLOGIN;
-          END IF;
-        END $do$;
+    // 3. Ler arquivos de migração na pasta drizzle
+    const drizzleDir = path.join(backendDir, 'drizzle');
+    if (!fs.existsSync(drizzleDir)) {
+      console.log('⚠️ Pasta ./drizzle não encontrada. Nenhuma migração a aplicar.');
+      await sql.end();
+      process.exit(0);
+    }
 
-        CREATE OR REPLACE FUNCTION auth.set_default_user_role()
-        RETURNS trigger AS $func$
-        BEGIN
-          IF NEW.role IS NULL OR NEW.role = '' THEN
-            NEW.role := 'authenticated';
-          END IF;
-          IF NEW.aud IS NULL OR NEW.aud = '' THEN
-            NEW.aud := 'authenticated';
-          END IF;
-          IF NEW.instance_id IS NULL THEN
-            NEW.instance_id := '00000000-0000-0000-0000-000000000000'::uuid;
-          END IF;
-          RETURN NEW;
-        END;
-        $func$ LANGUAGE plpgsql;
+    const files = fs
+      .readdirSync(drizzleDir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
 
-        DO $do$
-        BEGIN
-          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
-            UPDATE auth.users 
-            SET role = 'authenticated',
-                aud = 'authenticated',
-                instance_id = COALESCE(instance_id, '00000000-0000-0000-0000-000000000000'::uuid)
-            WHERE role IS NULL OR role = '' OR aud IS NULL OR aud = '' OR instance_id IS NULL;
+    // 4. Checar se o banco já foi inicializado anteriormente (bootstrap automático)
+    const migrationCountRow = await sql`SELECT count(*) as count FROM public.schema_migrations`;
+    const migrationCount = parseInt(migrationCountRow[0].count, 10);
 
-            DROP TRIGGER IF EXISTS trg_set_default_user_role ON auth.users;
-            CREATE TRIGGER trg_set_default_user_role
-              BEFORE INSERT OR UPDATE ON auth.users
-              FOR EACH ROW
-              EXECUTE FUNCTION auth.set_default_user_role();
-          END IF;
-        END $do$;
+    if (migrationCount === 0) {
+      const tableCheck = await sql`
+        SELECT EXISTS (
+          SELECT 1 FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'profiles'
+        ) as exists
       `;
 
-      for (const stmt of splitSqlStatements(postAuthSql)) {
-        try {
-          await sql.unsafe(stmt);
-        } catch (authErr: any) {
-          if (!['42P07', '42701', '42710', '42P06', '42704', '42P01', '00000'].includes(authErr.code)) {
-            console.warn('⚠️ Alerta ao verificar trigger do schema auth:', authErr.message);
-          }
+      if (tableCheck[0].exists) {
+        console.log('⚡ Banco de dados pré-existente detectado. Registrando histórico baseline...');
+        for (const file of files) {
+          const filePath = path.join(drizzleDir, file);
+          const sqlContent = fs.readFileSync(filePath, 'utf8');
+          const checksum = calculateChecksum(sqlContent);
+
+          await sql`
+            INSERT INTO public.schema_migrations 
+              (version_name, filename, checksum, sql_content, execution_time_ms)
+            VALUES 
+              (${currentVersion}, ${file}, ${checksum}, ${sqlContent}, 0)
+            ON CONFLICT (filename) DO NOTHING
+          `;
         }
+        console.log(`✅ Baseline de ${files.length} migrações registrado no histórico com sucesso!`);
       }
-      console.log('✅ Roles e triggers do schema auth verificados com sucesso!');
-    } catch (authErr: any) {
-      console.warn('⚠️ Alerta pós-migração:', authErr.message);
     }
 
-    console.log('🎉 Migrações concluídas com sucesso!');
+    // 5. Buscar migrações já executadas
+    const executedRows = await sql`
+      SELECT filename, checksum FROM public.schema_migrations
+    `;
+    const executedMap = new Map<string, string>();
+    for (const row of executedRows) {
+      executedMap.set(row.filename, row.checksum);
+    }
+
+    let appliedCount = 0;
+    let skippedCount = 0;
+
+    for (const file of files) {
+      const filePath = path.join(drizzleDir, file);
+      const sqlContent = fs.readFileSync(filePath, 'utf8');
+      const checksum = calculateChecksum(sqlContent);
+
+      if (executedMap.has(file)) {
+        const storedChecksum = executedMap.get(file);
+        if (storedChecksum !== checksum) {
+          console.error(
+            `❌ ERRO DE INTEGRIDADE: O arquivo de migração "${file}" foi modificado após ter sido aplicado no banco!`
+          );
+          console.error(`  - Checksum Registrado: ${storedChecksum}`);
+          console.error(`  - Checksum Atual:      ${checksum}`);
+          await sql.end();
+          process.exit(1);
+        }
+        skippedCount++;
+        continue;
+      }
+
+      console.log(`⏳ Aplicando migração pendente: \x1b[33m${file}\x1b[0m...`);
+      const startTime = Date.now();
+
+      // Executa a migração dentro de um bloco transacional
+      await sql.begin(async (tx) => {
+        await tx.unsafe(sqlContent);
+
+        const executionTimeMs = Date.now() - startTime;
+
+        await tx`
+          INSERT INTO public.schema_migrations 
+            (version_name, filename, checksum, sql_content, execution_time_ms)
+          VALUES 
+            (${currentVersion}, ${file}, ${checksum}, ${sqlContent}, ${executionTimeMs})
+        `;
+      });
+
+      const executionTimeMs = Date.now() - startTime;
+      console.log(`✅ ${file} aplicada com sucesso em ${executionTimeMs}ms!`);
+      appliedCount++;
+    }
+
+    // 6. Pós-migração: Verificar roles e permissões básicas para o PostgREST
+    await sql.unsafe(`
+      CREATE SCHEMA IF NOT EXISTS auth;
+
+      DO $do$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+          CREATE ROLE anon NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+          CREATE ROLE authenticated NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+          CREATE ROLE service_role NOLOGIN;
+        END IF;
+      END $do$;
+
+      GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+      GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+      GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+    `);
+
+    // 7. Notificar PostgREST
+    await notifyPostgrest(sql);
+
+    console.log('----------------------------------------------------');
+    console.log(
+      `🎉 Processo concluído: ${appliedCount} novas migrações aplicadas, ${skippedCount} já executadas.`
+    );
+    console.log('----------------------------------------------------');
+
+    await sql.end();
     process.exit(0);
   } catch (err: any) {
     console.error('❌ Erro crítico ao aplicar migrações:', err.message || err);
+    await sql.end();
     process.exit(1);
   }
 }

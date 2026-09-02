@@ -6,8 +6,12 @@ Template monorepo completo e modular projetado para desenvolvimento rápido, esc
 > **ATENÇÃO DESENVOLVEDORES E AGENTES DE IA (Gemini, Cursor, Copilot, etc.):**
 > Antes de escrever qualquer linha de código ou criar endpoints, você **deve consultar e seguir estritamente as regras e premissas arquiteturais** especificadas no diretório `.agents/` para não comprometer a segurança RLS ou a integridade de rede:
 > - 📘 **[Guia de Tomada de Decisão da Stack](file:///.agents/development_guide.md)**: Dita as regras sobre quando usar PostgREST, Fastify, RabbitMQ e Workers.
+> - 📜 **[Regras de Logs e Auditoria Sensível](file:///.agents/rules/logging_and_audit_architecture.md)**: Diretrizes de resiliência AMQP, buffer em memória e rastreamento de ações sensíveis.
+> - 🐘 **[Guia do PostgreSQL MCP para IAs](file:///.agents/postgres_mcp_guide.md)**: Manual de auditoria de logs via MCP e consumo seguro do schema do banco.
 > - ✉️ **[Regras de E-mail e White-Label](file:///.agents/email_rules.md)**: Diretrizes obrigatórias de branding, prevenção de vazamento de marca e links nos e-mails.
 > - 🗺️ **[Arquitetura Detalhada da Stack](file:///.agents/stack_architecture.md)**: Desenho físico da rede e infraestrutura Docker.
+
+
 
 ---
 
