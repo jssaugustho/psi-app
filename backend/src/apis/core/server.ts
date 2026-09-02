@@ -14,6 +14,7 @@ import { crmRoutes } from './routes/crm';
 import { captacaoRoutes } from './routes/captacao';
 import { formsRoutes } from './routes/forms';
 import { sql } from '../../shared/db';
+import { startDomainVerifyConsumer } from '../../consumers/domainVerifyConsumer';
 
 
 const port = env.PORT;
@@ -311,6 +312,13 @@ const start = async () => {
       console.log('✅ Escuta de eventos pg_notify ativa no canal [realtime_events].');
     } catch (err) {
       console.error('❌ Falha ao iniciar ouvinte pg_notify:', err);
+    }
+
+    // Iniciar Consumer de verificação automática de domínios
+    try {
+      await startDomainVerifyConsumer();
+    } catch (err) {
+      console.warn('⚠️ Consumer de domínios não disponível na inicialização. Verificação automática indisponível.');
     }
 
     await fastify.listen({ port, host: '0.0.0.0' });

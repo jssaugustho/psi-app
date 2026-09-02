@@ -5,6 +5,8 @@ import { db } from '../../../shared/db';
 import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities, profiles } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
+import { checkDomainOnCloudflare, persistDomainStatus } from '../../../shared/domainVerifier';
+import { scheduleDomainVerification } from '../../../consumers/domainVerifyConsumer';
 
 // Validation Schemas
 const CreatePageBodySchema = z.object({
@@ -754,7 +756,7 @@ function validateCPF(cpf: string): boolean {
 
 
   // POST /v1/crm/captacao/custom-hostname/register
-  // Registra um domínio próprio no Cloudflare Custom Hostnames
+  // Registra um domínio próprio no Cloudflare Custom Hostnames e persiste no banco
   fastify.post(
     '/custom-hostname/register',
     async (request, reply) => {
@@ -790,21 +792,42 @@ function validateCPF(cpf: string): boolean {
             .where(eq(capturePages.id, pageId));
         }
 
+        // Resolver workspaceId do token JWT
+        const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
+        const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
+
         // Se não houver credenciais do Cloudflare configuradas no admin, retornar instruções estáticas de CNAME
         if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
+          const staticRecords = [
+            {
+              type: 'CNAME',
+              name: cleanDomain.includes('.') ? cleanDomain.split('.')[0] : '@',
+              value: cnameTarget,
+              description: 'Apontamento principal do seu domínio no seu provedor de DNS',
+              status: 'pending' as const,
+            },
+          ];
+
+          // Persistir mesmo sem Cloudflare configurado
+          if (targetWorkspaceId) {
+            await db.insert(workspaceDomains).values({
+              workspaceId: targetWorkspaceId,
+              subdomain: cleanDomain.split('.')[0],
+              customDomain: cleanDomain,
+              dnsStatus: 'pending',
+              dnsRecords: staticRecords,
+            }).onConflictDoUpdate({
+              target: workspaceDomains.workspaceId,
+              set: { customDomain: cleanDomain, dnsStatus: 'pending', dnsRecords: staticRecords, updatedAt: new Date() },
+            });
+          }
+
           return reply.send({
             success: true,
             status: 'pending_validation',
             hostname: cleanDomain,
             cnameTarget,
-            dnsRecords: [
-              {
-                type: 'CNAME',
-                name: cleanDomain.includes('.') ? cleanDomain.split('.')[0] : '@',
-                value: cnameTarget,
-                description: 'Apontamento principal do seu domínio no seu provedor de DNS',
-              },
-            ],
+            dnsRecords: staticRecords,
             message: 'Domínio salvo! Complete o apontamento CNAME no seu provedor de DNS.',
           });
         }
@@ -827,10 +850,7 @@ function validateCPF(cpf: string): boolean {
             },
             body: JSON.stringify({
               hostname: cleanDomain,
-              ssl: {
-                method: 'http',
-                type: 'dv',
-              },
+              ssl: { method: 'http', type: 'dv' },
             }),
           }
         );
@@ -840,15 +860,12 @@ function validateCPF(cpf: string): boolean {
         if (createRes.ok && createData.result) {
           cfResult = createData.result;
         } else {
-          // Se já existe ou deu erro 1406, buscar o Custom Hostname existente por hostname
+          // Se já existe (erro 1406), buscar o Custom Hostname existente por hostname
           const listRes = await fetch(
             `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${cleanDomain}`,
             {
               method: 'GET',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             }
           );
           const listData: any = await listRes.json().catch(() => ({}));
@@ -857,12 +874,13 @@ function validateCPF(cpf: string): boolean {
           }
         }
 
-        const dnsRecords: Array<{ type: string; name: string; value: string; description: string }> = [
+        const dnsRecords: any[] = [
           {
             type: 'CNAME',
             name: cleanDomain.includes('.') ? cleanDomain.split('.')[0] : '@',
             value: cnameTarget,
             description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma',
+            status: 'pending',
           },
         ];
 
@@ -877,11 +895,12 @@ function validateCPF(cpf: string): boolean {
               name: cfResult.ownership_verification.name || `_cf-custom-hostname.${cleanDomain}`,
               value: cfResult.ownership_verification.value,
               description: 'Validação de propriedade do domínio junto ao Cloudflare',
+              status: 'pending',
             });
           }
 
           // Registros de Validação SSL (DCV)
-          if (cfResult.ssl && cfResult.ssl.validation_records && Array.isArray(cfResult.ssl.validation_records)) {
+          if (cfResult.ssl?.validation_records && Array.isArray(cfResult.ssl.validation_records)) {
             cfResult.ssl.validation_records.forEach((rec: any) => {
               if (rec.txt_name && rec.txt_value) {
                 dnsRecords.push({
@@ -889,14 +908,14 @@ function validateCPF(cpf: string): boolean {
                   name: rec.txt_name,
                   value: rec.txt_value,
                   description: 'Validação de emissão do certificado SSL de segurança',
+                  status: 'pending',
                 });
               }
             });
           }
         }
 
-        const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
-        const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
+        // 2. Persistir no banco — inclui dnsStatus e dnsRecords
         if (targetWorkspaceId && cleanDomain) {
           await db
             .insert(workspaceDomains)
@@ -905,6 +924,7 @@ function validateCPF(cpf: string): boolean {
               subdomain: cleanDomain.split('.')[0],
               customDomain: cleanDomain,
               cfHostnameId: hostnameId,
+              dnsStatus: cfStatus === 'active' ? 'active' : 'pending',
               dnsRecords,
             })
             .onConflictDoUpdate({
@@ -912,10 +932,22 @@ function validateCPF(cpf: string): boolean {
               set: {
                 customDomain: cleanDomain,
                 cfHostnameId: hostnameId,
+                dnsStatus: cfStatus === 'active' ? 'active' : 'pending',
                 dnsRecords,
                 updatedAt: new Date(),
               },
             });
+
+          // 3. Enfileirar verificação automática via RabbitMQ (polling a cada 3 min)
+          if (cfStatus !== 'active') {
+            await scheduleDomainVerification(
+              targetWorkspaceId,
+              cleanDomain,
+              hostnameId,
+              60_000, // Primeira tentativa após 1 minuto
+              0
+            );
+          }
         }
 
         return reply.send({
@@ -933,8 +965,9 @@ function validateCPF(cpf: string): boolean {
     }
   );
 
+
   // POST /v1/crm/captacao/custom-hostname/verify
-  // Revalida o status do Custom Hostname no Cloudflare
+  // Verificação manual: consulta CF, persiste resultado (mesmo se pendente), retorna status
   fastify.post(
     '/custom-hostname/verify',
     async (request, reply) => {
@@ -943,7 +976,7 @@ function validateCPF(cpf: string): boolean {
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        const userPayload: any = verifyUserJwt(authHeader.split(' ')[1]);
 
         const body: any = request.body || {};
         const { domain } = body;
@@ -953,58 +986,115 @@ function validateCPF(cpf: string): boolean {
         }
 
         const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+        // Buscar cf_hostname_id do banco para consulta mais eficiente
+        const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
+        let cfHostnameId: string | null = null;
+        if (targetWorkspaceId) {
+          const domainRecord = await db.query.workspaceDomains.findFirst({
+            where: eq(workspaceDomains.workspaceId, targetWorkspaceId),
+          });
+          cfHostnameId = domainRecord?.cfHostnameId || null;
+        }
+
+        // Consultar Cloudflare via helper compartilhado (com rate limiter embutido)
+        const result = await checkDomainOnCloudflare(cleanDomain, cfHostnameId);
+
         const settings = await db.query.platformSettings.findFirst();
         const baseDomain = settings?.baseDomain || 'psiapp.com.br';
         const cnameTarget = `custom.${baseDomain}`;
 
-        if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
+        // Sem Cloudflare configurado → retornar status sem salvar mudança de status
+        if (result.status === 'no_cloudflare') {
           return reply.send({
             success: true,
             status: 'pending_validation',
             hostname: cleanDomain,
             cnameTarget,
             sslActive: false,
-            message: 'Cloudflare não configurado no painel admin. Verificação concluída manualmente.',
+            dnsRecords: [],
+            rateLimited: false,
+            message: 'Cloudflare não configurado no painel admin.',
           });
         }
 
-        const token = settings.cloudflareApiToken;
-        const zoneId = settings.cloudflareZoneId;
-
-        const listRes = await fetch(
-          `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${cleanDomain}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const listData: any = await listRes.json().catch(() => ({}));
-        const cfResult = listData.result && listData.result.length > 0 ? listData.result[0] : null;
-
-        if (!cfResult) {
+        // Rate limited → retornar dados atuais do banco sem nova consulta
+        if (result.rateLimited) {
+          const domainRecord = targetWorkspaceId
+            ? await db.query.workspaceDomains.findFirst({ where: eq(workspaceDomains.workspaceId, targetWorkspaceId) })
+            : null;
           return reply.send({
             success: true,
-            status: 'not_found',
+            status: domainRecord?.dnsStatus || 'pending',
             hostname: cleanDomain,
             cnameTarget,
-            sslActive: false,
+            sslActive: domainRecord?.dnsStatus === 'active',
+            dnsRecords: domainRecord?.dnsRecords || [],
+            rateLimited: true,
+            message: 'Aguarde alguns segundos antes de verificar novamente.',
           });
         }
 
-        const sslActive = cfResult.ssl?.status === 'active' || cfResult.status === 'active';
+        // Persistir resultado no banco — sempre, mesmo que ainda pendente
+        if (targetWorkspaceId) {
+          await persistDomainStatus(targetWorkspaceId, cleanDomain, result);
+        }
 
         return reply.send({
           success: true,
-          status: cfResult.status,
-          sslStatus: cfResult.ssl?.status,
-          sslActive,
+          status: result.status,
+          sslStatus: result.sslStatus,
+          sslActive: result.isActive,
           hostname: cleanDomain,
-          hostnameId: cfResult.id,
-          cnameTarget,
+          hostnameId: result.hostnameId,
+          cnameTarget: result.cnameTarget || cnameTarget,
+          dnsRecords: result.dnsRecords,
+          rateLimited: false,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Erro interno', message: err.message });
+      }
+    }
+  );
+
+  // GET /v1/crm/captacao/workspace-domain?workspaceId=...
+  // Retorna o estado atual de DNS de um workspace (carregado do banco, sem consultar CF)
+  fastify.get(
+    '/workspace-domain',
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const userPayload: any = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const query: any = request.query || {};
+        const workspaceId = query.workspaceId || userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
+
+        if (!workspaceId) {
+          return reply.status(400).send({ error: 'Bad Request', message: 'workspaceId é obrigatório.' });
+        }
+
+        const domainRecord = await db.query.workspaceDomains.findFirst({
+          where: eq(workspaceDomains.workspaceId, workspaceId),
+        });
+
+        if (!domainRecord) {
+          return reply.send({ found: false, domain: null });
+        }
+
+        return reply.send({
+          found: true,
+          id: domainRecord.id,
+          workspaceId: domainRecord.workspaceId,
+          subdomain: domainRecord.subdomain,
+          customDomain: domainRecord.customDomain,
+          cfHostnameId: domainRecord.cfHostnameId,
+          dnsStatus: domainRecord.dnsStatus,
+          dnsRecords: domainRecord.dnsRecords || [],
+          updatedAt: domainRecord.updatedAt,
         });
       } catch (err: any) {
         fastify.log.error(err);
@@ -1013,3 +1103,4 @@ function validateCPF(cpf: string): boolean {
     }
   );
 }
+
