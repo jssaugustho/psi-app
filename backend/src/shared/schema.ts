@@ -354,8 +354,8 @@ export const mediaAssets = pgTable('media_assets', {
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type NewMediaAsset = typeof mediaAssets.$inferInsert;
 
-// ── 14. Logs de Erro do Sistema ─────────────────────────────────────────────
-export const errorLogs = pgTable('error_logs', {
+// ── 14. Logs do Sistema ─────────────────────────────────────────────────────
+export const logs = pgTable('logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name'),
   message: text('message').notNull(),
@@ -364,11 +364,33 @@ export const errorLogs = pgTable('error_logs', {
   userAgent: text('user_agent'),
   userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
   serviceName: text('service_name').notNull(),
-  severity: text('severity').$type<'error' | 'warning' | 'fatal'>().default('error').notNull(),
+  severity: text('severity').$type<'error' | 'warning' | 'fatal' | 'info'>().default('error').notNull(),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export type ErrorLog = typeof errorLogs.$inferSelect;
-export type NewErrorLog = typeof errorLogs.$inferInsert;
+export const errorLogs = logs;
+export type SystemLog = typeof logs.$inferSelect;
+export type NewSystemLog = typeof logs.$inferInsert;
+export type ErrorLog = SystemLog;
+
+// ── 15. Logs de Auditoria de Ações Sensíveis (Audit Trail) ──────────────────
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  action: text('action').notNull(),
+  category: text('category').$type<'auth' | 'security' | 'config' | 'email' | 'webhook' | 'data'>().notNull(),
+  serviceName: text('service_name').notNull(),
+  status: text('status').$type<'success' | 'failure'>().notNull(),
+  userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'set null' }),
+  ip: text('ip'),
+  userAgent: text('user_agent'),
+  details: jsonb('details').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
+
+
 

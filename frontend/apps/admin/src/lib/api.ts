@@ -839,7 +839,44 @@ export const api = {
     });
     return fetchApi<{ success: boolean; logs: ErrorLog[]; total: number }>(`/platform/errors?${params.toString()}`);
   },
+
+  // Buscar logs de auditoria de ações sensíveis
+  getAuditLogs: (filters: {
+    limit?: number;
+    offset?: number;
+    action?: string;
+    category?: string;
+    serviceName?: string;
+    status?: string;
+    userId?: string;
+    workspaceId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        params.append(key, String(val));
+      }
+    });
+    return fetchApi<{ success: boolean; logs: AuditLog[]; total: number }>(`/platform/audit-logs?${params.toString()}`);
+  },
 };
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  category: string;
+  serviceName: string;
+  status: 'success' | 'failure';
+  userId: string | null;
+  workspaceId: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  details: Record<string, any> | null;
+  createdAt: string;
+}
+
 
 export interface ErrorLog {
   id: string;

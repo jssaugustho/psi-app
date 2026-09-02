@@ -8,6 +8,8 @@ import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDoma
 import { eq, and } from 'drizzle-orm';
 import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest } from '../../../shared/auth';
 import { queueEmail } from '../../../emails/queue-email';
+import { publishErrorLog, publishAuditLog } from '../../../shared/queue';
+
 
 async function resolveWorkspaceFromRequest(request: any) {
   const origin = request.headers['origin'] as string | undefined;
@@ -213,6 +215,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           }
         }
 
+        await publishAuditLog({
+          action: 'auth.bootstrap',
+          category: 'auth',
+          serviceName: 'core-api',
+          status: 'success',
+          userId: profile.id,
+          ip: request.ip ?? null,
+          userAgent: (request.headers['user-agent'] as string) ?? null,
+          details: { email: cleanEmail, name: `${nome} ${sobrenome}` },
+        }).catch(() => {});
+
         return reply.status(201).send({
           message: 'Primeiro Administrador criado com sucesso!',
           access_token: authData.access_token,
@@ -232,11 +245,21 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        publishErrorLog({
+          name: err.name || 'BootstrapError',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: request.headers['user-agent'] || null,
+          serviceName: 'core-api',
+          severity: 'error',
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro no bootstrap',
           message: err.message || 'Não foi possível criar o Administrador inicial.',
         });
       }
+
     }
   );
 
@@ -305,6 +328,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           })
           .returning();
 
+        await publishAuditLog({
+          action: 'auth.register',
+          category: 'auth',
+          serviceName: 'core-api',
+          status: 'success',
+          userId: profile.id,
+          ip: request.ip ?? null,
+          userAgent: (request.headers['user-agent'] as string) ?? null,
+          details: { email: cleanEmail, name: `${nome} ${sobrenome}` },
+        }).catch(() => {});
+
         return reply.status(201).send({
           message: 'Usuário cadastrado com sucesso!',
           user: {
@@ -323,11 +357,21 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        publishErrorLog({
+          name: err.name || 'RegisterError',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: request.headers['user-agent'] || null,
+          serviceName: 'core-api',
+          severity: 'error',
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro no cadastro',
           message: err.message || 'Não foi possível realizar o cadastro.',
         });
       }
+
     }
   );
 
@@ -413,6 +457,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
+        await publishAuditLog({
+          action: 'auth.login',
+          category: 'auth',
+          serviceName: 'core-api',
+          status: 'success',
+          userId: userId || null,
+          ip: request.ip ?? null,
+          userAgent: (request.headers['user-agent'] as string) ?? null,
+          details: { email: cleanEmail, appType },
+        }).catch(() => {});
+
         return reply.send({
           access_token: authData.access_token,
           refresh_token: authData.refresh_token,
@@ -430,11 +485,22 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        publishAuditLog({
+          action: 'auth.login',
+          category: 'auth',
+          serviceName: 'core-api',
+          status: 'failure',
+          ip: request.ip ?? null,
+          userAgent: (request.headers['user-agent'] as string) ?? null,
+          details: { email: (request.body as any)?.email, reason: err.message },
+        }).catch(() => {});
+
         return reply.status(401).send({
           error: 'Falha no login',
           message: err.message || 'Credenciais inválidas.',
         });
       }
+
     }
   );
 

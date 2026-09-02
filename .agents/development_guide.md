@@ -87,3 +87,22 @@ graph TD
   - Utilitários de compressão e manipulação de imagem residem no pacote `@psi/image-utils`.
 * **Diretriz de Arquivos no Front-End**:
   - Arquivos de páginas (`page.tsx`) devem se manter concisos (< 50 linhas), delegando a lógica para hooks especialistas (`usePageEditor`) e componentes dedicados (`PageEditorHeader`, `PageEditorSidebar`, `PageEditorCanvas`).
+
+---
+
+### 6. 📜 Sistema de Logs de Erros & Auditoria Sensível (`logs` & `audit_logs`)
+
+* **Regra de Ouro (Zero DB no Path Crítico HTTP)**:
+  - NUNCA faça inserções diretas no PostgreSQL (`db.insert(logs)`) durante a execução de rotas HTTP na API.
+  - Toda a captura de logs deve utilizar os helpers assíncronos `publishErrorLog(payload)` e `publishAuditLog(payload)` em `src/shared/queue.ts`.
+* **Resiliência em Memória (`InMemoryLogBuffer`)**:
+  - Se o RabbitMQ estiver temporariamente indisponível ou reconectando, os helpers acumulam os registros em um buffer em memória estritamente limitado (**max 1.000 itens - FIFO**). Um timer de background tenta descarregar os itens acumulados a cada 5 segundos assim que a fila estiver online.
+* **Captura de Erros Obrigatória nas Rotas**:
+  - Todo bloco `catch (err)` em rotas da API Fastify deve obrigatoriamente chamar `publishErrorLog(...)` antes de retornar status HTTP 4xx/5xx para que o evento seja gravado na tabela `logs` e transmitido ao terminal Admin em tempo real.
+* **Rastreamento de Ações Sensíveis (`publishAuditLog`)**:
+  - Devem ser obrigatoriamente registrados eventos de auditoria sensíveis (`publishAuditLog`) em:
+    - **Autenticação**: `auth.bootstrap`, `auth.register`, `auth.login` (sucesso/falha com IP/User-Agent), `auth.forgot_password`, `auth.reset_password`, `auth.update_profile`.
+    - **Infraestrutura & Configurações**: `config.cloudflare_update`, `config.r2_storage_update`, `config.resend_update`, `config.white_label_update`.
+    - **Webhooks & Triagens**: `webhook.crm_received`, `forms.submitted`, `crm.contact_deleted`.
+    - **Workers**: `email.sent`, `email.failed`, `domain.verified`.
+

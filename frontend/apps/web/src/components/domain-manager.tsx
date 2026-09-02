@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { Card, Input, LoadingSpinner, BrandModal, DnsInstructions } from '@psi/ui';
+import { Card, Input, DnsInstructions } from '@psi/ui';
+
+
 import {
   Globe,
   ShieldCheck,
@@ -10,8 +12,11 @@ import {
   AlertCircle,
   ExternalLink,
   RefreshCw,
-  HelpCircle
+  HelpCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+
 import { useRealtime } from '@/context/RealtimeContext';
 
 export interface DomainManagerProps {
@@ -62,8 +67,10 @@ export function DomainManager({
   compactMode = false,
   className = '',
 }: DomainManagerProps) {
-  // DNS Modal & Status States
+  // DNS Modal, Accordion & Status States
+  const [savedCustomDomain, setSavedCustomDomain] = useState<string>('');
   const [showDnsModal, setShowDnsModal] = useState(false);
+  const [isDnsAccordionOpen, setIsDnsAccordionOpen] = useState(true);
   const [verifyingDns, setVerifyingDns] = useState(false);
   const [registeringCustom, setRegisteringCustom] = useState(false);
   const [domainVerified, setDomainVerified] = useState<boolean | null>(null);
@@ -95,6 +102,7 @@ export function DomainManager({
       if (event.action === 'verified' && event.data?.domain === customDomain) {
         setDomainVerified(true);
         setDomainStatus('active');
+        setIsDnsAccordionOpen(false); // Recolhe acordeon se verificado
         if (event.data?.dnsRecords?.length > 0) {
           setDnsRecords(event.data.dnsRecords);
         }
@@ -103,13 +111,15 @@ export function DomainManager({
     return unsubscribe;
   }, [subscribe, customDomain]);
 
-  // Carregar estado DNS persistido no banco ao montar (sem chamar a CF API)
+  // Carregar estado DNS persistido no banco ao montar E consultar Cloudflare em background
   useEffect(() => {
     if (!tenantId) return;
     api.getWorkspaceDomain(tenantId)
       .then((record: any) => {
-        if (!record) return;
-        if (record.customDomain && !customDomain) {
+        if (!record || !record.customDomain) return;
+        setSavedCustomDomain(record.customDomain);
+
+        if (!customDomain) {
           onCustomDomainChange(record.customDomain);
         }
         if (record.dnsRecords && record.dnsRecords.length > 0) {
@@ -119,11 +129,32 @@ export function DomainManager({
           setDomainStatus(record.dnsStatus);
           if (record.dnsStatus === 'active' || record.dnsStatus === 'verified') {
             setDomainVerified(true);
+            setIsDnsAccordionOpen(false);
+          } else {
+            setIsDnsAccordionOpen(true);
           }
         }
+
+        // Consulta de atualização na Cloudflare em background ao abrir a tela (rate-limited a 15s)
+        api.verifyCustomHostname(record.customDomain, undefined, tenantId)
+          .then((res) => {
+            if (res.dnsRecords && res.dnsRecords.length > 0) {
+              setDnsRecords(res.dnsRecords as any);
+            }
+            if (res.sslActive || res.status === 'active' || res.status === 'verified') {
+              setDomainVerified(true);
+              setDomainStatus('active');
+              setIsDnsAccordionOpen(false);
+            } else if (res.status && !res.rateLimited) {
+              setDomainStatus(res.status);
+            }
+          })
+          .catch(() => {});
       })
       .catch(() => {});
   }, [tenantId]);
+
+
 
 
   useEffect(() => {
@@ -156,10 +187,10 @@ export function DomainManager({
     }
   }, [tenantId, onCheckSubdomain]);
 
-  // Open DNS Setup Modal
-  const handleOpenSetupModal = async () => {
+  // Salvar Domínio & Registrar no Cloudflare
+  const handleSaveCustomDomain = async () => {
     if (!customDomain.trim()) {
-      setError('Digite o seu domínio próprio antes de abrir o setup.');
+      setError('Digite o seu domínio próprio antes de salvar.');
       return;
     }
     setRegisteringCustom(true);
@@ -168,29 +199,32 @@ export function DomainManager({
 
     try {
       const res = await api.registerCustomHostname(null, customDomain.trim(), tenantId);
+      const registeredDomain = res.hostname || customDomain.trim();
+      setSavedCustomDomain(registeredDomain);
+
       if (res.dnsRecords && res.dnsRecords.length > 0) {
         setDnsRecords(res.dnsRecords as any);
       } else {
-        const fallbackTarget = baseDomain && !baseDomain.includes('localhost') ? `custom.${baseDomain}` : 'custom.ajstrategy.digital';
-        setDnsRecords([
-          { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma', status: 'pending' },
-        ]);
+        setDnsRecords([]);
       }
+
       if (res.status === 'active' || res.status === 'verified') {
         setDomainVerified(true);
         setDomainStatus('active');
+        setIsDnsAccordionOpen(false);
+      } else {
+        setDomainVerified(false);
+        setDomainStatus(res.status || 'pending');
+        setIsDnsAccordionOpen(true);
       }
-      setShowDnsModal(true);
-    } catch {
-      const fallbackTarget = baseDomain && !baseDomain.includes('localhost') ? `custom.${baseDomain}` : 'custom.ajstrategy.digital';
-      setDnsRecords([
-        { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma', status: 'pending' },
-      ]);
-      setShowDnsModal(true);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao registrar domínio no Cloudflare.');
     } finally {
       setRegisteringCustom(false);
     }
   };
+
+
 
   // Verify Custom Domain DNS propagation (manual)
   const handleVerifyDomainDns = async () => {
@@ -211,9 +245,11 @@ export function DomainManager({
       } else if (res.sslActive || res.status === 'active' || res.status === 'verified') {
         setDomainVerified(true);
         setDomainStatus('active');
+        setIsDnsAccordionOpen(false);
       } else {
         setDomainVerified(false);
         setDomainStatus(res.status || 'pending');
+        setIsDnsAccordionOpen(true);
       }
     } catch {
       setDomainVerified(false);
@@ -242,58 +278,48 @@ export function DomainManager({
           <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4" /> Subdomínio da Conta Configurado
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Subdomínio da Conta Configurado
                 </span>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
                   Endereço Global Cadastrado
-                </h3>
+                </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setForceEditSubdomain(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-violet-600 hover:text-white bg-violet-600/10 hover:bg-violet-600 border border-violet-600/20 transition-all shadow-xs shrink-0 cursor-pointer"
+                  className="px-3 py-1 rounded-xl text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 border border-violet-500/20 transition-all cursor-pointer"
                 >
                   Editar Subdomínio
                 </button>
-
-                <a
-                  href="/dashboard/configuracoes"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-[var(--brand-gradient-start)] hover:text-white bg-[var(--brand-gradient-start)]/10 hover:bg-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/20 transition-all shadow-xs shrink-0"
-                >
-                  <span>Gerenciar nas Configurações</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
               </div>
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              O subdomínio pertence às configurações globais da sua conta e aplica-se a todas as suas páginas. Para alterá-lo, acesse as configurações.
+              O subdomínio pertence às configurações globais da sua conta e aplica-se a todas as suas páginas.
             </p>
 
-            <div className="p-3.5 rounded-xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 space-y-1 max-w-md">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
                   Subdomínio TheraOS
                 </span>
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  Ativo
+                <span className="text-xs font-mono font-bold text-slate-900 dark:text-white block">
+                  https://{subdomain}.{baseDomain}
                 </span>
               </div>
-              <span className="text-xs font-mono font-bold text-slate-900 dark:text-white block truncate">
-                https://{subdomain}.{baseDomain}
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Ativo
               </span>
             </div>
           </div>
         ) : (
-          /* EDITÁVEL SUBDOMÍNIO */
-          <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-3">
+          /* MODO EDITÁVEL SUBDOMÍNIO */
+          <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4 shadow-sm">
             <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-              Nome do Subdomínio TheraOS
+              Escolher Subdomínio Gratuito (Ex: minha-clinica.{baseDomain})
             </label>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
               <div className="flex items-center flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-sm focus-within:border-[var(--brand-gradient-start)] transition-all">
@@ -322,15 +348,6 @@ export function DomainManager({
               >
                 {isCheckingSubdomain ? 'Verificando...' : 'Verificar'}
               </button>
-              <a
-                href={`https://${subdomain || 'site'}.${baseDomain}`}
-                target="_blank"
-                rel="noreferrer"
-                className="h-10 px-4 rounded-xl border border-[var(--surface-border)] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-xs font-semibold shrink-0 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
-              >
-                <span>Abrir Seu Site Agora</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
 
             {isSubdomainAvailable === true && (
@@ -348,15 +365,15 @@ export function DomainManager({
 
         {/* DOMÍNIO PRÓPRIO (SE A CONTA JÁ POSSUI OU SE DESEJA CONECTAR) */}
         {isCustomDomainLocked && customDomain ? (
-          /* MODO READ-ONLY DOMÍNIO PRÓPRIO (SE A CONTA JÁ POSSUI DOMÍNIO REGISTRADO) */
-          <div className="p-3.5 rounded-xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 space-y-1 max-w-md">
+          /* MODO READ-ONLY DOMÍNIO PRÓPRIO */
+          <div className="p-4 rounded-2xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Domínio Próprio Customizado
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                  Conectado
+                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Verificado & Ativo
                 </span>
                 <button
                   type="button"
@@ -370,10 +387,43 @@ export function DomainManager({
             <span className="text-xs font-mono font-bold text-slate-900 dark:text-white block truncate">
               https://{customDomain}
             </span>
+
+            {/* Acordeon Inline no Modo Read-Only */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDnsAccordionOpen(!isDnsAccordionOpen)}
+                className="w-full px-3 py-2 rounded-xl flex items-center justify-between bg-slate-200/60 dark:bg-zinc-800/60 hover:bg-slate-200 dark:hover:bg-zinc-800 text-left transition-colors cursor-pointer border-none"
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Ver Registros DNS de Apontamento
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                  <span>{isDnsAccordionOpen ? 'Recolher' : 'Ver Registros'}</span>
+                  {isDnsAccordionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </button>
+
+              {isDnsAccordionOpen && (
+                <div className="mt-3 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                  <DnsInstructions
+                    domain={customDomain}
+                    dnsRecords={dnsRecords}
+                    baseDomain={baseDomain}
+                    onVerifyDns={handleVerifyDomainDns}
+                    isVerifying={verifyingDns}
+                    showActions={false}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          /* EDITÁVEL DOMÍNIO PRÓPRIO (DISPONÍVEL MESMO QUE A CONTA TENHA SUBDOMÍNIO) */
-          <div className="p-5 rounded-xl glass-sm border border-[var(--surface-border)] space-y-4">
+          /* EDITÁVEL DOMÍNIO PRÓPRIO */
+          <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
                 Conectar Seu Domínio Próprio (Opcional - Ex: www.suaclinica.com.br)
@@ -382,7 +432,7 @@ export function DomainManager({
               {/* Status Badge */}
               {verifyingDns ? (
                 <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
-                  <LoadingSpinner /> Verificando DNS...
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Verificando DNS...
                 </span>
               ) : domainVerified === true || domainStatus === 'active' || domainStatus === 'verified' ? (
                 <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
@@ -394,6 +444,7 @@ export function DomainManager({
                 </span>
               ) : null}
             </div>
+
 
             <Input
               type="text"
@@ -410,12 +461,16 @@ export function DomainManager({
             <div className="flex items-center gap-2 flex-wrap pt-1">
               <button
                 type="button"
-                onClick={handleOpenSetupModal}
+                onClick={handleSaveCustomDomain}
                 disabled={!customDomain.trim() || registeringCustom}
                 className="h-9 px-4 rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
               >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span>{registeringCustom ? 'Gerando Registros...' : '⚡ Configurar Registros DNS (Setup)'}</span>
+                {registeringCustom ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                )}
+                <span>{registeringCustom ? 'Registrando no Cloudflare...' : 'Salvar Domínio'}</span>
               </button>
 
               <button
@@ -424,10 +479,17 @@ export function DomainManager({
                 disabled={!customDomain.trim() || verifyingDns}
                 className="h-9 px-4 rounded-xl border border-[var(--surface-border)] bg-slate-200/80 hover:bg-slate-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>Checar Apontamento Agora</span>
+                <RefreshCw className={`h-3.5 w-3.5 ${verifyingDns ? 'animate-spin' : ''}`} />
+                <span>{verifyingDns ? 'Verificando...' : 'Checar Apontamento Agora'}</span>
               </button>
             </div>
+
+
+            {error && (
+              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-bold flex items-center gap-1 pt-1">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
+              </p>
+            )}
 
             {rateLimitMsg && (
               <p className="text-[11px] text-amber-500 dark:text-amber-400 flex items-center gap-1 pt-1">
@@ -435,8 +497,53 @@ export function DomainManager({
               </p>
             )}
 
+            {/* Acordeon Inline de Registros DNS — Exibe SOMENTE se o domínio estiver salvo e retornado da Cloudflare */}
+            {Boolean(savedCustomDomain) && customDomain.trim().toLowerCase() === savedCustomDomain.toLowerCase() && dnsRecords.length > 0 && (
+
+              <div className="mt-4 rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden bg-slate-50/50 dark:bg-zinc-950/40 transition-all shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setIsDnsAccordionOpen(!isDnsAccordionOpen)}
+                  className="w-full px-4 py-3 flex items-center justify-between bg-slate-100/80 hover:bg-slate-200/80 dark:bg-zinc-900/80 dark:hover:bg-zinc-900 text-left transition-colors cursor-pointer border-none"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-violet-500 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Tabela de Instruções & Registros DNS (CNAME & TXT)
+                    </span>
+                    {domainVerified === true || domainStatus === 'active' || domainStatus === 'verified' ? (
+                      <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        ✓ Ativo
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        Apontamento Pendente
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                    <span>{isDnsAccordionOpen ? 'Recolher Tabela' : 'Expandir Tabela'}</span>
+                    {isDnsAccordionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </div>
+                </button>
+
+                {isDnsAccordionOpen && (
+                  <div className="p-4 border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                    <DnsInstructions
+                      domain={customDomain.trim()}
+                      dnsRecords={dnsRecords}
+                      baseDomain={baseDomain}
+                      onVerifyDns={handleVerifyDomainDns}
+                      isVerifying={verifyingDns}
+                      showActions={false}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
-              💡 Clique em <strong>Configurar Registros DNS</strong> para ver a tabela com as instruções de apontamento atualizadas. Após configurar no seu provedor, o sistema verifica automaticamente a cada 3 minutos por até 4 horas.
+              💡 Clique em <strong>Salvar Domínio</strong> para registrar o seu domínio e extrair os registros de apontamento diretamente da Cloudflare.
             </p>
           </div>
         )}
@@ -513,22 +620,7 @@ export function DomainManager({
           </p>
         </div>
       )}
-
-      {/* Modal de Instalação e Apontamento DNS */}
-      <BrandModal
-        isOpen={showDnsModal}
-        onClose={() => setShowDnsModal(false)}
-        maxWidth="max-w-xl"
-      >
-        <DnsInstructions
-          domain={customDomain}
-          dnsRecords={dnsRecords}
-          baseDomain={baseDomain}
-          onVerifyDns={handleVerifyDomainDns}
-          isVerifying={verifyingDns}
-          onClose={() => setShowDnsModal(false)}
-        />
-      </BrandModal>
     </div>
   );
 }
+

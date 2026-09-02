@@ -5,10 +5,10 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles, errorLogs } from '../../../shared/schema';
+import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles, errorLogs, auditLogs } from '../../../shared/schema';
 import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
-import { publishErrorLog } from '../../../shared/queue';
+import { publishErrorLog, publishAuditLog } from '../../../shared/queue';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -310,6 +310,17 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
+        await publishAuditLog({
+          action: 'config.cloudflare_update',
+          category: 'config',
+          serviceName: 'core-api',
+          status: 'success',
+          userId: decoded.sub,
+          ip: request.ip ?? null,
+          userAgent: (request.headers['user-agent'] as string) ?? null,
+          details: { zone_id, base_domain: resolvedBaseDomain, r2_bucket_name },
+        }).catch(() => {});
+
         return reply.send({
           message: 'Credenciais do Cloudflare e Bucket R2 validadas e salvas com sucesso!',
           zone_id,
@@ -318,11 +329,21 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        publishErrorLog({
+          name: err.name || 'CloudflareConfigError',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: request.headers['user-agent'] || null,
+          serviceName: 'core-api',
+          severity: 'error',
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro na configuração do Cloudflare R2',
           message: err.message || 'Não foi possível validar as credenciais do Cloudflare R2.',
         });
       }
+
     }
   );
 
@@ -2158,6 +2179,15 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        publishErrorLog({
+          name: err.name || 'GetErrorsError',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: request.headers['user-agent'] || null,
+          serviceName: 'core-api',
+          severity: 'error',
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro interno',
           message: err.message || 'Não foi possível listar os logs de erro.',
@@ -2165,5 +2195,134 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // POST /v1/platform/errors (Recebe erros reportados client-side pelo Frontend)
+  fastify.post(
+    '/errors',
+    {
+      schema: {
+        body: z.object({
+          name: z.string().optional().nullable(),
+          message: z.string().min(1, 'Mensagem é obrigatória'),
+          stack: z.string().optional().nullable(),
+          url: z.string().optional().nullable(),
+          userAgent: z.string().optional().nullable(),
+          serviceName: z.string().default('frontend'),
+          severity: z.enum(['error', 'warning', 'fatal', 'info']).default('error'),
+          metadata: z.record(z.any()).optional().nullable(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        let userId: string | null = null;
+        const token = extractJwtFromRequest(request);
+        if (token) {
+          try {
+            const decoded = verifyUserJwt(token);
+            userId = decoded.sub;
+          } catch {}
+        }
+
+        const { name, message, stack, url, userAgent, serviceName, severity, metadata } = request.body;
+
+        await publishErrorLog({
+          name: name || 'ClientError',
+          message,
+          stack: stack || null,
+          url: url || (request.headers['referer'] as string) || null,
+          userAgent: userAgent || (request.headers['user-agent'] as string) || null,
+          userId,
+          serviceName: serviceName || 'frontend',
+          severity: severity || 'error',
+          metadata: metadata || null,
+        });
+
+        return reply.status(201).send({ success: true, message: 'Erro registrado com sucesso.' });
+      } catch (err: any) {
+        fastify.log.error('Erro ao processar POST /platform/errors:', err);
+        return reply.status(500).send({ error: 'Erro interno', message: 'Não foi possível salvar o erro.' });
+      }
+    }
+  );
+
+  // GET /v1/platform/audit-logs (Lista logs de auditoria de ações sensíveis)
+  fastify.get(
+    '/audit-logs',
+    {
+      schema: {
+        querystring: z.object({
+          limit: z.coerce.number().default(100),
+          offset: z.coerce.number().default(0),
+          action: z.string().optional(),
+          category: z.string().optional(),
+          serviceName: z.string().optional(),
+          status: z.string().optional(),
+          userId: z.string().optional(),
+          workspaceId: z.string().optional(),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
+        }
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+
+        const platformUserProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, decoded.sub),
+        });
+
+        if (platformUserProfile?.role !== 'admin') {
+          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores da plataforma.' });
+        }
+
+        const { limit, offset, action, category, serviceName, status, userId, workspaceId, startDate, endDate } = request.query;
+
+        const conditions = [];
+
+        if (action) conditions.push(eq(auditLogs.action, action));
+        if (category) conditions.push(eq(auditLogs.category, category as any));
+        if (serviceName) conditions.push(eq(auditLogs.serviceName, serviceName));
+        if (status) conditions.push(eq(auditLogs.status, status as any));
+        if (userId) conditions.push(eq(auditLogs.userId, userId));
+        if (workspaceId) conditions.push(eq(auditLogs.workspaceId, workspaceId));
+        if (startDate) conditions.push(gte(auditLogs.createdAt, new Date(startDate)));
+        if (endDate) conditions.push(lte(auditLogs.createdAt, new Date(endDate)));
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const logsList = await db.query.auditLogs.findMany({
+          where: whereClause,
+          limit,
+          offset,
+          orderBy: [desc(auditLogs.createdAt)],
+        });
+
+        const [totalResult] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditLogs)
+          .where(whereClause);
+
+        return reply.send({
+          success: true,
+          logs: logsList,
+          total: totalResult?.count || 0,
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro interno',
+          message: err.message || 'Não foi possível listar os logs de auditoria.',
+        });
+      }
+    }
+  );
 }
+
+
 

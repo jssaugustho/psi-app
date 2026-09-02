@@ -98,12 +98,19 @@ O **Nginx Proxy** centraliza todo o tráfego de entrada público no backend (por
 ---
 
 ### 8. 🐇 RabbitMQ Broker (Serviço: `rabbitmq`)
-* **Finalidade:** Broker de mensageria assíncrona e desacoplamento de serviços.
+* **Finalidade:** Broker de mensageria assíncrona, desacoplamento de serviços e captura resiliente de logs/auditoria.
 * **Exposição:** Porta `5672` (protocolo AMQP) e porta `15672` (Painel Web Management).
-* **Comportamento Esperado:** Gerencia a troca de mensagens utilizando Quorum Queues (`x-queue-type: quorum`) para permitir escala em cluster e replicação sem perda de dados, além de Dead Letter Queue (`foxbase.dlx`) e Fanout Exchange (`realtime.broadcast`).
-* **Como Usar:** Importe e utilize as funções `publishToQueue(routingKey, payload)` ou `publishRealtime(payload)` disponíveis em `src/shared/queue.ts`.
+* **Comportamento Esperado:** Gerencia a troca de mensagens utilizando Quorum Queues (`x-queue-type: quorum`) para escala em cluster e replicação sem perda de dados:
+  * `system.errors`: Fila de logs de exceções e falhas do sistema (persistidos na tabela `logs`).
+  * `system.audit`: Fila de auditoria de ações sensíveis (persistidos na tabela `audit_logs`).
+  * `email.transactional`: Fila de disparos de e-mails transacionais via Resend.
+  * `domain.verify`: Fila de verificação automática de domínios no Cloudflare.
+  * `psi.dlx`: Dead Letter Exchange e DLQ (`messages.dlq`).
+  * `realtime.broadcast`: Fanout Exchange para transmissão WebSocket aos frontends.
+* **Como Usar:** Importe e utilize as funções `publishToQueue(routingKey, payload)`, `publishErrorLog(payload)` ou `publishAuditLog(payload)` disponíveis em `src/shared/queue.ts`.
 
 ---
+
 
 ### 9. ☁️ Cloudflare Tunnel (Serviço: `tunnel`)
 * **Finalidade:** Exposição pública segura da aplicação para a internet via HTTPS sem necessidade de IP fixo.

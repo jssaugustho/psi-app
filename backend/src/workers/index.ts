@@ -1,17 +1,22 @@
 import { env } from '../config/env';
-import { getChannel, assertQuorumQueue, publishErrorLog } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishErrorLog, publishAuditLog } from '../shared/queue';
 import { db } from '../shared/db';
-import { systemStatusLogs, emailLogs, platformSettings, workspaces, workspaceDomains, errorLogs } from '../shared/schema';
+import { systemStatusLogs, emailLogs, platformSettings, workspaces, workspaceDomains, errorLogs, auditLogs } from '../shared/schema';
 import { lt, sql, eq, gt, and } from 'drizzle-orm';
 import { Resend } from 'resend';
 import { renderEmailTemplate, TemplateName, TemplatePropsMap } from '../emails/render';
 import { deriveEmailDomain } from '../shared/email-domain';
+import { startDomainVerifyConsumer } from '../consumers/domainVerifyConsumer';
 
 async function main() {
   console.log('⚙️ Inicializando TS Workers...');
 
   try {
+    // Iniciar Consumidor de Verificação de Domínios
+    await startDomainVerifyConsumer().catch(err => console.warn('⚠️ Falha ao iniciar consumidor de domínios no worker:', err));
+
     const channel = await getChannel();
+
 
     // Prefetch(1) garante distribuição equilibrada das tarefas entre múltiplos workers
     await channel.prefetch(1);
@@ -312,6 +317,17 @@ async function main() {
           },
         });
 
+        // 8. Publicar evento de auditoria de e-mail sensível
+        await publishAuditLog({
+          action: emailStatus === 'sent' ? 'email.sent' : 'email.failed',
+          category: 'email',
+          serviceName: 'workers',
+          status: emailStatus === 'sent' ? 'success' : 'failure',
+          workspaceId: tenantId ?? null,
+          details: { toEmail: to, subject, template, fromDomain: effectiveFromDomain, error: sendError },
+        }).catch(() => {});
+
+
         // Sempre ack
         channel.ack(msg);
       } catch (error: any) {
@@ -393,6 +409,57 @@ async function main() {
         channel.nack(msg, false, false);
       }
     });
+
+    // ── Consumidor: Fila de Auditoria de Ações Sensíveis ──────────────────────
+    const auditQueue = 'system.audit';
+    await assertQuorumQueue(auditQueue, auditQueue);
+    console.log(`📥 Fila [${auditQueue}] declarada e vinculada.`);
+
+    await channel.consume(auditQueue, async (msg) => {
+      if (!msg) return;
+
+      try {
+        const content = JSON.parse(msg.content.toString()) as {
+          action: string;
+          category: 'auth' | 'security' | 'config' | 'email' | 'webhook' | 'data';
+          serviceName: string;
+          status: 'success' | 'failure';
+          userId?: string | null;
+          workspaceId?: string | null;
+          ip?: string | null;
+          userAgent?: string | null;
+          details?: Record<string, any> | null;
+        };
+
+        console.log(`🛡️ Auditoria registrada [${content.category}:${content.action}] - ${content.status}`);
+
+        // Gravar log de auditoria no banco de dados
+        await db.insert(auditLogs).values({
+          action: content.action,
+          category: content.category,
+          serviceName: content.serviceName,
+          status: content.status,
+          userId: content.userId ?? null,
+          workspaceId: content.workspaceId ?? null,
+          ip: content.ip ?? null,
+          userAgent: content.userAgent ?? null,
+          details: content.details ?? null,
+        });
+
+        // Transmitir evento de auditoria via WebSocket Realtime
+        channel.publish(
+          realtimeExchange,
+          '',
+          Buffer.from(JSON.stringify({ type: 'system_audit', data: { action: content.action, category: content.category, createdAt: new Date().toISOString() } }))
+        );
+
+        channel.ack(msg);
+      } catch (error) {
+        console.error('❌ Erro ao processar log de auditoria da fila:', error);
+        channel.nack(msg, false, false);
+      }
+    });
+
 
     // Envia primeiro heartbeat em 5s e depois a cada 60s
     startWorkerHeartbeats(channel);

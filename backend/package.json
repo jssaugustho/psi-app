@@ -9,6 +9,7 @@
     "start:worker": "node dist/workers/index.js",
     "dev:api": "ts-node-dev --respawn --transpile-only src/apis/core/server.ts",
     "dev:worker": "ts-node-dev --respawn --transpile-only src/workers/index.ts",
+    "dev:deploy": "ts-node src/scripts/dev-deploy.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",

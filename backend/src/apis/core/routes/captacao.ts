@@ -3,12 +3,13 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
 import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities, profiles } from '../../../shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../../../shared/domainVerifier';
 import { scheduleDomainVerification } from '../../../consumers/domainVerifyConsumer';
 
 // Validation Schemas
+
 const CreatePageBodySchema = z.object({
   title: z.string().min(1, 'O título é obrigatório'),
   slug: z.string().optional().default(''),
@@ -796,7 +797,25 @@ function validateCPF(cpf: string): boolean {
         const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
         const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
 
+        // Verificar se o domínio já está cadastrado em outro workspace (chave única global)
+        if (cleanDomain && targetWorkspaceId) {
+          const existingDomain = await db.query.workspaceDomains.findFirst({
+            where: and(
+              eq(workspaceDomains.customDomain, cleanDomain),
+              ne(workspaceDomains.workspaceId, targetWorkspaceId)
+            ),
+          });
+
+          if (existingDomain) {
+            return reply.status(400).send({
+              error: 'Bad Request',
+              message: 'Este domínio já está cadastrado em outro workspace na plataforma.',
+            });
+          }
+        }
+
         // Se não houver credenciais do Cloudflare configuradas no admin, retornar instruções estáticas de CNAME
+
         if (!settings?.cloudflareApiToken || !settings?.cloudflareZoneId) {
           const staticRecords = [
             {
@@ -860,19 +879,35 @@ function validateCPF(cpf: string): boolean {
         if (createRes.ok && createData.result) {
           cfResult = createData.result;
         } else {
-          // Se já existe (erro 1406), buscar o Custom Hostname existente por hostname
-          const listRes = await fetch(
-            `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${cleanDomain}`,
-            {
-              method: 'GET',
-              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            }
+          const isAlreadyExists = createData.errors?.some(
+            (e: any) => e.code === 1406 || e.message?.toLowerCase().includes('already exists')
           );
-          const listData: any = await listRes.json().catch(() => ({}));
-          if (listData.result && listData.result.length > 0) {
-            cfResult = listData.result[0];
+
+          if (isAlreadyExists) {
+            // Se já existe (erro 1406), buscar o Custom Hostname existente por hostname
+            const listRes = await fetch(
+              `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${encodeURIComponent(cleanDomain)}`,
+              {
+                method: 'GET',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              }
+            );
+            const listData: any = await listRes.json().catch(() => ({}));
+            if (listData.result && listData.result.length > 0) {
+              cfResult = listData.result[0];
+            }
+          } else {
+            // Erro real da API da Cloudflare (ex: 403 Authentication Error, 10000 Token Inválido)
+            const cfErrorMsg = createData.errors?.[0]?.message || `Erro HTTP ${createRes.status} no Cloudflare`;
+            console.error(`❌ Cloudflare API Error (${createRes.status}):`, createData.errors);
+
+            return reply.status(400).send({
+              error: 'Cloudflare API Error',
+              message: `Falha ao registrar no Cloudflare: ${cfErrorMsg}. Verifique o Token de API e o Zone ID nas configurações da plataforma.`,
+            });
           }
         }
+
 
         const dnsRecords: any[] = [
           {

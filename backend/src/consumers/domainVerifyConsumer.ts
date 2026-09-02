@@ -18,7 +18,7 @@
  *   - A fila adiciona delay mínimo de 3 minutos entre tentativas automáticas
  */
 
-import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime, publishErrorLog, publishAuditLog } from '../shared/queue';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../shared/domainVerifier';
 import { db } from '../shared/db';
 import { workspaceDomains } from '../shared/schema';
@@ -55,8 +55,6 @@ export async function scheduleDomainVerification(
   };
 
   if (delayMs > 0) {
-    // Usar setTimeout para implementar delay simples (RabbitMQ sem plugin de delay)
-    // Em produção, usar o plugin rabbitmq-delayed-message-exchange ou TTL+DLQ
     setTimeout(async () => {
       await publishToQueue(ROUTING_KEY, message);
       console.log(`📬 Domain verify agendado (${delayMs}ms delay): ${domain} [attempt ${attempts + 1}/${MAX_ATTEMPTS}]`);
@@ -84,7 +82,14 @@ export async function startDomainVerifyConsumer(): Promise<void> {
         message = JSON.parse(msg.content.toString()) as DomainVerifyMessage;
       } catch {
         console.error('❌ Domain verify: mensagem inválida na fila');
-        channel.nack(msg, false, false);
+        await publishErrorLog({
+          name: 'DomainVerifyQueueError',
+          message: 'Mensagem inválida recebida na fila domain.verify',
+          serviceName: 'domain-verifier',
+          severity: 'warning',
+          metadata: { rawMessage: msg.content.toString() }
+        }).catch(() => {});
+        channel.nack(msg, false, false); // Encaminha para DLQ
         return;
       }
 
@@ -102,9 +107,18 @@ export async function startDomainVerifyConsumer(): Promise<void> {
           console.log(`💾 Status persistido: ${domain} → ${result.status}`);
         }
 
-        // 3. Domínio verificado com sucesso → notificar frontend via realtime
+        // 3. Domínio verificado com sucesso → notificar frontend via realtime e salvar audit log
         if (result.isActive) {
           console.log(`✅ Domínio ativo: ${domain}`);
+          await publishAuditLog({
+            action: 'domain.verified',
+            category: 'config',
+            serviceName: 'domain-verifier',
+            status: 'success',
+            workspaceId,
+            details: { domain, attempts },
+          }).catch(() => {});
+
           await publishRealtime({
             entity: 'domain',
             action: 'verified',
@@ -119,6 +133,7 @@ export async function startDomainVerifyConsumer(): Promise<void> {
           return;
         }
 
+
         // 4. Ainda pendente → agendar próxima tentativa se dentro do limite
         const nextAttempts = attempts + 1;
         if (nextAttempts < MAX_ATTEMPTS) {
@@ -132,16 +147,33 @@ export async function startDomainVerifyConsumer(): Promise<void> {
           console.log(`⏳ ${domain} ainda pendente. Próxima verificação em ${RETRY_DELAY_MS / 60000} min (attempt ${nextAttempts + 1}/${MAX_ATTEMPTS})`);
         } else {
           console.warn(`⚠️ ${domain} atingiu máximo de tentativas (${MAX_ATTEMPTS}). Encerrando verificação automática.`);
-          // Marcar como expirado no banco
           await db.update(workspaceDomains)
             .set({ dnsStatus: 'expired', updatedAt: new Date() })
             .where(eq(workspaceDomains.workspaceId, workspaceId));
+
+          await publishErrorLog({
+            name: 'DomainVerifyTimeout',
+            message: `Tempo limite de verificação atingido para o domínio ${domain}`,
+            serviceName: 'domain-verifier',
+            severity: 'warning',
+            metadata: { workspaceId, domain, attempts }
+          }).catch(() => {});
         }
 
         channel.ack(msg);
       } catch (err: any) {
         console.error(`❌ Erro ao verificar domínio ${domain}:`, err.message);
-        // Requeue uma vez em caso de erro inesperado
+
+        await publishErrorLog({
+          name: err.name || 'DomainVerifyError',
+          message: err.message || String(err),
+          stack: err.stack,
+          serviceName: 'domain-verifier',
+          severity: 'error',
+          metadata: { workspaceId, domain, attempts }
+        }).catch(() => {});
+
+        // Requeue apenas se attempts < 3, senão descarta para DLQ (messages.dlq)
         channel.nack(msg, false, attempts < 3);
       }
     });
@@ -151,3 +183,4 @@ export async function startDomainVerifyConsumer(): Promise<void> {
     console.warn(`⚠️ Falha ao iniciar consumer de domínios: ${err.message}. Verificação automática indisponível.`);
   }
 }
+
