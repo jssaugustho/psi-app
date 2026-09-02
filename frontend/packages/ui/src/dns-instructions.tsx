@@ -9,6 +9,7 @@ export interface DnsRecordItem {
   name: string;
   value: string;
   description?: string;
+  status?: string; // 'pending' | 'verified' | 'error' | 'active'
 }
 
 export interface DnsInstructionsProps {
@@ -62,8 +63,8 @@ export function DnsInstructions({
     dnsRecords && dnsRecords.length > 0
       ? dnsRecords
       : [
-          { type: 'CNAME', name: 'www', value: fallbackCnameTarget, description: 'Redirecionamento CNAME do subdomínio para o servidor da plataforma' },
-          { type: 'A', name: '@ (ou em branco)', value: '185.199.108.153', description: 'Endereço IP do servidor do site' },
+          { type: 'CNAME', name: 'www', value: fallbackCnameTarget, description: 'Redirecionamento CNAME do subdomínio para o servidor da plataforma', status: 'pending' },
+          { type: 'A', name: '@ (ou em branco)', value: '185.199.108.153', description: 'Endereço IP do servidor do site', status: 'pending' },
         ];
 
   return (
@@ -101,6 +102,7 @@ export function DnsInstructions({
               <th className="p-3">Tipo</th>
               <th className="p-3">Nome / Host</th>
               <th className="p-3">Valor / Apontamento</th>
+              <th className="p-3 text-center">Status</th>
               <th className="p-3 text-right">Ação</th>
             </tr>
           </thead>
@@ -111,6 +113,21 @@ export function DnsInstructions({
                 <td className="p-3 text-slate-700 dark:text-slate-300">{rec.name}</td>
                 <td className="p-3 text-indigo-600 dark:text-indigo-300 truncate max-w-[160px]" title={rec.value}>
                   {rec.value}
+                </td>
+                <td className="p-3 text-center font-sans">
+                  {rec.status === 'verified' || rec.status === 'active' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                      <Check className="h-3 w-3" /> OK
+                    </span>
+                  ) : rec.status === 'error' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
+                      Erro
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      Pendente
+                    </span>
+                  )}
                 </td>
                 <td className="p-3 text-right font-sans">
                   <button

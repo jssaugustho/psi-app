@@ -12,6 +12,7 @@ import {
   RefreshCw,
   HelpCircle
 } from 'lucide-react';
+import { useRealtime } from '@/context/RealtimeContext';
 
 export interface DomainManagerProps {
   tenantId?: string;
@@ -67,8 +68,9 @@ export function DomainManager({
   const [registeringCustom, setRegisteringCustom] = useState(false);
   const [domainVerified, setDomainVerified] = useState<boolean | null>(null);
   const [domainStatus, setDomainStatus] = useState<string>('pending');
-  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; value: string; description: string }>>([]);
+  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; value: string; description: string; status?: string }>>([]);
   const [error, setError] = useState('');
+  const [rateLimitMsg, setRateLimitMsg] = useState('');
 
   const [baseDomain, setBaseDomain] = useState(process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app');
 
@@ -86,7 +88,44 @@ export function DomainManager({
   const isSubdomainLocked = (propReadOnlySubdomain !== undefined ? propReadOnlySubdomain : readOnly) && !forceEditSubdomain;
   const isCustomDomainLocked = (domainVerified === true || domainStatus === 'active' || domainStatus === 'verified') && Boolean(customDomain) && !forceEditCustomDomain;
 
-  // Fetch platform base domain on mount
+  // Realtime — ouvir evento de domínio verificado automaticamente pela fila
+  const { subscribe } = useRealtime();
+  useEffect(() => {
+    const unsubscribe = subscribe('domain', (event: any) => {
+      if (event.action === 'verified' && event.data?.domain === customDomain) {
+        setDomainVerified(true);
+        setDomainStatus('active');
+        if (event.data?.dnsRecords?.length > 0) {
+          setDnsRecords(event.data.dnsRecords);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [subscribe, customDomain]);
+
+  // Carregar estado DNS persistido no banco ao montar (sem chamar a CF API)
+  useEffect(() => {
+    if (!tenantId) return;
+    api.getWorkspaceDomain(tenantId)
+      .then((record: any) => {
+        if (!record) return;
+        if (record.customDomain && !customDomain) {
+          onCustomDomainChange(record.customDomain);
+        }
+        if (record.dnsRecords && record.dnsRecords.length > 0) {
+          setDnsRecords(record.dnsRecords as any);
+        }
+        if (record.dnsStatus) {
+          setDomainStatus(record.dnsStatus);
+          if (record.dnsStatus === 'active' || record.dnsStatus === 'verified') {
+            setDomainVerified(true);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [tenantId]);
+
+
   useEffect(() => {
     api.getPlatformSetupStatus()
       .then((res) => {
@@ -125,17 +164,16 @@ export function DomainManager({
     }
     setRegisteringCustom(true);
     setError('');
-
+    setRateLimitMsg('');
 
     try {
-      const res = await api.registerCustomHostname(null, customDomain.trim());
+      const res = await api.registerCustomHostname(null, customDomain.trim(), tenantId);
       if (res.dnsRecords && res.dnsRecords.length > 0) {
-        setDnsRecords(res.dnsRecords);
+        setDnsRecords(res.dnsRecords as any);
       } else {
         const fallbackTarget = baseDomain && !baseDomain.includes('localhost') ? `custom.${baseDomain}` : 'custom.ajstrategy.digital';
         setDnsRecords([
-          { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma' },
-          { type: 'A', name: '@ (ou em branco)', value: '185.199.108.153', description: 'Endereço IP do servidor do site' }
+          { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma', status: 'pending' },
         ]);
       }
       if (res.status === 'active' || res.status === 'verified') {
@@ -146,8 +184,7 @@ export function DomainManager({
     } catch {
       const fallbackTarget = baseDomain && !baseDomain.includes('localhost') ? `custom.${baseDomain}` : 'custom.ajstrategy.digital';
       setDnsRecords([
-        { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma' },
-        { type: 'A', name: '@ (ou em branco)', value: '185.199.108.153', description: 'Endereço IP do servidor do site' }
+        { type: 'CNAME', name: customDomain.trim().includes('.') ? customDomain.trim().split('.')[0] : '@', value: fallbackTarget, description: 'Apontamento CNAME do seu subdomínio para o servidor da plataforma', status: 'pending' },
       ]);
       setShowDnsModal(true);
     } finally {
@@ -155,14 +192,23 @@ export function DomainManager({
     }
   };
 
-  // Verify Custom Domain DNS propagation
+  // Verify Custom Domain DNS propagation (manual)
   const handleVerifyDomainDns = async () => {
     if (!customDomain.trim()) return;
     setVerifyingDns(true);
     setError('');
+    setRateLimitMsg('');
     try {
-      const res = await api.verifyCustomHostname(customDomain.trim());
-      if (res.sslActive || res.status === 'active' || res.status === 'verified') {
+      const res = await api.verifyCustomHostname(customDomain.trim(), undefined, tenantId);
+
+      // Atualizar dnsRecords com status por registro (se retornado)
+      if (res.dnsRecords && res.dnsRecords.length > 0) {
+        setDnsRecords(res.dnsRecords as any);
+      }
+
+      if (res.rateLimited) {
+        setRateLimitMsg(res.message || 'Aguarde antes de verificar novamente.');
+      } else if (res.sslActive || res.status === 'active' || res.status === 'verified') {
         setDomainVerified(true);
         setDomainStatus('active');
       } else {
@@ -175,6 +221,7 @@ export function DomainManager({
       setVerifyingDns(false);
     }
   };
+
 
   const activeDomainPrefix = customDomain.trim()
     ? customDomain.trim()
@@ -382,8 +429,14 @@ export function DomainManager({
               </button>
             </div>
 
+            {rateLimitMsg && (
+              <p className="text-[11px] text-amber-500 dark:text-amber-400 flex items-center gap-1 pt-1">
+                <AlertCircle className="h-3 w-3 shrink-0" /> {rateLimitMsg}
+              </p>
+            )}
+
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
-              💡 Clique em <strong>Configurar Registros DNS</strong> para ver a tabela com as instruções de apontamento atualizadas e personalizadas para o seu provedor (Registro.br, GoDaddy, Cloudflare, etc.).
+              💡 Clique em <strong>Configurar Registros DNS</strong> para ver a tabela com as instruções de apontamento atualizadas. Após configurar no seu provedor, o sistema verifica automaticamente a cada 3 minutos por até 4 horas.
             </p>
           </div>
         )}

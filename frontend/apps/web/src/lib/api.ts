@@ -1218,21 +1218,21 @@ export const api = {
     return fetchApi<{ available: boolean; slug: string; fullUrl: string; reason: string }>(query);
   },
 
-  registerCustomHostname: async (pageId: string | null, domain: string): Promise<{
+  registerCustomHostname: async (pageId: string | null, domain: string, workspaceId?: string): Promise<{
     success: boolean;
     status: string;
     hostname: string;
     hostnameId?: string;
     cnameTarget: string;
-    dnsRecords: Array<{ type: string; name: string; value: string; description: string }>;
+    dnsRecords: Array<{ type: string; name: string; value: string; description: string; status?: string }>;
   }> => {
     return fetchApi('/crm/captacao/custom-hostname/register', {
       method: 'POST',
-      body: JSON.stringify({ pageId, domain }),
+      body: JSON.stringify({ pageId, domain, workspaceId }),
     });
   },
 
-  verifyCustomHostname: async (domain: string, hostnameId?: string): Promise<{
+  verifyCustomHostname: async (domain: string, hostnameId?: string, workspaceId?: string): Promise<{
     success: boolean;
     status: string;
     sslStatus?: string;
@@ -1240,12 +1240,32 @@ export const api = {
     hostname: string;
     hostnameId?: string;
     cnameTarget: string;
+    dnsRecords?: Array<{ type: string; name: string; value: string; description: string; status?: string }>;
+    rateLimited?: boolean;
+    message?: string;
   }> => {
     return fetchApi('/crm/captacao/custom-hostname/verify', {
       method: 'POST',
-      body: JSON.stringify({ domain, hostnameId }),
+      body: JSON.stringify({ domain, hostnameId, workspaceId }),
     });
   },
+
+  getWorkspaceDomain: async (workspaceId: string): Promise<{
+    found?: boolean;
+    id?: string;
+    workspaceId?: string;
+    subdomain?: string;
+    customDomain?: string | null;
+    cfHostnameId?: string | null;
+    dnsStatus?: string;
+    dnsRecords?: Array<{ type: string; name: string; value: string; description?: string; status?: string }>;
+    updatedAt?: string;
+  } | null> => {
+    const res = await fetchApi<any>(`/crm/captacao/workspace-domain?workspaceId=${encodeURIComponent(workspaceId)}`);
+    if (!res || res.found === false) return null;
+    return res;
+  },
+
 
   createWorkspace: async (name: string, ownerId: string): Promise<Workspace> => {
     const res = await fetchApi<Workspace[]>(`${PGRST_BASE_URL}/workspaces`, {
@@ -1276,12 +1296,13 @@ export const api = {
     return res[0];
   },
 
-  createWorkspaceDomain: async (workspaceId: string, subdomain: string): Promise<any> => {
+  createWorkspaceDomain: async (workspaceId: string, subdomain: string, customDomain?: string | null): Promise<any> => {
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains`, {
       method: 'POST',
       body: JSON.stringify({
         workspace_id: workspaceId,
         subdomain,
+        custom_domain: customDomain || null,
       }),
       headers: {
         'Prefer': 'return=representation'
@@ -1290,12 +1311,12 @@ export const api = {
     return res[0];
   },
 
-  updateWorkspaceDomain: async (workspaceId: string, subdomain: string): Promise<any> => {
+  updateWorkspaceDomain: async (workspaceId: string, subdomain: string, customDomain?: string | null): Promise<any> => {
+    const body: any = { subdomain };
+    if (customDomain !== undefined) body.custom_domain = customDomain;
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        subdomain,
-      }),
+      body: JSON.stringify(body),
       headers: {
         'Prefer': 'return=representation'
       }
@@ -1339,10 +1360,7 @@ export const api = {
     return res.length > 0;
   },
 
-  getWorkspaceDomain: async (workspaceId: string): Promise<WorkspaceDomain | null> => {
-    const res = await fetchApi<WorkspaceDomain[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}&select=id,workspaceId:workspace_id,subdomain,customDomain:custom_domain,cfHostnameId:cf_hostname_id,dnsStatus:dns_status,dnsRecords:dns_records,createdAt:created_at,updatedAt:updated_at`);
-    return res[0] || null;
-  },
+
 
   getVisualIdentity: async (workspaceId: string): Promise<any | null> => {
     const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}`);

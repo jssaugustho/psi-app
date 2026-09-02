@@ -192,23 +192,30 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
     try {
       const cleanSub = subdomainInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const cleanCustom = customDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
       if (!cleanSub || cleanSub.length < 3) {
         throw new Error('O subdomínio deve ter ao menos 3 caracteres.');
       }
 
-      if (cleanSub !== workspaceDomain?.subdomain) {
-        if (subdomainAvailable === false) {
-          throw new Error('Por favor, escolha um subdomínio disponível.');
-        }
-        if (!workspaceDomain?.subdomain) {
-          await api.createWorkspaceDomain(currentWorkspace.id, cleanSub);
-        } else {
-          await api.updateWorkspaceDomain(currentWorkspace.id, cleanSub);
-        }
+      if (cleanSub !== workspaceDomain?.subdomain && subdomainAvailable === false) {
+        throw new Error('Por favor, escolha um subdomínio disponível.');
+      }
+
+      // 1. Salvar ou atualizar subdomínio e domínio customizado no banco
+      if (!workspaceDomain?.subdomain) {
+        await api.createWorkspaceDomain(currentWorkspace.id, cleanSub, cleanCustom || null);
+      } else {
+        await api.updateWorkspaceDomain(currentWorkspace.id, cleanSub, cleanCustom || null);
+      }
+
+      // 2. Se um domínio customizado foi informado, registrar o hostname na Cloudflare / DB
+      if (cleanCustom) {
+        await api.registerCustomHostname(null, cleanCustom, currentWorkspace.id);
       }
 
       const updatedDomain = await api.getWorkspaceDomain(currentWorkspace.id);
-      setWorkspaceDomain(updatedDomain);
+      setWorkspaceDomain(updatedDomain as any);
       if (updatedDomain) {
         setSubdomainInput(updatedDomain.subdomain || '');
         setCustomDomainInput(updatedDomain.customDomain || '');
@@ -223,6 +230,7 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
       setSaving(false);
     }
   };
+
 
 
 

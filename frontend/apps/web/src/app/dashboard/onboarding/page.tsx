@@ -157,7 +157,11 @@ export default function OnboardingPage() {
     if (subdomainAvailable === false) { setError('Por favor, escolha um subdomínio disponível.'); return; }
     setSubmitting(true);
     try {
-      await api.createWorkspaceDomain(createdWorkspace.id, subdomain.toLowerCase().trim());
+      const cleanCustom = customDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      await api.createWorkspaceDomain(createdWorkspace.id, subdomain.toLowerCase().trim(), cleanCustom || null);
+      if (cleanCustom) {
+        await api.registerCustomHostname(null, cleanCustom, createdWorkspace.id);
+      }
       await reloadBrand();
       window.location.href = '/dashboard/crm';
     } catch (err: any) {
@@ -165,6 +169,7 @@ export default function OnboardingPage() {
       setSubmitting(false);
     }
   };
+
 
   const logoUrl =
     theme === 'light'
