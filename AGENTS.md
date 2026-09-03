@@ -196,8 +196,8 @@ npm run db:version   # Applies pending migrations, prompts tag (e.g. v1.1.0), up
 npm run db:reset     # Resets DB (Localhost only, requires "CONFIRMAR")
 
 # Local Docker Deploy (Windows/WSL)
-npm run dev:deploy          # Fast deploy (~3s): rebuilds api/workers, reloads Nginx (avoids 502 Bad Gateway)
-npm run dev:deploy -- --full # Full infra rebuild (docker compose down && docker compose up -d --build)
+npm run dev:deploy          # Full deploy por padrão: docker compose down && docker compose up -d --build + healthcheck
+npm run dev:deploy -- --fast # Fast deploy (~3s): rebuilds apenas api/workers e reinicia Nginx
 ```
 
 ---

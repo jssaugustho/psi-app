@@ -16,6 +16,8 @@ interface LogsTableProps {
   isRealtimeActive: boolean;
   setIsRealtimeActive: (active: boolean) => void;
   isConnected: boolean;
+  isSubscribed?: boolean;
+  reconnectSocket?: () => void;
   hasNewChanges: boolean;
   pendingLogsCount: number;
   loadLogs: () => void;
@@ -43,6 +45,8 @@ export function LogsTable({
   isRealtimeActive,
   setIsRealtimeActive,
   isConnected,
+  isSubscribed = true,
+  reconnectSocket,
   hasNewChanges,
   pendingLogsCount,
   loadLogs,
@@ -68,6 +72,8 @@ export function LogsTable({
     }
   };
 
+  const isFullyConnected = isConnected && isSubscribed;
+
   return (
     <Card className="p-0 overflow-hidden shadow-sm border-brand-divider">
       {/* Header Unificado da Tabela com Controles no Padrão da Plataforma */}
@@ -81,14 +87,32 @@ export function LogsTable({
 
         {/* Linha de Botões e Controles */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          {/* Status do WebSocket */}
-          <div
-            title={isConnected ? 'WebSocket Conectado' : 'Reconectando WebSocket...'}
-            className="h-9 px-3 flex items-center gap-2 rounded-xl border border-brand-divider text-xs font-mono bg-black/5 dark:bg-white/5 shrink-0"
+          {/* Status do WebSocket (Interativo para Reconexão) */}
+          <button
+            type="button"
+            onClick={reconnectSocket}
+            title={
+              isFullyConnected
+                ? 'WebSocket Conectado e Transmitindo (Clique para reconectar/verificar)'
+                : isConnected
+                ? 'Conectado mas aguardando confirmação da sala de logs (Clique para re-assinar)'
+                : 'WebSocket Desconectado (Clique para reconectar)'
+            }
+            className="h-9 px-3 flex items-center gap-2 rounded-xl border border-brand-divider text-xs font-mono bg-black/5 dark:bg-white/5 shrink-0 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
           >
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            <span className="opacity-75 font-sans text-xs">{isConnected ? 'Conectado' : 'Reconectando'}</span>
-          </div>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isFullyConnected
+                  ? 'bg-emerald-500 animate-pulse'
+                  : isConnected
+                  ? 'bg-amber-500 animate-pulse'
+                  : 'bg-red-500'
+              }`}
+            />
+            <span className="opacity-75 font-sans text-xs">
+              {isFullyConnected ? 'Conectado' : isConnected ? 'Assinando...' : 'Desconectado'}
+            </span>
+          </button>
 
           {/* Botão de Filtros */}
           <Button
@@ -219,12 +243,14 @@ export function LogsTable({
                 row.log.serviceName === 'frontend' ? 'text-pink-600 dark:text-pink-400' :
                 'text-emerald-600 dark:text-emerald-400';
 
+              const clientAppVal = row.log.clientApp || (row.log.metadata as any)?.clientApp || 'unknown';
+
               const appColor =
-                row.log.clientApp === 'admin' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10' :
-                row.log.clientApp === 'web' ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500/30 bg-cyan-500/10' :
-                row.log.clientApp === 'sites' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
-                row.log.clientApp === 'workers' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
-                row.log.clientApp === 'core-api' ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
+                clientAppVal === 'admin' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10' :
+                clientAppVal === 'web' ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500/30 bg-cyan-500/10' :
+                clientAppVal === 'sites' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
+                clientAppVal === 'workers' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
+                clientAppVal === 'core-api' ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
                 'text-slate-500 border-slate-500/20 bg-slate-500/10';
 
               const roleLabelMap: Record<string, string> = {
@@ -267,7 +293,7 @@ export function LogsTable({
 
                     <span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase truncate max-w-full ${appColor}`}>
-                        {row.log.clientApp || 'unknown'}
+                        {clientAppVal}
                       </span>
                     </span>
 
@@ -302,9 +328,9 @@ export function LogsTable({
                     )}
                   </div>
 
-                  {/* Conteúdo Expandido com scrollbar customizada própria e cores adaptativas do tema */}
+                  {/* Conteúdo Expandido com altura dinâmica e cores adaptativas do tema */}
                   {isExpanded && (
-                    <div className="px-6 py-4 bg-black/[0.03] dark:bg-white/[0.02] border-t border-b border-brand-divider text-xs overflow-y-auto custom-scrollbar max-h-[calc(100%-54px)] select-text space-y-4 transition-colors">
+                    <div className="px-6 py-4 bg-black/[0.03] dark:bg-white/[0.02] border-t border-b border-brand-divider text-xs select-text space-y-4 transition-colors">
                       {/* Grid de Informações Principais em Cards Embutidos */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Card: Detalhes do Evento */}
@@ -327,14 +353,14 @@ export function LogsTable({
                                 <td className="pb-2 break-all">
                                   <div className="flex items-center gap-2">
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${appColor}`}>
-                                      {row.log.clientApp || 'unknown'}
+                                      {clientAppVal}
                                     </span>
-                                    {row.log.clientApp && (
+                                    {clientAppVal !== 'unknown' && (
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setClientApp(row.log.clientApp!);
+                                          setClientApp(clientAppVal);
                                         }}
                                         className="inline-flex items-center gap-1 text-[11px] font-sans px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
                                         title="Filtrar tabela por este App"
@@ -532,7 +558,7 @@ export function LogsTable({
                                 {copiedStackId === `stack-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar Stack Trace'}
                               </button>
                             </div>
-                            <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-red-300 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner max-h-[300px]">
+                            <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-red-300 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
                               {stackContent}
                             </pre>
                           </div>
@@ -557,7 +583,7 @@ export function LogsTable({
                               {copiedStackId === `meta-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar JSON'}
                             </button>
                           </div>
-                          <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-emerald-400 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner max-h-[350px]">
+                          <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-emerald-400 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
                             {JSON.stringify(row.log.metadata, null, 2)}
                           </pre>
                         </div>

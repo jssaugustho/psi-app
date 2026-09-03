@@ -14,7 +14,7 @@ async function checkBootstrap(): Promise<{ hasAdmin: boolean; hasPlatformSetting
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
   try {
     const res = await fetch(`${apiUrl}/auth/bootstrap/status`, {
-      cache: 'no-store',
+      next: { revalidate: 300, tags: ['bootstrap'] },
       headers: {
         'Content-Type': 'application/json',
       },

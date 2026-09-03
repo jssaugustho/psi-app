@@ -8,6 +8,8 @@ export interface ApiStatusContextType {
   isOffline: boolean;
   checking: boolean;
   errorMsg: string | null;
+  offlineReason: 'user_internet' | 'api_server' | null;
+  isAdmin: boolean;
   apiStatus: ServiceStatusState;
   dbStatus: ServiceStatusState;
   queueStatus: ServiceStatusState;
@@ -18,6 +20,8 @@ const ApiStatusContext = createContext<ApiStatusContextType>({
   isOffline: false,
   checking: false,
   errorMsg: null,
+  offlineReason: null,
+  isAdmin: false,
   apiStatus: 'checking',
   dbStatus: 'waiting',
   queueStatus: 'waiting',
@@ -28,6 +32,43 @@ export interface ApiStatusProviderProps {
   children: React.ReactNode;
   apiUrl?: string;
   defaultRedirectUrl?: string;
+}
+
+/**
+ * Função utilitária para testar ativamente a conectividade real de internet do usuário.
+ * Realiza requisições leves de teste para verificar se o dispositivo possui acesso à rede externa.
+ */
+async function checkUserInternetAccess(): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    await fetch(`https://1.1.1.1/favicon.ico?_=${Date.now()}`, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return true;
+  } catch {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      await fetch(`https://www.google.com/favicon.ico?_=${Date.now()}`, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export function ApiStatusProvider({
@@ -41,11 +82,37 @@ export function ApiStatusProvider({
   const [isOffline, setIsOffline] = useState(false);
   const [checking, setChecking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [offlineReason, setOfflineReason] = useState<'user_internet' | 'api_server' | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Estados dos serviços individuais
   const [apiStatus, setApiStatus] = useState<ServiceStatusState>('checking');
   const [dbStatus, setDbStatus] = useState<ServiceStatusState>('waiting');
   const [queueStatus, setQueueStatus] = useState<ServiceStatusState>('waiting');
+
+  // Detectar se o usuário é administrador
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawUser = localStorage.getItem('user') || localStorage.getItem('profile');
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser);
+        if (parsed?.role === 'admin') {
+          setIsAdmin(true);
+          return;
+        }
+      }
+      if (window.location.hostname.includes('admin') || window.location.pathname.startsWith('/dashboard')) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          setIsAdmin(true);
+          return;
+        }
+      }
+    } catch {
+      // Ignora erro de parsing
+    }
+  }, [pathname]);
 
   const getResolvedApiUrl = useCallback(() => {
     const envApiUrl = process.env.NEXT_PUBLIC_API_URL || '';
@@ -63,10 +130,22 @@ export function ApiStatusProvider({
       setQueueStatus('checking');
     }
 
+    // 1. Verificar desconexão imediata pela API da rede do navegador
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOfflineReason('user_internet');
+      setErrorMsg('Sem conexão com a internet. Verifique seu sinal de Wi-Fi ou cabo de rede.');
+      setApiStatus('down');
+      setDbStatus('waiting');
+      setQueueStatus('waiting');
+      setIsOffline(true);
+      if (!silent) setChecking(false);
+      return;
+    }
+
     try {
       const baseUrl = getResolvedApiUrl();
       const healthEndpoint = baseUrl.endsWith('/v1') ? `${baseUrl}/health` : `${baseUrl}/v1/health`;
-      
+
       const response = await fetch(healthEndpoint, {
         method: 'GET',
         cache: 'no-store',
@@ -85,18 +164,20 @@ export function ApiStatusProvider({
 
         if (dbOk && queueOk) {
           setErrorMsg(null);
+          setOfflineReason(null);
           setIsOffline(false);
 
-          // Se estava na rota /offline e recuperou conexão, redireciona de volta
           if (typeof window !== 'undefined' && window.location.pathname === '/offline') {
             const redirectTarget = defaultRedirectUrl || '/';
             window.location.href = redirectTarget;
           }
         } else {
-          setErrorMsg('O servidor de API respondeu, mas existem serviços internos inoperantes.');
+          setOfflineReason('api_server');
+          setErrorMsg('O servidor de API respondeu, mas existem serviços internos em manutenção.');
           setIsOffline(true);
         }
       } else {
+        setOfflineReason('api_server');
         setApiStatus('down');
         setDbStatus('waiting');
         setQueueStatus('waiting');
@@ -104,10 +185,20 @@ export function ApiStatusProvider({
         setIsOffline(true);
       }
     } catch (err) {
+      // 2. A requisição para a nossa API falhou. Vamos testar ativamente se a internet do usuário funciona:
+      const hasUserInternet = await checkUserInternetAccess();
+
+      if (!hasUserInternet) {
+        setOfflineReason('user_internet');
+        setErrorMsg('Sem conexão com a internet. Verifique seu sinal de Wi-Fi ou cabo de rede.');
+      } else {
+        setOfflineReason('api_server');
+        setErrorMsg('Sem resposta do servidor de API. Verifique se o backend está rodando.');
+      }
+
       setApiStatus('down');
       setDbStatus('waiting');
       setQueueStatus('waiting');
-      setErrorMsg('Sem resposta do servidor de API. Verifique se o backend está rodando.');
       setIsOffline(true);
     } finally {
       if (!silent) {
@@ -116,40 +207,23 @@ export function ApiStatusProvider({
     }
   }, [getResolvedApiUrl, defaultRedirectUrl]);
 
-  // Checagem imediata de saúde ao montar a aplicação (ex: rota /login ou raiz)
+  // Checagem síncrona imediata ao montar
   useEffect(() => {
     checkHealth(true);
   }, [checkHealth]);
 
-  // Escutar CustomEvents de conexao emitidos pelos helpers fetchApi
+  // Polling automático a cada 60 segundos enquanto estiver ONLINE
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (isOffline) return;
 
-    const handleOffline = (event: Event) => {
-      const customEvent = event as CustomEvent<{ message?: string }>;
-      if (customEvent.detail?.message) {
-        setErrorMsg(customEvent.detail.message);
-      }
-      setIsOffline(true);
-    };
+    const interval = setInterval(() => {
+      checkHealth(true);
+    }, 60000);
 
-    const handleOnline = () => {
-      if (isOffline) {
-        setIsOffline(false);
-        setErrorMsg(null);
-      }
-    };
+    return () => clearInterval(interval);
+  }, [isOffline, checkHealth]);
 
-    window.addEventListener('psi:api-offline', handleOffline);
-    window.addEventListener('psi:api-online', handleOnline);
-
-    return () => {
-      window.removeEventListener('psi:api-offline', handleOffline);
-      window.removeEventListener('psi:api-online', handleOnline);
-    };
-  }, [isOffline]);
-
-  // Auto-ping timer a cada 3s quando offline
+  // Auto-ping rápido a cada 3 segundos enquanto estiver OFFLINE
   useEffect(() => {
     if (!isOffline) return;
 
@@ -162,12 +236,65 @@ export function ApiStatusProvider({
     return () => clearInterval(interval);
   }, [isOffline, checking, checkHealth]);
 
+  // Eventos de conectividade nativos do navegador e eventos customizados psi:api-offline
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleWindowOffline = () => {
+      setOfflineReason('user_internet');
+      setErrorMsg('Sem conexão com a internet. Verifique seu sinal de Wi-Fi ou cabo de rede.');
+      setIsOffline(true);
+    };
+
+    const handleWindowOnline = () => {
+      checkHealth(true);
+    };
+
+    const handleCustomOffline = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ message?: string }>;
+      const hasUserInternet = await checkUserInternetAccess();
+
+      if (!hasUserInternet) {
+        setOfflineReason('user_internet');
+        setErrorMsg('Sem conexão com a internet. Verifique seu sinal de Wi-Fi ou cabo de rede.');
+      } else {
+        setOfflineReason('api_server');
+        if (customEvent.detail?.message) {
+          setErrorMsg(customEvent.detail.message);
+        }
+      }
+      setIsOffline(true);
+    };
+
+    const handleCustomOnline = () => {
+      if (isOffline) {
+        setIsOffline(false);
+        setErrorMsg(null);
+        setOfflineReason(null);
+      }
+    };
+
+    window.addEventListener('offline', handleWindowOffline);
+    window.addEventListener('online', handleWindowOnline);
+    window.addEventListener('psi:api-offline', handleCustomOffline);
+    window.addEventListener('psi:api-online', handleCustomOnline);
+
+    return () => {
+      window.removeEventListener('offline', handleWindowOffline);
+      window.removeEventListener('online', handleWindowOnline);
+      window.removeEventListener('psi:api-offline', handleCustomOffline);
+      window.removeEventListener('psi:api-online', handleCustomOnline);
+    };
+  }, [isOffline, checkHealth]);
+
   return (
     <ApiStatusContext.Provider
       value={{
         isOffline,
         checking,
         errorMsg,
+        offlineReason,
+        isAdmin,
         apiStatus,
         dbStatus,
         queueStatus,
@@ -176,7 +303,7 @@ export function ApiStatusProvider({
     >
       {children}
 
-      {/* Modal de Sobreposição Global (Z-Index Máximo) - Exibido quando offline fora da rota /offline */}
+      {/* Modal de Sobreposição Global (Z-Index Máximo) */}
       {isOffline && !isOfflinePage && (
         <div
           className="fixed inset-0 flex items-center justify-center p-4"
@@ -194,6 +321,8 @@ export function ApiStatusProvider({
             queueStatus={queueStatus}
             checking={checking}
             errorMsg={errorMsg}
+            offlineReason={offlineReason}
+            isAdmin={isAdmin}
             onRetry={() => checkHealth(false)}
           />
         </div>

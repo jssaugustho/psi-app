@@ -82,10 +82,7 @@ export default function AdminResetPasswordPage() {
       : tenant?.logoDarkUrl || tenant?.logoLightUrl;
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 relative"
-      style={{ backgroundColor: 'var(--brand-bg-color)', transition: 'background-color 0.3s' }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
       {/* Botão de alternância de tema */}
       <div className="absolute top-4 right-4 z-10">
         <button

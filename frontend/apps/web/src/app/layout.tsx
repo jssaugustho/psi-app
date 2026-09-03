@@ -15,7 +15,7 @@ async function checkBootstrap(): Promise<{ hasAdmin: boolean; hasPlatformSetting
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
   try {
     const res = await fetch(`${apiUrl}/auth/bootstrap/status`, {
-      cache: 'no-store',
+      next: { revalidate: 300, tags: ['bootstrap'] },
       headers: {
         'Content-Type': 'application/json',
       },
@@ -87,17 +87,17 @@ export default async function RootLayout({
         className="min-h-full flex flex-col font-sans"
         suppressHydrationWarning
       >
-        <AuthProvider>
-          <BrandProvider>
-            <ApiStatusProvider>
+        <ApiStatusProvider>
+          <AuthProvider>
+            <BrandProvider>
               <ProgressProvider>
                 <ErrorProvider>
                   {unlocked ? children : <LockScreen />}
                 </ErrorProvider>
               </ProgressProvider>
-            </ApiStatusProvider>
-          </BrandProvider>
-        </AuthProvider>
+            </BrandProvider>
+          </AuthProvider>
+        </ApiStatusProvider>
       </body>
     </html>
   );

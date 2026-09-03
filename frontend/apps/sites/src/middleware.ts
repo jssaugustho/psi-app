@@ -5,10 +5,10 @@ export const config = {
   matcher: [
     /*
      * Match todas as rotas exceto:
-     * - _next/static, _next/image, favicon.ico, sitemap.xml, robots.txt
-     * - arquivos de mídia/estáticos (.css, .js, .svg, .png, .jpg, .webp)
+     * - api, _next/static, _next/image, favicon.ico, sitemap.xml, robots.txt
+     * - arquivos de mídia e estáticos (.css, .js, .svg, .png, .jpg, .jpeg, .gif, .webp, .woff, .woff2, .ttf, .eot, .ico, .json, .webmanifest)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|woff|woff2|ttf|eot|ico|json|webmanifest)$).*)',
   ],
 };
 

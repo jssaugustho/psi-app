@@ -2,7 +2,14 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api, Tenant } from '@/lib/api';
-import { BrandLoader } from '@psi/ui';
+import {
+  BrandLoader,
+  savePlatformBrandBackup,
+  loadPlatformBrandBackup,
+  saveUserWorkspaceBackup,
+  loadUserWorkspaceBackup,
+  applyBrandStylesToDOM,
+} from '@psi/ui';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -29,76 +36,25 @@ const BrandContext = createContext<BrandContextType>({
   reloadBrand: async () => {},
 });
 
-const BACKUP_STORAGE_KEY = 'theraos_platform_brand_cache';
-const USER_WORKSPACE_BACKUP_KEY = 'theraos_user_workspace_brand_cache';
-
-function saveBrandBackup(primary: Tenant | null) {
-  if (typeof window === 'undefined') return;
-  try {
-    if (primary) {
-      localStorage.setItem(
-        BACKUP_STORAGE_KEY,
-        JSON.stringify({
-          platformBrand: primary,
-          updatedAt: Date.now(),
-        })
-      );
-    }
-  } catch (e) {
-    console.warn('Falha ao salvar cache de marca no localStorage:', e);
-  }
-}
-
-function loadBrandBackup(): Tenant | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(BACKUP_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed.platformBrand || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function saveUserWorkspaceBackup(userTenant: Tenant | null) {
-  if (typeof window === 'undefined') return;
-  try {
-    if (userTenant) {
-      localStorage.setItem(
-        USER_WORKSPACE_BACKUP_KEY,
-        JSON.stringify({
-          userTenant,
-          updatedAt: Date.now(),
-        })
-      );
-    }
-  } catch (e) {
-    console.warn('Falha ao salvar cache de workspace no localStorage:', e);
-  }
-}
-
-function loadUserWorkspaceBackup(): Tenant | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(USER_WORKSPACE_BACKUP_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed.userTenant || null;
-  } catch (e) {
-    return null;
-  }
-}
-
 export function BrandProvider({ children }: { children: React.ReactNode }) {
-  const [tenant, setTenant] = useState<Tenant | null>(null);
+  // Inicialização com null para garantir 100% de paridade na hidratação SSR/Client do Next.js
   const [primaryTenant, setPrimaryTenant] = useState<Tenant | null>(null);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [bootstrapped, setBootstrapped] = useState<boolean | null>(null);
   const [theme, setTheme] = useState<ThemeMode>('dark');
   const [loading, setLoading] = useState(true);
 
-  // Inicializar estado do tema a partir do localStorage
+  // Resgata os caches do localStorage imediatamente após a hidratação inicial do client
   useEffect(() => {
+    const cachedPrimary = loadPlatformBrandBackup<Tenant>();
+    if (cachedPrimary) {
+      setPrimaryTenant(cachedPrimary);
+    }
+    const cachedUser = loadUserWorkspaceBackup<Tenant>();
+    if (cachedUser) {
+      setTenant(cachedUser);
+    }
+
     const savedTheme = localStorage.getItem('theme') as ThemeMode | null;
     if (savedTheme === 'light' || savedTheme === 'dark') {
       setTheme(savedTheme);
@@ -109,63 +65,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const applyBrandStyles = useCallback((pTenant: Tenant | null, uTenant: Tenant | null, currentTheme: ThemeMode) => {
-    const root = document.documentElement;
-
-    // A marca visual do App/Dashboard (TheraOS) vem exclusivamente das configurações da plataforma (pTenant).
-    // Caso pTenant ainda não tenha sido carregado da API, tenta o cache do localStorage.
-    const cachedPlatform = !pTenant ? loadBrandBackup() : null;
-    const activePlatform = pTenant || cachedPlatform;
-
-    // Fallback da marca da plataforma: usa violeta/púrpura da TheraOS (#7C3AED / #A855F7)
-    const start = activePlatform?.gradientColorStart || '#7C3AED';
-    const end = activePlatform?.gradientColorEnd || '#A855F7';
-    const contrast = activePlatform?.contrastColor || '#FFFFFF';
-
-    root.style.setProperty('--brand-gradient-start', start);
-    root.style.setProperty('--brand-gradient-end', end);
-    root.style.setProperty('--brand-contrast-color', contrast);
-    root.style.setProperty('--brand-gradient', `linear-gradient(135deg, ${start}, ${end})`);
-
-    const bgLight = activePlatform?.bgLightColor || '#FAFAFA';
-    const bgDark = activePlatform?.bgDarkColor || '#09090B';
-
-    if (currentTheme === 'light') {
-      root.classList.remove('dark');
-      root.classList.add('light');
-      root.style.setProperty('--brand-bg-color', bgLight);
-      root.style.setProperty('--brand-card-bg-color', '#FFFFFF');
-      root.style.setProperty('--brand-text-color', '#09090B');
-    } else {
-      root.classList.remove('light');
-      root.classList.add('dark');
-      root.style.setProperty('--brand-bg-color', bgDark);
-      root.style.setProperty('--brand-card-bg-color', 'color-mix(in srgb, #FFFFFF 6%, ' + bgDark + ')');
-      root.style.setProperty('--brand-text-color', '#F4F4F5');
-    }
-
-    // Favicon e Ícone da Plataforma
-    const iconUrl =
-      currentTheme === 'light'
-        ? (activePlatform?.iconLightUrl || activePlatform?.iconDarkUrl || activePlatform?.logoLightUrl || activePlatform?.logoDarkUrl)
-        : (activePlatform?.iconDarkUrl || activePlatform?.iconLightUrl || activePlatform?.logoDarkUrl || activePlatform?.logoLightUrl);
-
-    if (iconUrl) {
-      const existingIcons = document.querySelectorAll("link[rel*='icon']");
-      if (existingIcons.length > 0) {
-        existingIcons.forEach((el) => {
-          (el as HTMLLinkElement).href = iconUrl;
-        });
-      } else {
-        const link = document.createElement('link');
-        link.type = 'image/x-icon';
-        link.rel = 'shortcut icon';
-        link.href = iconUrl;
-        document.getElementsByTagName('head')[0].appendChild(link);
-      }
-    }
-
-    const platformTitle = activePlatform?.name || 'TheraOS';
-    document.title = platformTitle;
+    applyBrandStylesToDOM(pTenant, currentTheme, 'TheraOS');
   }, []);
 
   const toggleTheme = () => {
@@ -177,7 +77,6 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   const loadBrand = useCallback(async () => {
     try {
-      const host = typeof window !== 'undefined' ? window.location.hostname : '';
       let resolvedPrimary: Tenant | null = null;
       let resolvedUserTenant: Tenant | null = null;
       let hasApiError = false;
@@ -193,8 +92,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       // 1. Sempre buscar o Tenant-Pai (Plataforma White-Label Principal)
       try {
         const primaryRes = await api.getPrimaryTenant();
-        if (primaryRes?.tenant) {
-          resolvedPrimary = primaryRes.tenant;
+        const fetchedPrimary = primaryRes?.tenant;
+        if (fetchedPrimary && (fetchedPrimary.name || fetchedPrimary.gradientColorStart || fetchedPrimary.logoDarkUrl || fetchedPrimary.logoLightUrl)) {
+          resolvedPrimary = fetchedPrimary;
         }
       } catch (err) {
         console.warn('Erro ao carregar tenant principal da API:', err);
@@ -208,10 +108,13 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
       if (activeWorkspaceId) {
         try {
-          resolvedUserTenant = await api.getTenantById(activeWorkspaceId);
-          if (resolvedUserTenant && typeof window !== 'undefined') {
-            document.cookie = `active_workspace_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
-            document.cookie = `active_tenant_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+          const userWorkspace = await api.getTenantById(activeWorkspaceId);
+          if (userWorkspace && (userWorkspace.name || userWorkspace.gradientColorStart || userWorkspace.logoDarkUrl || userWorkspace.logoLightUrl)) {
+            resolvedUserTenant = userWorkspace;
+            if (typeof window !== 'undefined') {
+              document.cookie = `active_workspace_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+              document.cookie = `active_tenant_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+            }
           }
         } catch (err) {
           console.warn('Erro ao carregar workspace ativo por id:', err);
@@ -221,9 +124,9 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
       if (resolvedPrimary) {
         setPrimaryTenant(resolvedPrimary);
-        saveBrandBackup(resolvedPrimary);
+        savePlatformBrandBackup(resolvedPrimary);
       } else if (hasApiError) {
-        const backup = loadBrandBackup();
+        const backup = loadPlatformBrandBackup<Tenant>();
         if (backup) {
           console.log('📦 Marca da plataforma carregada do cache no localStorage.');
           setPrimaryTenant(backup);
@@ -234,18 +137,18 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         setTenant(resolvedUserTenant);
         saveUserWorkspaceBackup(resolvedUserTenant);
       } else if (hasApiError) {
-        const userBackup = loadUserWorkspaceBackup();
+        const userBackup = loadUserWorkspaceBackup<Tenant>();
         if (userBackup) {
           setTenant(userBackup);
         }
       }
     } catch (err) {
       console.error('Erro ao resolver branding:', err);
-      const backup = loadBrandBackup();
+      const backup = loadPlatformBrandBackup<Tenant>();
       if (backup) {
         setPrimaryTenant(backup);
       }
-      const userBackup = loadUserWorkspaceBackup();
+      const userBackup = loadUserWorkspaceBackup<Tenant>();
       if (userBackup) {
         setTenant(userBackup);
       }
@@ -264,7 +167,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     applyBrandStyles(primaryTenant, tenant, theme);
   }, [primaryTenant, tenant, theme, applyBrandStyles]);
 
-  // Keep theme class in sync with theme state on every render to prevent Next.js layout resets
+  // Keep theme class in sync with documentElement
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'light') {
@@ -278,7 +181,6 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   // Handle loading state transitions
   useEffect(() => {
-    // Prevent loader from re-triggering if the app is already loaded and theme changes
     if (!loading && loaderState === 'done') return;
 
     if (loading) {

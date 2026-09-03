@@ -107,6 +107,8 @@ async function main() {
           message: string;
           stack?: string | null;
           url?: string | null;
+          clientApp?: string | null;
+          userRole?: string | null;
           userAgent?: string | null;
           userId?: string | null;
           workspaceId?: string | null;
@@ -119,6 +121,9 @@ async function main() {
         const logType = content.type || 'info';
         console.log(`📝 Log [${logType.toUpperCase()}] recebido do serviço [${content.serviceName}]: ${content.message}`);
 
+        const resolvedClientApp = content.clientApp || (content.metadata as any)?.clientApp || 'unknown';
+        const resolvedUserRole = content.userRole || (content.metadata as any)?.userRole || 'anon';
+
         let insertedLog: any = null;
         try {
           // Gravar log unificado no banco de dados e retornar o registro criado
@@ -128,6 +133,8 @@ async function main() {
             message: content.message,
             stack: content.stack ?? null,
             url: content.url ?? null,
+            clientApp: resolvedClientApp,
+            userRole: resolvedUserRole,
             userAgent: content.userAgent ?? null,
             userId: content.userId ?? null,
             workspaceId: content.workspaceId ?? null,
@@ -152,6 +159,8 @@ async function main() {
             message: content.message,
             stack: content.stack ?? null,
             url: content.url ?? null,
+            clientApp: resolvedClientApp,
+            userRole: resolvedUserRole,
             userAgent: content.userAgent ?? null,
             userId: null,
             workspaceId: null,

@@ -4,7 +4,7 @@ import { getCapturePageByDomain, getTenantByDomain, getPrimaryTenant, getBootstr
 import { CapturePageRenderer } from '../../../../components/CapturePageRenderer'
 import { NotFoundView } from '../../../../components/NotFoundView'
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 interface PageProps {
   params: Promise<{

@@ -2221,6 +2221,9 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const { name, message, stack, url, userAgent, serviceName, severity, metadata } = request.body;
 
+        const clientApp = (request.raw as any).clientApp || 'unknown';
+        const userRole = (request.raw as any).userRole || 'anon';
+
         await log({
           name: name || 'ClientError',
           type: 'error',
@@ -2229,6 +2232,8 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           message,
           stack: stack || null,
           url: url || (request.headers['referer'] as string) || null,
+          clientApp,
+          userRole,
           userAgent: userAgent || (request.headers['user-agent'] as string) || null,
           userId,
           metadata: metadata || null,

@@ -47,7 +47,21 @@ fastify.register(cors, {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-service-secret', 'x-webhook-secret', 'x-secret', 'X-Webhook-Secret', 'X-Secret'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-service-secret',
+    'x-webhook-secret',
+    'x-secret',
+    'X-Webhook-Secret',
+    'X-Secret',
+    'X-Client-App',
+    'x-client-app',
+    'X-Client-Url',
+    'x-client-url',
+    'X-Request-ID',
+    'x-request-id',
+  ],
 });
 
 // Rota de Healthcheck básica e detalhada
@@ -116,7 +130,16 @@ fastify.addHook('onRequest', async (request, reply) => {
 
 // ── Hook Global: Log de Acesso HTTP (onResponse) ────────────────────────────
 fastify.addHook('onResponse', async (request, reply) => {
-  if (request.url === '/v1/status/health' || request.url === '/status/health') {
+  const urlPath = request.url.split('?')[0];
+
+  // Ignorar rotas de healthcheck e preflight CORS OPTIONS para não poluir a tabela de logs
+  if (
+    request.method === 'OPTIONS' ||
+    urlPath === '/health' ||
+    urlPath === '/v1/health' ||
+    urlPath === '/status/health' ||
+    urlPath === '/v1/status/health'
+  ) {
     return;
   }
 
@@ -265,13 +288,13 @@ const start = async () => {
         try {
           const token = data?.token || socket.handshake.auth?.token;
           if (!token) {
-            socket.emit('error', { message: 'Token JWT de autenticação não fornecido.' });
+            socket.emit('subscribed-admin-logs', { success: false, error: 'Token JWT de autenticação não fornecido.' });
             return;
           }
 
           const decoded = verifyUserJwt(token);
           if (!decoded || !decoded.sub) {
-            socket.emit('error', { message: 'Token JWT inválido ou expirado.' });
+            socket.emit('subscribed-admin-logs', { success: false, error: 'Token JWT inválido ou expirado.' });
             return;
           }
 
@@ -280,7 +303,7 @@ const start = async () => {
           });
 
           if (userProfile?.role !== 'admin') {
-            socket.emit('error', { message: 'Acesso negado. Restrito a administradores.' });
+            socket.emit('subscribed-admin-logs', { success: false, error: 'Acesso negado. Restrito a administradores.' });
             return;
           }
 
@@ -289,7 +312,7 @@ const start = async () => {
           socket.emit('subscribed-admin-logs', { success: true });
         } catch (err: any) {
           console.warn(`⚠️ Tentativa não autorizada de assinar logs via WebSocket (${socket.id}):`, err.message || err);
-          socket.emit('error', { message: 'Falha na autenticação do socket de logs.' });
+          socket.emit('subscribed-admin-logs', { success: false, error: 'Falha na autenticação do socket de logs.' });
         }
       });
 

@@ -25,7 +25,7 @@ export default async function SettingsPage() {
       headers: {
         'Authorization': `Bearer ${token}`
       },
-      next: { revalidate: 0 } // Desabilitar cache para checagem sempre atualizada
+      next: { revalidate: 30 } // Desabilitar cache para checagem sempre atualizada
     });
     if (meRes.ok) {
       const meData = await meRes.json();
@@ -50,7 +50,7 @@ export default async function SettingsPage() {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        next: { revalidate: 0 }
+        next: { revalidate: 30 }
       });
       if (res.ok) {
         const data = await res.json();
@@ -71,7 +71,7 @@ export default async function SettingsPage() {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        next: { revalidate: 0 }
+        next: { revalidate: 30 }
       });
       if (memberRes.ok) {
         const memberData = await memberRes.json();
@@ -92,7 +92,7 @@ export default async function SettingsPage() {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        next: { revalidate: 0 }
+        next: { revalidate: 30 }
       });
       if (res.ok) {
         const data = await res.json();
@@ -113,7 +113,7 @@ export default async function SettingsPage() {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        next: { revalidate: 0 }
+        next: { revalidate: 30 }
       });
       if (res.ok) {
         const data = await res.json();
@@ -149,7 +149,7 @@ export default async function SettingsPage() {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           },
-          next: { revalidate: 0 }
+          next: { revalidate: 30 }
         }
       );
       if (memberRes.ok) {

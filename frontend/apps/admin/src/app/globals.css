@@ -52,6 +52,22 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* ── Cursor Pointer global para elementos clicáveis ── */
+button,
+[role="button"],
+select,
+label[for],
+summary,
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+select:disabled {
+  cursor: not-allowed;
+}
+
 /* ── Utilitários reutilizáveis ── */
 .brand-surface {
   background-color: var(--brand-card-bg-color);

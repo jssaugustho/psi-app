@@ -68,7 +68,7 @@ async function checkGoTrue() {
 async function checkNginx() {
   const start = Date.now();
   try {
-    const res = await fetch('http://nginx:80/', {
+    const res = await fetch('http://nginx:80/health', {
       method: 'GET',
       signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(3000) : undefined,
     });

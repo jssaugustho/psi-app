@@ -5,12 +5,13 @@ export const config = {
   matcher: [
     /*
      * Intercepta todas as requisições exceto:
+     * - api/ (rotas de API interna ou proxy)
      * - _next/static (assets estáticos compilados)
      * - _next/image (otimizador de imagem do Next)
      * - favicon.ico, sitemap.xml, robots.txt
-     * - arquivos de mídia diretos (.png, .jpg, .svg, .webp)
+     * - arquivos de mídia e estáticos (.svg, .png, .jpg, .jpeg, .gif, .webp, .css, .js, .woff, .woff2, .ttf, .eot, .ico, .json, .webmanifest)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api/|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|woff|woff2|ttf|eot|ico|json|webmanifest)$).*)',
   ],
 };
 

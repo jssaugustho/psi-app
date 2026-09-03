@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
 
 let resolvedPgrstUrl = API_BASE_URL;
@@ -118,12 +120,12 @@ async function verifyUserAccess(pageId: string, token: string): Promise<boolean>
   }
 }
 
-export async function getCapturePageBySlugs(
+export const getCapturePageBySlugs = cache(async (
   tenantSlug: string,
   pageSlug: string,
   isPreview?: boolean,
   token?: string
-): Promise<CapturePageData | null> {
+): Promise<CapturePageData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
   const targetSlug = (pageSlug === '_root_' || pageSlug === 'root') ? '' : (pageSlug || '');
@@ -131,7 +133,8 @@ export async function getCapturePageBySlugs(
     ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains!inner(*))&slug=eq.${targetSlug}&tenants.workspace_domains.subdomain=eq.${tenantSlug}`
     : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains!inner(*))&slug=eq.${targetSlug}&is_active=eq.true&tenants.workspace_domains.subdomain=eq.${tenantSlug}`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const fetchOptions: RequestInit = (isPreview || token) ? { cache: 'no-store' } : { next: { revalidate: 60, tags: ['sites', `site-${tenantSlug}`] } };
+    const res = await fetch(url, fetchOptions);
     if (!res.ok) {
       return null;
     }
@@ -172,19 +175,21 @@ export async function getCapturePageBySlugs(
     handleFetchError(err);
     return null;
   }
-}
+});
 
-export async function getCapturePageByDomain(
+export const getCapturePageByDomain = cache(async (
   domainName: string,
   pathSlug: string = '',
   isPreview?: boolean,
   token?: string
-): Promise<CapturePageData | null> {
+): Promise<CapturePageData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
   const cleanDomain = domainName.split(':')[0].toLowerCase();
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app';
   const cleanPathSlug = (pathSlug === '_root_' || pathSlug === 'root') ? '' : pathSlug.trim().toLowerCase();
+
+  const fetchOptions: RequestInit = (isPreview || token) ? { cache: 'no-store' } : { next: { revalidate: 60, tags: ['sites', `domain-${cleanDomain}`] } };
 
   let tenantData: TenantData | null = null;
 
@@ -211,7 +216,7 @@ export async function getCapturePageByDomain(
     const altCleanDomain = cleanDomain.startsWith('www.') ? cleanDomain.replace('www.', '') : `www.${cleanDomain}`;
     const domainUrl = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&or=(custom_domain.eq.${cleanDomain},custom_domain.eq.${altCleanDomain})`;
     try {
-      const res = await fetch(domainUrl, { cache: 'no-store' });
+      const res = await fetch(domainUrl, fetchOptions);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0 && data[0].workspace) {
@@ -244,7 +249,7 @@ export async function getCapturePageByDomain(
       ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&workspace_id=eq.${tenantData.id}&slug=eq.${cleanPathSlug}&limit=1`
       : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&workspace_id=eq.${tenantData.id}&slug=eq.${cleanPathSlug}&is_active=eq.true&limit=1`;
     try {
-      const res = await fetch(pageUrl, { cache: 'no-store' });
+      const res = await fetch(pageUrl, fetchOptions);
       if (res.ok) {
         const data = await res.json();
         apiConnection.notifyOnline();
@@ -288,7 +293,7 @@ export async function getCapturePageByDomain(
     ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&or=(custom_domain.eq.${cleanDomain},custom_domain.eq.${altCleanDomain})&limit=1`
     : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&or=(custom_domain.eq.${cleanDomain},custom_domain.eq.${altCleanDomain})&is_active=eq.true&limit=1`;
   try {
-    const res = await fetch(legacyUrl, { cache: 'no-store' });
+    const res = await fetch(legacyUrl, fetchOptions);
     if (res.ok) {
       const data = await res.json();
       apiConnection.notifyOnline();
@@ -322,7 +327,7 @@ export async function getCapturePageByDomain(
   }
 
   return null;
-}
+});
 
 export interface TenantData {
   id: string;
@@ -340,12 +345,13 @@ export interface TenantData {
   logoDarkUrl?: string | null;
 }
 
-export async function getTenantBySlug(slug: string): Promise<TenantData | null> {
+export const getTenantBySlug = cache(async (slug: string): Promise<TenantData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
+  const fetchOptions: RequestInit = { next: { revalidate: 60, tags: ['tenants', `tenant-${slug}`] } };
   const url = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&subdomain=eq.${slug}`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, fetchOptions);
     if (res.ok) {
       const data = await res.json();
       apiConnection.notifyOnline();
@@ -377,7 +383,7 @@ export async function getTenantBySlug(slug: string): Promise<TenantData | null> 
   if (uuidRegex.test(slug)) {
     const directUrl = `${PGRST_BASE_URL}/workspaces?id=eq.${slug}`;
     try {
-      const res = await fetch(directUrl, { cache: 'no-store' });
+      const res = await fetch(directUrl, fetchOptions);
       if (res.ok) {
         const data = await res.json();
         apiConnection.notifyOnline();
@@ -406,17 +412,18 @@ export async function getTenantBySlug(slug: string): Promise<TenantData | null> 
   }
 
   return null;
-}
+});
 
-export async function getTenantByDomain(domain: string): Promise<TenantData | null> {
+export const getTenantByDomain = cache(async (domain: string): Promise<TenantData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
   const clean = domain.split(':')[0].toLowerCase();
   const altClean = clean.startsWith('www.') ? clean.replace('www.', '') : `www.${clean}`;
 
+  const fetchOptions: RequestInit = { next: { revalidate: 60, tags: ['tenants', `domain-${clean}`] } };
   const url = `${PGRST_BASE_URL}/workspace_domains?select=workspace:workspaces(*)&or=(custom_domain.eq.${clean},custom_domain.eq.${altClean})`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, fetchOptions);
     if (res.ok) {
       const data = await res.json();
       apiConnection.notifyOnline();
@@ -444,14 +451,14 @@ export async function getTenantByDomain(domain: string): Promise<TenantData | nu
   }
 
   return null;
-}
+});
 
-export async function getPrimaryTenant(): Promise<TenantData | null> {
+export const getPrimaryTenant = cache(async (): Promise<TenantData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
   const url = `${API_BASE_URL}/platform/tenant/primary`;
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { next: { revalidate: 300, tags: ['primary-tenant'] } });
     if (res.ok) {
       const data = await res.json();
       apiConnection.notifyOnline();
@@ -479,13 +486,13 @@ export async function getPrimaryTenant(): Promise<TenantData | null> {
   }
 
   return null;
-}
+});
 
-export async function getBootstrapStatus(): Promise<{ bootstrapped: boolean } | null> {
+export const getBootstrapStatus = cache(async (): Promise<{ bootstrapped: boolean } | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/bootstrap/status`, { cache: 'no-store' });
+    const res = await fetch(`${API_BASE_URL}/auth/bootstrap/status`, { next: { revalidate: 300, tags: ['bootstrap'] } });
     if (!res.ok) return null;
     apiConnection.notifyOnline();
     return await res.json();
@@ -493,4 +500,4 @@ export async function getBootstrapStatus(): Promise<{ bootstrapped: boolean } | 
     handleFetchError(err);
     return null;
   }
-}
+});

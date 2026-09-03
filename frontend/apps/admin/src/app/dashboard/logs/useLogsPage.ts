@@ -38,6 +38,7 @@ export function useLogsPage() {
   const [pendingLogsCount, setPendingLogsCount] = useState(0);
   const [isRealtimeActive, setIsRealtimeActive] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const isRealtimeActiveRef = useRef(isRealtimeActive);
 
@@ -60,6 +61,19 @@ export function useLogsPage() {
 
   totalRef.current = total;
   logsCountRef.current = logs.length;
+
+  // Função para reconectar / re-assinar manualmente o socket
+  const reconnectSocket = useCallback(() => {
+    if (socketRef.current) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      socketRef.current.auth = { token };
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      } else {
+        socketRef.current.emit('subscribe-admin-logs', { token });
+      }
+    }
+  }, []);
 
   // Conta filtros ativos
   const activeFiltersCount = useMemo(() => {
@@ -105,8 +119,8 @@ export function useLogsPage() {
       setLogs(res.logs || []);
       setTotal(res.total || 0);
 
-      // Reseta rolagem do container virtualizado
-      if (containerRef.current) {
+      // Mantem a rolagem do container virtualizado caso o usuario esteja lendo
+      if (containerRef.current && containerRef.current.scrollTop <= 10) {
         containerRef.current.scrollTop = 0;
         setScrollTop(0);
       }
@@ -173,23 +187,42 @@ export function useLogsPage() {
     const apiBaseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/v1';
     const socketOrigin = apiBaseUrl.replace(/\/v1\/?$/, '');
     const socketPath = '/v1/socket.io';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
     const socket = io(socketOrigin, {
       path: socketPath,
       transports: ['websocket'],
-      auth: { token },
+      auth: { token: getToken() },
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setIsConnected(true);
-      socket.emit('subscribe-admin-logs', { token });
+      socket.emit('subscribe-admin-logs', { token: getToken() });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('subscribed-admin-logs', (res: { success: boolean; error?: string }) => {
+      if (res?.success) {
+        setIsConnected(true);
+        setIsSubscribed(true);
+      } else {
+        console.warn('⚠️ Assinatura de logs recusada pelo servidor:', res?.error);
+        setIsSubscribed(false);
+      }
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.warn('🔌 WebSocket desconectado:', reason);
       setIsConnected(false);
+      setIsSubscribed(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('⚠️ Erro de conexão no WebSocket:', err.message);
+      setIsConnected(false);
+      setIsSubscribed(false);
     });
 
     socket.on('realtime-event', (event: { type: string; data: any }) => {
@@ -200,6 +233,17 @@ export function useLogsPage() {
           if (isRealtimeActiveRef.current) {
             setLogs((prevLogs) => {
               if (prevLogs.some((item) => item.id === logItem.id)) return prevLogs;
+
+              // Mantem a posicao de rolagem travada se o usuario estiver lendo/scrolled down
+              if (containerRef.current && containerRef.current.scrollTop > 10) {
+                const currentScroll = containerRef.current.scrollTop;
+                requestAnimationFrame(() => {
+                  if (containerRef.current) {
+                    containerRef.current.scrollTop = currentScroll + 54;
+                  }
+                });
+              }
+
               return [logItem, ...prevLogs];
             });
             setTotal((prevTotal) => prevTotal + 1);
@@ -256,19 +300,30 @@ export function useLogsPage() {
     }
   };
 
-  // Cálculo de offsets para renderização virtualizada de accordions
+  // Cálculo de offsets para renderização virtualizada de accordions com altura dinâmica
   const virtualRows = useMemo(() => {
     let currentOffset = 0;
     return logs.map((log) => {
       const isExpanded = expandedIds.has(log.id);
-      const hasStack = Boolean(log.stack || (log.metadata as any)?.stack || (log.metadata as any)?.stackTrace);
+      const stackContent = log.stack || (log.metadata as any)?.stack || (log.metadata as any)?.stackTrace;
+      const hasStack = Boolean(stackContent);
       const hasMetadata = Boolean(log.metadata && Object.keys(log.metadata).length > 0);
 
       let height = 54;
       if (isExpanded) {
-        height = 250; // Altura base para detalhes + contexto do cliente
-        if (hasStack) height += 230; // Card de Stack Trace
-        if (hasMetadata) height += 270; // Card de Metadados JSON
+        // Altura base para informações do evento e contexto de rastreamento
+        height = 250;
+
+        if (hasStack) {
+          const stackLines = String(stackContent).split('\n').length;
+          height += Math.max(120, stackLines * 18 + 70);
+        }
+
+        if (hasMetadata) {
+          const metaJson = JSON.stringify(log.metadata, null, 2);
+          const metaLines = metaJson.split('\n').length;
+          height += Math.max(120, metaLines * 18 + 70);
+        }
       }
 
       const offset = currentOffset;
@@ -325,7 +380,7 @@ export function useLogsPage() {
     loadingInitial, loadingMore, error,
     hasNewChanges, pendingLogsCount,
     isRealtimeActive, setIsRealtimeActive,
-    isConnected,
+    isConnected, isSubscribed, reconnectSocket,
     expandedIds, toggleExpand,
     containerRef, handleScroll,
     totalHeight, visibleRows,
