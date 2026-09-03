@@ -35,7 +35,26 @@ export async function getChannel(): Promise<AmqpChannel> {
     const realtimeExchange = 'realtime.broadcast';
     await ch.assertExchange(realtimeExchange, 'fanout', { durable: true });
 
-    console.log('✅ Conectado com sucesso ao RabbitMQ.');
+    // Garantir a declaração prévia de todas as filas principais para evitar descarte em exchanges sem binding
+    const coreQueues = [
+      { name: 'system.logs', routingKey: 'system.logs' },
+      { name: 'system.status', routingKey: 'system.status' },
+      { name: 'email.transactional', routingKey: 'email.transactional' },
+      { name: 'presence.events', routingKey: 'presence.events' },
+      { name: 'realtime.events', routingKey: 'realtime.events' }
+    ];
+
+    for (const q of coreQueues) {
+      await ch.assertQueue(q.name, {
+        durable: true,
+        deadLetterExchange,
+        deadLetterRoutingKey: 'dead-letter',
+        arguments: { 'x-queue-type': 'quorum' }
+      });
+      await ch.bindQueue(q.name, exchange, q.routingKey);
+    }
+
+    console.log('✅ Conectado com sucesso ao RabbitMQ e filas principais vinculadas.');
 
     connection = conn;
     channel = ch;
@@ -131,6 +150,14 @@ export async function publishToQueue(routingKey: string, payload: any): Promise<
   }
 }
 
+export async function publishPresenceEvent(payload: any): Promise<boolean> {
+  return publishToQueue('presence.events', payload);
+}
+
+export async function publishRealtimeEvent(payload: any): Promise<boolean> {
+  return publishToQueue('realtime.events', payload);
+}
+
 export async function publishRealtime(payload: any): Promise<boolean> {
   try {
     const ch = await getChannel();
@@ -144,32 +171,82 @@ export async function publishRealtime(payload: any): Promise<boolean> {
   }
 }
 
-export async function publishErrorLog(payload: {
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidUuid(id?: string | null): boolean {
+  if (!id) return false;
+  return UUID_REGEX.test(id.trim());
+}
+
+export interface LogPayload {
   name?: string | null;
+  type?: 'error' | 'audit' | 'info' | 'system' | 'warn' | 'dlq' | 'http' | string;
+  severity?: 'error' | 'warning' | 'fatal' | 'info' | 'debug';
+  serviceName: string;
   message: string;
   stack?: string | null;
   url?: string | null;
+  clientApp?: string | null;
+  userRole?: string | null;
   userAgent?: string | null;
-  userId?: string | null;
-  serviceName: string;
-  severity?: 'error' | 'warning' | 'fatal' | 'info';
-  metadata?: Record<string, any> | null;
-}): Promise<boolean> {
-  return publishToQueue('system.errors', payload);
-}
-
-export async function publishAuditLog(payload: {
-  action: string;
-  category: 'auth' | 'security' | 'config' | 'email' | 'webhook' | 'data';
-  serviceName: string;
-  status: 'success' | 'failure';
   userId?: string | null;
   workspaceId?: string | null;
-  ip?: string | null;
-  userAgent?: string | null;
-  details?: Record<string, any> | null;
-}): Promise<boolean> {
-  return publishToQueue('system.audit', payload);
+  sessionId?: string | null;
+  metadata?: Record<string, any> | null;
 }
+
+export async function log(payload: LogPayload): Promise<boolean> {
+  const isErrorEvent =
+    Boolean(payload.stack) ||
+    Boolean(payload.name && (payload.name.toLowerCase().includes('error') || payload.name.toLowerCase().includes('fail'))) ||
+    payload.severity === 'error' ||
+    payload.severity === 'fatal' ||
+    payload.type === 'error';
+
+  const defaultType = isErrorEvent ? 'error' : (payload.type || 'info');
+  const defaultSeverity = isErrorEvent
+    ? (payload.severity === 'fatal' ? 'fatal' : 'error')
+    : (payload.severity || (defaultType === 'error' ? 'error' : 'info'));
+
+  const sanitized: LogPayload = {
+    ...payload,
+    name: payload.name || (isErrorEvent ? 'system.error' : 'system.event'),
+    type: defaultType,
+    severity: defaultSeverity,
+    clientApp: payload.clientApp || (payload.metadata as any)?.clientApp || 'unknown',
+    userRole: payload.userRole || (payload.metadata as any)?.userRole || 'anon',
+  };
+
+  if (sanitized.userId && !isValidUuid(sanitized.userId)) {
+    sanitized.metadata = {
+      ...(sanitized.metadata || {}),
+      unlinkedUserId: sanitized.userId,
+    };
+    sanitized.userId = null;
+  }
+
+  if (sanitized.workspaceId && !isValidUuid(sanitized.workspaceId)) {
+    sanitized.metadata = {
+      ...(sanitized.metadata || {}),
+      unlinkedWorkspaceId: sanitized.workspaceId,
+    };
+    sanitized.workspaceId = null;
+  }
+
+  if (sanitized.sessionId && !isValidUuid(sanitized.sessionId)) {
+    sanitized.metadata = {
+      ...(sanitized.metadata || {}),
+      unlinkedSessionId: sanitized.sessionId,
+    };
+    sanitized.sessionId = null;
+  }
+
+  return publishToQueue('system.logs', sanitized);
+}
+
+// Alias universal para retrocompatibilidade
+export const publishLog = log;
+
+
 
 

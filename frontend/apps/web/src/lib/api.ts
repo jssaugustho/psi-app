@@ -6,7 +6,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source';
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source,webhook_secret';
 
 export interface User {
   id: string;
@@ -57,15 +57,16 @@ export interface VisualIdentity {
 }
 
 export interface WorkspaceDomain {
-  id: string;
-  workspaceId: string;
-  subdomain: string;
+  id?: string;
+  workspaceId?: string;
+  subdomain?: string;
   customDomain?: string | null;
   cfHostnameId?: string | null;
-  dnsStatus: string;
-  dnsRecords?: Array<{ type: string; name: string; value: string; description?: string }> | null;
+  dnsStatus?: string;
+  dnsRecords?: Array<{ type: string; name: string; value: string; description?: string; status?: string }> | null;
   createdAt?: string;
   updatedAt?: string;
+  found?: boolean;
 }
 
 export interface Workspace {
@@ -81,6 +82,7 @@ export interface Workspace {
   defaultSiteAvatarUrl?: string | null;
   traffic_sources?: string[];
   default_traffic_source?: string;
+  webhook_secret?: string | null;
   visualIdentity?: VisualIdentity | null;
   workspaceDomain?: WorkspaceDomain | null;
   createdAt?: string;
@@ -168,37 +170,37 @@ export interface Contact {
   id: string;
   tenant_id: string;
   name: string;
-  phone: string | null;
-  email: string | null;
+  phone?: string | null;
+  email?: string | null;
   status: string;
-  source: string | null;
-  screening_notes: string | null;
-  next_contact_at: string | null;
-  last_contact_at: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_relation: string | null;
-  emergency_contact_phone: string | null;
-  is_minor: boolean;
-  accepted_contract_at: string | null;
-  age_confirmed_at: string | null;
-  signed_contract_content: string | null;
-  consent_ip: string | null;
-  consent_user_agent: string | null;
+  source?: string | null;
+  screening_notes?: string | null;
+  next_contact_at?: string | null;
+  last_contact_at?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_relation?: string | null;
+  emergency_contact_phone?: string | null;
+  is_minor?: boolean;
+  accepted_contract_at?: string | null;
+  age_confirmed_at?: string | null;
+  signed_contract_content?: string | null;
+  consent_ip?: string | null;
+  consent_user_agent?: string | null;
   // Responsável legal (quando menor de idade)
-  parent_name: string | null;
-  parent_cpf: string | null;
-  parent_phone: string | null;
+  parent_name?: string | null;
+  parent_cpf?: string | null;
+  parent_phone?: string | null;
   // Campos personalizados vindos do formulário
-  custom_field_values: Record<string, any>;
+  custom_field_values?: Record<string, any>;
   // Origem
-  form_id: string | null;
-  capture_page_id: string | null;
+  form_id?: string | null;
+  capture_page_id?: string | null;
   // UTMs
-  utm_source: string | null;
-  utm_medium: string | null;
-  utm_campaign: string | null;
-  utm_term: string | null;
-  utm_content: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_term?: string | null;
+  utm_content?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -267,9 +269,15 @@ export const apiConnection = {
   },
   notifyOffline(errorMsg?: string) {
     connectionListeners.forEach((fn) => fn('offline', errorMsg));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('psi:api-offline', { detail: { message: errorMsg } }));
+    }
   },
   notifyOnline() {
     connectionListeners.forEach((fn) => fn('online'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('psi:api-online'));
+    }
   },
 };
 
@@ -283,7 +291,16 @@ export interface FetchApiOptions extends RequestInit {
 async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isRetry = false): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
+  const isSitePage = typeof window !== 'undefined' && (
+    window.location.pathname.startsWith('/f/') ||
+    window.location.pathname.startsWith('/p/') ||
+    window.location.pathname.startsWith('/site/')
+  );
+  const clientApp = isSitePage ? 'sites' : 'web';
+
   const headers: Record<string, string> = {
+    'X-Client-App': clientApp,
+    ...(typeof window !== 'undefined' && window.location?.href ? { 'X-Client-Url': window.location.href } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -683,6 +700,7 @@ export const api = {
     if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
     if (body.traffic_sources !== undefined) dbBody.traffic_sources = body.traffic_sources;
     if (body.default_traffic_source !== undefined) dbBody.default_traffic_source = body.default_traffic_source;
+    if (body.webhook_secret !== undefined) dbBody.webhook_secret = body.webhook_secret;
 
     const res = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?id=eq.${tenantId}`, {
       method: 'PATCH',

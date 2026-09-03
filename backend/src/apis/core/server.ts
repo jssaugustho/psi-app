@@ -5,15 +5,18 @@ import multipart from '@fastify/multipart';
 import socketio from 'socket.io';
 import cookie from '@fastify/cookie';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
-import { getChannel, publishRealtime, publishErrorLog } from '../../shared/queue';
-import { extractJwtFromRequest, verifyUserJwt } from '../../shared/auth';
+import crypto from 'crypto';
+import { getChannel, publishRealtime, publishRealtimeEvent, publishPresenceEvent, log } from '../../shared/queue';
+import { extractJwtFromRequest, verifyUserJwt, extractUserAndSessionFromToken } from '../../shared/auth';
 import { authRoutes } from './routes/auth';
 import { platformRoutes } from './routes/platform';
 import { statusRoutes, startSystemStatusHeartbeats } from './routes/status';
 import { crmRoutes } from './routes/crm';
 import { captacaoRoutes } from './routes/captacao';
 import { formsRoutes } from './routes/forms';
-import { sql } from '../../shared/db';
+import { sql, db } from '../../shared/db';
+import { profiles } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 import { startDomainVerifyConsumer } from '../../consumers/domainVerifyConsumer';
 
 
@@ -44,7 +47,7 @@ fastify.register(cors, {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-service-secret'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-service-secret', 'x-webhook-secret', 'x-secret', 'X-Webhook-Secret', 'X-Secret'],
 });
 
 // Rota de Healthcheck básica e detalhada
@@ -81,20 +84,86 @@ fastify.get('/health', async () => {
   };
 });
 
+// ── Hook Global: Rastreabilidade de Requisição (requestId, userId, sessionId, clientApp, userRole) ─
+fastify.addHook('onRequest', async (request, reply) => {
+  const reqIdHeader = (request.headers['x-request-id'] || request.headers['X-Request-ID']) as string | undefined;
+  const requestId = reqIdHeader && reqIdHeader.trim() ? reqIdHeader.trim() : crypto.randomUUID();
+
+  const rawClientApp = (request.headers['x-client-app'] || request.headers['X-Client-App']) as string | undefined;
+  const clientApp = rawClientApp && rawClientApp.trim() ? rawClientApp.trim().toLowerCase() : 'unknown';
+
+  const rawClientUrl = (request.headers['x-client-url'] || request.headers['X-Client-Url'] || request.headers['referer'] || request.headers['Referer']) as string | undefined;
+  const clientUrl = rawClientUrl && rawClientUrl.trim() ? rawClientUrl.trim() : request.url;
+
+  (request.raw as any).requestId = requestId;
+  (request.raw as any).clientApp = clientApp;
+  (request.raw as any).clientUrl = clientUrl;
+  (request.raw as any).userRole = 'anon';
+  (request.raw as any).startTime = Date.now();
+
+  const token = extractJwtFromRequest(request);
+  if (token) {
+    const { userId, sessionId, userRole } = extractUserAndSessionFromToken(token);
+    (request.raw as any).userId = userId;
+    (request.raw as any).sessionId = sessionId;
+    if (userRole) {
+      (request.raw as any).userRole = userRole;
+    }
+  }
+
+  reply.header('X-Request-ID', requestId);
+});
+
+// ── Hook Global: Log de Acesso HTTP (onResponse) ────────────────────────────
+fastify.addHook('onResponse', async (request, reply) => {
+  if (request.url === '/v1/status/health' || request.url === '/status/health') {
+    return;
+  }
+
+  const durationMs = Date.now() - ((request.raw as any).startTime || Date.now());
+  const requestId = (request.raw as any).requestId || null;
+  const userId = (request.raw as any).userId || null;
+  const sessionId = (request.raw as any).sessionId || null;
+  const clientApp = (request.raw as any).clientApp || 'unknown';
+  const userRole = (request.raw as any).userRole || 'anon';
+  const clientUrl = (request.raw as any).clientUrl || request.url;
+
+  log({
+    name: 'http.access',
+    type: 'http',
+    severity: reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warning' : 'info',
+    serviceName: 'core-api',
+    message: `Requisição HTTP ${request.method} ${request.url} finalizada com status ${reply.statusCode} em ${durationMs}ms.`,
+    userId,
+    sessionId,
+    clientApp,
+    userRole,
+    url: clientUrl,
+    userAgent: (request.headers['user-agent'] as string) || null,
+    metadata: {
+      requestId,
+      sessionId,
+      clientApp,
+      userRole,
+      method: request.method,
+      statusCode: reply.statusCode,
+      durationMs,
+      ip: request.ip,
+      path: request.url,
+    },
+  }).catch(() => {});
+});
+
 // Manipulador global de erros da API (Fastify)
 fastify.setErrorHandler(async (error, request, reply) => {
   request.log.error(error);
 
-  let userId: string | null = null;
-  const token = extractJwtFromRequest(request);
-  if (token) {
-    try {
-      const decoded = verifyUserJwt(token);
-      userId = decoded.sub;
-    } catch {
-      // Ignora erro de JWT inválido/expirado para o log
-    }
-  }
+  const requestId = (request.raw as any).requestId || null;
+  const userId = (request.raw as any).userId || null;
+  const sessionId = (request.raw as any).sessionId || null;
+  const clientApp = (request.raw as any).clientApp || 'unknown';
+  const userRole = (request.raw as any).userRole || 'anon';
+  const clientUrl = (request.raw as any).clientUrl || request.url;
 
   // Detecta se é erro de banco de dados/Postgres
   let serviceName = 'core-api';
@@ -107,19 +176,29 @@ fastify.setErrorHandler(async (error, request, reply) => {
     serviceName = 'postgres';
   }
 
-  // Enfileira o erro no RabbitMQ
-  await publishErrorLog({
-    name: error.name || 'FastifyError',
-    message: error.message || 'Erro interno na API',
+  // Enfileira o erro no RabbitMQ via funcao universal log
+  await log({
+    type: 'error',
+    name: error.name || 'api.global_error',
+    message: `Erro não tratado na rota [${request.method} ${request.url}]: ${error.message || 'Erro interno na API'}`,
     stack: error.stack,
-    url: request.url,
+    url: clientUrl,
+    clientApp,
+    userRole,
     userAgent: request.headers['user-agent'] || null,
     userId,
+    sessionId,
     serviceName,
     severity: 'error',
     metadata: {
+      requestId,
+      sessionId,
+      clientApp,
+      userRole,
       method: request.method,
       statusCode: error.statusCode || 500,
+      ip: request.ip,
+      errorName: error.name,
     },
   }).catch((pubErr) => {
     request.log.error('Erro ao publicar log de erro no RabbitMQ:', pubErr);
@@ -138,6 +217,7 @@ fastify.register(authRoutes, { prefix: '/auth' });
 fastify.register(platformRoutes, { prefix: '/platform' });
 fastify.register(statusRoutes, { prefix: '/platform' });
 fastify.register(crmRoutes, { prefix: '/crm' });
+fastify.register(crmRoutes, { prefix: '/v1/crm' });
 fastify.register(captacaoRoutes, { prefix: '/crm/captacao' });
 fastify.register(formsRoutes, { prefix: '/crm/forms' });
 
@@ -147,37 +227,6 @@ const start = async () => {
     const server = fastify.server;
 
     // Estrutura em memória para presença de usuários
-    interface PresenceUser {
-      userId: string;
-      nome: string;
-      sobrenome: string;
-      email: string;
-      avatarUrl: string | null;
-      path: string;
-      lastSeen: number;
-    }
-
-    const globalPresence = new Map<string, Map<string, PresenceUser>>();
-
-    function handlePresenceEvent(event: any) {
-      const { tenantId, userId, action, data } = event;
-      if (!tenantId || !userId) return;
-
-      if (action === 'leave') {
-        globalPresence.get(tenantId)?.delete(userId);
-        return;
-      }
-
-      if (!globalPresence.has(tenantId)) {
-        globalPresence.set(tenantId, new Map());
-      }
-
-      globalPresence.get(tenantId)!.set(userId, {
-        ...data,
-        lastSeen: Date.now(),
-      });
-    }
-
     // Inicializar o Socket.io compartilhando a mesma porta HTTP do Fastify
     // Forçamos o uso do transport 'websocket' para permitir escala horizontal sem sticky sessions
     const io = new socketio.Server(server, {
@@ -201,13 +250,54 @@ const start = async () => {
         socket.join(`user:${data.userId}`);
         socket.join(`tenant:${data.tenantId}`);
         console.log(`🚪 Cliente ${socket.id} assinou user:${data.userId} e tenant:${data.tenantId}`);
+
+        // Solicita sincronização imediata de presença para a nova conexão
+        publishPresenceEvent({
+          entity: 'presence',
+          action: 'subscribe',
+          tenantId: data.tenantId,
+          userId: data.userId,
+        });
+      });
+
+      // Assinatura autenticada com verificação de perfil 'admin' para Logs de Erro do Sistema
+      socket.on('subscribe-admin-logs', async (data: { token?: string }) => {
+        try {
+          const token = data?.token || socket.handshake.auth?.token;
+          if (!token) {
+            socket.emit('error', { message: 'Token JWT de autenticação não fornecido.' });
+            return;
+          }
+
+          const decoded = verifyUserJwt(token);
+          if (!decoded || !decoded.sub) {
+            socket.emit('error', { message: 'Token JWT inválido ou expirado.' });
+            return;
+          }
+
+          const userProfile = await db.query.profiles.findFirst({
+            where: eq(profiles.id, decoded.sub),
+          });
+
+          if (userProfile?.role !== 'admin') {
+            socket.emit('error', { message: 'Acesso negado. Restrito a administradores.' });
+            return;
+          }
+
+          socket.join('platform:admin_logs');
+          console.log(`🛡️ Cliente admin ${socket.id} (User: ${decoded.sub}) assinou a sala [platform:admin_logs]`);
+          socket.emit('subscribed-admin-logs', { success: true });
+        } catch (err: any) {
+          console.warn(`⚠️ Tentativa não autorizada de assinar logs via WebSocket (${socket.id}):`, err.message || err);
+          socket.emit('error', { message: 'Falha na autenticação do socket de logs.' });
+        }
       });
 
       socket.on('presence-pulse', (data: any) => {
         if (!data || !data.userId || !data.tenantId) return;
 
-        // Publica o pulso no RabbitMQ para sincronizar em todas as instâncias da API
-        publishRealtime({
+        // Enfileira o pulso de presença para a Engine de Presença dedicada
+        publishPresenceEvent({
           entity: 'presence',
           action: 'heartbeat',
           tenantId: data.tenantId,
@@ -226,7 +316,7 @@ const start = async () => {
       socket.on('disconnect', () => {
         console.log(`🔌 Cliente desconectado: ${socket.id}`);
         if (currentUserId && currentTenantId) {
-          publishRealtime({
+          publishPresenceEvent({
             entity: 'presence',
             action: 'leave',
             tenantId: currentTenantId,
@@ -236,6 +326,23 @@ const start = async () => {
         }
       });
     });
+
+    // Função auxiliar para despachar cada item individual ou de um lote aos sockets
+    const dispatchRealtimeItem = (item: any) => {
+      if (!item) return;
+
+      if (item.type === 'system_error' || item.type === 'system_audit' || item.type === 'system_log') {
+        io.to('platform:admin_logs').emit('realtime-event', item);
+      } else if (item.entity === 'presence' && item.action === 'list') {
+        io.to(`tenant:${item.tenantId}`).emit('presence-list', item.data);
+      } else {
+        if (item.userId) {
+          io.to(`user:${item.userId}`).emit('realtime-event', item);
+        } else if (item.tenantId) {
+          io.to(`tenant:${item.tenantId}`).emit('realtime-event', item);
+        }
+      }
+    };
 
     // Iniciar Consumer do RabbitMQ para eventos Realtime (Broadcast)
     try {
@@ -248,24 +355,16 @@ const start = async () => {
         if (msg) {
           try {
             const content = JSON.parse(msg.content.toString());
-            console.log('📢 Evento Realtime recebido do RabbitMQ:', content);
 
-            if (content.entity === 'presence') {
-              handlePresenceEvent(content);
+            if (content.type === 'realtime_batch' && Array.isArray(content.events)) {
+              content.events.forEach((item: any) => dispatchRealtimeItem(item));
             } else {
-              // Eventos de negócios (leads, etc.)
-              if (content.userId) {
-                io.to(`user:${content.userId}`).emit('realtime-event', content);
-              } else if (content.tenantId) {
-                io.to(`tenant:${content.tenantId}`).emit('realtime-event', content);
-              } else {
-                io.emit('realtime-event', content);
-              }
+              dispatchRealtimeItem(content);
             }
 
             channel.ack(msg);
           } catch (err) {
-            console.error('❌ Erro ao processar evento realtime:', err);
+            console.error('❌ Erro ao processar evento realtime broadcast:', err);
             channel.nack(msg, false, false);
           }
         }
@@ -274,44 +373,36 @@ const start = async () => {
       console.warn('⚠️ RabbitMQ não disponível na inicialização do realtime consumer. Tentando prosseguir com servidor HTTP.');
     }
 
-    // Limpeza periódica de presença inativa e transmissão da lista para cada tenant
-    setInterval(() => {
-      const now = Date.now();
-      const expirationMs = 25 * 1000; // 25s sem pulso = offline
-
-      for (const [tenantId, usersMap] of globalPresence.entries()) {
-        let hasChanges = false;
-        for (const [userId, user] of usersMap.entries()) {
-          if (now - user.lastSeen > expirationMs) {
-            usersMap.delete(userId);
-            hasChanges = true;
-          }
-        }
-
-        // Transmite a lista atualizada de presença para a sala do Tenant
-        const activeUsersList = Array.from(usersMap.values()).map(({ lastSeen, ...u }) => u);
-        io.to(`tenant:${tenantId}`).emit('presence-list', activeUsersList);
-
-        if (usersMap.size === 0) {
-          globalPresence.delete(tenantId);
-        }
-      }
-    }, 10000); // Executa a cada 10 segundos
-
-    // Iniciar Ouvinte (LISTEN) de Eventos do PostgreSQL e repassar para o RabbitMQ
+    // Iniciar Ouvinte (LISTEN) de Eventos do PostgreSQL e repassar para a Fila de Realtime
     try {
       await sql.listen('realtime_events', (payload) => {
         try {
           const parsed = JSON.parse(payload);
           console.log('⚡ Evento recebido via pg_notify:', parsed);
-          publishRealtime(parsed);
-        } catch (err) {
-          console.error('❌ Erro ao repassar evento do Postgres para o RabbitMQ:', err);
+          publishRealtimeEvent(parsed);
+        } catch (err: any) {
+          console.error('❌ Erro ao repassar evento do Postgres para a fila de Realtime:', err);
+          log({
+            name: 'server.pg_notify_error',
+            type: 'error',
+            severity: 'error',
+            serviceName: 'core-api',
+            message: err.message || String(err),
+            stack: err.stack,
+          }).catch(() => {});
         }
       });
       console.log('✅ Escuta de eventos pg_notify ativa no canal [realtime_events].');
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Falha ao iniciar ouvinte pg_notify:', err);
+      log({
+        name: 'server.pg_notify_init_error',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: err.message || String(err),
+        stack: err.stack,
+      }).catch(() => {});
     }
 
     // Iniciar Consumer de verificação automática de domínios

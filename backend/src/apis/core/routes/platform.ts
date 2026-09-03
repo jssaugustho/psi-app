@@ -5,10 +5,10 @@ import path from 'path';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles, errorLogs, auditLogs } from '../../../shared/schema';
+import { platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, mediaAssets, capturePages, contacts, interactionHistory, profiles, logs, auditLogs } from '../../../shared/schema';
 import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
-import { publishErrorLog, publishAuditLog } from '../../../shared/queue';
+import { log } from '../../../shared/queue';
 import { S3Client, PutObjectCommand, HeadBucketCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -310,15 +310,15 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        await publishAuditLog({
-          action: 'config.cloudflare_update',
-          category: 'config',
+        await log({
+          name: 'config.cloudflare_update',
+          type: 'audit',
+          severity: 'info',
           serviceName: 'core-api',
-          status: 'success',
+          message: '[config:config.cloudflare_update] - success',
           userId: decoded.sub,
-          ip: request.ip ?? null,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          details: { zone_id, base_domain: resolvedBaseDomain, r2_bucket_name },
+          metadata: { ip: request.ip ?? null, zone_id, base_domain: resolvedBaseDomain, r2_bucket_name },
         }).catch(() => {});
 
         return reply.send({
@@ -329,14 +329,15 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
-        publishErrorLog({
+        log({
           name: err.name || 'CloudflareConfigError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
           message: err.message || String(err),
           stack: err.stack,
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
-          serviceName: 'core-api',
-          severity: 'error',
         }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro na configuração do Cloudflare R2',
@@ -2033,68 +2034,41 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         // 3. Excluir o workspace
         await db.delete(workspaces).where(eq(workspaces.id, id));
 
+        log({
+          name: 'platform.workspace_deleted',
+          type: 'audit',
+          severity: 'warning',
+          serviceName: 'core-api',
+          message: `Workspace [${targetWorkspace.name}] excluído por usuário ${decoded.sub}`,
+          workspaceId: id,
+          userId: decoded.sub,
+          metadata: {
+            workspaceName: targetWorkspace.name,
+            requestId: (request.raw as any).requestId,
+          },
+        }).catch(() => {});
+
         return reply.send({ success: true, message: 'Workspace excluído com sucesso.' });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'platform.delete_workspace_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          workspaceId: (request.params as any)?.id,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
   );
 
-  // POST /v1/platform/errors
-  // Envia log de erro para a fila do RabbitMQ
-  fastify.post(
-    '/errors',
-    {
-      schema: {
-        body: z.object({
-          name: z.string().optional().nullable(),
-          message: z.string().min(1, 'Mensagem é obrigatória'),
-          stack: z.string().optional().nullable(),
-          url: z.string().optional().nullable(),
-          userAgent: z.string().optional().nullable(),
-          severity: z.enum(['error', 'warning', 'fatal']).default('error'),
-          metadata: z.record(z.any()).optional().nullable(),
-        }),
-      },
-    },
-    async (request, reply) => {
-      try {
-        let userId: string | null = null;
-        const token = extractJwtFromRequest(request);
-        if (token) {
-          try {
-            const decoded = verifyUserJwt(token);
-            userId = decoded.sub;
-          } catch (jwtErr) {
-            // Ignora erro de JWT expirado/inválido para não quebrar a requisição
-          }
-        }
 
-        const { name, message, stack, url, userAgent, severity, metadata } = request.body;
-
-        await publishErrorLog({
-          name,
-          message,
-          stack,
-          url,
-          userAgent,
-          userId,
-          serviceName: 'frontend',
-          severity,
-          metadata: metadata || undefined,
-        });
-
-        return reply.send({ success: true, message: 'Erro enfileirado com sucesso.' });
-      } catch (err: any) {
-        fastify.log.error(err);
-        return reply.status(500).send({
-          error: 'Erro interno',
-          message: err.message || 'Não foi possível enfileirar o log de erro.',
-        });
-      }
-    }
-  );
 
   // GET /v1/platform/errors
   // Lista logs de erro com filtros e paginação
@@ -2105,11 +2079,16 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         querystring: z.object({
           limit: z.coerce.number().default(100),
           offset: z.coerce.number().default(0),
+          type: z.string().optional(),
           serviceName: z.string().optional(),
           severity: z.string().optional(),
           name: z.string().optional(),
           message: z.string().optional(),
           userId: z.string().optional(),
+          sessionId: z.string().optional(),
+          requestId: z.string().optional(),
+          clientApp: z.string().optional(),
+          userRole: z.string().optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
         }),
@@ -2131,62 +2110,78 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores da plataforma.' });
         }
 
-        const { limit, offset, serviceName, severity, name, message, userId, startDate, endDate } = request.query;
+        const { limit, offset, type, serviceName, severity, name, message, userId, sessionId, requestId, clientApp, userRole, startDate, endDate } = request.query;
 
         const conditions = [];
 
+        if (type) {
+          conditions.push(eq(logs.type, type));
+        }
         if (serviceName) {
-          conditions.push(eq(errorLogs.serviceName, serviceName));
+          conditions.push(eq(logs.serviceName, serviceName));
         }
         if (severity) {
-          conditions.push(eq(errorLogs.severity, severity as any));
+          conditions.push(eq(logs.severity, severity as any));
         }
         if (name) {
-          conditions.push(sql`${errorLogs.name} ILIKE ${'%' + name + '%'}`);
+          conditions.push(sql`${logs.name} ILIKE ${'%' + name + '%'}`);
         }
         if (message) {
-          conditions.push(sql`${errorLogs.message} ILIKE ${'%' + message + '%'}`);
+          conditions.push(sql`${logs.message} ILIKE ${'%' + message + '%'}`);
         }
         if (userId) {
-          conditions.push(eq(errorLogs.userId, userId));
+          conditions.push(eq(logs.userId, userId));
+        }
+        if (sessionId) {
+          conditions.push(eq(logs.sessionId, sessionId));
+        }
+        if (requestId) {
+          conditions.push(sql`${logs.metadata}->>'requestId' = ${requestId}`);
+        }
+        if (clientApp) {
+          conditions.push(eq(logs.clientApp, clientApp));
+        }
+        if (userRole) {
+          conditions.push(eq(logs.userRole, userRole));
         }
         if (startDate) {
-          conditions.push(gte(errorLogs.createdAt, new Date(startDate)));
+          conditions.push(gte(logs.createdAt, new Date(startDate)));
         }
         if (endDate) {
-          conditions.push(lte(errorLogs.createdAt, new Date(endDate)));
+          conditions.push(lte(logs.createdAt, new Date(endDate)));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         // Buscar registros e total
-        const logs = await db.query.errorLogs.findMany({
+        const logsList = await db.query.logs.findMany({
           where: whereClause,
           limit,
           offset,
-          orderBy: [desc(errorLogs.createdAt)],
+          orderBy: [desc(logs.createdAt)],
         });
 
         const [totalCountResult] = await db
           .select({ count: sql<number>`count(*)::int` })
-          .from(errorLogs)
+          .from(logs)
           .where(whereClause);
 
         return reply.send({
           success: true,
-          logs,
+          logs: logsList,
           total: totalCountResult?.count || 0,
         });
       } catch (err: any) {
         fastify.log.error(err);
-        publishErrorLog({
+        log({
           name: err.name || 'GetErrorsError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
           message: err.message || String(err),
           stack: err.stack,
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
-          serviceName: 'core-api',
-          severity: 'error',
         }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro interno',
@@ -2226,15 +2221,16 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const { name, message, stack, url, userAgent, serviceName, severity, metadata } = request.body;
 
-        await publishErrorLog({
+        await log({
           name: name || 'ClientError',
+          type: 'error',
+          severity: severity || 'error',
+          serviceName: serviceName || 'frontend',
           message,
           stack: stack || null,
           url: url || (request.headers['referer'] as string) || null,
           userAgent: userAgent || (request.headers['user-agent'] as string) || null,
           userId,
-          serviceName: serviceName || 'frontend',
-          severity: severity || 'error',
           metadata: metadata || null,
         });
 

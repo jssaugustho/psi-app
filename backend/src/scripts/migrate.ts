@@ -7,6 +7,7 @@ import {
   calculateChecksum,
   ensureMigrationTables,
   getCurrentVersionName,
+  getAllSqlFiles,
   notifyPostgrest,
 } from '../shared/migrations';
 
@@ -19,7 +20,7 @@ if (!process.env.DATABASE_URL) {
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
-async function migrate() {
+export async function runMigrations() {
   console.log('----------------------------------------------------');
   console.log('📦 Executando Sistema de Migrações PSI App');
   console.log('----------------------------------------------------');
@@ -44,18 +45,15 @@ async function migrate() {
     const currentVersion = await getCurrentVersionName(sql);
     console.log(`\n📌 Versão Ativa do App: \x1b[36m${currentVersion}\x1b[0m`);
 
-    // 3. Ler arquivos de migração na pasta drizzle
+    // 3. Ler arquivos de migração na raiz de ./drizzle (baseline + migrações arquivadas e pontuais)
     const drizzleDir = path.join(backendDir, 'drizzle');
     if (!fs.existsSync(drizzleDir)) {
       console.log('⚠️ Pasta ./drizzle não encontrada. Nenhuma migração a aplicar.');
       await sql.end();
-      process.exit(0);
+      return;
     }
 
-    const files = fs
-      .readdirSync(drizzleDir)
-      .filter((f) => f.endsWith('.sql'))
-      .sort();
+    const sqlFiles = getAllSqlFiles(drizzleDir);
 
     // 4. Checar se o banco já foi inicializado anteriormente (bootstrap automático)
     const migrationCountRow = await sql`SELECT count(*) as count FROM public.schema_migrations`;
@@ -70,21 +68,21 @@ async function migrate() {
       `;
 
       if (tableCheck[0].exists) {
-        console.log('⚡ Banco de dados pré-existente detectado. Registrando histórico baseline...');
-        for (const file of files) {
-          const filePath = path.join(drizzleDir, file);
-          const sqlContent = fs.readFileSync(filePath, 'utf8');
+        console.log(`⚡ Banco de dados pré-existente detectado. Registrando histórico baseline para a versão [\x1b[36m${currentVersion}\x1b[0m]...`);
+        for (const fileItem of sqlFiles) {
+          const sqlContent = fs.readFileSync(fileItem.fullPath, 'utf8');
           const checksum = calculateChecksum(sqlContent);
 
           await sql`
             INSERT INTO public.schema_migrations 
               (version_name, filename, checksum, sql_content, execution_time_ms)
             VALUES 
-              (${currentVersion}, ${file}, ${checksum}, ${sqlContent}, 0)
+              (${currentVersion}, ${fileItem.filename}, ${checksum}, ${sqlContent}, 0)
             ON CONFLICT (filename) DO NOTHING
           `;
+          console.log(`  📋 Audit: "${fileItem.filename}" ➔ Vinculado à Versão: [${currentVersion}]`);
         }
-        console.log(`✅ Baseline de ${files.length} migrações registrado no histórico com sucesso!`);
+        console.log(`✅ Baseline de ${sqlFiles.length} migrações registrado no histórico com sucesso!`);
       }
     }
 
@@ -100,9 +98,9 @@ async function migrate() {
     let appliedCount = 0;
     let skippedCount = 0;
 
-    for (const file of files) {
-      const filePath = path.join(drizzleDir, file);
-      const sqlContent = fs.readFileSync(filePath, 'utf8');
+    for (const fileItem of sqlFiles) {
+      const file = fileItem.filename;
+      const sqlContent = fs.readFileSync(fileItem.fullPath, 'utf8');
       const checksum = calculateChecksum(sqlContent);
 
       if (executedMap.has(file)) {
@@ -118,6 +116,30 @@ async function migrate() {
         }
         skippedCount++;
         continue;
+      }
+
+      // 🛡️ Proteção Absoluta de Integridade: Se for o schema_baseline.sql e o banco de dados já possuir tabelas ativas, NUNCA executa DDL no banco
+      if (file === 'schema_baseline.sql') {
+        const tableCheck = await sql`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'profiles'
+          ) as exists
+        `;
+
+        if (tableCheck[0].exists) {
+          console.log(`🛡️  Proteção Ativa: "schema_baseline.sql" marcado como sincronizado (dados do banco preservados intactoss).`);
+          await sql`
+            INSERT INTO public.schema_migrations 
+              (version_name, filename, checksum, sql_content, execution_time_ms)
+            VALUES 
+              (${currentVersion}, ${file}, ${checksum}, ${sqlContent}, 0)
+            ON CONFLICT (filename) DO NOTHING
+          `;
+          executedMap.set(file, checksum);
+          skippedCount++;
+          continue;
+        }
       }
 
       console.log(`⏳ Aplicando migração pendente: \x1b[33m${file}\x1b[0m...`);
@@ -138,7 +160,7 @@ async function migrate() {
       });
 
       const executionTimeMs = Date.now() - startTime;
-      console.log(`✅ ${file} aplicada com sucesso em ${executionTimeMs}ms!`);
+      console.log(`✅ Migração "${file}" executada com sucesso! | 🏷️  Versão: [\x1b[36m${currentVersion}\x1b[0m] | ⏱️  Tempo: ${executionTimeMs}ms`);
       appliedCount++;
     }
 
@@ -173,12 +195,11 @@ async function migrate() {
 
     console.log('----------------------------------------------------');
     console.log(
-      `🎉 Processo concluído: ${appliedCount} novas migrações aplicadas, ${skippedCount} já executadas.`
+      `🎉 Processo concluído: ${appliedCount} novas migrações aplicadas, ${skippedCount} já executadas (Versão Ativa: ${currentVersion}).`
     );
     console.log('----------------------------------------------------');
 
     await sql.end();
-    process.exit(0);
   } catch (err: any) {
     console.error('❌ Erro crítico ao aplicar migrações:', err.message || err);
     await sql.end();
@@ -186,4 +207,6 @@ async function migrate() {
   }
 }
 
-migrate();
+if (require.main === module) {
+  runMigrations().then(() => process.exit(0));
+}

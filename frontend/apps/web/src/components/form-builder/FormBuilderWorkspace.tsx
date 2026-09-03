@@ -931,7 +931,6 @@ export function FormBuilderWorkspace({
                   </button>
                 </div>
               </div>
-            </div>
 
               {/* Painel de Variáveis do CRM */}
               <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
@@ -1187,8 +1186,8 @@ export function FormBuilderWorkspace({
           </div>
         </div>
       ) : (
-        /* Tab 2: Theme & Visual Identity Configs with Live Interactive Form Card Preview */
         <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+          {/* Tab 2: Theme & Visual Identity Configs with Live Interactive Form Card Preview */}
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column: Color & Font Pickers */}
             <div className="space-y-6">

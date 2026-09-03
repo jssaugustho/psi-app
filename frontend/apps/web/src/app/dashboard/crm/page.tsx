@@ -31,7 +31,21 @@ import {
   Edit2,
   Settings,
   GripVertical,
-  Activity
+  Activity,
+  Webhook,
+  Key,
+  Copy,
+  Check,
+  RefreshCw,
+  Code,
+  Send,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ExternalLink,
+  FileCode,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 
 interface TrafficSourceObj {
@@ -142,13 +156,42 @@ export default function CrmPage() {
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [isAddColumnOpen, setIsAddColumnOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'pipeline' | 'sources'>('pipeline');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'pipeline' | 'sources' | 'webhook'>('pipeline');
 
-  // Fontes de tráfego locais (estruturadas)
+  // Fontes de tráfego locais (estruturadas) & Webhook
   const { reloadBrand } = useBrand();
   const [localTrafficSources, setLocalTrafficSources] = useState<TrafficSourceObj[]>([]);
   const [localDefaultSource, setLocalDefaultSource] = useState('Manual');
+  const [webhookSecret, setWebhookSecret] = useState(tenant?.webhook_secret || '');
+  const [showSecret, setShowSecret] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [testWebhookLoading, setTestWebhookLoading] = useState(false);
+  const [testWebhookResult, setTestWebhookResult] = useState<{ status: number; statusText: string; success: boolean; data: any } | null>(null);
+  const [testPayload, setTestPayload] = useState({
+    name: 'Lead de Teste Webhook',
+    email: 'teste.webhook@exemplo.com',
+    phone: '(11) 98888-7777',
+    notes: 'Teste disparado a partir da aba de configurações do CRM',
+    source: 'Webhook Teste',
+    utm_source: 'webhook_test',
+    utm_medium: 'cpc',
+    utm_campaign: 'teste_campanha',
+  });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingSecret, setSavingSecret] = useState(false);
+  const [secretSaveStatus, setSecretSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const getWebhookUrl = useCallback(() => {
+    if (typeof window === 'undefined') return '';
+    const apiEnv = process.env.NEXT_PUBLIC_API_URL;
+    if (apiEnv) {
+      const cleanApi = apiEnv.endsWith('/v1') ? apiEnv : `${apiEnv}/v1`;
+      return `${cleanApi}/crm/webhook?workspace_id=${tenantId || ''}`;
+    }
+    return `${window.location.protocol}//${window.location.hostname}:5000/v1/crm/webhook?workspace_id=${tenantId || ''}`;
+  }, [tenantId]);
 
   // Formulário para Nova Fonte de Tráfego
   const [newSourceName, setNewSourceName] = useState('');
@@ -207,8 +250,7 @@ export default function CrmPage() {
     try {
       await reorderColumnsOptimistic(updated);
     } catch (err) {
-      console.error(err);
-      alert('Erro ao reordenar estágios.');
+      console.error('Falha ao reordenar estágios:', err);
     }
   };
 
@@ -257,6 +299,7 @@ export default function CrmPage() {
       const normalized = normalizeTrafficSources(tenant.traffic_sources);
       setLocalTrafficSources(normalized);
       setLocalDefaultSource(tenant.default_traffic_source || 'Manual');
+      setWebhookSecret(tenant.webhook_secret || '');
     }
   }, [tenant, isSettingsOpen]);
 
@@ -422,7 +465,7 @@ export default function CrmPage() {
         status: '',
       });
     } catch (err) {
-      alert('Falha ao adicionar contato');
+      console.error('Falha ao adicionar contato:', err);
     }
   };
 
@@ -436,7 +479,7 @@ export default function CrmPage() {
       setIsAddColumnOpen(false);
       setNewColumnName('');
     } catch (err) {
-      alert('Falha ao adicionar coluna');
+      console.error('Falha ao adicionar coluna:', err);
     }
   };
 
@@ -910,11 +953,11 @@ export default function CrmPage() {
           
           <div className="brand-modal w-full max-w-md rounded-2xl shadow-2xl relative z-10 animate-modal-enter">
             {/* Header */}
-            <div className="p-6 border-b border-[var(--surface-border)] bg-slate-950/5 dark:bg-slate-950/20 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <div className="p-6 border-b border-[var(--surface-border)] bg-[var(--surface-header-bg)] flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[var(--brand-gradient-start)]" /> Cadastrar Novo Lead
               </h2>
-              <button onClick={() => setIsAddContactOpen(false)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setIsAddContactOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1023,11 +1066,11 @@ export default function CrmPage() {
           
           <div className="brand-modal w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative z-10 animate-modal-enter">
             {/* Header */}
-            <div className="p-6 border-b border-[var(--surface-border)] bg-slate-950/5 dark:bg-slate-950/20 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <div className="p-6 border-b border-[var(--surface-border)] bg-[var(--surface-header-bg)] flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[var(--brand-gradient-start)]" /> Adicionar Estágio
               </h2>
-              <button onClick={() => setIsAddColumnOpen(false)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setIsAddColumnOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1080,22 +1123,22 @@ export default function CrmPage() {
           
           <div className="brand-modal w-full max-w-5xl rounded-3xl shadow-2xl relative z-10 animate-modal-enter flex flex-col h-[85vh] max-h-[820px] overflow-hidden border border-[var(--surface-border)]">
             {/* Header */}
-            <div className="px-6 py-5 border-b border-[var(--surface-border)] bg-slate-950/20 flex items-center justify-between">
+            <div className="px-6 py-5 border-b border-[var(--surface-border)] bg-[var(--surface-header-bg)] flex items-center justify-between">
               <div>
-                <span className="text-[10px] uppercase font-semibold tracking-wider text-[var(--brand-gradient-start)]">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--brand-gradient-start)]">
                   Triagem
                 </span>
-                <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Settings className="w-5 h-5 text-[var(--brand-gradient-start)]" /> Configurações do Funil
                 </h2>
               </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-white/5 transition-colors">
+              <button onClick={() => setIsSettingsOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Alternador de Abas Interno */}
-            <div className="px-6 pt-4 pb-2 border-b border-white/5 bg-slate-950/10">
+            <div className="px-6 pt-4 pb-2 border-b border-[var(--surface-border)] bg-[var(--surface-header-bg)]">
               <div className="flex gap-1 p-1 rounded-2xl w-fit glass-sm">
                 <button
                   type="button"
@@ -1136,6 +1179,26 @@ export default function CrmPage() {
                   }
                 >
                   Fontes de Tráfego ({localTrafficSources.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingsTab('webhook')}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all border-none cursor-pointer"
+                  style={
+                    activeSettingsTab === 'webhook'
+                      ? {
+                          background: 'var(--brand-gradient)',
+                          color: 'var(--brand-contrast-color)',
+                          boxShadow: '0 2px 12px color-mix(in srgb, var(--brand-gradient-start) 25%, transparent)',
+                        }
+                      : {
+                          background: 'transparent',
+                          color: 'var(--brand-text-color)',
+                          opacity: 0.65,
+                        }
+                  }
+                >
+                  <Webhook className="w-3.5 h-3.5" /> Webhook de Leads
                 </button>
               </div>
             </div>
@@ -1366,8 +1429,7 @@ export default function CrmPage() {
                             setNewColumnColor('#6366F1');
                             setNewColumnCategory('acolhimento');
                           } catch (err) {
-                            console.error(err);
-                            alert('Erro ao salvar estágio.');
+                            console.error('Erro ao salvar estágio:', err);
                           }
                         }}
                         className="px-5 py-2 text-xs font-bold text-white rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all"
@@ -1624,7 +1686,7 @@ export default function CrmPage() {
                             setEditingSourceId(null);
                           } else {
                             if (localTrafficSources.some(s => s.id === idVal)) {
-                              alert('Este canal já está cadastrado.');
+                              console.warn('Este canal já está cadastrado.');
                               return;
                             }
                             setLocalTrafficSources([...localTrafficSources, newSource]);
@@ -1645,14 +1707,401 @@ export default function CrmPage() {
                 </div>
               )}
 
+              {/* ABA 3: WEBHOOK DE LEADS */}
+              {activeSettingsTab === 'webhook' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full items-stretch overflow-y-auto custom-scrollbar pr-1">
+                  
+                  {/* Coluna 1: Configuração do Secret & Documentação da Rota (7 colunas) */}
+                  <div className="lg:col-span-7 flex flex-col space-y-4">
+                    
+                    {/* Box 1: Configurar Webhook Secret */}
+                    <div className="glass-sm p-5 rounded-2xl border border-slate-200 dark:border-white/10 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <Key className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Secret de Autenticação
+                          </h3>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            Chave de segurança transmitida via header para validar requisições externas.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newUuid = crypto.randomUUID();
+                            setWebhookSecret(newUuid);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-slate-300 dark:border-white/15 bg-slate-100 dark:bg-white/10 text-indigo-600 dark:text-indigo-300 hover:bg-slate-200 dark:hover:bg-white/20 active:scale-95 cursor-pointer shadow-sm"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Gerar UUID
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                            Webhook Secret (Header: X-Webhook-Secret)
+                          </label>
+                          {secretSaveStatus && (
+                            <span
+                              className={`text-[11px] font-bold flex items-center gap-1 animate-fade-in ${
+                                secretSaveStatus.type === 'success'
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                            >
+                              {secretSaveStatus.type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                              {secretSaveStatus.message}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type={showSecret ? 'text' : 'password'}
+                              placeholder="Ex: sec_9f8d7e6a5b4c..."
+                              value={webhookSecret}
+                              onChange={(e) => setWebhookSecret(e.target.value)}
+                              className="glass-sm w-full pl-3.5 pr-10 py-2 text-xs rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-white/15"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSecret(!showSecret)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 p-1 cursor-pointer"
+                              title={showSecret ? 'Ocultar Secret' : 'Exibir Secret'}
+                            >
+                              {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!webhookSecret) return;
+                              navigator.clipboard.writeText(webhookSecret);
+                              setCopiedSecret(true);
+                              setTimeout(() => setCopiedSecret(false), 2000);
+                            }}
+                            disabled={!webhookSecret}
+                            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/15 hover:bg-slate-200 dark:hover:bg-white/20 disabled:opacity-40 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                          >
+                            {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedSecret ? 'Copiado!' : 'Copiar'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={savingSecret || !tenantId}
+                            onClick={async () => {
+                              if (!tenantId) return;
+                              setSavingSecret(true);
+                              setSecretSaveStatus(null);
+                              try {
+                                await api.updateTenantBranding(tenantId, {
+                                  webhook_secret: webhookSecret,
+                                });
+                                await reloadBrand();
+                                setSecretSaveStatus({ type: 'success', message: 'Secret salvo com sucesso!' });
+                                setTimeout(() => setSecretSaveStatus(null), 4000);
+                              } catch (err: any) {
+                                setSecretSaveStatus({ type: 'error', message: err.message || 'Erro ao salvar secret' });
+                              } finally {
+                                setSavingSecret(false);
+                              }
+                            }}
+                            className="px-4 py-2 text-xs font-bold text-white rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer shrink-0"
+                          >
+                            {savingSecret ? 'Salvando...' : 'Salvar'}
+                          </button>
+                        </div>
+                        {!webhookSecret && (
+                          <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 mt-1">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            Configure um Secret para habilitar o recebimento seguro de leads neste workspace.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Box 2: URL de Destino do Webhook */}
+                    <div className="glass-sm p-5 rounded-2xl border border-slate-200 dark:border-white/10 space-y-3">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Endpoint do Webhook
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Envie requisições <code className="text-indigo-600 dark:text-indigo-300 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">POST</code> para a URL abaixo incluindo seu <code className="text-indigo-600 dark:text-indigo-300 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">workspace_id</code>:
+                      </p>
+
+                      <div className="flex gap-2 items-center">
+                        <div className="flex-1 px-3.5 py-2 text-xs text-indigo-700 dark:text-indigo-300 font-mono rounded-xl truncate select-all bg-slate-100 dark:bg-slate-950/60 border border-slate-300 dark:border-white/15">
+                          {getWebhookUrl() || 'Carregando URL...'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = getWebhookUrl();
+                            if (!url) return;
+                            navigator.clipboard.writeText(url);
+                            setCopiedUrl(true);
+                            setTimeout(() => setCopiedUrl(false), 2000);
+                          }}
+                          className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-300 dark:border-white/15 hover:bg-slate-200 dark:hover:bg-white/20 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedUrl ? 'Copiada!' : 'Copiar URL'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Box 3: Documentação Técnica da Rota */}
+                    <div className="glass-sm p-5 rounded-2xl border border-slate-200 dark:border-white/10 space-y-3 flex-1">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-white/10 pb-3">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          <FileCode className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Documentação da Integração
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = getWebhookUrl();
+                            const promptText = `### Prompt de Integração de Webhook (Plataforma PSI)
+
+Você é um desenvolvedor encarregado de implementar a integração para envio de leads para a plataforma PSI via Webhook.
+
+**Especificações da API:**
+- **URL do Webhook:** ${url}
+- **Método HTTP:** POST
+- **Header Obrigatório:** X-Webhook-Secret: ${webhookSecret || '[SEU_WEBHOOK_SECRET]'}
+- **Content-Type:** application/json
+
+**Formato do Payload (JSON):**
+\`\`\`json
+{
+  "name": "Nome Completo do Lead (Obrigatório)",
+  "email": "lead@exemplo.com",
+  "phone": "(11) 99999-8888",
+  "notes": "Busco atendimento psicológico",
+  "source": "Instagram / Site / Make / N8N",
+  "utm_source": "instagram",
+  "utm_medium": "cpc",
+  "utm_campaign": "campanha_ansiedade"
+}
+\`\`\`
+
+**Respostas da API:**
+- **HTTP 201 Created:** Lead cadastrado com sucesso no CRM.
+- **HTTP 200 OK:** Lead duplicado detectado; observação adicionada à timeline do paciente existente.
+- **HTTP 401 Unauthorized:** Secret incorreto ou ausente no header X-Webhook-Secret.
+- **HTTP 400 Bad Request:** Nome do lead ou workspace_id ausentes.`;
+
+                            navigator.clipboard.writeText(promptText);
+                            setCopiedPrompt(true);
+                            setTimeout(() => setCopiedPrompt(false), 2500);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-purple-300 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 active:scale-95 cursor-pointer shadow-sm shrink-0"
+                        >
+                          {copiedPrompt ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                          )}
+                          <span>{copiedPrompt ? 'Prompt Copiado!' : 'Copiar Prompt para LLMs'}</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 text-xs">
+                        <div className="grid grid-cols-2 gap-2 font-mono">
+                          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700">
+                            <span className="text-slate-700 dark:text-slate-300 block font-sans font-bold text-[11px]">Header Obrigatório:</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-extrabold text-xs mt-1 block">X-Webhook-Secret</span>
+                          </div>
+                          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700">
+                            <span className="text-slate-700 dark:text-slate-300 block font-sans font-bold text-[11px]">Content-Type:</span>
+                            <span className="text-indigo-700 dark:text-indigo-300 font-extrabold text-xs mt-1 block">application/json</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">Exemplo de Payload JSON (Body)</span>
+                          <pre
+                            style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
+                            className="p-3.5 rounded-xl text-[12px] font-mono border border-slate-700 overflow-x-auto shadow-inner select-text"
+                          >
+{`{
+  "name": "Nome do Lead",
+  "email": "lead@exemplo.com",
+  "phone": "(11) 99999-8888",
+  "notes": "Busco atendimento para ansiedade",
+  "source": "Instagram Ads",
+  "utm_source": "instagram",
+  "utm_medium": "cpc",
+  "utm_campaign": "campanha_ansiedade"
+}`}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coluna 2: Testador de Webhook em Tempo Real (5 colunas) */}
+                  <div className="lg:col-span-5 glass-sm p-5 rounded-2xl border border-slate-200 dark:border-white/10 flex flex-col space-y-4">
+                    <div className="border-b border-slate-200 dark:border-white/10 pb-3">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <Send className="w-4 h-4 text-[var(--brand-gradient-start)]" /> Testar Envios em Tempo Real
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                        Dispare uma requisição simulada diretamente para a rota do webhook.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3 flex-1">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">Nome do Lead</label>
+                        <input
+                          type="text"
+                          value={testPayload.name}
+                          onChange={(e) => setTestPayload({ ...testPayload, name: e.target.value })}
+                          className="w-full px-3 py-1.5 text-xs rounded-xl text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-white/15 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-medium"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">Telefone</label>
+                          <input
+                            type="text"
+                            value={testPayload.phone}
+                            onChange={(e) => setTestPayload({ ...testPayload, phone: e.target.value })}
+                            className="w-full px-3 py-1.5 text-xs rounded-xl text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-white/15 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-medium"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">E-mail</label>
+                          <input
+                            type="email"
+                            value={testPayload.email}
+                            onChange={(e) => setTestPayload({ ...testPayload, email: e.target.value })}
+                            className="w-full px-3 py-1.5 text-xs rounded-xl text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-white/15 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">Observações</label>
+                        <input
+                          type="text"
+                          value={testPayload.notes}
+                          onChange={(e) => setTestPayload({ ...testPayload, notes: e.target.value })}
+                          className="w-full px-3 py-1.5 text-xs rounded-xl text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-white/15 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">UTM Source</label>
+                        <input
+                          type="text"
+                          value={testPayload.utm_source}
+                          onChange={(e) => setTestPayload({ ...testPayload, utm_source: e.target.value })}
+                          className="w-full px-3 py-1.5 text-xs rounded-xl text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-950/60 border border-slate-300 dark:border-white/15 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gradient-start)] font-mono font-medium"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={testWebhookLoading || !tenantId}
+                        onClick={async () => {
+                          if (!tenantId) return;
+                          setTestWebhookLoading(true);
+                          setTestWebhookResult(null);
+
+                          const targetUrl = getWebhookUrl();
+
+                          try {
+                            const res = await fetch(targetUrl, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'X-Webhook-Secret': webhookSecret,
+                              },
+                              body: JSON.stringify(testPayload),
+                            });
+
+                            const status = res.status;
+                            const statusText = res.statusText;
+                            let data = {};
+                            try {
+                              data = await res.json();
+                            } catch (e) {
+                              data = { rawResponse: await res.text() };
+                            }
+
+                            setTestWebhookResult({
+                              status,
+                              statusText,
+                              success: res.ok,
+                              data,
+                            });
+
+                            // Se a inclusão do lead foi um sucesso, re-busca os leads no CRM
+                            if (res.ok) {
+                              fetchCrmData(tenantId);
+                            }
+                          } catch (err: any) {
+                            setTestWebhookResult({
+                              status: 0,
+                              statusText: 'Network Error',
+                              success: false,
+                              data: { error: err.message || 'Falha na conexão' },
+                            });
+                          } finally {
+                            setTestWebhookLoading(false);
+                          }
+                        }}
+                        className="w-full py-2.5 text-xs font-bold text-white rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                      >
+                        {testWebhookLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        <span>{testWebhookLoading ? 'Enviando...' : 'Disparar Webhook de Teste'}</span>
+                      </button>
+
+                      {testWebhookResult && (
+                        <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-white/10 animate-fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] uppercase font-extrabold tracking-wider text-slate-800 dark:text-slate-200">Resposta do Server:</span>
+                            <span
+                              className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold ${
+                                testWebhookResult.success
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30'
+                              }`}
+                            >
+                              HTTP {testWebhookResult.status} {testWebhookResult.statusText}
+                            </span>
+                          </div>
+                          <pre
+                            style={{ backgroundColor: '#0f172a', color: '#f8fafc' }}
+                            className="p-3.5 rounded-xl text-[12px] font-mono max-h-48 overflow-y-auto border border-slate-700 shadow-inner select-text"
+                          >
+                            {JSON.stringify(testWebhookResult.data, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-[var(--surface-border)] flex items-center justify-between bg-slate-950/20">
+            <div className="px-6 py-4 border-t border-[var(--surface-border)] flex items-center justify-between bg-[var(--surface-header-bg)]">
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                className="glass-sm px-4 py-2 text-xs text-slate-300 rounded-xl hover:bg-white/5 active:scale-95 transition-all"
+                className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 rounded-xl bg-slate-200/80 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
               >
                 Fechar
               </button>
@@ -1666,17 +2115,18 @@ export default function CrmPage() {
                   try {
                     await api.updateTenantBranding(tenantId, {
                       traffic_sources: localTrafficSources as any,
-                      default_traffic_source: localDefaultSource
+                      default_traffic_source: localDefaultSource,
+                      webhook_secret: webhookSecret,
                     });
                     await reloadBrand();
                     setIsSettingsOpen(false);
                   } catch (err: any) {
-                    alert(err.message || 'Erro ao salvar configurações.');
+                    console.error('Erro ao salvar configurações:', err);
                   } finally {
                     setSavingSettings(false);
                   }
                 }}
-                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-lg bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-lg bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
               </button>

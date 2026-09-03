@@ -7,6 +7,7 @@ import { eq, and, ne } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../../../shared/domainVerifier';
 import { scheduleDomainVerification } from '../../../consumers/domainVerifyConsumer';
+import { log } from '../../../shared/queue';
 
 // Validation Schemas
 
@@ -406,6 +407,17 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
 
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'captacao.create_page_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(401).send({ error: 'Não autorizado', message: err.message });
       }
     }
@@ -571,6 +583,22 @@ function validateCPF(cpf: string): boolean {
           notes: `Triagem concluída e enviada com sucesso pelo paciente via formulário público.`,
         });
 
+        log({
+          name: 'captacao.lead_captured',
+          type: 'audit',
+          severity: 'info',
+          serviceName: 'core-api',
+          message: `Novo lead [${rawName}] (Telefone: ${rawPhone || 'N/A'}) capturado com sucesso no formulário de triagem.`,
+          workspaceId: targetWorkspaceId,
+          metadata: {
+            contactId: newContact.id,
+            leadName: rawName,
+            phone: rawPhone,
+            pageId,
+            requestId: (request.raw as any).requestId,
+          },
+        }).catch(() => {});
+
         return reply.status(201).send({
           success: true,
           contactId: newContact.id,
@@ -579,6 +607,18 @@ function validateCPF(cpf: string): boolean {
 
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'captacao.public_submit_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: `Falha ao processar o envio público da página de triagem: ${err.message || String(err)}`,
+          stack: err.stack,
+          workspaceId: targetWorkspaceId,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId, pageId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro interno',
           message: err.message || 'Falha ao processar o envio da triagem.',

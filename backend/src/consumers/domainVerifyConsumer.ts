@@ -18,7 +18,7 @@
  *   - A fila adiciona delay mínimo de 3 minutos entre tentativas automáticas
  */
 
-import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime, publishErrorLog, publishAuditLog } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime, log } from '../shared/queue';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../shared/domainVerifier';
 import { db } from '../shared/db';
 import { workspaceDomains } from '../shared/schema';
@@ -82,11 +82,12 @@ export async function startDomainVerifyConsumer(): Promise<void> {
         message = JSON.parse(msg.content.toString()) as DomainVerifyMessage;
       } catch {
         console.error('❌ Domain verify: mensagem inválida na fila');
-        await publishErrorLog({
+        await log({
           name: 'DomainVerifyQueueError',
-          message: 'Mensagem inválida recebida na fila domain.verify',
-          serviceName: 'domain-verifier',
+          type: 'error',
           severity: 'warning',
+          serviceName: 'domain-verifier',
+          message: 'Mensagem inválida recebida na fila domain.verify',
           metadata: { rawMessage: msg.content.toString() }
         }).catch(() => {});
         channel.nack(msg, false, false); // Encaminha para DLQ
@@ -110,13 +111,14 @@ export async function startDomainVerifyConsumer(): Promise<void> {
         // 3. Domínio verificado com sucesso → notificar frontend via realtime e salvar audit log
         if (result.isActive) {
           console.log(`✅ Domínio ativo: ${domain}`);
-          await publishAuditLog({
-            action: 'domain.verified',
-            category: 'config',
+          await log({
+            name: 'domain.verified',
+            type: 'audit',
+            severity: 'info',
             serviceName: 'domain-verifier',
-            status: 'success',
+            message: '[config:domain.verified] - success',
             workspaceId,
-            details: { domain, attempts },
+            metadata: { domain, attempts },
           }).catch(() => {});
 
           await publishRealtime({
@@ -151,12 +153,14 @@ export async function startDomainVerifyConsumer(): Promise<void> {
             .set({ dnsStatus: 'expired', updatedAt: new Date() })
             .where(eq(workspaceDomains.workspaceId, workspaceId));
 
-          await publishErrorLog({
+          await log({
             name: 'DomainVerifyTimeout',
-            message: `Tempo limite de verificação atingido para o domínio ${domain}`,
-            serviceName: 'domain-verifier',
+            type: 'error',
             severity: 'warning',
-            metadata: { workspaceId, domain, attempts }
+            serviceName: 'domain-verifier',
+            message: `Tempo limite de verificação atingido para o domínio ${domain}`,
+            workspaceId,
+            metadata: { domain, attempts }
           }).catch(() => {});
         }
 
@@ -164,13 +168,15 @@ export async function startDomainVerifyConsumer(): Promise<void> {
       } catch (err: any) {
         console.error(`❌ Erro ao verificar domínio ${domain}:`, err.message);
 
-        await publishErrorLog({
+        await log({
           name: err.name || 'DomainVerifyError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'domain-verifier',
           message: err.message || String(err),
           stack: err.stack,
-          serviceName: 'domain-verifier',
-          severity: 'error',
-          metadata: { workspaceId, domain, attempts }
+          workspaceId,
+          metadata: { domain, attempts }
         }).catch(() => {});
 
         // Requeue apenas se attempts < 3, senão descarta para DLQ (messages.dlq)

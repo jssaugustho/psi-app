@@ -1,5 +1,6 @@
 import React from 'react';
 import './globals.css';
+import { ApiStatusProvider } from '@psi/ui';
 import { IframeNavigationBlocker } from '../components/IframeNavigationBlocker';
 
 export const metadata = {
@@ -15,8 +16,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body className="antialiased bg-[#000000] text-[#F4F4F5]" suppressHydrationWarning>
-        <IframeNavigationBlocker />
-        {children}
+        <ApiStatusProvider defaultRedirectUrl="/">
+          <IframeNavigationBlocker />
+          {children}
+        </ApiStatusProvider>
       </body>
     </html>
   );

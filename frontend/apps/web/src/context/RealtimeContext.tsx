@@ -13,7 +13,7 @@ export interface OnlineUser {
   sobrenome: string;
   email: string;
   avatarUrl: string | null;
-  path: string;
+  path?: string | null;
 }
 
 export type RealtimeCallback = (event: any) => void;
@@ -62,6 +62,15 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     newSocket.on('connect', () => {
       console.log('✅ Conectado ao servidor de Realtime WebSocket');
       newSocket.emit('subscribe', { userId: user.id, tenantId: tenant.id });
+      newSocket.emit('presence-pulse', {
+        userId: user.id,
+        tenantId: tenant.id,
+        nome: user.nome,
+        sobrenome: user.sobrenome,
+        email: user.email,
+        avatarUrl: user.avatar_url || null,
+        path: window.location.pathname,
+      });
     });
 
     newSocket.on('presence-list', (users: OnlineUser[]) => {

@@ -1,9 +1,117 @@
 {
-  "id": "1329b653-fcb8-43f4-9223-745dd37b1820",
+  "id": "75b627b7-36d2-4927-8fdf-01fe13b888cd",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.audit_logs": {
+      "name": "audit_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "service_name": {
+          "name": "service_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "details": {
+          "name": "details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "audit_logs_user_id_profiles_id_fk": {
+          "name": "audit_logs_user_id_profiles_id_fk",
+          "tableFrom": "audit_logs",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "audit_logs_workspace_id_workspaces_id_fk": {
+          "name": "audit_logs_workspace_id_workspaces_id_fk",
+          "tableFrom": "audit_logs",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.capture_pages": {
       "name": "capture_pages",
       "schema": "",
@@ -15,11 +123,17 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "visual_identity_id": {
+          "name": "visual_identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "title": {
           "name": "title",
@@ -95,68 +209,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "title_draft": {
-          "name": "title_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "slug_draft": {
-          "name": "slug_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cta_type_draft": {
-          "name": "cta_type_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cta_whatsapp_message_draft": {
-          "name": "cta_whatsapp_message_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cta_external_url_draft": {
-          "name": "cta_external_url_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "form_id_draft": {
-          "name": "form_id_draft",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "custom_domain_draft": {
-          "name": "custom_domain_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "seo_config_draft": {
-          "name": "seo_config_draft",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "site_config_draft": {
-          "name": "site_config_draft",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dictionary_draft": {
-          "name": "dictionary_draft",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "form_flow_draft": {
-          "name": "form_flow_draft",
+        "draft_data": {
+          "name": "draft_data",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -178,17 +232,30 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "capture_pages_tenant_id_tenants_id_fk": {
-          "name": "capture_pages_tenant_id_tenants_id_fk",
+        "capture_pages_workspace_id_workspaces_id_fk": {
+          "name": "capture_pages_workspace_id_workspaces_id_fk",
           "tableFrom": "capture_pages",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "capture_pages_visual_identity_id_visual_identities_id_fk": {
+          "name": "capture_pages_visual_identity_id_visual_identities_id_fk",
+          "tableFrom": "capture_pages",
+          "tableTo": "visual_identities",
+          "columnsFrom": [
+            "visual_identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "capture_pages_form_id_screening_forms_id_fk": {
@@ -197,19 +264,6 @@
           "tableTo": "screening_forms",
           "columnsFrom": [
             "form_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "capture_pages_form_id_draft_screening_forms_id_fk": {
-          "name": "capture_pages_form_id_draft_screening_forms_id_fk",
-          "tableFrom": "capture_pages",
-          "tableTo": "screening_forms",
-          "columnsFrom": [
-            "form_id_draft"
           ],
           "columnsTo": [
             "id"
@@ -235,11 +289,17 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "pipeline_column_id": {
+          "name": "pipeline_column_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "name": {
           "name": "name",
@@ -320,6 +380,55 @@
           "primaryKey": false,
           "notNull": false
         },
+        "age_confirmed_at": {
+          "name": "age_confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signed_contract_content": {
+          "name": "signed_contract_content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent_ip": {
+          "name": "consent_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent_user_agent": {
+          "name": "consent_user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_name": {
+          "name": "parent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_cpf": {
+          "name": "parent_cpf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_phone": {
+          "name": "parent_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "custom_field_values": {
+          "name": "custom_field_values",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
         "utm_source": {
           "name": "utm_source",
           "type": "text",
@@ -377,19 +486,48 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_contacts_custom_fields": {
+          "name": "idx_contacts_custom_fields",
+          "columns": [
+            {
+              "expression": "custom_field_values",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        }
+      },
       "foreignKeys": {
-        "contacts_tenant_id_tenants_id_fk": {
-          "name": "contacts_tenant_id_tenants_id_fk",
+        "contacts_workspace_id_workspaces_id_fk": {
+          "name": "contacts_workspace_id_workspaces_id_fk",
           "tableFrom": "contacts",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "contacts_pipeline_column_id_pipeline_columns_id_fk": {
+          "name": "contacts_pipeline_column_id_pipeline_columns_id_fk",
+          "tableFrom": "contacts",
+          "tableTo": "pipeline_columns",
+          "columnsFrom": [
+            "pipeline_column_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "contacts_form_id_screening_forms_id_fk": {
@@ -421,6 +559,94 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.custom_field_definitions": {
+      "name": "custom_field_definitions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'text'"
+        },
+        "options": {
+          "name": "options",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "custom_field_definitions_workspace_id_workspaces_id_fk": {
+          "name": "custom_field_definitions_workspace_id_workspaces_id_fk",
+          "tableFrom": "custom_field_definitions",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "custom_field_def_workspace_key_unique": {
+          "name": "custom_field_def_workspace_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "workspace_id",
+            "key"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -502,6 +728,102 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.logs": {
+      "name": "logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stack": {
+          "name": "stack",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_name": {
+          "name": "service_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'error'"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "logs_user_id_profiles_id_fk": {
+          "name": "logs_user_id_profiles_id_fk",
+          "tableFrom": "logs",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.interaction_history": {
       "name": "interaction_history",
       "schema": "",
@@ -519,8 +841,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -566,12 +888,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "interaction_history_tenant_id_tenants_id_fk": {
-          "name": "interaction_history_tenant_id_tenants_id_fk",
+        "interaction_history_workspace_id_workspaces_id_fk": {
+          "name": "interaction_history_workspace_id_workspaces_id_fk",
           "tableFrom": "interaction_history",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
@@ -597,8 +919,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -681,12 +1003,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "media_assets_tenant_id_tenants_id_fk": {
-          "name": "media_assets_tenant_id_tenants_id_fk",
+        "media_assets_workspace_id_workspaces_id_fk": {
+          "name": "media_assets_workspace_id_workspaces_id_fk",
           "tableFrom": "media_assets",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
@@ -733,8 +1055,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -789,12 +1111,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "pipeline_columns_tenant_id_tenants_id_fk": {
-          "name": "pipeline_columns_tenant_id_tenants_id_fk",
+        "pipeline_columns_workspace_id_workspaces_id_fk": {
+          "name": "pipeline_columns_workspace_id_workspaces_id_fk",
           "tableFrom": "pipeline_columns",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
@@ -886,34 +1208,6 @@
           "notNull": true,
           "default": "'#09090B'"
         },
-        "card_light_color": {
-          "name": "card_light_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#FFFFFF'"
-        },
-        "card_dark_color": {
-          "name": "card_dark_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#18181B'"
-        },
-        "text_light_color": {
-          "name": "text_light_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#0F172A'"
-        },
-        "text_dark_color": {
-          "name": "text_dark_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#F8FAFC'"
-        },
         "cloudflare_api_token": {
           "name": "cloudflare_api_token",
           "type": "text",
@@ -983,13 +1277,6 @@
         },
         "has_resend": {
           "name": "has_resend",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "is_configured": {
-          "name": "is_configured",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -1072,35 +1359,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "cpf": {
+          "name": "cpf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "crp": {
           "name": "crp",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "bio": {
-          "name": "bio",
-          "type": "text",
+        "has_no_crp": {
+          "name": "has_no_crp",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
-        },
-        "specialties": {
-          "name": "specialties",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "city_state": {
-          "name": "city_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "instagram": {
-          "name": "instagram",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": false
         },
         "role": {
           "name": "role",
@@ -1151,11 +1427,17 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "visual_identity_id": {
+          "name": "visual_identity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "title": {
           "name": "title",
@@ -1188,26 +1470,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "title_draft": {
-          "name": "title_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "slug_draft": {
-          "name": "slug_draft",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "theme_config_draft": {
-          "name": "theme_config_draft",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "form_flow_draft": {
-          "name": "form_flow_draft",
+        "draft_data": {
+          "name": "draft_data",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -1229,17 +1493,30 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "screening_forms_tenant_id_tenants_id_fk": {
-          "name": "screening_forms_tenant_id_tenants_id_fk",
+        "screening_forms_workspace_id_workspaces_id_fk": {
+          "name": "screening_forms_workspace_id_workspaces_id_fk",
           "tableFrom": "screening_forms",
-          "tableTo": "tenants",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "screening_forms_visual_identity_id_visual_identities_id_fk": {
+          "name": "screening_forms_visual_identity_id_visual_identities_id_fk",
+          "tableFrom": "screening_forms",
+          "tableTo": "visual_identities",
+          "columnsFrom": [
+            "visual_identity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -1300,8 +1577,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.tenant_members": {
-      "name": "tenant_members",
+    "public.visual_identities": {
+      "name": "visual_identities",
       "schema": "",
       "columns": {
         "id": {
@@ -1311,24 +1588,98 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "tenant_id": {
-          "name": "tenant_id",
+        "workspace_id": {
+          "name": "workspace_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
+        "name": {
+          "name": "name",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "role": {
-          "name": "role",
+        "is_workspace_default": {
+          "name": "is_workspace_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "favicon_url": {
+          "name": "favicon_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_config": {
+          "name": "logo_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_color": {
+          "name": "primary_color",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'secretaria'"
+          "default": "'#4F46E5'"
+        },
+        "secondary_color": {
+          "name": "secondary_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#06B6D4'"
+        },
+        "contrast_color": {
+          "name": "contrast_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#FFFFFF'"
+        },
+        "bg_color": {
+          "name": "bg_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#F8FAFC'"
+        },
+        "card_color": {
+          "name": "card_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#FFFFFF'"
+        },
+        "text_color": {
+          "name": "text_color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'#0F172A'"
+        },
+        "font_heading": {
+          "name": "font_heading",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Playfair Display'"
+        },
+        "font_body": {
+          "name": "font_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Inter'"
         },
         "created_at": {
           "name": "created_at",
@@ -1347,25 +1698,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "tenant_members_tenant_id_tenants_id_fk": {
-          "name": "tenant_members_tenant_id_tenants_id_fk",
-          "tableFrom": "tenant_members",
-          "tableTo": "tenants",
+        "visual_identities_workspace_id_workspaces_id_fk": {
+          "name": "visual_identities_workspace_id_workspaces_id_fk",
+          "tableFrom": "visual_identities",
+          "tableTo": "workspaces",
           "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "tenant_members_user_id_profiles_id_fk": {
-          "name": "tenant_members_user_id_profiles_id_fk",
-          "tableFrom": "tenant_members",
-          "tableTo": "profiles",
-          "columnsFrom": [
-            "user_id"
+            "workspace_id"
           ],
           "columnsTo": [
             "id"
@@ -1380,8 +1718,204 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.tenants": {
-      "name": "tenants",
+    "public.workspace_domains": {
+      "name": "workspace_domains",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subdomain": {
+          "name": "subdomain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "custom_domain": {
+          "name": "custom_domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cf_hostname_id": {
+          "name": "cf_hostname_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dns_status": {
+          "name": "dns_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "dns_records": {
+          "name": "dns_records",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "workspace_domains_workspace_id_workspaces_id_fk": {
+          "name": "workspace_domains_workspace_id_workspaces_id_fk",
+          "tableFrom": "workspace_domains",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workspace_domains_workspace_id_unique": {
+          "name": "workspace_domains_workspace_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "workspace_id"
+          ]
+        },
+        "workspace_domains_subdomain_unique": {
+          "name": "workspace_domains_subdomain_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "subdomain"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workspace_members": {
+      "name": "workspace_members",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "workspace_id": {
+          "name": "workspace_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'membro'"
+        },
+        "permissions": {
+          "name": "permissions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "workspace_members_workspace_id_workspaces_id_fk": {
+          "name": "workspace_members_workspace_id_workspaces_id_fk",
+          "tableFrom": "workspace_members",
+          "tableTo": "workspaces",
+          "columnsFrom": [
+            "workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "workspace_members_user_id_profiles_id_fk": {
+          "name": "workspace_members_user_id_profiles_id_fk",
+          "tableFrom": "workspace_members",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workspace_members_workspace_user_unique": {
+          "name": "workspace_members_workspace_user_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "workspace_id",
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workspaces": {
+      "name": "workspaces",
       "schema": "",
       "columns": {
         "id": {
@@ -1397,170 +1931,51 @@
           "primaryKey": false,
           "notNull": true
         },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_primary": {
-          "name": "is_primary",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "owner_id": {
           "name": "owner_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "logo_light_url": {
-          "name": "logo_light_url",
+        "crp": {
+          "name": "crp",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "logo_dark_url": {
-          "name": "logo_dark_url",
+        "bio": {
+          "name": "bio",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "icon_light_url": {
-          "name": "icon_light_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "icon_dark_url": {
-          "name": "icon_dark_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_site_avatar_url": {
-          "name": "default_site_avatar_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_site_logo_url": {
-          "name": "default_site_logo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_site_favicon_url": {
-          "name": "default_site_favicon_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "default_site_logo_config": {
-          "name": "default_site_logo_config",
+        "specialties": {
+          "name": "specialties",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
-        "default_site_primary_color": {
-          "name": "default_site_primary_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'#4F46E5'"
-        },
-        "default_site_secondary_color": {
-          "name": "default_site_secondary_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'#06B6D4'"
-        },
-        "gradient_color_start": {
-          "name": "gradient_color_start",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#4F46E5'"
-        },
-        "gradient_color_end": {
-          "name": "gradient_color_end",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#06B6D4'"
-        },
-        "contrast_color": {
-          "name": "contrast_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#FFFFFF'"
-        },
-        "bg_light_color": {
-          "name": "bg_light_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#F8FAFC'"
-        },
-        "bg_dark_color": {
-          "name": "bg_dark_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#020617'"
-        },
-        "card_light_color": {
-          "name": "card_light_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#FFFFFF'"
-        },
-        "card_dark_color": {
-          "name": "card_dark_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#0F172A'"
-        },
-        "text_light_color": {
-          "name": "text_light_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#0F172A'"
-        },
-        "text_dark_color": {
-          "name": "text_dark_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'#F8FAFC'"
-        },
-        "email_domain": {
-          "name": "email_domain",
+        "city_state": {
+          "name": "city_state",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "resend_api_key": {
-          "name": "resend_api_key",
+        "instagram": {
+          "name": "instagram",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "cf_hostname_id": {
-          "name": "cf_hostname_id",
+        "is_online_service": {
+          "name": "is_online_service",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "default_site_avatar_url": {
+          "name": "default_site_avatar_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1570,7 +1985,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[\"Manual\",\"Instagram\",\"Google Ads\",\"Facebook Ads\",\"Webhook\"]'::jsonb"
+          "default": "'[\"Manual\",\"Instagram\",\"Google Ads\",\"Facebook Ads\",\"Indicação\",\"TikTok\",\"Site / Orgânico\",\"Webhook\"]'::jsonb"
         },
         "default_traffic_source": {
           "name": "default_traffic_source",
@@ -1596,9 +2011,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "tenants_owner_id_profiles_id_fk": {
-          "name": "tenants_owner_id_profiles_id_fk",
-          "tableFrom": "tenants",
+        "workspaces_owner_id_profiles_id_fk": {
+          "name": "workspaces_owner_id_profiles_id_fk",
+          "tableFrom": "workspaces",
           "tableTo": "profiles",
           "columnsFrom": [
             "owner_id"
@@ -1611,15 +2026,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "tenants_slug_unique": {
-          "name": "tenants_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

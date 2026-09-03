@@ -5,6 +5,7 @@ import { db } from '../../../shared/db';
 import { contacts, pipelineColumns, interactionHistory, workspaces } from '../../../shared/schema';
 import { eq, and, or } from 'drizzle-orm';
 import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
+import { log } from '../../../shared/queue';
 
 const WebhookQuerySchema = z.object({
   workspace_id: z.string().uuid('ID do Workspace inválido').optional(),
@@ -59,11 +60,61 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
       } = request.body;
 
       try {
-        // 1. Normalizar telefone e e-mail para comparação
+        // 1. Buscar workspace para verificar se existe e validar o webhookSecret
+        const workspace = await db.query.workspaces.findFirst({
+          where: eq(workspaces.id, targetWorkspaceId),
+        });
+
+        if (!workspace) {
+          return reply.status(404).send({
+            error: 'Workspace não encontrado',
+            message: 'O workspace_id fornecido não corresponde a nenhuma clínica registrada.',
+          });
+        }
+
+        // 2. Validar Secret enviado via Header
+        const incomingSecret =
+          (request.headers['x-webhook-secret'] as string) ||
+          (request.headers['x-secret'] as string) ||
+          (request.headers['authorization'] as string)?.replace(/^Bearer\s+/i, '');
+
+        if (!workspace.webhookSecret || workspace.webhookSecret.trim() === '') {
+          log({
+            name: 'crm.webhook_secret_not_configured',
+            type: 'audit',
+            severity: 'warning',
+            serviceName: 'core-api',
+            message: `Tentativa de acesso por webhook no workspace [${workspace.name}] sem segredo (secret) configurado.`,
+            workspaceId: targetWorkspaceId,
+            metadata: { requestId: (request.raw as any).requestId, workspaceName: workspace.name },
+          }).catch(() => {});
+          return reply.status(401).send({
+            error: 'Não autorizado',
+            message: 'O secret do webhook não foi configurado para este workspace.',
+          });
+        }
+
+        if (incomingSecret !== workspace.webhookSecret) {
+          log({
+            name: 'crm.webhook_unauthorized',
+            type: 'audit',
+            severity: 'warning',
+            serviceName: 'core-api',
+            message: `Tentativa não autorizada de webhook com segredo (secret) inválido no workspace [${workspace.name}].`,
+            workspaceId: targetWorkspaceId,
+            metadata: { requestId: (request.raw as any).requestId, workspaceName: workspace.name },
+          }).catch(() => {});
+          return reply.status(401).send({
+            error: 'Não autorizado',
+            message: 'Secret do webhook inválido ou ausente.',
+          });
+        }
+
+        // 3. Normalizar telefone e e-mail para comparação
         const normalizedPhone = phone ? phone.trim().replace(/\D/g, '') : null;
         const normalizedEmail = email ? email.trim().toLowerCase() : null;
 
-        // 2. Verificar duplicados (por telefone ou por e-mail no mesmo workspace)
+        // 4. Verificar duplicados (por telefone ou por e-mail no mesmo workspace)
         let existingContact = null;
 
         if (normalizedPhone || normalizedEmail) {
@@ -107,18 +158,6 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
               name: existingContact.name,
               status: existingContact.status,
             },
-          });
-        }
-
-        // 3. Buscar workspace para obter origens de tráfego configuradas
-        const workspace = await db.query.workspaces.findFirst({
-          where: eq(workspaces.id, targetWorkspaceId),
-        });
-
-        if (!workspace) {
-          return reply.status(404).send({
-            error: 'Workspace não encontrado',
-            message: 'O workspace_id fornecido não corresponde a nenhuma clínica registrada.',
           });
         }
 
@@ -179,6 +218,18 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'crm.webhook_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          workspaceId: targetWorkspaceId,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro interno',
           message: err.message || 'Falha ao processar a captura do contato.',

@@ -24,20 +24,7 @@
   --surface-active: rgba(255, 255, 255, 0.10);
   --surface-input: rgba(0, 0, 0, 0.30);
   --surface-muted: rgba(255, 255, 255, 0.60); /* opacidade do texto secundário */
-
-  /* ── Status semânticos (neutros — usam a cor de texto com opacidade) ── */
-  --status-success-bg: rgba(16, 185, 129, 0.10);
-  --status-success-border: rgba(16, 185, 129, 0.25);
-  --status-success-text: #34D399;
-  --status-error-bg: rgba(239, 68, 68, 0.10);
-  --status-error-border: rgba(239, 68, 68, 0.25);
-  --status-error-text: #F87171;
-  --status-warning-bg: rgba(245, 158, 11, 0.10);
-  --status-warning-border: rgba(245, 158, 11, 0.25);
-  --status-warning-text: #FCD34D;
-  --status-info-bg: rgba(99, 102, 241, 0.10);
-  --status-info-border: rgba(99, 102, 241, 0.25);
-  --status-info-text: rgba(255, 255, 255, 0.75);
+  --surface-header-bg: color-mix(in srgb, var(--brand-gradient-start) 8%, #09090B);
 }
 
 /* ── Quando o tema claro está ativo, ajusta as superfícies derivadas ── */
@@ -48,6 +35,7 @@ html.light {
   --surface-active: rgba(0, 0, 0, 0.08);
   --surface-input: rgba(255, 255, 255, 0.80);
   --surface-muted: rgba(0, 0, 0, 0.55);
+  --surface-header-bg: color-mix(in srgb, var(--brand-gradient-start) 3%, #F8FAFC);
   --status-info-text: rgba(0, 0, 0, 0.70);
 }
 

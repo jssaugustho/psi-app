@@ -1,6 +1,7 @@
 import { db } from '../shared/db';
 import { workspaces } from '../shared/schema';
 import dotenv from 'dotenv';
+import readline from 'readline';
 
 dotenv.config();
 
@@ -44,6 +45,19 @@ function generateRandomPhone(): string {
   return `(${ddd}) ${prefix}-${suffix}`;
 }
 
+function askSecret(promptText: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(promptText, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
 async function main() {
   console.log('🚀 Iniciando script de teste de carga de leads via Webhook...');
 
@@ -59,6 +73,23 @@ async function main() {
   const workspaceName = workspace.name;
   console.log(`🏢 Workspace selecionado: ${workspaceName} (ID: ${workspaceId})`);
   console.log(`📋 Origens de tráfego configuradas no workspace:`, workspace.trafficSources);
+
+  // Secret do Webhook (via arg CLI, env ou prompt interativo)
+  let secret = process.argv[2] || process.env.WEBHOOK_SECRET || '';
+  if (!secret) {
+    const defaultSecretMsg = workspace.webhookSecret ? ` (pressione ENTER para usar o secret do DB: "${workspace.webhookSecret}")` : '';
+    secret = await askSecret(`🔑 Digite o Secret do Webhook${defaultSecretMsg}: `);
+    if (!secret && workspace.webhookSecret) {
+      secret = workspace.webhookSecret;
+    }
+  }
+
+  if (!secret) {
+    console.error('❌ Erro: Secret do webhook não foi fornecido. Configure no CRM ou passe como argumento ao rodar o script.');
+    process.exit(1);
+  }
+
+  console.log(`🔐 Secret configurado para envio no Header: "${secret}"`);
 
   // Endpoint do webhook
   const webhookUrl = `http://localhost:5000/crm/webhook?workspace_id=${workspaceId}`;
@@ -117,12 +148,14 @@ async function main() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Webhook-Secret': secret,
         },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errBody = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errBody}`);
       }
 
       const result = (await response.json()) as any;

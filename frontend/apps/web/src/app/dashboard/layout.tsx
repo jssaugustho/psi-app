@@ -42,7 +42,8 @@ const FormIcon = () => (
 
 import { RealtimeProvider, useRealtime } from '@/context/RealtimeContext';
 
-function getFriendlyPath(path: string): string {
+function getFriendlyPath(path?: string | null): string {
+  if (!path || typeof path !== 'string') return 'No Painel';
   if (path.startsWith('/dashboard/captacao')) return 'No Criador de Sites';
   if (path.startsWith('/dashboard/crm')) return 'Na Triagem';
   if (path.startsWith('/dashboard/configuracoes')) return 'Nas Configurações';
@@ -52,6 +53,9 @@ function getFriendlyPath(path: string): string {
 
 function OnlineUsersIndicator() {
   const { onlineUsers } = useRealtime();
+  const { user } = useAuth();
+
+  if (onlineUsers.length === 0) return null;
 
   return (
     <div className="relative group">
@@ -67,34 +71,32 @@ function OnlineUsersIndicator() {
         <span>{onlineUsers.length} online</span>
       </button>
 
-      {onlineUsers.length > 0 && (
-        <div className="absolute right-0 mt-2 w-64 glass-lg border border-[var(--surface-border)] rounded-xl shadow-2xl p-3 space-y-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left">
-          <h4 className="text-xs font-bold border-b border-[var(--surface-border)] pb-1.5 mb-1.5 opacity-75" style={{ color: 'var(--brand-text-color)' }}>
-            Membros Online
-          </h4>
-          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-            {onlineUsers.map((u) => (
-              <div key={u.userId} className="flex items-center gap-2 text-xs">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white font-bold flex items-center justify-center shrink-0 text-[10px]">
-                  {u.avatarUrl ? (
-                    <img src={u.avatarUrl} alt={u.nome} className="w-full h-full rounded-full object-cover" />
-                  ) : (
-                    `${u.nome?.[0]?.toUpperCase() ?? ''}${u.sobrenome?.[0]?.toUpperCase() ?? ''}`
-                  )}
-                </div>
-                <div className="truncate flex-1">
-                  <span className="block font-medium truncate" style={{ color: 'var(--brand-text-color)' }}>
-                    {u.nome} {u.sobrenome}
-                  </span>
-                  <span className="block text-[9px] opacity-55 truncate" style={{ color: 'var(--brand-text-color)' }}>
-                    {getFriendlyPath(u.path)}
-                  </span>
-                </div>
+      <div className="absolute right-0 mt-2 w-64 glass-lg border border-[var(--surface-border)] rounded-xl shadow-2xl p-3 space-y-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50 text-left">
+        <h4 className="text-xs font-bold border-b border-[var(--surface-border)] pb-1.5 mb-1.5 opacity-75" style={{ color: 'var(--brand-text-color)' }}>
+          Membros Online
+        </h4>
+        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+          {onlineUsers.map((u) => (
+            <div key={u.userId} className="flex items-center gap-2 text-xs">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white font-bold flex items-center justify-center shrink-0 text-[10px]">
+                {u.avatarUrl ? (
+                  <img src={u.avatarUrl} alt={u.nome} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  `${u.nome?.[0]?.toUpperCase() ?? ''}${u.sobrenome?.[0]?.toUpperCase() ?? ''}`
+                )}
               </div>
-            ))}
-          </div>
+              <div className="truncate flex-1">
+                <span className="block font-medium truncate" style={{ color: 'var(--brand-text-color)' }}>
+                  {u.nome} {u.sobrenome}{u.userId === user?.id && <span className="font-normal opacity-70 ml-1 text-[11px]">(você)</span>}
+                </span>
+                <span className="block text-[9px] opacity-55 truncate" style={{ color: 'var(--brand-text-color)' }}>
+                  {getFriendlyPath(u.path)}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

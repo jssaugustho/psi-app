@@ -18,7 +18,7 @@ export default function CaptacaoPage() {
   const [error, setError] = useState('');
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [pageToDelete, setPageToDelete] = useState<{ id: string; title: string } | null>(null);
-  const [workspaceDomain, setWorkspaceDomain] = useState<WorkspaceDomain | null>(null);
+  const [workspaceDomain, setWorkspaceDomain] = useState<any | null>(null);
   const [verifiedDomains, setVerifiedDomains] = useState<Record<string, boolean>>({});
   const [isTenantDomainActive, setIsTenantDomainActive] = useState(false);
   const [drafts, setDrafts] = useState<any[]>([]);

@@ -5,7 +5,7 @@ import { db } from '../../../shared/db';
 import { screeningForms, capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, visualIdentities, customFieldDefinitions } from '../../../shared/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { verifyUserJwt } from '../../../shared/auth';
-import { publishRealtime } from '../../../shared/queue';
+import { publishRealtime, log } from '../../../shared/queue';
 import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
 
 const defaultFormFlow = {
@@ -816,6 +816,22 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
           data: newContact,
         });
 
+        log({
+          name: 'forms.triage_submitted',
+          type: 'audit',
+          severity: 'info',
+          serviceName: 'core-api',
+          message: `Formulário de triagem enviado com sucesso pelo paciente [${rawName}].`,
+          workspaceId: targetWorkspaceId,
+          metadata: {
+            contactId: newContact.id,
+            patientName: rawName,
+            formId,
+            pageId,
+            requestId: (request.raw as any).requestId,
+          },
+        }).catch(() => {});
+
         return reply.status(201).send({
           success: true,
           contactId: newContact.id,
@@ -823,6 +839,18 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'forms.public_submit_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: `Falha ao processar o formulário público de triagem: ${err.message || String(err)}`,
+          stack: err.stack,
+          workspaceId: targetWorkspaceId,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId, formId, pageId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro interno',
           message: err.message || 'Falha ao processar o envio da triagem.',

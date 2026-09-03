@@ -243,9 +243,15 @@ export const apiConnection = {
   },
   notifyOffline(errorMsg?: string) {
     connectionListeners.forEach((fn) => fn('offline', errorMsg));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('psi:api-offline', { detail: { message: errorMsg } }));
+    }
   },
   notifyOnline() {
     connectionListeners.forEach((fn) => fn('online'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('psi:api-online'));
+    }
   },
 };
 
@@ -253,6 +259,8 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const headers: Record<string, string> = {
+    'X-Client-App': 'admin',
+    ...(typeof window !== 'undefined' && window.location?.href ? { 'X-Client-Url': window.location.href } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -287,13 +295,17 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
     response = await fetch(url, fetchOptions);
   } catch (err: any) {
     console.error('Falha de conexão com o backend no endpoint:', endpoint, err);
+    apiConnection.notifyOffline('Sem resposta do servidor de API. Verifique se o backend está rodando.');
     throw new Error('Servidor de API indisponível.');
   }
 
   // Verificar status 502, 503, 504 (erros de proxy/gateway)
   if ([502, 503, 504].includes(response.status)) {
+    apiConnection.notifyOffline(`O servidor de API retornou código de erro ${response.status}.`);
     throw new Error('Servidor de API temporariamente indisponível.');
   }
+
+  apiConnection.notifyOnline();
 
   // Tratar resposta vazia (204 No Content ou corpo sem texto)
   const contentType = response.headers.get('content-type');
@@ -823,11 +835,16 @@ export const api = {
   getErrorLogs: (filters: {
     limit?: number;
     offset?: number;
+    type?: string;
     serviceName?: string;
     severity?: string;
     name?: string;
     message?: string;
     userId?: string;
+    sessionId?: string;
+    requestId?: string;
+    clientApp?: string;
+    userRole?: string;
     startDate?: string;
     endDate?: string;
   }) => {
@@ -880,12 +897,17 @@ export interface AuditLog {
 
 export interface ErrorLog {
   id: string;
+  type?: string;
   name: string | null;
   message: string;
   stack: string | null;
   url: string | null;
+  clientApp?: string | null;
+  userRole?: string | null;
   userAgent: string | null;
   userId: string | null;
+  workspaceId?: string | null;
+  sessionId?: string | null;
   serviceName: string;
   severity: string;
   metadata: Record<string, any> | null;

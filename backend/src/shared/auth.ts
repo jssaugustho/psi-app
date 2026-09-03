@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
-import { publishErrorLog } from './queue';
+import { log } from './queue';
 
 
 const JWT_SECRET = env.JWT_SECRET;
@@ -40,9 +40,27 @@ export interface UserProfile {
  */
 export interface JwtUserPayload {
   sub: string; // User ID
+  session_id?: string; // Auth Session ID (GoTrue/Supabase)
+  sid?: string;
   email: string;
   role: string;
   exp: number;
+}
+
+/**
+ * Decodifica o token JWT para extrair com seguranca userId e sessionId
+ */
+export function extractUserAndSessionFromToken(token: string): { userId: string | null; sessionId: string | null; userRole: string | null } {
+  try {
+    const decoded = jwt.decode(token) as any;
+    if (!decoded) return { userId: null, sessionId: null, userRole: null };
+    const userId = decoded.sub || decoded.user_id || null;
+    const sessionId = decoded.session_id || decoded.sid || decoded.jti || null;
+    const userRole = decoded.role || decoded.user_role || (decoded.app_metadata as any)?.role || null;
+    return { userId, sessionId, userRole };
+  } catch {
+    return { userId: null, sessionId: null, userRole: null };
+  }
 }
 
 /**
@@ -104,8 +122,9 @@ export async function createGoTrueUser(
     const errorBody = await response.json().catch(() => ({}));
     const message = (errorBody as any)?.msg || (errorBody as any)?.error_description || (errorBody as any)?.message || 'Erro ao criar usuário no GoTrue';
     
-    await publishErrorLog({
+    await log({
       name: 'GoTrueCreateUserError',
+      type: 'error',
       message: `GoTrue: ${message}`,
       stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
       serviceName: 'gotrue',
@@ -140,8 +159,9 @@ export async function loginGoTrueUser(email: string, password: string, baseUrl?:
     const message = (errorBody as any)?.error_description || (errorBody as any)?.msg || 'Credenciais inválidas';
 
     if (response.status >= 500) {
-      await publishErrorLog({
+      await log({
         name: 'GoTrueLoginError',
+        type: 'error',
         message: `GoTrue: ${message}`,
         stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
         serviceName: 'gotrue',
@@ -181,8 +201,9 @@ export async function refreshGoTrueToken(refreshToken: string, baseUrl?: string)
       'Refresh token inválido ou expirado';
 
     if (response.status >= 500) {
-      await publishErrorLog({
+      await log({
         name: 'GoTrueRefreshTokenError',
+        type: 'error',
         message: `GoTrue: ${message}`,
         stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
         serviceName: 'gotrue',
@@ -235,8 +256,9 @@ export async function generateGoTrueLink(
       (errorBody as any)?.message ||
       'Erro ao gerar link no GoTrue';
 
-    await publishErrorLog({
+    await log({
       name: 'GoTrueGenerateLinkError',
+      type: 'error',
       message: `GoTrue: ${message}`,
       stack: `URL: ${targetUrl}\nStatus: ${response.status}`,
       serviceName: 'gotrue',

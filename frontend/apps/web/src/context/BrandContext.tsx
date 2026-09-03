@@ -30,6 +30,7 @@ const BrandContext = createContext<BrandContextType>({
 });
 
 const BACKUP_STORAGE_KEY = 'theraos_platform_brand_cache';
+const USER_WORKSPACE_BACKUP_KEY = 'theraos_user_workspace_brand_cache';
 
 function saveBrandBackup(primary: Tenant | null) {
   if (typeof window === 'undefined') return;
@@ -55,6 +56,35 @@ function loadBrandBackup(): Tenant | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed.platformBrand || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveUserWorkspaceBackup(userTenant: Tenant | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (userTenant) {
+      localStorage.setItem(
+        USER_WORKSPACE_BACKUP_KEY,
+        JSON.stringify({
+          userTenant,
+          updatedAt: Date.now(),
+        })
+      );
+    }
+  } catch (e) {
+    console.warn('Falha ao salvar cache de workspace no localStorage:', e);
+  }
+}
+
+function loadUserWorkspaceBackup(): Tenant | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(USER_WORKSPACE_BACKUP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed.userTenant || null;
   } catch (e) {
     return null;
   }
@@ -202,12 +232,22 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
       if (resolvedUserTenant) {
         setTenant(resolvedUserTenant);
+        saveUserWorkspaceBackup(resolvedUserTenant);
+      } else if (hasApiError) {
+        const userBackup = loadUserWorkspaceBackup();
+        if (userBackup) {
+          setTenant(userBackup);
+        }
       }
     } catch (err) {
       console.error('Erro ao resolver branding:', err);
       const backup = loadBrandBackup();
       if (backup) {
         setPrimaryTenant(backup);
+      }
+      const userBackup = loadUserWorkspaceBackup();
+      if (userBackup) {
+        setTenant(userBackup);
       }
     } finally {
       setLoading(false);

@@ -8,7 +8,7 @@ import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDoma
 import { eq, and } from 'drizzle-orm';
 import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest } from '../../../shared/auth';
 import { queueEmail } from '../../../emails/queue-email';
-import { publishErrorLog, publishAuditLog } from '../../../shared/queue';
+import { log } from '../../../shared/queue';
 
 
 async function resolveWorkspaceFromRequest(request: any) {
@@ -215,15 +215,15 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           }
         }
 
-        await publishAuditLog({
-          action: 'auth.bootstrap',
-          category: 'auth',
+        await log({
+          name: 'auth.bootstrap',
+          type: 'audit',
+          severity: 'info',
           serviceName: 'core-api',
-          status: 'success',
+          message: `Primeiro Administrador [${cleanEmail}] (${nome} ${sobrenome}) cadastrado e autenticado no bootstrap.`,
           userId: profile.id,
-          ip: request.ip ?? null,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          details: { email: cleanEmail, name: `${nome} ${sobrenome}` },
+          metadata: { ip: request.ip ?? null, email: cleanEmail, name: `${nome} ${sobrenome}` },
         }).catch(() => {});
 
         return reply.status(201).send({
@@ -245,14 +245,15 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
-        publishErrorLog({
+        log({
           name: err.name || 'BootstrapError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
           message: err.message || String(err),
           stack: err.stack,
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
-          serviceName: 'core-api',
-          severity: 'error',
         }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro no bootstrap',
@@ -328,15 +329,15 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           })
           .returning();
 
-        await publishAuditLog({
-          action: 'auth.register',
-          category: 'auth',
+        await log({
+          name: 'auth.register',
+          type: 'audit',
+          severity: 'info',
           serviceName: 'core-api',
-          status: 'success',
+          message: `Novo usuário [${cleanEmail}] (${nome} ${sobrenome}) cadastrado com sucesso.`,
           userId: profile.id,
-          ip: request.ip ?? null,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          details: { email: cleanEmail, name: `${nome} ${sobrenome}` },
+          metadata: { ip: request.ip ?? null, email: cleanEmail, name: `${nome} ${sobrenome}` },
         }).catch(() => {});
 
         return reply.status(201).send({
@@ -357,14 +358,15 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
-        publishErrorLog({
+        log({
           name: err.name || 'RegisterError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
           message: err.message || String(err),
           stack: err.stack,
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
-          serviceName: 'core-api',
-          severity: 'error',
         }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro no cadastro',
@@ -457,15 +459,15 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           });
         }
 
-        await publishAuditLog({
-          action: 'auth.login',
-          category: 'auth',
+        await log({
+          name: 'auth.login_success',
+          type: 'audit',
+          severity: 'info',
           serviceName: 'core-api',
-          status: 'success',
+          message: `Login realizado com sucesso pelo usuário [${cleanEmail}] (App: ${appType || 'web'}).`,
           userId: userId || null,
-          ip: request.ip ?? null,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          details: { email: cleanEmail, appType },
+          metadata: { ip: request.ip ?? null, email: cleanEmail, appType },
         }).catch(() => {});
 
         return reply.send({
@@ -485,14 +487,14 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
-        publishAuditLog({
-          action: 'auth.login',
-          category: 'auth',
+        log({
+          name: 'auth.login_failed',
+          type: 'audit',
+          severity: 'warning',
           serviceName: 'core-api',
-          status: 'failure',
-          ip: request.ip ?? null,
+          message: `Falha de autenticação para o usuário [${(request.body as any)?.email}]: ${err.message || 'Credenciais inválidas'}.`,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          details: { email: (request.body as any)?.email, reason: err.message },
+          metadata: { ip: request.ip ?? null, email: (request.body as any)?.email, reason: err.message },
         }).catch(() => {});
 
         return reply.status(401).send({
@@ -572,6 +574,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.forgot_password_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro no servidor',
           message: 'Não foi possível processar a solicitação de redefinição de senha.',
@@ -625,6 +638,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.reset_password_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro ao redefinir senha',
           message: err.message || 'Token expirado ou inválido. Solicite um novo link.',
@@ -785,6 +809,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.update_profile_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro na atualização',
           message: err.message || 'Não foi possível atualizar o perfil.',
@@ -822,6 +857,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.refresh_token_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(401).send({
           error: 'Refresh inválido',
           message: err.message || 'Não foi possível renovar a sessão. Faça login novamente.',
@@ -1012,6 +1058,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.invite_member_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro no convite',
           message: err.message || 'Não foi possível enviar o convite.',
@@ -1135,6 +1192,17 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        log({
+          name: 'auth.resend_invite_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(400).send({
           error: 'Erro ao reenviar convite',
           message: err.message || 'Não foi possível reenviar o convite.',

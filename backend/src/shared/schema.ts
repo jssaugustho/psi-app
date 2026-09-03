@@ -34,9 +34,10 @@ export const workspaces = pgTable('workspaces', {
   isOnlineService: boolean('is_online_service').default(true).notNull(),
   defaultSiteAvatarUrl: text('default_site_avatar_url'),
 
-  // Configurações do CRM (Fontes de Tráfego)
+  // Configurações do CRM (Fontes de Tráfego & Webhook)
   trafficSources: jsonb('traffic_sources').$type<string[]>().default(['Manual', 'Instagram', 'Google Ads', 'Facebook Ads', 'Indicação', 'TikTok', 'Site / Orgânico', 'Webhook']).notNull(),
   defaultTrafficSource: text('default_traffic_source').default('Manual').notNull(),
+  webhookSecret: text('webhook_secret'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -166,10 +167,11 @@ export const emailLogs = pgTable('email_logs', {
   subject: text('subject').notNull(),
   template: text('template').notNull(),
   htmlBody: text('html_body').notNull(),
-  status: text('status').$type<'sent' | 'failed'>().default('sent').notNull(),
+  status: text('status').$type<'sent' | 'failed' | 'pending'>().default('pending').notNull(),
   error: text('error'),
+  retryCount: integer('retry_count').default(0).notNull(),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),
-  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -354,15 +356,20 @@ export const mediaAssets = pgTable('media_assets', {
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type NewMediaAsset = typeof mediaAssets.$inferInsert;
 
-// ── 14. Logs do Sistema ─────────────────────────────────────────────────────
+// ── 14. Logs do Sistema Unificados ──────────────────────────────────────────
 export const logs = pgTable('logs', {
   id: uuid('id').primaryKey().defaultRandom(),
+  type: text('type').default('error').notNull(),
   name: text('name'),
   message: text('message').notNull(),
   stack: text('stack'),
   url: text('url'),
+  clientApp: text('client_app'),
+  userRole: text('user_role'),
   userAgent: text('user_agent'),
   userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'set null' }),
+  sessionId: uuid('session_id'),
   serviceName: text('service_name').notNull(),
   severity: text('severity').$type<'error' | 'warning' | 'fatal' | 'info'>().default('error').notNull(),
   metadata: jsonb('metadata').$type<Record<string, unknown>>(),

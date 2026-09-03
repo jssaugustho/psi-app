@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import postgres from 'postgres';
+import fs from 'fs';
+import path from 'path';
 
 export interface SchemaVersion {
   id: string;
@@ -24,6 +26,40 @@ export interface SchemaMigration {
  */
 export function calculateChecksum(content: string): string {
   return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+/**
+ * Busca recursivamente todos os arquivos .sql no diretório de migrações
+ */
+export interface SqlFileItem {
+  filename: string;
+  fullPath: string;
+}
+
+export function getAllSqlFiles(dir: string): SqlFileItem[] {
+  let results: SqlFileItem[] = [];
+  if (!fs.existsSync(dir)) return results;
+
+  const items = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+    if (item.isDirectory()) {
+      results = results.concat(getAllSqlFiles(fullPath));
+    } else if (item.isFile() && item.name.endsWith('.sql')) {
+      results.push({
+        filename: item.name,
+        fullPath: fullPath,
+      });
+    }
+  }
+
+  // Ordena colocando schema_baseline.sql sempre em primeiro lugar, seguido dos arquivos numerados
+  return results.sort((a, b) => {
+    if (a.filename === 'schema_baseline.sql') return -1;
+    if (b.filename === 'schema_baseline.sql') return 1;
+    return a.filename.localeCompare(b.filename);
+  });
 }
 
 /**
