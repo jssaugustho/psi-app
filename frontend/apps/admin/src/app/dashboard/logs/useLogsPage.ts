@@ -311,18 +311,18 @@ export function useLogsPage() {
 
       let height = 54;
       if (isExpanded) {
-        // Altura base para informações do evento e contexto de rastreamento
-        height = 250;
+        // Base generosa para "DETALHES DO EVENTO" + "CONTEXTO E RASTREAMENTO" (2 colunas em grid) + paddings/gaps
+        height = 360;
 
         if (hasStack) {
           const stackLines = String(stackContent).split('\n').length;
-          height += Math.max(120, stackLines * 18 + 70);
+          height += Math.max(140, stackLines * 19 + 80);
         }
 
         if (hasMetadata) {
           const metaJson = JSON.stringify(log.metadata, null, 2);
           const metaLines = metaJson.split('\n').length;
-          height += Math.max(120, metaLines * 18 + 70);
+          height += Math.max(140, metaLines * 19 + 80);
         }
       }
 

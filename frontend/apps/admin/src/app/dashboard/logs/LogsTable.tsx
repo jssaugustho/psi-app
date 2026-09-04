@@ -272,7 +272,7 @@ export function LogsTable({
                     width: '100%',
                     height: `${row.height}px`,
                   }}
-                  className="border-b border-brand-divider overflow-hidden"
+                  className="border-b border-brand-divider overflow-visible"
                 >
                   {/* Linha da Tabela (Header Alinhado no Mesmo Grid) */}
                   <div

@@ -150,13 +150,15 @@ fastify.addHook('onResponse', async (request, reply) => {
   const clientApp = (request.raw as any).clientApp || 'unknown';
   const userRole = (request.raw as any).userRole || 'anon';
   const clientUrl = (request.raw as any).clientUrl || request.url;
+  const errorStack = (request.raw as any).errorStack || null;
 
   log({
     name: 'http.access',
-    type: 'http',
+    type: reply.statusCode >= 400 ? 'error' : 'http',
     severity: reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warning' : 'info',
     serviceName: 'core-api',
     message: `Requisição HTTP ${request.method} ${request.url} finalizada com status ${reply.statusCode} em ${durationMs}ms.`,
+    stack: errorStack,
     userId,
     sessionId,
     clientApp,
@@ -173,6 +175,7 @@ fastify.addHook('onResponse', async (request, reply) => {
       durationMs,
       ip: request.ip,
       path: request.url,
+      ...(errorStack ? { stackTrace: errorStack } : {}),
     },
   }).catch(() => {});
 });
@@ -187,6 +190,10 @@ fastify.setErrorHandler(async (error, request, reply) => {
   const clientApp = (request.raw as any).clientApp || 'unknown';
   const userRole = (request.raw as any).userRole || 'anon';
   const clientUrl = (request.raw as any).clientUrl || request.url;
+
+  // Armazena a stack trace no request para captura no log de acesso
+  (request.raw as any).errorStack = error.stack || null;
+  (request.raw as any).errorMessage = error.message || null;
 
   // Detecta se é erro de banco de dados/Postgres
   let serviceName = 'core-api';
