@@ -10,6 +10,7 @@
 - **ALWAYS enable RLS on every public table**: Toda tabela criada em `public` deve conter `ALTER TABLE public.<table_name> ENABLE ROW LEVEL SECURITY;`.
 - **ALWAYS isolate tenant data by `workspace_id`**: As tabelas devem ter a coluna `workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE`.
 - **NEVER expose Service Keys to the Frontend**: Operações administrativas exigem backend Fastify ou Stored Functions com `SECURITY DEFINER`.
+- **NEVER store JWT access or refresh tokens in `localStorage` or `sessionStorage`**: ALWAYS manage authentication via 100% HttpOnly cookies (`access_token`, `refresh_token`). Nginx automatically maps the HttpOnly `$cookie_access_token` to `Authorization: Bearer <token>` for PostgREST (`/rest/v1/*`), making the frontend 100% immune to XSS token theft.
 
 ---
 

@@ -14,6 +14,7 @@ export * from './brand-logo';
 export * from './service-status-card';
 export * from './api-status-context';
 export * from './error-view';
+export * from './error-context';
 export * from './not-found-view';
 export * from './brand-storage';
 

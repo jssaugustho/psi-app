@@ -6,9 +6,39 @@ import { z } from 'zod';
 import { db } from '../../../shared/db';
 import { profiles, platformSettings, workspaces, workspaceMembers, workspaceDomains, visualIdentities, emailLogs, pipelineColumns } from '../../../shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest } from '../../../shared/auth';
+import { createGoTrueUser, loginGoTrueUser, refreshGoTrueToken, verifyUserJwt, generateServiceRoleJwt, generateGoTrueLink, extractJwtFromRequest, logoutGoTrueUser, parseGoTrueError } from '../../../shared/auth';
 import { queueEmail } from '../../../emails/queue-email';
 import { log } from '../../../shared/queue';
+
+function setAuthCookies(
+  reply: any,
+  accessToken: string,
+  refreshToken: string,
+  expiresInSeconds: number = 3600
+) {
+  const isProd = env.NODE_ENV === 'production';
+  reply.setCookie('access_token', accessToken, {
+    path: '/',
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    maxAge: expiresInSeconds,
+  });
+  reply.setCookie('refresh_token', refreshToken, {
+    path: '/',
+    httpOnly: true,
+    secure: isProd,
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60, // 30 dias
+  });
+}
+
+function clearAuthCookies(reply: any) {
+  reply.clearCookie('access_token', { path: '/' });
+  reply.clearCookie('refresh_token', { path: '/' });
+  reply.clearCookie('token', { path: '/' });
+}
+
 
 
 async function resolveWorkspaceFromRequest(request: any) {
@@ -226,6 +256,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           metadata: { ip: request.ip ?? null, email: cleanEmail, name: `${nome} ${sobrenome}` },
         }).catch(() => {});
 
+        setAuthCookies(reply, authData.access_token, authData.refresh_token, authData.expires_in ?? 3600);
+
         return reply.status(201).send({
           message: 'Primeiro Administrador criado com sucesso!',
           access_token: authData.access_token,
@@ -245,6 +277,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        const parsedError = parseGoTrueError(err, 400);
+
         log({
           name: err.name || 'BootstrapError',
           type: 'error',
@@ -255,9 +289,11 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
         }).catch(() => {});
-        return reply.status(400).send({
+
+        return reply.status(parsedError.statusCode).send({
           error: 'Erro no bootstrap',
-          message: err.message || 'Não foi possível criar o Administrador inicial.',
+          code: parsedError.code,
+          message: parsedError.message,
         });
       }
 
@@ -358,6 +394,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        const parsedError = parseGoTrueError(err, 400);
+
         log({
           name: err.name || 'RegisterError',
           type: 'error',
@@ -368,9 +406,11 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           url: request.url,
           userAgent: request.headers['user-agent'] || null,
         }).catch(() => {});
-        return reply.status(400).send({
+
+        return reply.status(parsedError.statusCode).send({
           error: 'Erro no cadastro',
-          message: err.message || 'Não foi possível realizar o cadastro.',
+          code: parsedError.code,
+          message: parsedError.message,
         });
       }
 
@@ -441,7 +481,16 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             template: 'login_notification',
             to: email,
             tenantId: matchedWorkspace?.id,
+            userId: userId,
             subject: emailSubject,
+            metadata: {
+              requestId: (request.raw as any).requestId,
+              clientApp: (request.raw as any).clientApp || appType,
+              sessionId: (request.raw as any).sessionId || authData.session?.id || null,
+              userRole: profile.role || 'user',
+              userId: userId,
+              workspaceId: matchedWorkspace?.id,
+            },
             props: {
               userName: profile.firstName,
               userEmail: email,
@@ -470,6 +519,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           metadata: { ip: request.ip ?? null, email: cleanEmail, appType },
         }).catch(() => {});
 
+        setAuthCookies(reply, authData.access_token, authData.refresh_token, authData.expires_in ?? 3600);
+
         return reply.send({
           access_token: authData.access_token,
           refresh_token: authData.refresh_token,
@@ -487,6 +538,8 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        const parsedError = parseGoTrueError(err, 401);
+
         log({
           name: 'auth.login_failed',
           type: 'audit',
@@ -494,12 +547,13 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           serviceName: 'core-api',
           message: `Falha de autenticação para o usuário [${(request.body as any)?.email}]: ${err.message || 'Credenciais inválidas'}.`,
           userAgent: (request.headers['user-agent'] as string) ?? null,
-          metadata: { ip: request.ip ?? null, email: (request.body as any)?.email, reason: err.message },
+          metadata: { ip: request.ip ?? null, email: (request.body as any)?.email, reason: err.message, code: parsedError.code },
         }).catch(() => {});
 
-        return reply.status(401).send({
+        return reply.status(parsedError.statusCode).send({
           error: 'Falha no login',
-          message: err.message || 'Credenciais inválidas.',
+          code: parsedError.code,
+          message: parsedError.message,
         });
       }
 
@@ -553,7 +607,16 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
             template: 'reset_password',
             to: profile.email,
             tenantId: matchedWorkspace?.id,
+            userId: profile.id,
             subject: `Redefinição de Senha — ${brandName}`,
+            metadata: {
+              requestId: (request.raw as any).requestId,
+              clientApp: (request.raw as any).clientApp || appType,
+              sessionId: (request.raw as any).sessionId || null,
+              userRole: profile.role || 'user',
+              userId: profile.id,
+              workspaceId: matchedWorkspace?.id,
+            },
             props: {
               userName: profile.firstName,
               userEmail: profile.email,
@@ -660,15 +723,14 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
   // GET /v1/auth/me
   fastify.get('/me', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const token = extractJwtFromRequest(request);
+      if (!token) {
         return reply.status(401).send({
           error: 'Não autorizado',
-          message: 'Cabeçalho Authorization ausente ou malformatado.',
+          message: 'Token de autenticação ausente ou inválido.',
         });
       }
 
-      const token = authHeader.split(' ')[1];
       const payload = verifyUserJwt(token);
 
       // Buscar perfil usando Drizzle ORM
@@ -728,15 +790,14 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({
             error: 'Não autorizado',
-            message: 'Cabeçalho Authorization ausente ou malformatado.',
+            message: 'Token de autenticação ausente ou inválido.',
           });
         }
 
-        const token = authHeader.split(' ')[1];
         const payload = verifyUserJwt(token);
         const userId = payload.sub;
 
@@ -830,23 +891,31 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
 
   // POST /v1/auth/refresh
   // Faz proxy para GoTrue /token?grant_type=refresh_token
-  // O frontend envia o refresh_token e recebe um novo par access_token + refresh_token
+  // O frontend envia o refresh_token no corpo ou via cookie HttpOnly
   fastify.post(
     '/refresh',
     {
       schema: {
         body: z.object({
-          refresh_token: z.string().min(1, 'refresh_token é obrigatório'),
-        }),
+          refresh_token: z.string().optional(),
+        }).optional().nullable(),
       },
     },
     async (request, reply) => {
       try {
-        const { refresh_token } = request.body;
-        const authData = await refreshGoTrueToken(refresh_token);
+        const refreshToken = request.body?.refresh_token || request.cookies?.refresh_token;
+        if (!refreshToken) {
+          return reply.status(401).send({
+            error: 'Refresh inválido',
+            message: 'Nenhum refresh token fornecido.',
+          });
+        }
+        const authData = await refreshGoTrueToken(refreshToken);
 
         // O GoTrue retorna expires_in em segundos; calculamos o timestamp absoluto
         const expiresAt = Math.floor(Date.now() / 1000) + (authData.expires_in ?? 3600);
+
+        setAuthCookies(reply, authData.access_token, authData.refresh_token, authData.expires_in ?? 3600);
 
         return reply.send({
           access_token: authData.access_token,
@@ -875,6 +944,44 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // POST /v1/auth/logout
+  // Revoga a sessão no GoTrue server-side e limpa os cookies HttpOnly
+  fastify.post('/logout', async (request, reply) => {
+    try {
+      const token = extractJwtFromRequest(request);
+      const userId = (request.raw as any).userId || null;
+      const sessionId = (request.raw as any).sessionId || null;
+
+      if (token) {
+        await logoutGoTrueUser(token);
+      }
+
+      clearAuthCookies(reply);
+
+      await log({
+        name: 'auth.logout',
+        type: 'audit',
+        severity: 'info',
+        serviceName: 'core-api',
+        message: `Sessão encerrada e cookies invalidados para o usuário [${userId || 'desconhecido'}].`,
+        userId: userId || null,
+        sessionId: sessionId || null,
+        userAgent: (request.headers['user-agent'] as string) ?? null,
+        metadata: { ip: request.ip ?? null },
+      }).catch(() => {});
+
+      return reply.send({
+        message: 'Sessão encerrada com sucesso.',
+      });
+    } catch (err: any) {
+      fastify.log.error('Erro no logout:', err);
+      clearAuthCookies(reply);
+      return reply.send({
+        message: 'Sessão encerrada com sucesso.',
+      });
+    }
+  });
 
   // POST /v1/auth/invite
   // Convia um novo colaborador ou adiciona um colaborador existente ao workspace
@@ -1034,7 +1141,16 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           template: 'invite_member',
           to: targetEmail,
           tenantId: workspaceId,
+          userId: inviterId,
           subject: `Você foi convidado para colaborar na clínica ${brandName}`,
+          metadata: {
+            requestId: (request.raw as any).requestId,
+            clientApp: (request.raw as any).clientApp || 'web',
+            sessionId: (request.raw as any).sessionId || null,
+            userRole: (request.raw as any).userRole || 'admin',
+            userId: inviterId,
+            workspaceId,
+          },
           props: {
             userName: existingProfile ? `${existingProfile.firstName}`.trim() : 'Colaborador',
             inviterName,
@@ -1172,7 +1288,16 @@ export async function authRoutes(fastifyApp: FastifyInstance) {
           template: 'invite_member',
           to: targetEmail,
           tenantId: workspaceId,
+          userId: inviterId,
           subject: `Convite de acesso - ${invitingWorkspace.name}`,
+          metadata: {
+            requestId: (request.raw as any).requestId,
+            clientApp: (request.raw as any).clientApp || 'web',
+            sessionId: (request.raw as any).sessionId || null,
+            userRole: (request.raw as any).userRole || 'admin',
+            userId: inviterId,
+            workspaceId,
+          },
           props: {
             userName: `${targetUser.firstName}`.trim(),
             inviterName: 'Administrador',

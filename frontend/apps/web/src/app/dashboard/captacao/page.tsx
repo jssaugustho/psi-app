@@ -226,8 +226,7 @@ export default function CaptacaoPage() {
   const getVerSiteUrl = (page: CapturePage) => {
     const prodUrl = getPageProductionUrl(page);
     if (page.siteConfig?.status !== 'published') {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
-      return `${prodUrl}?staging=true&token=${token}`;
+      return `${prodUrl}?staging=true`;
     }
     return prodUrl;
   };

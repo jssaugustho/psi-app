@@ -168,6 +168,15 @@ export async function loginGoTrueUser(email: string, password: string, baseUrl?:
         severity: 'error',
         metadata: { status: response.status, url: targetUrl, email }
       }).catch(err => console.error('Erro ao reportar falha do GoTrue:', err));
+    } else {
+      await log({
+        name: 'auth.login_failed',
+        type: 'audit',
+        severity: 'warning',
+        serviceName: 'gotrue',
+        message: `Tentativa de login falhou para email [${email}]: ${message}`,
+        metadata: { status: response.status, url: targetUrl, email }
+      }).catch(err => console.error('Erro ao reportar tentativa invalida no GoTrue:', err));
     }
 
     throw new Error(message);
@@ -271,4 +280,143 @@ export async function generateGoTrueLink(
 
   return await response.json();
 }
+
+/**
+ * Realiza o logout do usuário no GoTrue (/logout)
+ * Revoga a sessão e o refresh token no GoTrue server-side.
+ */
+export async function logoutGoTrueUser(accessToken: string, baseUrl?: string) {
+  const targetUrl = baseUrl ? `${baseUrl}/logout` : `${GOTRUE_URL}/logout`;
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      const message = (errorBody as any)?.msg || (errorBody as any)?.error_description || 'Erro ao revogar sessão no GoTrue';
+      console.warn(`⚠️ GoTrue logout retorno status ${response.status}: ${message}`);
+    }
+  } catch (err: any) {
+    console.error('❌ Erro ao chamar GoTrue /logout:', err?.message || err);
+  }
+}
+
+export interface ParsedAuthError {
+  code: string;
+  message: string;
+  statusCode: number;
+}
+
+/**
+ * Mapeia erros brutos retornados pelo GoTrue para códigos padronizados e mensagens amigáveis em PT-BR.
+ * Garante segurança contra User Enumeration e fornece feedback compreensível na UI.
+ */
+export function parseGoTrueError(err: any, defaultStatusCode: number = 400): ParsedAuthError {
+  const rawMessage = (
+    typeof err === 'string'
+      ? err
+      : err?.message || err?.msg || err?.error_description || ''
+  ).toLowerCase();
+
+  // 1. Credenciais inválidas ou Usuário não encontrado (Anti-User Enumeration)
+  if (
+    rawMessage.includes('invalid login credentials') ||
+    rawMessage.includes('user not found') ||
+    rawMessage.includes('invalid_grant') ||
+    rawMessage.includes('invalid email or password')
+  ) {
+    return {
+      code: 'INVALID_CREDENTIALS',
+      message: 'E-mail ou senha incorretos.',
+      statusCode: 401,
+    };
+  }
+
+  // 2. E-mail não confirmado
+  if (rawMessage.includes('email not confirmed')) {
+    return {
+      code: 'EMAIL_NOT_CONFIRMED',
+      message: 'Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.',
+      statusCode: 400,
+    };
+  }
+
+  // 3. Limite de taxa / Anti-Spam
+  if (
+    rawMessage.includes('rate limit') ||
+    rawMessage.includes('too many requests') ||
+    err?.status === 429
+  ) {
+    return {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.',
+      statusCode: 429,
+    };
+  }
+
+  // 4. Usuário já cadastrado
+  if (
+    rawMessage.includes('user already registered') ||
+    rawMessage.includes('user_already_exists') ||
+    rawMessage.includes('already exists')
+  ) {
+    return {
+      code: 'USER_ALREADY_EXISTS',
+      message: 'Já existe uma conta cadastrada com este e-mail.',
+      statusCode: 422,
+    };
+  }
+
+  // 5. Senha muito curta
+  if (
+    rawMessage.includes('password should be at least') ||
+    rawMessage.includes('password is too short')
+  ) {
+    return {
+      code: 'PASSWORD_TOO_SHORT',
+      message: 'A senha deve ter no mínimo 6 caracteres.',
+      statusCode: 400,
+    };
+  }
+
+  // 6. Token / Link expirado ou inválido
+  if (
+    rawMessage.includes('token has expired') ||
+    rawMessage.includes('invalid or has expired') ||
+    rawMessage.includes('otp expired')
+  ) {
+    return {
+      code: 'INVALID_TOKEN',
+      message: 'O link de acesso expirou ou é inválido. Solicite um novo link.',
+      statusCode: 400,
+    };
+  }
+
+  // 7. E-mail inválido
+  if (
+    rawMessage.includes('unable to validate email address') ||
+    rawMessage.includes('invalid email')
+  ) {
+    return {
+      code: 'INVALID_EMAIL',
+      message: 'Por favor, informe um endereço de e-mail válido.',
+      statusCode: 400,
+    };
+  }
+
+  // Fallback seguro em Português
+  return {
+    code: 'AUTH_ERROR',
+    message: err?.message && !err.message.startsWith('GoTrue:')
+      ? err.message
+      : 'Não foi possível concluir a autenticação. Verifique os dados fornecidos.',
+    statusCode: defaultStatusCode,
+  };
+}
+
+
 

@@ -218,6 +218,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
         log({
           name: 'crm.webhook_error',
           type: 'error',
@@ -230,6 +231,7 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
           userAgent: (request.headers['user-agent'] as string) || null,
           metadata: { requestId: (request.raw as any).requestId },
         }).catch(() => {});
+
         return reply.status(500).send({
           error: 'Erro interno',
           message: err.message || 'Falha ao processar a captura do contato.',

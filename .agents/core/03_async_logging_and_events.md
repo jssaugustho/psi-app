@@ -112,31 +112,57 @@ Toda requisição HTTP que chega à API passa obrigatoriamente pelos hooks globa
 
 ---
 
-### B) Rastreabilidade de Ponta a Ponta em Filas & Workers (Correlation Tracing)
-Para conseguir rastrear uma requisição completa desde o clique do usuário até a execução de um background worker, **SEMPRE repasse `requestId`, `userId` e `sessionId` no envelope da mensagem RabbitMQ**:
+### B) Rastreabilidade de Ponta a Ponta em Filas & Workers (RequiredQueueMetadata)
+Para conseguir rastrear uma requisição completa desde o clique do usuário até a execução de um background worker, **SEMPRE utilize a interface estrita `RequiredQueueMetadata` exportada de `src/shared/queue.ts`**:
 
 ```typescript
-// Na API HTTP ao publicar para uma fila de trabalho:
-await publishToQueue('email.transactional', {
-  to: 'cliente@exemplo.com',
-  template: 'welcome',
-  metadata: { requestId: req.raw.requestId, userId: req.raw.userId, sessionId: req.raw.sessionId }
-});
+export interface RequiredQueueMetadata {
+  requestId: string;
+  clientApp: 'web' | 'admin' | 'sites' | 'core-api' | 'workers' | 'unknown';
+  userId: string | null;
+  sessionId: string | null;
+  userRole?: string | null;
+  workspaceId?: string | null;
+}
+```
 
-// No Worker ao consumir a mensagem:
-log({
-  type: 'info',
-  serviceName: 'email-worker',
-  message: `E-mail de boas-vindas enviado para cliente@exemplo.com`,
-  userId: payload.metadata?.userId,
-  sessionId: payload.metadata?.sessionId,
-  metadata: { requestId: payload.metadata?.requestId, attempts: 1 }
+#### Enfileiramento na API HTTP:
+```typescript
+await queueEmail({
+  template: 'welcome',
+  to: user.email,
+  metadata: {
+    requestId: (req.raw as any).requestId,
+    clientApp: (req.raw as any).clientApp || 'web',
+    userId: req.raw.userId || null,
+    sessionId: req.raw.sessionId || null,
+    userRole: req.raw.userRole || 'psychologist',
+    workspaceId: req.raw.workspaceId || null,
+  }
 });
 ```
 
-> 💡 **Benefício do Tracing Duplo (`userId` + `sessionId`)**:
-> - **`userId` (QUEM)**: Retorna todas as ações do usuário *Dr. Carlos*.
-> - **`sessionId` (QUAL DISPOSITIVO/SESSÃO)**: Se o Dr. Carlos tiver 2 conexões ativas (Celular e Notebook), o `sessionId` isola **exatamente a sessão/dispositivo** onde ocorreu um evento ou erro.
+#### No Worker ao consumir a mensagem:
+```typescript
+log({
+  name: 'email.sent',
+  type: 'info',
+  serviceName: 'email-worker',
+  message: `E-mail de boas-vindas enviado com sucesso`,
+  clientApp: payload.metadata?.clientApp || 'workers',
+  userRole: payload.metadata?.userRole || null,
+  userId: payload.metadata?.userId || null,
+  sessionId: payload.metadata?.sessionId || null,
+  metadata: { requestId: payload.metadata?.requestId }
+});
+```
+
+### C) Interceptação de Erros PostgREST & Shared `@psi/ui` ErrorContext
+1. **Shared `ErrorProvider` (`@psi/ui/src/error-context.tsx`)**:
+   - `web` e `admin` consomem o mesmo `ErrorProvider` unificado exportado por `@psi/ui`.
+   - Captura exceções Globais (`window.onerror`, `unhandledrejection`) e repassa erros para a API `/v1/platform/errors`.
+2. **Interceptador HTTP PostgREST (`frontend/apps/web/src/lib/api.ts` e `frontend/apps/admin/src/lib/api.ts`)**:
+   - Requisições PostgREST com status HTTP 4xx ou 5xx disparam automaticamente uma notificação assíncrona POST `/v1/platform/errors` com `X-Client-App` (`web` ou `admin`), enviando `stack`, `message`, `url` e metadados HTTP.
 
 ---
 

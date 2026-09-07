@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
+import { getFriendlyAuthErrorMessage } from '@/lib/auth-errors';
 import { Button, Input, Card, BrandModal } from '@psi/ui';
 
 export default function AdminLoginPage() {
@@ -43,8 +44,14 @@ export default function AdminLoginPage() {
     checkBootstrap();
   }, [router]);
 
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [authLoading, user, router]);
+
   // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
-  if (isBootReady && !authLoading && user && user.role === 'admin') {
+  if (!authLoading && user) {
     return null;
   }
 
@@ -56,7 +63,7 @@ export default function AdminLoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.message || 'Falha ao autenticar.');
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -175,7 +182,10 @@ export default function AdminLoginPage() {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="admin@exemplo.com"
           />
 
@@ -184,7 +194,10 @@ export default function AdminLoginPage() {
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="••••••••"
           />
 
@@ -265,7 +278,7 @@ export default function AdminLoginPage() {
                   const res = await api.forgotPassword(forgotEmail);
                   setForgotSuccess(res.message);
                 } catch (err: any) {
-                  setForgotError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+                  setForgotError(getFriendlyAuthErrorMessage(err, 'Não foi possível enviar o e-mail de recuperação.'));
                 } finally {
                   setSendingForgot(false);
                 }
@@ -277,7 +290,10 @@ export default function AdminLoginPage() {
                 type="email"
                 required
                 value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
+                onChange={(e) => {
+                  setForgotEmail(e.target.value);
+                  if (forgotError) setForgotError(null);
+                }}
                 placeholder="admin@exemplo.com"
               />
 

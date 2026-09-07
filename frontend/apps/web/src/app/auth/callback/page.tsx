@@ -35,15 +35,8 @@ function AuthCallbackComponent() {
           return;
         }
 
-        // 2. Persistir a sessão nos locais esperados pela plataforma
-        localStorage.setItem('token', accessToken);
-        localStorage.setItem('refresh_token', refreshToken);
-
-        const expiresAt = Math.floor(Date.now() / 1000) + (expiresIn ? Number(expiresIn) : 3600);
-        localStorage.setItem('token_expires_at', String(expiresAt));
-
-        // Gravar no cookie para SSR
-        document.cookie = `token=${accessToken}; path=/; max-age=604800; SameSite=Lax; Secure`;
+        // 2. Transmitir para o backend gravar os cookies HttpOnly
+        await api.refreshToken(refreshToken);
 
         // 3. Obter parâmetros adicionais de redirecionamento passados na URL de convite
         const type = searchParams.get('type');

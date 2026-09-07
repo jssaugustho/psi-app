@@ -102,12 +102,8 @@ export function ApiStatusProvider({
           return;
         }
       }
-      if (window.location.hostname.includes('admin') || window.location.pathname.startsWith('/dashboard')) {
-        const token = localStorage.getItem('token');
-        if (token) {
-          setIsAdmin(true);
-          return;
-        }
+      if (window.location.hostname.includes('admin')) {
+        setIsAdmin(true);
       }
     } catch {
       // Ignora erro de parsing
@@ -257,13 +253,11 @@ export function ApiStatusProvider({
       if (!hasUserInternet) {
         setOfflineReason('user_internet');
         setErrorMsg('Sem conexão com a internet. Verifique seu sinal de Wi-Fi ou cabo de rede.');
+        setIsOffline(true);
       } else {
-        setOfflineReason('api_server');
-        if (customEvent.detail?.message) {
-          setErrorMsg(customEvent.detail.message);
-        }
+        // Valida ativamente com o endpoint de health do backend antes de marcar offline
+        checkHealth(true);
       }
-      setIsOffline(true);
     };
 
     const handleCustomOnline = () => {

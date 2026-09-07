@@ -101,24 +101,54 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         hasApiError = true;
       }
 
-      // 2. Resolver o workspace ativo do usuário via localStorage / cookie
-      const activeWorkspaceId = typeof window !== 'undefined'
-        ? (localStorage.getItem('active_workspace_id') || localStorage.getItem('active_tenant_id') || sessionStorage.getItem('active_workspace_id'))
-        : null;
+      const isPublicAuthPage = typeof window !== 'undefined' && (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/register' ||
+        window.location.pathname.startsWith('/forgot-password') ||
+        window.location.pathname.startsWith('/reset-password') ||
+        window.location.pathname.startsWith('/auth/') ||
+        window.location.pathname === '/offline'
+      );
 
-      if (activeWorkspaceId) {
-        try {
-          const userWorkspace = await api.getTenantById(activeWorkspaceId);
-          if (userWorkspace && (userWorkspace.name || userWorkspace.gradientColorStart || userWorkspace.logoDarkUrl || userWorkspace.logoLightUrl)) {
-            resolvedUserTenant = userWorkspace;
-            if (typeof window !== 'undefined') {
-              document.cookie = `active_workspace_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
-              document.cookie = `active_tenant_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+      // Em páginas públicas de autenticação, resolver apenas o Tenant-Pai (Plataforma) e pular consultas de workspace privado
+      if (!isPublicAuthPage) {
+        // 2. Resolver o workspace ativo do usuário via localStorage / cookie
+        const activeWorkspaceId = typeof window !== 'undefined'
+          ? (localStorage.getItem('active_workspace_id') || localStorage.getItem('active_tenant_id') || sessionStorage.getItem('active_workspace_id'))
+          : null;
+
+        if (activeWorkspaceId) {
+          try {
+            const userWorkspace = await api.getTenantById(activeWorkspaceId);
+            if (userWorkspace && (userWorkspace.name || userWorkspace.gradientColorStart || userWorkspace.logoDarkUrl || userWorkspace.logoLightUrl)) {
+              resolvedUserTenant = userWorkspace;
+              if (typeof window !== 'undefined') {
+                document.cookie = `active_workspace_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+                document.cookie = `active_tenant_id=${activeWorkspaceId}; path=/; max-age=31536000; SameSite=Lax`;
+              }
             }
+          } catch (err) {
+            console.warn('Erro ao carregar workspace ativo por id:', err);
+            hasApiError = true;
           }
-        } catch (err) {
-          console.warn('Erro ao carregar workspace ativo por id:', err);
-          hasApiError = true;
+        }
+
+        // Se não resolveu por ID em localStorage, realiza fallback buscando workspaces do usuário logado
+        if (!resolvedUserTenant) {
+          try {
+            const myWorkspaces = await api.getMyWorkspaces();
+            if (myWorkspaces && myWorkspaces.length > 0) {
+              resolvedUserTenant = myWorkspaces[0];
+              if (typeof window !== 'undefined' && resolvedUserTenant?.id) {
+                localStorage.setItem('active_workspace_id', resolvedUserTenant.id);
+                localStorage.setItem('active_tenant_id', resolvedUserTenant.id);
+                document.cookie = `active_workspace_id=${resolvedUserTenant.id}; path=/; max-age=31536000; SameSite=Lax`;
+                document.cookie = `active_tenant_id=${resolvedUserTenant.id}; path=/; max-age=31536000; SameSite=Lax`;
+              }
+            }
+          } catch (err) {
+            console.warn('Erro no fallback de resolução de workspace:', err);
+          }
         }
       }
 

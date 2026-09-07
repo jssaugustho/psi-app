@@ -118,17 +118,39 @@ export async function executeWithResendRateLimit<T>(task: () => Promise<T>): Pro
 
 /**
  * Verifica limites anti-spam por destinatário:
- *  1. Máximo 1 e-mail do mesmo template por minuto (60s)
- *  2. Máximo 3 e-mails de qualquer template a cada 5 minutos (300s)
+ *  1. Intervalo mínimo de 3 segundos entre e-mails do mesmo template (evita rajada/duplicação acidental)
+ *  2. Máximo 2 e-mails do mesmo template por minuto (60s) — permite login simultâneo no Web e Admin
+ *  3. Máximo 5 e-mails de qualquer template a cada 5 minutos (300s)
  */
 export async function checkRecipientAntiSpamLimit(
   toEmail: string,
   template: string
 ): Promise<{ allowed: boolean; reason?: string }> {
+  const threeSecondsAgo = new Date(Date.now() - 3 * 1000);
   const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000);
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-  // Regra 1: Mesmo template enviado no último minuto
+  // Regra 1: Evitar rajadas simultâneas (menos de 3s) do mesmo template
+  const burstCheck = await db
+    .select({ count: count() })
+    .from(emailLogs)
+    .where(
+      and(
+        eq(emailLogs.toEmail, toEmail),
+        eq(emailLogs.template, template),
+        eq(emailLogs.status, 'sent'),
+        gt(emailLogs.createdAt, threeSecondsAgo)
+      )
+    );
+
+  if ((burstCheck[0]?.count ?? 0) > 0) {
+    return {
+      allowed: false,
+      reason: `Envio bloqueado por rajada (anti-spam). Aguarde 3s entre envios do template [${template}].`,
+    };
+  }
+
+  // Regra 2: Máximo 2 e-mails do mesmo template por minuto (60s)
   const recentSameTemplate = await db
     .select({ count: count() })
     .from(emailLogs)
@@ -141,14 +163,14 @@ export async function checkRecipientAntiSpamLimit(
       )
     );
 
-  if ((recentSameTemplate[0]?.count ?? 0) > 0) {
+  if ((recentSameTemplate[0]?.count ?? 0) >= 2) {
     return {
       allowed: false,
-      reason: `Envio bloqueado por limite de taxa (anti-spam). Máximo 1 e-mail do template [${template}] por minuto para ${toEmail}.`,
+      reason: `Envio bloqueado por limite de taxa (anti-spam). Máximo 2 e-mails do template [${template}] por minuto para ${toEmail}.`,
     };
   }
 
-  // Regra 2: Qualquer template nos últimos 5 minutos (máximo 3)
+  // Regra 3: Máximo 5 e-mails de qualquer template a cada 5 minutos (300s)
   const recentTotalSends = await db
     .select({ count: count() })
     .from(emailLogs)
@@ -160,14 +182,35 @@ export async function checkRecipientAntiSpamLimit(
       )
     );
 
-  if ((recentTotalSends[0]?.count ?? 0) >= 3) {
+  if ((recentTotalSends[0]?.count ?? 0) >= 5) {
     return {
       allowed: false,
-      reason: `Envio bloqueado por limite de volume (anti-spam). Máximo 3 e-mails a cada 5 minutos para ${toEmail}.`,
+      reason: `Envio bloqueado por limite de volume (anti-spam). Máximo 5 e-mails a cada 5 minutos para ${toEmail}.`,
     };
   }
 
   return { allowed: true };
+}
+
+/**
+ * Verifica se um erro ou mensagem de erro se refere a Rate Limit (HTTP 429 ou Anti-Spam).
+ */
+export function isRateLimitErrorMessage(error?: any): boolean {
+  if (!error) return false;
+  if (typeof error === 'object') {
+    if (error.status === 429 || error.statusCode === 429 || error.name === 'rate_limit_exceeded') return true;
+    error = error.message || error.reason || JSON.stringify(error);
+  }
+  const str = String(error).toLowerCase();
+  return (
+    str.includes('429') ||
+    str.includes('rate limit') ||
+    str.includes('rate_limit') ||
+    str.includes('anti-spam') ||
+    str.includes('limite de taxa') ||
+    str.includes('limite de volume') ||
+    str.includes('too many requests')
+  );
 }
 
 // ── 4. Escalonamento Justo por Usuário / Tenant ─────────────────────────────

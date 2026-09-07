@@ -49,6 +49,16 @@ export function useLogsPage() {
   // Accordion (Itens abertos)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+  // Alturas reais medidas no DOM para cada linha expandida
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
+
+  const updateRowHeight = useCallback((id: string, height: number) => {
+    setMeasuredHeights((prev) => {
+      if (prev[id] === height) return prev;
+      return { ...prev, [id]: height };
+    });
+  }, []);
+
   // Refs de Virtualização
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -65,12 +75,10 @@ export function useLogsPage() {
   // Função para reconectar / re-assinar manualmente o socket
   const reconnectSocket = useCallback(() => {
     if (socketRef.current) {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      socketRef.current.auth = { token };
       if (!socketRef.current.connected) {
         socketRef.current.connect();
       } else {
-        socketRef.current.emit('subscribe-admin-logs', { token });
+        socketRef.current.emit('subscribe-admin-logs', {});
       }
     }
   }, []);
@@ -188,19 +196,17 @@ export function useLogsPage() {
     const socketOrigin = apiBaseUrl.replace(/\/v1\/?$/, '');
     const socketPath = '/v1/socket.io';
 
-    const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
     const socket = io(socketOrigin, {
       path: socketPath,
       transports: ['websocket'],
-      auth: { token: getToken() },
+      withCredentials: true,
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
       setIsConnected(true);
-      socket.emit('subscribe-admin-logs', { token: getToken() });
+      socket.emit('subscribe-admin-logs', {});
     });
 
     socket.on('subscribed-admin-logs', (res: { success: boolean; error?: string }) => {
@@ -305,24 +311,29 @@ export function useLogsPage() {
     let currentOffset = 0;
     return logs.map((log) => {
       const isExpanded = expandedIds.has(log.id);
-      const stackContent = log.stack || (log.metadata as any)?.stack || (log.metadata as any)?.stackTrace;
-      const hasStack = Boolean(stackContent);
-      const hasMetadata = Boolean(log.metadata && Object.keys(log.metadata).length > 0);
-
       let height = 54;
+
       if (isExpanded) {
-        // Base generosa para "DETALHES DO EVENTO" + "CONTEXTO E RASTREAMENTO" (2 colunas em grid) + paddings/gaps
-        height = 360;
+        if (measuredHeights[log.id]) {
+          height = measuredHeights[log.id];
+        } else {
+          const stackContent = log.stack || (log.metadata as any)?.stack || (log.metadata as any)?.stackTrace;
+          const hasStack = Boolean(stackContent);
+          const hasMetadata = Boolean(log.metadata && Object.keys(log.metadata).length > 0);
 
-        if (hasStack) {
-          const stackLines = String(stackContent).split('\n').length;
-          height += Math.max(140, stackLines * 19 + 80);
-        }
+          // Base generosa inicial antes da medicao pelo ResizeObserver
+          height = 400;
 
-        if (hasMetadata) {
-          const metaJson = JSON.stringify(log.metadata, null, 2);
-          const metaLines = metaJson.split('\n').length;
-          height += Math.max(140, metaLines * 19 + 80);
+          if (hasStack) {
+            const stackLines = String(stackContent).split('\n').length;
+            height += Math.min(320, Math.max(140, stackLines * 20 + 80));
+          }
+
+          if (hasMetadata) {
+            const metaJson = JSON.stringify(log.metadata, null, 2);
+            const metaLines = metaJson.split('\n').length;
+            height += Math.min(320, Math.max(140, metaLines * 20 + 80));
+          }
         }
       }
 
@@ -330,7 +341,7 @@ export function useLogsPage() {
       currentOffset += height;
       return { log, offset, height };
     });
-  }, [logs, expandedIds]);
+  }, [logs, expandedIds, measuredHeights]);
 
   const totalHeight = virtualRows.length > 0 ? virtualRows[virtualRows.length - 1].offset + virtualRows[virtualRows.length - 1].height : 0;
 
@@ -382,9 +393,11 @@ export function useLogsPage() {
     isRealtimeActive, setIsRealtimeActive,
     isConnected, isSubscribed, reconnectSocket,
     expandedIds, toggleExpand,
+    updateRowHeight,
     containerRef, handleScroll,
     totalHeight, visibleRows,
     loadLogs: fetchInitialLogs,
     resetFilters,
   };
 }
+

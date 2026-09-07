@@ -173,10 +173,9 @@ export function FormBuilderWorkspace({
   useEffect(() => {
     const workspaceId = tenant?.id;
     if (!workspaceId) return;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${workspaceId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      credentials: 'include'
     })
       .then(r => r.json())
       .then(data => { if (data.fields) setCrmCustomFields(data.fields); })

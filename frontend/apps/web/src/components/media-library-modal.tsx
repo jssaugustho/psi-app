@@ -427,9 +427,20 @@ export const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({
           </div>
 
           {error && (
-            <div className="text-[11px] text-red-500 dark:text-red-400 font-medium bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            <div className="text-[11px] text-red-500 dark:text-red-400 font-medium bg-red-500/10 border border-red-500/20 p-2.5 rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+              {(error.includes('Sessão expirada') || error.includes('Token') || error.includes('JWT') || error.includes('autorizado')) && (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider transition-colors shrink-0 cursor-pointer border-none"
+                >
+                  Recarregar
+                </button>
+              )}
             </div>
           )}
 

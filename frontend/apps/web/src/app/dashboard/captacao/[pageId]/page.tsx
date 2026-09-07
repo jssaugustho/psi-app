@@ -1679,9 +1679,7 @@ export default function PageEditor({ params }: PageProps) {
   const [token, setToken] = useState('');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setToken(localStorage.getItem('token') || '');
-    }
+    setToken('active');
   }, []);
 
   // Live preview mode state ('desktop' | 'mobile')
@@ -4555,13 +4553,15 @@ export default function PageEditor({ params }: PageProps) {
 
   const pageSlugForPreview = page.slug || '_root_';
 
-  const previewIframeUrl = workspaceDomain?.subdomain 
-    ? `${landingBaseUrl}/p/${workspaceDomain.subdomain}/${pageSlugForPreview}?preview=true&key=${previewKey}&token=${token}`
+  const activeSubdomain = workspaceDomain?.subdomain || tenant?.workspaceDomain?.subdomain;
+
+  const previewIframeUrl = activeSubdomain 
+    ? `${landingBaseUrl}/p/${activeSubdomain}/${pageSlugForPreview}?preview=true&key=${previewKey}&token=${token}`
     : '#';
 
   // External Preview URL (without preview=true)
-  const externalPreviewUrl = workspaceDomain?.subdomain 
-    ? `${landingBaseUrl}/p/${workspaceDomain.subdomain}/${pageSlugForPreview}`
+  const externalPreviewUrl = activeSubdomain 
+    ? `${landingBaseUrl}/p/${activeSubdomain}/${pageSlugForPreview}`
     : '#';
 
   const previewUrlWithToken = externalPreviewUrl !== '#'

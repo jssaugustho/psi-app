@@ -44,9 +44,6 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     // Extrair base URL para o WebSocket a partir do NEXT_PUBLIC_API_URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     const socketUrl = apiUrl.replace(/\/v1\/?$/, ''); // Remove '/v1' do final para usar a porta base
@@ -54,16 +51,17 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newSocket = io(socketUrl, {
       path: '/v1/socket.io',
       transports: ['websocket'],
-      auth: { token },
+      withCredentials: true,
       autoConnect: true,
       reconnection: true,
     });
 
     newSocket.on('connect', () => {
       console.log('✅ Conectado ao servidor de Realtime WebSocket');
-      newSocket.emit('subscribe', { userId: user.id, tenantId: tenant.id });
+      newSocket.emit('subscribe', { userId: user.id, workspaceId: tenant.id, tenantId: tenant.id });
       newSocket.emit('presence-pulse', {
         userId: user.id,
+        workspaceId: tenant.id,
         tenantId: tenant.id,
         nome: user.nome,
         sobrenome: user.sobrenome,
@@ -114,6 +112,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const sendPresencePulse = () => {
       socket.emit('presence-pulse', {
         userId: user.id,
+        workspaceId: tenant.id,
         tenantId: tenant.id,
         nome: user.nome,
         sobrenome: user.sobrenome,

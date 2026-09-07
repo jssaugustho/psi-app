@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Palette, Sparkles, AlertCircle } from 'lucide-react';
+import { Palette, Sparkles, AlertCircle, Check, Pipette } from 'lucide-react';
 import { Input } from '@psi/ui';
 
 export const COLOR_PALETTES = [
@@ -111,16 +111,20 @@ export function ColorPaletteSelector({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={(e) => {
-              if (hasImage) setActiveColorPopover(isOpen ? null : popoverKey);
-              else e.currentTarget.parentElement?.querySelector<HTMLInputElement>('input[type="color"]')?.click();
-            }}
+            onClick={() => setActiveColorPopover(isOpen ? null : popoverKey)}
             className="h-10 w-12 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm cursor-pointer p-1 transition-all hover:scale-105 flex items-center justify-center relative overflow-hidden shrink-0 bg-transparent"
             style={{ backgroundColor: value }}
+            title="Escolher cor da sua marca ou personalizada"
           >
             <div className="w-full h-full rounded-lg border border-black/10 dark:border-white/20" />
           </button>
-          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="sr-only" />
+          <input
+            id={`color-picker-native-${popoverKey}`}
+            type="color"
+            value={value && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value) ? value : '#458270'}
+            onChange={(e) => onChange(e.target.value)}
+            className="sr-only"
+          />
           <Input
             type="text"
             value={value}
@@ -134,30 +138,78 @@ export function ColorPaletteSelector({
             <span>Hexadecimal inválido (ex: #C5825D)</span>
           </span>
         )}
-        {isOpen && hasImage && (
+        {isOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setActiveColorPopover(null)} />
-            <div className="absolute top-full left-0 z-50 mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl min-w-[220px]">
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
-                {isExtractingColors ? 'Extraindo cores...' : 'Cores da sua Marca'}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {extractedBrandColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => { onChange(color); setActiveColorPopover(null); }}
-                    className="h-8 w-8 rounded-lg border-2 border-transparent hover:border-violet-500 hover:scale-110 transition-all cursor-pointer shadow-sm bg-transparent"
-                    style={{ backgroundColor: color }}
-                    title={color}
-                  />
-                ))}
+            <div className="absolute top-full left-0 z-50 mt-1.5 p-3.5 rounded-2xl border border-slate-200 dark:border-zinc-700/80 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md shadow-2xl min-w-[240px] max-w-[280px] animate-in fade-in zoom-in-95 duration-150 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-2">
+                <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  CORES DA SUA MARCA
+                </p>
+                {isExtractingColors && (
+                  <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400 animate-pulse">
+                    Extraindo...
+                  </span>
+                )}
+              </div>
+
+              {extractedBrandColors.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                    Cores extraídas do logotipo e ícone:
+                  </p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {extractedBrandColors.map((color) => {
+                      const isSelected = value.toLowerCase() === color.toLowerCase();
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => { onChange(color); setActiveColorPopover(null); }}
+                          className={`h-8 w-8 rounded-lg border transition-all cursor-pointer shadow-xs relative flex items-center justify-center ${
+                            isSelected
+                              ? 'ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-zinc-900 border-white dark:border-zinc-800 scale-105'
+                              : 'border-black/10 dark:border-white/10 hover:scale-110 hover:shadow-md'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={`Usar ${color}`}
+                        >
+                          {isSelected && (
+                            <Check className={`w-4 h-4 ${getContrastColor(color) === '#FFFFFF' ? 'text-white' : 'text-black'}`} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                  {hasImage
+                    ? 'Extraindo cores das imagens...'
+                    : 'Envie um Logotipo ou Ícone acima para extrair sugestões de cor da sua marca.'}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveColorPopover(null);
+                    const el = document.getElementById(`color-picker-native-${popoverKey}`) as HTMLInputElement;
+                    if (el) el.click();
+                  }}
+                  className="flex-1 py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-[10px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Pipette className="w-3 h-3 text-violet-500" />
+                  <span>Seletor Customizado</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setActiveColorPopover(null)}
-                  className="h-8 px-2 rounded-lg border border-slate-200 dark:border-zinc-700 text-[10px] font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-800 cursor-pointer bg-transparent"
+                  className="py-1.5 px-3 rounded-lg bg-slate-100 dark:bg-zinc-800 text-[10px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
                 >
-                  Hex
+                  Fechar
                 </button>
               </div>
             </div>

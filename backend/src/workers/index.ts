@@ -153,22 +153,26 @@ async function main() {
             dbInsertError: dbErr.message,
           };
 
-          [insertedLog] = await db.insert(logs).values({
-            type: logType,
-            name: content.name ?? null,
-            message: content.message,
-            stack: content.stack ?? null,
-            url: content.url ?? null,
-            clientApp: resolvedClientApp,
-            userRole: resolvedUserRole,
-            userAgent: content.userAgent ?? null,
-            userId: null,
-            workspaceId: null,
-            sessionId: content.sessionId ?? null,
-            serviceName: content.serviceName,
-            severity: content.severity ?? (logType === 'error' ? 'error' : 'info'),
-            metadata: fallbackMetadata,
-          }).returning();
+          try {
+            [insertedLog] = await db.insert(logs).values({
+              type: logType,
+              name: content.name ?? null,
+              message: content.message,
+              stack: content.stack ?? null,
+              url: content.url ?? null,
+              clientApp: resolvedClientApp,
+              userRole: resolvedUserRole,
+              userAgent: content.userAgent ?? null,
+              userId: null,
+              workspaceId: null,
+              sessionId: content.sessionId ?? null,
+              serviceName: content.serviceName,
+              severity: content.severity ?? (logType === 'error' ? 'error' : 'info'),
+              metadata: fallbackMetadata,
+            }).returning();
+          } catch (secondaryDbErr: any) {
+            console.error('❌ Falha crítica ao salvar log no banco de dados (fallback ativado):', secondaryDbErr.message, JSON.stringify(content));
+          }
         }
 
         // Notificar via WebSocket Realtime (global e admin room)
@@ -228,6 +232,16 @@ function startWorkerHeartbeats(channel: any) {
       );
     } catch (e: any) {
       console.error('❌ Erro ao enviar heartbeat do Worker:', e);
+      try {
+        await db.insert(systemStatusLogs).values({
+          serviceName: 'Workers',
+          status: 'degraded',
+          responseTimeMs: Date.now() - start,
+          message: `Heartbeat RabbitMQ Publish Error: ${e.message}`,
+        });
+      } catch (dbErr: any) {
+        console.error('❌ Falha crítica ao registrar status do worker no DB:', dbErr.message);
+      }
       log({
         name: e.name || 'WorkerHeartbeatError',
         type: 'error',

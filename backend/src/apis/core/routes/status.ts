@@ -3,9 +3,9 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
 import { systemStatusLogs } from '../../../shared/schema';
-import { getChannel } from '../../../shared/queue';
+import { getChannel, log } from '../../../shared/queue';
 import { eq, and, gte, sql } from 'drizzle-orm';
-import { verifyUserJwt } from '../../../shared/auth';
+import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
 import { env } from '../../../config/env';
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -188,11 +188,11 @@ export async function statusRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         const { range } = request.query;
 
@@ -304,6 +304,21 @@ export async function statusRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        log({
+          name: 'status.get_history_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack || null,
+          url: request.url,
+          clientApp: (request.raw as any).clientApp,
+          userRole: (request.raw as any).userRole,
+          userId: (request.raw as any).userId,
+          sessionId: (request.raw as any).sessionId,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro ao obter logs de status',
           message: err.message || 'Não foi possível buscar logs históricos de status.',
@@ -318,11 +333,11 @@ export async function statusRoutes(fastifyApp: FastifyInstance) {
     '/status/check',
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         await runAllSystemChecks();
 
@@ -331,11 +346,27 @@ export async function statusRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        log({
+          name: 'status.manual_check_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack || null,
+          url: request.url,
+          clientApp: (request.raw as any).clientApp,
+          userRole: (request.raw as any).userRole,
+          userId: (request.raw as any).userId,
+          sessionId: (request.raw as any).sessionId,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro no check manual',
           message: err.message || 'Não foi possível rodar o check de status manualmente.',
         });
       }
+
     }
   );
 }

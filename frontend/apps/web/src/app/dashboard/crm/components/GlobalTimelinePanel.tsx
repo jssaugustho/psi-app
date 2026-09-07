@@ -34,16 +34,18 @@ export function GlobalTimelinePanel({ tenantId }: GlobalTimelinePanelProps) {
     if (!tenantId) return;
 
     const unsubscribe = subscribe('interaction_history', (event) => {
-      const eventTenantId = event.data.tenant_id || event.data.tenantId;
-      if (eventTenantId !== tenantId) return;
+      const eventWorkspaceId = event.workspaceId || event.workspace_id || event.data?.workspace_id || event.data?.tenant_id || event.tenantId;
+      if (eventWorkspaceId !== tenantId) return;
 
       if (event.action === 'created') {
         const logData = event.data;
         // Enriquecer com o nome do contato localmente se disponível
-        const matchedContact = contacts.find((c) => c.id === logData.contact_id);
+        const matchedContact = contacts.find((c) => c.id === (logData.contact_id || logData.contactId));
         const newLog: InteractionHistory = {
           ...logData,
-          contact: matchedContact ? { name: matchedContact.name } : null,
+          contact_id: logData.contact_id || logData.contactId,
+          workspace_id: logData.workspace_id || logData.workspaceId,
+          contact: matchedContact ? { name: matchedContact.name } : logData.contact || null,
         };
 
         setHistory((prev) => {

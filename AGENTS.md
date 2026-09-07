@@ -27,8 +27,9 @@
 7. **ALWAYS use atomic procedures (RPC) for multi-table transactions**:
    - Use PL/pgSQL Stored Functions exposed via PostgREST RPC (`POST /rest/v1/rpc/<func_name>`).
    - For elevated permissions without exposing service keys, use `SECURITY DEFINER` procedures.
-8. **NEVER expose Service Keys to the Frontend**:
+8. **NEVER expose Service Keys to the Frontend and NEVER store tokens in `localStorage`**:
    - Perform administrative or elevated operations via Fastify backend routes or `SECURITY DEFINER` RPC functions.
+   - ALWAYS manage authentication via 100% HttpOnly cookies (`access_token`, `refresh_token`). Nginx automatically converts the HttpOnly `$cookie_access_token` into `Authorization: Bearer <token>` for PostgREST (`/rest/v1/*`), keeping frontend JS 100% token-free and immune to XSS theft.
 9. **ALWAYS propagate `requestId`, `userId` and `sessionId` for End-to-End Tracing**:
    - Fastify injects a syntactic UUID `X-Request-ID` into every HTTP response (`request.raw.requestId`).
    - Repasse `requestId`, `userId` e `sessionId` em todas as mensagens publicadas no RabbitMQ para observabilidade total no worker.
@@ -60,6 +61,7 @@ Before executing tasks, read **ONLY** the specific context file relevant to your
 | Staging, Drafts & Publishing | [.agents/architectures/site_staging_and_publishing.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/site_staging_and_publishing.md) | Draft state vs Published state, Cloudflare subdomains |
 | Captacao Funnel & Psychologist CRM | [.agents/architectures/captacao_ux.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/captacao_ux.md) | Lead capture flow, CRM board, Kanban columns |
 | Platform Settings & Feature Flags | [.agents/architectures/platform_settings.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/platform_settings.md) | Tenant configuration, feature flags, global settings |
+| MVP Discrepancies & Post-MVP Backlog | [.agents/backlog/01_mvp_discrepancies_and_technical_debt.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/backlog/01_mvp_discrepancies_and_technical_debt.md) | Technical debt, deferred refactorings, MVP gaps & Post-MVP roadmap |
 
 ---
 
@@ -184,6 +186,20 @@ Sempre que criar ou alterar uma funcionalidade, adicione ou atualize a documenta
    - `4. Concrete Code Recipes & Schemas`: Tabelas SQL, endpoints e componentes `@psi/ui` utilizados.
    - `5. Anti-Patterns & Prohibitions`: Exemplo explicito de ❌ Errado vs ✅ Correto.
 3. **Mapear na Tabela Mestre**: Adicione o arquivo à tabela **Context Loading Matrix** na seção 2 do `AGENTS.md`.
+
+---
+
+### 🟢 Receita 5: Padrão Universal de Rate-Limit, Status 'pending' e DLQ para Workers Assíncronos
+
+Sempre que implementar retentativas em workers ou serviços assíncronos submetidos a limites de taxa (anti-spam interno ou APIs externas como Resend, Cloudflare, WhatsApp):
+
+1. **Erros de Rate-Limit (429 / Anti-Spam)**:
+   - **NUNCA** marcar o status como `failed` e **NUNCA** enviar para a DLQ (`messages.dlq`).
+   - Manter o registro no banco com `status: 'pending'`, atualizar o motivo do atraso e reagendar assincronamente com delay (`publishToQueue` / `setTimeout`).
+   - Dar `channel.ack(msg)` para liberar a mensagem atual do consumidor RabbitMQ.
+2. **Outros Erros Técnicos (Falhas de Schema, Autenticação, Domínio)**:
+   - Permitir até **3 retentativas** em `status: 'pending'` com backoff assíncrono.
+   - Ao exceder 3 tentativas, atualizar para `status: 'failed'` e dar `channel.nack(msg, false, false)` direcionando para a DLQ.
 
 ---
 

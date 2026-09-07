@@ -13,14 +13,16 @@ interface EmailLog {
   subject: string;
   template: string;
   html_body: string;
-  status: 'sent' | 'failed';
+  status: 'sent' | 'failed' | 'pending';
   error: string | null;
+  retry_count?: number;
   metadata: {
     device?: string;
     ip?: string;
     loginAt?: string;
+    nextRetryAt?: string;
   } | null;
-  sent_at: string;
+  sent_at: string | null;
   created_at: string;
 }
 
@@ -83,14 +85,17 @@ const ChevronRightIcon = () => (
 );
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-function formatDate(iso: string): string {
+function formatDate(iso?: string | null): string {
+  if (!iso) return '-';
   try {
-    return new Date(iso).toLocaleString('pt-BR', {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    return date.toLocaleString('pt-BR', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
       timeZone: 'America/Sao_Paulo',
     });
-  } catch { return iso; }
+  } catch { return String(iso); }
 }
 
 function templateLabel(template: string): string {
@@ -105,7 +110,6 @@ const PAGE_SIZE = 20;
 const POSTGREST_BASE = env.NEXT_PUBLIC_POSTGREST_URL;
 
 async function fetchEmailLogs(
-  token: string,
   opts: { page: number; status: string; template: string; search: string }
 ): Promise<{ logs: EmailLog[]; total: number }> {
   const offset = opts.page * PAGE_SIZE;
@@ -120,8 +124,8 @@ async function fetchEmailLogs(
   if (opts.search) params.set('to_email', `ilike.*${opts.search}*`);
 
   const res = await fetch(`${POSTGREST_BASE}/email_logs?${params.toString()}`, {
+    credentials: 'include',
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       Prefer: 'count=exact',
     },
@@ -238,11 +242,11 @@ function EmailPreviewModal({
               <div className="space-y-3">
                 {[
                   { label: 'Template', value: templateLabel(log.template) },
-                  { label: 'Status', value: log.status === 'sent' ? 'Enviado' : 'Falhou' },
-                  { label: 'Data de envio', value: formatDate(log.sent_at) },
+                  { label: 'Status', value: log.status === 'sent' ? 'Enviado' : log.status === 'pending' ? 'Pendente (Reagendado)' : 'Falhou' },
+                  { label: log.status === 'sent' ? 'Data de envio' : 'Data de criação', value: formatDate(log.status === 'sent' ? log.sent_at : log.created_at) },
                   ...(log.metadata?.device ? [{ label: 'Dispositivo', value: log.metadata.device }] : []),
                   ...(log.metadata?.ip ? [{ label: 'IP', value: log.metadata.ip }] : []),
-                  ...(log.error ? [{ label: 'Erro', value: log.error }] : []),
+                  ...(log.error ? [{ label: 'Erro / Motivo', value: log.error }] : []),
                 ].map(({ label, value }) => (
                   <div key={label}>
                     <p className="text-xs font-medium mb-0.5" style={{ opacity: 0.5 }}>{label}</p>
@@ -313,8 +317,7 @@ export default function EmailsPage() {
     setLoadingLogs(true);
     setError('');
     try {
-      const token = localStorage.getItem('token') ?? '';
-      const { logs: data, total: count } = await fetchEmailLogs(token, {
+      const { logs: data, total: count } = await fetchEmailLogs({
         page, status: statusFilter, template: templateFilter, search,
       });
       setLogs(data);
@@ -372,10 +375,11 @@ export default function EmailsPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           {[
             { label: 'Total de E-mails', value: total, color: 'var(--brand-gradient-start)' },
             { label: 'Enviados', value: logs.filter(l => l.status === 'sent').length, color: '#10B981' },
+            { label: 'Pendentes / Reagendados', value: logs.filter(l => l.status === 'pending').length, color: '#F59E0B' },
             { label: 'Com falha', value: logs.filter(l => l.status === 'failed').length, color: '#EF4444' },
           ].map(stat => (
             <div
@@ -421,17 +425,17 @@ export default function EmailsPage() {
             </form>
 
             {/* Status filter */}
-            {/* Status filter */}
             <Select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
               options={[
                 { value: '', label: 'Todos os status' },
                 { value: 'sent', label: 'Enviados' },
+                { value: 'pending', label: 'Pendentes / Reagendados' },
                 { value: 'failed', label: 'Com falha' },
               ]}
               variant="glass"
-              className="min-w-[150px]"
+              className="min-w-[190px]"
             />
 
             {/* Template filter */}
@@ -550,14 +554,16 @@ export default function EmailsPage() {
                           style={
                             log.status === 'sent'
                               ? { background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.2)' }
+                              : log.status === 'pending'
+                              ? { background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }
                               : { background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }
                           }
                         >
-                          {log.status === 'sent' ? 'Enviado' : 'Falhou'}
+                          {log.status === 'sent' ? 'Enviado' : log.status === 'pending' ? 'Pendente' : 'Falhou'}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--brand-text-color)', opacity: 0.6 }}>
-                        {formatDate(log.sent_at)}
+                        {log.status === 'sent' ? formatDate(log.sent_at) : formatDate(log.created_at)}
                       </td>
                     </tr>
                   ))}

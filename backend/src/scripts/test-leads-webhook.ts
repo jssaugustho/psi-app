@@ -1,5 +1,7 @@
 import { db } from '../shared/db';
 import { workspaces } from '../shared/schema';
+import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import readline from 'readline';
 
@@ -33,6 +35,8 @@ const clinicalNotes = [
 const utmSources = ['google', 'instagram', 'facebook', 'ig', 'fb', 'linkedin', 'newsletter', 'tiktok', 'youtube'];
 const utmMediums = ['cpc', 'cpm', 'organic', 'email', 'social', 'sponsored', 'stories'];
 const utmCampaigns = ['ansiedade_geral', 'autoestima_feminina', 'terapia_casal_2026', 'promocional_dia_saude', 'branding_clinica'];
+const utmTerms = ['psicologo', 'terapia_ansiedade', 'atendimento_online', 'consulta_psicologia'];
+const utmContents = ['banner_topo', 'cta_rodape', 'carrossel_01', 'link_bio'];
 
 function randomElement<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -68,31 +72,38 @@ async function main() {
     process.exit(1);
   }
 
-  const workspace = allWorkspaces[0];
+  let workspace = allWorkspaces[0];
   const workspaceId = workspace.id;
   const workspaceName = workspace.name;
   console.log(`🏢 Workspace selecionado: ${workspaceName} (ID: ${workspaceId})`);
   console.log(`📋 Origens de tráfego configuradas no workspace:`, workspace.trafficSources);
 
-  // Secret do Webhook (via arg CLI, env ou prompt interativo)
-  let secret = process.argv[2] || process.env.WEBHOOK_SECRET || '';
-  if (!secret) {
-    const defaultSecretMsg = workspace.webhookSecret ? ` (pressione ENTER para usar o secret do DB: "${workspace.webhookSecret}")` : '';
-    secret = await askSecret(`🔑 Digite o Secret do Webhook${defaultSecretMsg}: `);
-    if (!secret && workspace.webhookSecret) {
-      secret = workspace.webhookSecret;
-    }
+  // Se o workspace não possui secret configurado no banco, auto-gerar um secret válido
+  if (!workspace.webhookSecret || workspace.webhookSecret.trim() === '') {
+    const generatedSecret = crypto.randomUUID();
+    console.log(`⚙️ Workspace sem secret. Auto-configurando webhookSecret: "${generatedSecret}"...`);
+    await db.update(workspaces)
+      .set({ webhookSecret: generatedSecret })
+      .where(eq(workspaces.id, workspaceId));
+    workspace.webhookSecret = generatedSecret;
+  }
+
+  // Secret do Webhook (via arg CLI, env, secret do DB ou prompt interativo)
+  let secret = process.argv[2] || process.env.WEBHOOK_SECRET || workspace.webhookSecret || '';
+  if (!secret && process.stdin.isTTY) {
+    secret = await askSecret(`🔑 Digite o Secret do Webhook: `);
   }
 
   if (!secret) {
-    console.error('❌ Erro: Secret do webhook não foi fornecido. Configure no CRM ou passe como argumento ao rodar o script.');
+    console.error('❌ Erro: Secret do webhook não foi fornecido. Configure no CRM ou passe como argumento.');
     process.exit(1);
   }
 
   console.log(`🔐 Secret configurado para envio no Header: "${secret}"`);
 
-  // Endpoint do webhook
-  const webhookUrl = `http://localhost:5000/crm/webhook?workspace_id=${workspaceId}`;
+  // Endpoint do webhook (Padrão API REST /v1/crm/webhook)
+  const baseUrl = process.env.API_URL || 'http://localhost:5000';
+  const webhookUrl = `${baseUrl.replace(/\/$/, '')}/v1/crm/webhook?workspace_id=${workspaceId}`;
   console.log(`🔗 URL do Webhook: ${webhookUrl}\n`);
 
   let successCount = 0;
@@ -111,7 +122,6 @@ async function main() {
     let phone = '';
     
     if (isDuplicateTest) {
-      // Repetir um padrão prévio simples para gerar duplicados
       const dupNum = Math.floor(Math.random() * 5) + 1;
       email = `lead.duplicado.${dupNum}@example.com`;
       phone = `1198765432${dupNum}`;
@@ -128,6 +138,8 @@ async function main() {
     const utm_source = hasUtms ? randomElement(utmSources) : null;
     const utm_medium = hasUtms ? randomElement(utmMediums) : null;
     const utm_campaign = hasUtms ? randomElement(utmCampaigns) : null;
+    const utm_term = hasUtms ? randomElement(utmTerms) : null;
+    const utm_content = hasUtms ? randomElement(utmContents) : null;
 
     // 20% de chance de enviar uma origem direta ("source") sem UTMs
     const source = (!hasUtms && Math.random() < 0.5) ? randomElement(['Manual', 'Instagram', 'Indicação']) : null;
@@ -141,6 +153,12 @@ async function main() {
       utm_source,
       utm_medium,
       utm_campaign,
+      utm_term,
+      utm_content,
+      custom_field_values: {
+        pref_horario: randomElement(['Manhã', 'Tarde', 'Noite']),
+        modalidade: randomElement(['Online', 'Presencial']),
+      },
     };
 
     try {
@@ -186,7 +204,10 @@ async function main() {
   console.log(`⚠️ Tentativas de Re-cadastro (Duplicados): ${duplicateCount}`);
   console.log(`❌ Erros / Falhas: ${errorCount}`);
   console.log('------------------------------');
-  process.exit(0);
+  process.exit(errorCount > 0 ? 1 : 0);
 }
 
-main();
+main().catch((err) => {
+  console.error('❌ Erro não capturado no script:', err);
+  process.exit(1);
+});

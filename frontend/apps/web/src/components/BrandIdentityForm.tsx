@@ -92,7 +92,7 @@ export function BrandIdentityForm({
     }
   }, [fontHeading, fontBody]);
 
-  // Color Extraction Logic from Logo or Favicon
+  // Color Extraction Logic from Logo and/or Favicon (Icon)
   useEffect(() => {
     if (!logoUrl && !faviconUrl) {
       setExtractedBrandColors([]);
@@ -147,90 +147,135 @@ export function BrandIdentityForm({
       );
     };
 
-    const extractPalette = async (imgUrl: string) => {
-      return new Promise<string[]>((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.src = imgUrl;
+    const extractPalette = async (imgUrl: string): Promise<string[]> => {
+      return new Promise<string[]>((resolve) => {
+        if (!imgUrl) return resolve([]);
 
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return resolve([]);
+        const processImage = (src: string, useCrossOrigin: boolean) => {
+          const img = new Image();
+          if (useCrossOrigin && !src.startsWith('data:')) {
+            img.crossOrigin = 'Anonymous';
+          }
 
-            canvas.width = 120;
-            canvas.height = 120;
-            ctx.drawImage(img, 0, 0, 120, 120);
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return resolve([]);
 
-            const imgData = ctx.getImageData(0, 0, 120, 120).data;
-            const colorCounts: Record<string, number> = {};
+              const size = 100;
+              canvas.width = size;
+              canvas.height = size;
+              ctx.drawImage(img, 0, 0, size, size);
 
-            for (let i = 0; i < imgData.length; i += 16) {
-              const r = imgData[i];
-              const g = imgData[i + 1];
-              const b = imgData[i + 2];
-              const a = imgData[i + 3];
+              let imgData: ImageData;
+              try {
+                imgData = ctx.getImageData(0, 0, size, size);
+              } catch (err) {
+                if (useCrossOrigin && !src.startsWith('data:')) {
+                  // Retry without crossOrigin attribute in case of CORS canvas taint
+                  processImage(src, false);
+                  return;
+                }
+                return resolve([]);
+              }
 
-              if (a < 180) continue; // Skip semi-transparent pixels
+              const data = imgData.data;
+              const colorScores: Record<string, { count: number; score: number }> = {};
 
-              // Filter out pure white, pure black or neutral greys
-              const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-              const isGrey = Math.abs(r - g) < 15 && Math.abs(g - b) < 15;
-              if (luma > 240 || luma < 15 || isGrey) continue;
+              for (let i = 0; i < data.length; i += 16) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
 
-              const hex = rgbToHex(r, g, b);
-              colorCounts[hex] = (colorCounts[hex] || 0) + 1;
-            }
+                if (a < 50) continue; // Ignore transparent pixels
 
-            const sorted = Object.entries(colorCounts)
-              .sort((a, b) => b[1] - a[1])
-              .map(x => x[0]);
+                // Quantize to step of 12 for grouping
+                const qR = Math.min(255, Math.round(r / 12) * 12);
+                const qG = Math.min(255, Math.round(g / 12) * 12);
+                const qB = Math.min(255, Math.round(b / 12) * 12);
+                const hex = rgbToHex(qR, qG, qB);
 
-            const uniqueColors: string[] = [];
-            for (const color of sorted) {
-              let tooClose = false;
-              for (const existing of uniqueColors) {
-                if (colorDistance(color, existing) < 45) {
-                  tooClose = true;
-                  break;
+                const { s, l } = rgbToHsl(r, g, b);
+                const isNeutral = s < 0.12;
+                const isExtremeLuma = l > 0.95 || l < 0.05;
+                const weight = isNeutral ? 0.3 : (1 + s * 3) * (isExtremeLuma ? 0.5 : 1.2);
+
+                if (!colorScores[hex]) {
+                  colorScores[hex] = { count: 0, score: 0 };
+                }
+                colorScores[hex].count += 1;
+                colorScores[hex].score += weight;
+              }
+
+              const sorted = Object.entries(colorScores)
+                .sort((a, b) => b[1].score - a[1].score)
+                .map(([hex]) => hex);
+
+              const uniqueColors: string[] = [];
+              for (const color of sorted) {
+                let tooClose = false;
+                for (const existing of uniqueColors) {
+                  if (colorDistance(color, existing) < 35) {
+                    tooClose = true;
+                    break;
+                  }
+                }
+                if (!tooClose) {
+                  uniqueColors.push(color);
+                  if (uniqueColors.length >= 6) break;
                 }
               }
-              if (!tooClose) {
-                uniqueColors.push(color);
-                if (uniqueColors.length >= 5) break;
-              }
-            }
 
-            resolve(uniqueColors);
-          } catch (e) {
-            reject(e);
-          }
+              resolve(uniqueColors);
+            } catch (e) {
+              resolve([]);
+            }
+          };
+
+          img.onerror = () => {
+            if (useCrossOrigin && !src.startsWith('data:')) {
+              processImage(src, false);
+            } else {
+              resolve([]);
+            }
+          };
+
+          img.src = src;
         };
 
-        img.onerror = (e) => reject(e);
+        processImage(imgUrl, true);
       });
     };
 
-    const activeImageSrc = logoUrl || faviconUrl || '';
-    if (activeImageSrc) {
-      extractPalette(activeImageSrc)
-        .then((colors) => {
-          if (!isMounted) return;
-          const combined = [...colors];
-          const deduplicated: string[] = [];
-          for (const hex of combined) {
-            if (!deduplicated.includes(hex)) deduplicated.push(hex);
+    const imagesToExtract = [logoUrl, faviconUrl].filter(Boolean) as string[];
+
+    Promise.all(imagesToExtract.map(url => extractPalette(url)))
+      .then((results) => {
+        if (!isMounted) return;
+        const combined = results.flat();
+        const deduplicated: string[] = [];
+        for (const hex of combined) {
+          let tooClose = false;
+          for (const existing of deduplicated) {
+            if (colorDistance(hex, existing) < 30) {
+              tooClose = true;
+              break;
+            }
           }
-          if (!deduplicated.includes('#FFFFFF')) deduplicated.push('#FFFFFF');
-          if (!deduplicated.includes('#000000')) deduplicated.push('#000000');
-          setExtractedBrandColors(deduplicated.slice(0, 10));
-          setIsExtractingColors(false);
-        })
-        .catch(() => {
-          if (isMounted) setIsExtractingColors(false);
-        });
-    }
+          if (!tooClose) {
+            deduplicated.push(hex);
+          }
+        }
+        if (!deduplicated.includes('#FFFFFF')) deduplicated.push('#FFFFFF');
+        if (!deduplicated.includes('#000000')) deduplicated.push('#000000');
+        setExtractedBrandColors(deduplicated.slice(0, 10));
+        setIsExtractingColors(false);
+      })
+      .catch(() => {
+        if (isMounted) setIsExtractingColors(false);
+      });
 
     return () => {
       isMounted = false;

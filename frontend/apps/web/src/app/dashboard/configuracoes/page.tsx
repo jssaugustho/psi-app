@@ -12,7 +12,7 @@ const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:ci
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get('token')?.value;
+  const token = cookieStore.get('access_token')?.value || cookieStore.get('token')?.value;
 
   if (!token) {
     redirect('/login');

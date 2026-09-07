@@ -5,13 +5,14 @@
  *
  * Recursos:
  *   - Limitação de taxa global no Resend (Max 2 req/s) com retentativa em HTTP 429
+ *   - Retentativa ILIMITADA para erros de Rate Limit / Anti-Spam (mantendo status 'pending')
+ *   - Retentativa LIMITADA (máx 3) e encaminhamento para DLQ (messages.dlq) para outros erros
  *   - Cache em memória de verificação de domínios (TTL 10min)
  *   - Sub-filas/Espaçamento justo por Usuário / Tenant (mínimo de 2s entre envios)
- *   - Proteção anti-spam por destinatário (máx 1 e-mail do mesmo template/min, 3 no total/5min)
  *   - Registro estruturado em `email_logs`, `audit_logs` e `logs`
  */
 
-import { getChannel, assertQuorumQueue, log } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishToQueue, log } from '../shared/queue';
 import { db } from '../shared/db';
 import { emailLogs, workspaceDomains } from '../shared/schema';
 import { eq } from 'drizzle-orm';
@@ -24,10 +25,12 @@ import {
   checkRecipientAntiSpamLimit,
   getSenderThrottleWaitMs,
   recordSenderSend,
+  isRateLimitErrorMessage,
 } from '../emails/rate-limiter';
 
 const QUEUE_NAME = 'email.transactional';
 const ROUTING_KEY = 'email.transactional';
+const MAX_NON_RATE_LIMIT_RETRIES = 3;
 
 async function updateOrCreateEmailLog(data: {
   emailLogId?: string;
@@ -123,6 +126,38 @@ export async function startEmailConsumer(): Promise<void> {
           const errMsg = 'Configurações do Resend ausentes: API Key da plataforma não configurada.';
           console.error(`❌ ${errMsg}`);
 
+          const nextRetry = retryCount + 1;
+          if (nextRetry <= MAX_NON_RATE_LIMIT_RETRIES) {
+            const userMsg = `${errMsg} (tentativa ${nextRetry}/${MAX_NON_RATE_LIMIT_RETRIES})`;
+            await updateOrCreateEmailLog({
+              emailLogId,
+              toEmail: to,
+              subject: customSubject ?? 'Notificação',
+              template,
+              status: 'pending',
+              error: userMsg,
+              retryCount: nextRetry,
+              metadata: {
+                ...metadata,
+                tenantId: tenantId ?? null,
+                userId: userId ?? null,
+              },
+            });
+
+            setTimeout(async () => {
+              await publishToQueue(ROUTING_KEY, {
+                ...parsedPayload,
+                emailLogId,
+                retryCount: nextRetry,
+                _requeuedAt: new Date().toISOString(),
+              });
+            }, 30000);
+
+            channel.ack(msg);
+            return;
+          }
+
+          // Exaurido -> Enviar para DLQ
           await updateOrCreateEmailLog({
             emailLogId,
             toEmail: to,
@@ -130,16 +165,35 @@ export async function startEmailConsumer(): Promise<void> {
             template,
             status: 'failed',
             error: errMsg,
-            retryCount,
+            retryCount: nextRetry,
             metadata: {
               ...metadata,
-              device: (props as any)?.device ?? null,
-              ip: (props as any)?.ip ?? null,
-              loginAt: (props as any)?.loginAt ?? null,
               tenantId: tenantId ?? null,
               userId: userId ?? null,
             },
           });
+
+          await log({
+            name: 'email.failed',
+            type: 'audit',
+            severity: 'warning',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.failed] - ${errMsg}`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              template,
+              error: errMsg,
+              emailLogId,
+              retryCount: nextRetry,
+            },
+          }).catch(() => {});
 
           channel.nack(msg, false, false);
           return;
@@ -162,6 +216,38 @@ export async function startEmailConsumer(): Promise<void> {
         if (!effectiveFromDomain) {
           const errMsg = 'Domínio de envio não configurado (nem no tenant nem na plataforma).';
           console.error(`❌ ${errMsg}`);
+
+          const nextRetry = retryCount + 1;
+          if (nextRetry <= MAX_NON_RATE_LIMIT_RETRIES) {
+            const userMsg = `${errMsg} (tentativa ${nextRetry}/${MAX_NON_RATE_LIMIT_RETRIES})`;
+            await updateOrCreateEmailLog({
+              emailLogId,
+              toEmail: to,
+              subject: customSubject ?? 'Notificação',
+              template,
+              status: 'pending',
+              error: userMsg,
+              retryCount: nextRetry,
+              metadata: {
+                ...metadata,
+                tenantId: tenantId ?? null,
+                userId: userId ?? null,
+              },
+            });
+
+            setTimeout(async () => {
+              await publishToQueue(ROUTING_KEY, {
+                ...parsedPayload,
+                emailLogId,
+                retryCount: nextRetry,
+                _requeuedAt: new Date().toISOString(),
+              });
+            }, 30000);
+
+            channel.ack(msg);
+            return;
+          }
+
           await updateOrCreateEmailLog({
             emailLogId,
             toEmail: to,
@@ -169,16 +255,36 @@ export async function startEmailConsumer(): Promise<void> {
             template,
             status: 'failed',
             error: errMsg,
-            retryCount,
+            retryCount: nextRetry,
             metadata: {
               ...metadata,
-              device: (props as any)?.device ?? null,
-              ip: (props as any)?.ip ?? null,
-              loginAt: (props as any)?.loginAt ?? null,
               tenantId: tenantId ?? null,
               userId: userId ?? null,
             },
           });
+
+          await log({
+            name: 'email.failed',
+            type: 'audit',
+            severity: 'warning',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.failed] - ${errMsg}`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              template,
+              error: errMsg,
+              emailLogId,
+              retryCount: nextRetry,
+            },
+          }).catch(() => {});
+
           channel.nack(msg, false, false);
           return;
         }
@@ -192,6 +298,37 @@ export async function startEmailConsumer(): Promise<void> {
         if (!isVerified) {
           console.error(`❌ Falha de verificação do domínio: ${verifyError}`);
 
+          const nextRetry = retryCount + 1;
+          if (nextRetry <= MAX_NON_RATE_LIMIT_RETRIES) {
+            const userMsg = `${verifyError} (tentativa ${nextRetry}/${MAX_NON_RATE_LIMIT_RETRIES})`;
+            await updateOrCreateEmailLog({
+              emailLogId,
+              toEmail: to,
+              subject: customSubject ?? 'Notificação',
+              template,
+              status: 'pending',
+              error: userMsg,
+              retryCount: nextRetry,
+              metadata: {
+                ...metadata,
+                tenantId: tenantId ?? null,
+                userId: userId ?? null,
+              },
+            });
+
+            setTimeout(async () => {
+              await publishToQueue(ROUTING_KEY, {
+                ...parsedPayload,
+                emailLogId,
+                retryCount: nextRetry,
+                _requeuedAt: new Date().toISOString(),
+              });
+            }, 30000);
+
+            channel.ack(msg);
+            return;
+          }
+
           await updateOrCreateEmailLog({
             emailLogId,
             toEmail: to,
@@ -199,16 +336,35 @@ export async function startEmailConsumer(): Promise<void> {
             template,
             status: 'failed',
             error: verifyError,
-            retryCount,
+            retryCount: nextRetry,
             metadata: {
               ...metadata,
-              device: (props as any)?.device ?? null,
-              ip: (props as any)?.ip ?? null,
-              loginAt: (props as any)?.loginAt ?? null,
               tenantId: tenantId ?? null,
               userId: userId ?? null,
             },
           });
+
+          await log({
+            name: 'email.failed',
+            type: 'audit',
+            severity: 'warning',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.failed] - ${verifyError}`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              template,
+              error: verifyError,
+              emailLogId,
+              retryCount: nextRetry,
+            },
+          }).catch(() => {});
 
           channel.nack(msg, false, false);
           return;
@@ -217,16 +373,22 @@ export async function startEmailConsumer(): Promise<void> {
         // 5. Anti-Spam Check por Destinatário
         const antiSpamCheck = await checkRecipientAntiSpamLimit(to, template);
         if (!antiSpamCheck.allowed) {
-          console.warn(`⚠️ ${antiSpamCheck.reason}`);
+          const nextRetry = retryCount + 1;
+          const delayMs = 60 * 1000; // 60 segundos de janela anti-spam
+          const errMsg = antiSpamCheck.reason || 'Envio bloqueado por limites anti-spam.';
+          const userMsg = `${errMsg} (Reagendado automaticamente em 60s - Tentativa ${nextRetry})`;
 
+          console.warn(`⏳ ${userMsg}`);
+
+          // Manter status PENDING no banco com aviso amigável
           await updateOrCreateEmailLog({
             emailLogId,
             toEmail: to,
             subject: customSubject ?? 'Notificação',
             template,
-            status: 'failed',
-            error: antiSpamCheck.reason || 'Envio bloqueado por limites anti-spam.',
-            retryCount,
+            status: 'pending',
+            error: userMsg,
+            retryCount: nextRetry,
             metadata: {
               ...metadata,
               device: (props as any)?.device ?? null,
@@ -234,8 +396,43 @@ export async function startEmailConsumer(): Promise<void> {
               loginAt: (props as any)?.loginAt ?? null,
               tenantId: tenantId ?? null,
               userId: userId ?? null,
+              rateLimited: true,
+              nextRetryAt: new Date(Date.now() + delayMs).toISOString(),
             },
           });
+
+          await log({
+            name: 'email.rate_limited',
+            type: 'info',
+            severity: 'info',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.rate_limited] - Reagendando e-mail [${template}] para [${to}] em 60s (Tentativa ${nextRetry})`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              template,
+              error: errMsg,
+              emailLogId,
+              retryCount: nextRetry,
+              delayMs,
+            },
+          }).catch(() => {});
+
+          // Re-enfileirar assincronamente após 60s (retentativa ILIMITADA para anti-spam)
+          setTimeout(async () => {
+            await publishToQueue(ROUTING_KEY, {
+              ...parsedPayload,
+              emailLogId,
+              retryCount: nextRetry,
+              _requeuedFromRateLimitAt: new Date().toISOString(),
+            });
+          }, delayMs);
 
           channel.ack(msg);
           return;
@@ -263,7 +460,8 @@ export async function startEmailConsumer(): Promise<void> {
         const fromAddress = `"${safeBrandName}" <${cleanFromAddress}>`;
 
         let sendError: string | null = null;
-        let emailStatus: 'sent' | 'failed' = 'sent';
+        let emailStatus: 'sent' | 'failed' | 'pending' = 'sent';
+        let externalErrorDetails: any = null;
 
         try {
           const resendResponse = await executeWithResendRateLimit(async () => {
@@ -278,6 +476,7 @@ export async function startEmailConsumer(): Promise<void> {
           if (resendResponse.error) {
             sendError = resendResponse.error.message;
             emailStatus = 'failed';
+            externalErrorDetails = resendResponse.error;
             console.error(`❌ Resend retornou erro para [${to}]:`, resendResponse.error);
           } else {
             console.log(`✅ E-mail [${template}] enviado com sucesso para ${to} (ID: ${emailLogId ?? 's/id'})`);
@@ -286,18 +485,191 @@ export async function startEmailConsumer(): Promise<void> {
         } catch (sendErr: any) {
           sendError = sendErr?.message ?? 'Erro desconhecido no envio';
           emailStatus = 'failed';
+          externalErrorDetails = { message: sendErr?.message, stack: sendErr?.stack, name: sendErr?.name };
           console.error(`❌ Falha ao enviar e-mail para [${to}]:`, sendErr);
         }
 
-        // 9. Persistir/Atualizar log no banco de dados
+        // 9. Verificar se o erro foi de Rate-Limit HTTP 429
+        const isRateLimit = sendError && isRateLimitErrorMessage(externalErrorDetails || sendError);
+
+        if (emailStatus === 'failed' && isRateLimit) {
+          const nextRetry = retryCount + 1;
+          const delayMs = 30 * 1000; // 30 segundos
+          const userMsg = `Resend Rate-Limit (429): ${sendError}. Reagendado (Tentativa ${nextRetry})`;
+
+          console.warn(`⏳ ${userMsg}`);
+
+          await updateOrCreateEmailLog({
+            emailLogId,
+            toEmail: to,
+            subject,
+            template,
+            htmlBody,
+            status: 'pending', // Manter PENDING para retentativa ilimitada de 429
+            error: userMsg,
+            retryCount: nextRetry,
+            metadata: {
+              ...metadata,
+              device: (props as any)?.device ?? null,
+              ip: (props as any)?.ip ?? null,
+              loginAt: (props as any)?.loginAt ?? null,
+              tenantId: tenantId ?? null,
+              userId: userId ?? null,
+              fromDomain: effectiveFromDomain,
+              rateLimited: true,
+              ...(externalErrorDetails ? { externalErrorResponse: externalErrorDetails } : {}),
+            },
+          });
+
+          await log({
+            name: 'email.rate_limited',
+            type: 'info',
+            severity: 'info',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.rate_limited] - Resend 429 para [${to}]. Reagendando em 30s (Tentativa ${nextRetry})`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              subject,
+              template,
+              error: sendError,
+              emailLogId,
+              retryCount: nextRetry,
+            },
+          }).catch(() => {});
+
+          setTimeout(async () => {
+            await publishToQueue(ROUTING_KEY, {
+              ...parsedPayload,
+              emailLogId,
+              retryCount: nextRetry,
+              _requeuedFromRateLimitAt: new Date().toISOString(),
+            });
+          }, delayMs);
+
+          channel.ack(msg);
+          return;
+        }
+
+        // 10. Tratar outros erros de envio (não-rate-limit)
+        if (emailStatus === 'failed') {
+          const nextRetry = retryCount + 1;
+          if (nextRetry <= MAX_NON_RATE_LIMIT_RETRIES) {
+            const userMsg = `${sendError} (tentativa ${nextRetry}/${MAX_NON_RATE_LIMIT_RETRIES})`;
+            console.warn(`🔄 ${userMsg}`);
+
+            await updateOrCreateEmailLog({
+              emailLogId,
+              toEmail: to,
+              subject,
+              template,
+              htmlBody,
+              status: 'pending',
+              error: userMsg,
+              retryCount: nextRetry,
+              metadata: {
+                ...metadata,
+                fromDomain: effectiveFromDomain,
+                ...(externalErrorDetails ? { externalErrorResponse: externalErrorDetails } : {}),
+              },
+            });
+
+            await log({
+              name: 'email.retrying',
+              type: 'audit',
+              severity: 'warning',
+              serviceName: 'workers',
+              clientApp: metadata?.clientApp || 'workers',
+              userRole: metadata?.userRole || 'system',
+              message: `[email:email.retrying] - ${userMsg}`,
+              userId: userId ?? metadata?.userId ?? null,
+              workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+              sessionId: metadata?.sessionId ?? null,
+              metadata: {
+                workerName: 'emailConsumer',
+                requestId: metadata?.requestId ?? null,
+                toEmail: to,
+                subject,
+                template,
+                error: sendError,
+                emailLogId,
+                retryCount: nextRetry,
+              },
+            }).catch(() => {});
+
+            setTimeout(async () => {
+              await publishToQueue(ROUTING_KEY, {
+                ...parsedPayload,
+                emailLogId,
+                retryCount: nextRetry,
+                _requeuedAt: new Date().toISOString(),
+              });
+            }, nextRetry * 30000);
+
+            channel.ack(msg);
+            return;
+          }
+
+          // Se excedeu retentativas para erro não-rate-limit -> Marcar failed e enviar para DLQ via nack
+          const finalError = `[Falha Permanente] ${sendError} (Excedido ${MAX_NON_RATE_LIMIT_RETRIES} tentativas)`;
+          await updateOrCreateEmailLog({
+            emailLogId,
+            toEmail: to,
+            subject,
+            template,
+            htmlBody,
+            status: 'failed',
+            error: finalError,
+            retryCount: nextRetry,
+            metadata: {
+              ...metadata,
+              fromDomain: effectiveFromDomain,
+              ...(externalErrorDetails ? { externalErrorResponse: externalErrorDetails } : {}),
+            },
+          });
+
+          await log({
+            name: 'email.failed',
+            type: 'audit',
+            severity: 'error',
+            serviceName: 'workers',
+            clientApp: metadata?.clientApp || 'workers',
+            userRole: metadata?.userRole || 'system',
+            message: `[email:email.failed] - ${finalError}`,
+            userId: userId ?? metadata?.userId ?? null,
+            workspaceId: tenantId ?? metadata?.workspaceId ?? null,
+            sessionId: metadata?.sessionId ?? null,
+            metadata: {
+              workerName: 'emailConsumer',
+              requestId: metadata?.requestId ?? null,
+              toEmail: to,
+              subject,
+              template,
+              error: finalError,
+              emailLogId,
+              retryCount: nextRetry,
+            },
+          }).catch(() => {});
+
+          channel.nack(msg, false, false);
+          return;
+        }
+
+        // 11. Envio realizado com Sucesso!
         await updateOrCreateEmailLog({
           emailLogId,
           toEmail: to,
           subject,
           template,
           htmlBody,
-          status: emailStatus,
-          error: sendError,
+          status: 'sent',
+          error: null,
           retryCount,
           metadata: {
             ...metadata,
@@ -310,15 +682,14 @@ export async function startEmailConsumer(): Promise<void> {
           },
         });
 
-        // 10. Publicar evento de log unificado
         await log({
-          name: emailStatus === 'sent' ? 'email.sent' : 'email.failed',
+          name: 'email.sent',
           type: 'audit',
-          severity: emailStatus === 'sent' ? 'info' : 'warning',
+          severity: 'info',
           serviceName: 'workers',
           clientApp: metadata?.clientApp || 'workers',
           userRole: metadata?.userRole || 'system',
-          message: `[email:${emailStatus === 'sent' ? 'email.sent' : 'email.failed'}] - ${emailStatus === 'sent' ? 'success' : 'failure'}`,
+          message: '[email:email.sent] - success',
           userId: userId ?? metadata?.userId ?? null,
           workspaceId: tenantId ?? metadata?.workspaceId ?? null,
           sessionId: metadata?.sessionId ?? null,
@@ -331,7 +702,6 @@ export async function startEmailConsumer(): Promise<void> {
             subject,
             template,
             fromDomain: effectiveFromDomain,
-            error: sendError,
             emailLogId,
             retryCount,
           },
@@ -372,7 +742,7 @@ export async function startEmailConsumer(): Promise<void> {
               template: parsedPayload.template ?? 'unknown',
               status: 'failed',
               error: error?.message ?? 'Erro de processamento',
-              retryCount: parsedPayload.retryCount ?? 0,
+              retryCount: (parsedPayload.retryCount ?? 0) + 1,
             });
           } catch {
             /* ignora erro secundário */

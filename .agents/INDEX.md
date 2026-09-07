@@ -21,6 +21,8 @@ This directory contains the modular AI-First rules, architectural specifications
 │   ├── site_staging_and_publishing.md  # Draft, Staging & Subdomain publishing
 │   ├── captacao_ux.md                  # Lead capture & Psychologist CRM workflow
 │   └── platform_settings.md            # System settings & tenant feature flags
+├── backlog/                            # 📋 MVP Backlog & Technical Debt Tracking
+│   └── 01_mvp_discrepancies_and_technical_debt.md # MVP discrepancies & Post-MVP refactoring roadmap
 └── studies/                            # 📚 Research & Reference Guides
     ├── crm_psychologist_study.md       # UX and psychologist workflow research
     └── postgres_mcp_guide.md           # PostgreSQL MCP server tool instructions

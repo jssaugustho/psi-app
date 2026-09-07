@@ -1,4 +1,4 @@
-import { publishToQueue } from '../shared/queue';
+import { publishToQueue, RequiredQueueMetadata } from '../shared/queue';
 import { db } from '../shared/db';
 import { emailLogs } from '../shared/schema';
 import { LoginNotificationProps } from './templates/login-notification';
@@ -6,8 +6,9 @@ import { InviteMemberProps } from './templates/invite-member';
 import { ResetPasswordProps } from './templates/reset-password';
 
 // ── Base de Metadados de E-mail para Tracing ──────────────────────────────
-export interface EmailTracingMetadata {
+export interface EmailTracingMetadata extends Partial<RequiredQueueMetadata> {
   requestId?: string;
+  clientApp?: string;
   sessionId?: string;
   workspaceId?: string;
   userId?: string;

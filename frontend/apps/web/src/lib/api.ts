@@ -2,9 +2,9 @@ import { compressImage, type UploadType } from '@psi/image-utils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
-const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
-  ? API_BASE_URL.slice(0, -3) + '/rest/v1'
-  : API_BASE_URL + '/rest/v1';
+const PGRST_BASE_URL = typeof window !== 'undefined'
+  ? '/rest/v1'
+  : (API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/rest/v1' : API_BASE_URL + '/rest/v1');
 
 const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source,webhook_secret';
 
@@ -157,6 +157,7 @@ export interface RefreshTokenResponse {
 export interface PipelineColumn {
   id: string;
   tenant_id: string;
+  workspace_id?: string;
   name: string;
   slug: string;
   color: string;
@@ -234,21 +235,20 @@ async function doRefresh(): Promise<string> {
   if (_refreshPromise) return _refreshPromise;
 
   _refreshPromise = (async () => {
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-    if (!refreshToken) throw new Error('Sem refresh_token disponível');
+    const refreshUrl = typeof window !== 'undefined'
+      ? '/v1/auth/refresh'
+      : `${API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/v1' : API_BASE_URL}/auth/refresh`;
 
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetch(refreshUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: JSON.stringify({}),
+      credentials: 'include',
     });
 
     if (!response.ok) throw new Error('Refresh falhou');
 
     const data: RefreshTokenResponse = await response.json();
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    localStorage.setItem('token_expires_at', String(data.expires_at));
     return data.access_token;
   })().finally(() => {
     _refreshPromise = null;
@@ -289,8 +289,6 @@ export interface FetchApiOptions extends RequestInit {
  * Helper genérico de fetch para chamadas à API
  */
 async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isRetry = false): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
   const isSitePage = typeof window !== 'undefined' && (
     window.location.pathname.startsWith('/f/') ||
     window.location.pathname.startsWith('/p/') ||
@@ -298,38 +296,63 @@ async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isR
   );
   const clientApp = isSitePage ? 'sites' : 'web';
 
+  let resolvedEndpoint = endpoint;
+  let baseUrl = API_BASE_URL;
+
+  // Em ambiente de navegador (client side), converter URLs absolutas para a API/PostgREST
+  // em rotas relativas (/v1/... ou /rest/v1/...) para utilizar os rewrites Same-Origin do Next.js (next.config.ts).
+  // Isso garante chamadas Same-Origin 100% compativeis com cookies HttpOnly SameSite=Lax.
+  if (typeof window !== 'undefined') {
+    if (resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(resolvedEndpoint);
+        if (parsedUrl.pathname.startsWith('/v1/') || parsedUrl.pathname.startsWith('/rest/v1/') || parsedUrl.pathname.startsWith('/auth/v1/')) {
+          resolvedEndpoint = parsedUrl.pathname + parsedUrl.search;
+        }
+      } catch {
+        // Ignora erro de parse
+      }
+    }
+    if (baseUrl.startsWith('http://') || baseUrl.startsWith('https://')) {
+      baseUrl = baseUrl.endsWith('/v1') ? '/v1' : '';
+    }
+  }
+
+  if (baseUrl.endsWith('/v1')) {
+    if (resolvedEndpoint.startsWith('/v1/')) {
+      resolvedEndpoint = resolvedEndpoint.slice(3);
+    } else if (resolvedEndpoint.startsWith('/rest/v1/')) {
+      baseUrl = baseUrl.slice(0, -3);
+    }
+  }
+
+  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
+    ? resolvedEndpoint
+    : `${baseUrl}${resolvedEndpoint}`;
+
+  const isPostgrest = url.includes('/rest/v1');
+
   const headers: Record<string, string> = {
-    'X-Client-App': clientApp,
-    ...(typeof window !== 'undefined' && window.location?.href ? { 'X-Client-Url': window.location.href } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  if (!isPostgrest) {
+    headers['X-Client-App'] = clientApp;
+    if (typeof window !== 'undefined' && window.location?.href) {
+      headers['X-Client-Url'] = window.location.href;
+    }
+  }
 
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  let resolvedEndpoint = endpoint;
-  if (API_BASE_URL.endsWith('/v1') && resolvedEndpoint.startsWith('/v1/')) {
-    resolvedEndpoint = resolvedEndpoint.slice(3);
-  }
-
-  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
-    ? resolvedEndpoint
-    : `${API_BASE_URL}${resolvedEndpoint}`;
-
-  const isPostgrest = url.includes('/rest/v1');
   const { skipNotifyOffline, ...restOptions } = options;
   const fetchOptions: RequestInit = {
+    credentials: 'include',
     ...restOptions,
     headers,
   };
-  if (!isPostgrest && options.credentials === undefined) {
-    fetchOptions.credentials = 'include';
-  }
 
   let response;
   try {
@@ -364,26 +387,30 @@ async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isR
     }
   }
 
+  const isAuthCheckEndpoint = endpoint.includes('/auth/me');
   const isAuthEndpoint = endpoint.includes('/auth/login') ||
                          endpoint.includes('/auth/register') ||
                          endpoint.includes('/auth/bootstrap') ||
-                         endpoint.includes('/auth/refresh');
+                         endpoint.includes('/auth/refresh') ||
+                         isAuthCheckEndpoint;
 
-  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez (apenas para rotas protegidas)
-  if (response.status === 401 && !_isRetry && !isAuthEndpoint) {
+  // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez (exceto em login/register/bootstrap)
+  if (response.status === 401 && !_isRetry && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register') && !endpoint.includes('/auth/bootstrap')) {
     try {
       await doRefresh();
       return fetchApi<T>(endpoint, options, true); // retry com novo token
     } catch {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('auth:logout'));
-      }
       throw new Error('Sessão expirada. Faça login novamente.');
     }
   }
 
   if (!response.ok) {
-    const errorMsg = data.message || data.error || 'Erro na requisição';
+    let errorMsg = data.message || data.error || 'Erro na requisição';
+
+    // Se for erro de autorização ou token ausente/expirado, sanitizar a mensagem
+    if (response.status === 401 || errorMsg.includes('Token JWT') || errorMsg.includes('JWT') || errorMsg === 'Não autorizado') {
+      errorMsg = 'Sessão expirada. Faça login novamente.';
+    }
 
     // Registrar erro no RabbitMQ se for erro de servidor (5xx) ou PostgREST (400)
     const isPostgrest = url.includes('/rest/v1');
@@ -391,14 +418,14 @@ async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isR
     const isCoreApi = !isPostgrest && !isGoTrue;
     const serviceName = isPostgrest ? 'postgrest' : isGoTrue ? 'gotrue' : 'core-api';
 
-    if (response.status >= 500 || (isPostgrest && response.status === 400)) {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (response.status >= 500 || (isPostgrest && response.status >= 400)) {
       fetch(`${API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/v1' : API_BASE_URL}/platform/errors`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'X-Client-App': 'web',
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: isPostgrest ? 'PostgrestError' : isGoTrue ? 'GoTrueError' : 'ApiError',
           message: `${response.status} ${response.statusText}: ${errorMsg}`,
@@ -411,6 +438,7 @@ async function fetchApi<T>(endpoint: string, options: FetchApiOptions = {}, _isR
             url,
             endpoint,
             serviceName,
+            clientApp: 'web',
           }
         }),
       }).catch(err => console.error('Erro ao registrar log de erro na API:', err));
@@ -463,12 +491,18 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
 
-  // Renovar access_token usando o refresh_token
-  refreshToken: (refresh_token: string) =>
+  // Renovar access_token usando o cookie HttpOnly ou refresh_token de callback
+  refreshToken: (refresh_token?: string) =>
     fetchApi<RefreshTokenResponse>('/auth/refresh', {
       method: 'POST',
-      body: JSON.stringify({ refresh_token }),
+      body: JSON.stringify(refresh_token ? { refresh_token } : {}),
       skipNotifyOffline: true,
+    }),
+
+  // Encerrar a sessão do usuário no backend e revogar tokens
+  logout: () =>
+    fetchApi<{ message: string }>('/auth/logout', {
+      method: 'POST',
     }),
 
   // Buscar perfil do usuário logado
@@ -784,28 +818,95 @@ export const api = {
     return res[0] || null;
   },
 
-  // --- CRM: Pipeline Columns ---
-  getPipelineColumns: async (tenantId: string): Promise<PipelineColumn[]> => {
-    return fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns?workspace_id=eq.${tenantId}&order=order.asc`);
+  getMyWorkspaces: async (): Promise<Tenant[]> => {
+    const me = await fetchApi<{ user: User }>('/auth/me').catch(() => null);
+    if (!me?.user?.id) return [];
+    // Busca via membros do workspace
+    const members = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_members?user_id=eq.${me.user.id}&select=workspace:workspaces(${TENANT_SELECT})`).catch(() => []);
+    if (members && members.length > 0) {
+      const list = members.map((m: any) => m.workspace).filter(Boolean);
+      if (list.length > 0) return list;
+    }
+    // Fallback por proprietário (owner_id)
+    const owned = await fetchApi<Tenant[]>(`${PGRST_BASE_URL}/workspaces?select=${TENANT_SELECT}&owner_id=eq.${me.user.id}`).catch(() => []);
+    return owned || [];
   },
 
-  createPipelineColumn: async (body: { tenant_id: string; name: string; order: number; slug?: string; color?: string; category?: string }): Promise<PipelineColumn> => {
-    const { tenant_id, ...rest } = body;
-    const res = await fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns`, {
+  // --- CRM: Pipeline Columns ---
+  getPipelineColumns: async (tenantId: string): Promise<PipelineColumn[]> => {
+    if (!tenantId) return [];
+
+    const normalize = (col: any): PipelineColumn => ({
+      ...col,
+      tenant_id: col.tenant_id || col.workspace_id || tenantId,
+      workspace_id: col.workspace_id || col.tenant_id || tenantId,
+    });
+
+    let cols = await fetchApi<any[]>(`${PGRST_BASE_URL}/pipeline_columns?workspace_id=eq.${tenantId}&order=order.asc`).catch(() => []);
+
+    // Se o workspace não possui nenhuma coluna cadastrada no DB, cria as 7 colunas padrão automaticamente
+    if (!cols || cols.length === 0) {
+      const defaultCols = [
+        { name: 'Contato Inicial', slug: 'contato-inicial', color: '#6366F1', category: 'pendente', order: 0 },
+        { name: 'Triagem', slug: 'triagem', color: '#F59E0B', category: 'acolhimento', order: 1 },
+        { name: '1ª Sessão Agendada', slug: '1a-sessao-agendada', color: '#3B82F6', category: 'acolhimento', order: 2 },
+        { name: 'Sessão Realizada', slug: 'sessao-realizada', color: '#10B981', category: 'acolhimento', order: 3 },
+        { name: 'Paciente Ativo', slug: 'paciente-ativo', color: '#8B5CF6', category: 'paciente', order: 4 },
+        { name: 'Alta Clínica', slug: 'alta-clinica', color: '#14B8A6', category: 'alta', order: 5 },
+        { name: 'Arquivado', slug: 'arquivado', color: '#EF4444', category: 'negativa', order: 6 },
+      ];
+
+      try {
+        const created: any[] = [];
+        for (const item of defaultCols) {
+          const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/pipeline_columns`, {
+            method: 'POST',
+            body: JSON.stringify({ workspace_id: tenantId, ...item }),
+            headers: { 'Prefer': 'return=representation' }
+          }).catch(() => []);
+          if (res && res[0]) {
+            created.push(res[0]);
+          }
+        }
+        if (created.length > 0) {
+          cols = created;
+        }
+      } catch (err) {
+        console.warn('Erro ao auto-criar colunas padrão do CRM:', err);
+      }
+    }
+
+    return (cols || []).map(normalize);
+  },
+
+  createPipelineColumn: async (body: { tenant_id?: string; workspace_id?: string; name: string; order: number; slug?: string; color?: string; category?: string }): Promise<PipelineColumn> => {
+    const wsId = body.workspace_id || body.tenant_id;
+    const { tenant_id, workspace_id, ...rest } = body;
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/pipeline_columns`, {
       method: 'POST',
-      body: JSON.stringify({ workspace_id: tenant_id, ...rest }),
+      body: JSON.stringify({ workspace_id: wsId, ...rest }),
       headers: { 'Prefer': 'return=representation' }
     });
-    return res[0];
+    const item = res[0];
+    return {
+      ...item,
+      tenant_id: item.tenant_id || item.workspace_id || wsId,
+      workspace_id: item.workspace_id || item.tenant_id || wsId,
+    };
   },
 
   updatePipelineColumn: async (id: string, body: Partial<PipelineColumn>): Promise<PipelineColumn> => {
-    const res = await fetchApi<PipelineColumn[]>(`${PGRST_BASE_URL}/pipeline_columns?id=eq.${id}`, {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/pipeline_columns?id=eq.${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
       headers: { 'Prefer': 'return=representation' }
     });
-    return res[0];
+    const item = res[0];
+    return {
+      ...item,
+      tenant_id: item.tenant_id || item.workspace_id,
+      workspace_id: item.workspace_id || item.tenant_id,
+    };
   },
 
   deletePipelineColumn: async (id: string): Promise<void> => {
@@ -1146,10 +1247,24 @@ export const api = {
     });
   },
 
-  // --- Formulários de Triagem (Screening Forms) ---
+  // --- Formulários de Triagem (Screening Forms - PostgREST nativo com RLS) ---
   getForms: async (tenantId: string): Promise<ScreeningForm[]> => {
-    const res = await fetchApi<{ success: boolean; forms: ScreeningForm[] }>(`/crm/forms?tenantId=${tenantId}`);
-    return res.forms || [];
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms?workspace_id=eq.${tenantId}&order=created_at.desc`);
+    return list.map(item => ({
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config,
+      formFlow: item.form_flow,
+      titleDraft: item.draft_data?.title ?? null,
+      slugDraft: item.draft_data?.slug ?? null,
+      themeConfigDraft: item.draft_data?.themeConfig ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    }));
   },
 
   createForm: async (body: {
@@ -1159,16 +1274,52 @@ export const api = {
     themeConfig?: Record<string, any>;
     formFlow?: Record<string, any>;
   }): Promise<ScreeningForm> => {
-    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms`, {
+    const slug = body.slug || body.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms`, {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        workspace_id: body.tenantId,
+        title: body.title,
+        slug,
+        is_active: true,
+        theme_config: body.themeConfig || {},
+        form_flow: body.formFlow || {},
+      }),
+      headers: { 'Prefer': 'return=representation' }
     });
-    return res.form;
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config,
+      formFlow: item.form_flow,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
   },
 
   getFormById: async (id: string): Promise<ScreeningForm> => {
-    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms/${id}`);
-    return res.form;
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms?id=eq.${id}`);
+    if (!list || list.length === 0) throw new Error('Formulário não encontrado');
+    const item = list[0];
+    return {
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config,
+      formFlow: item.form_flow,
+      titleDraft: item.draft_data?.title ?? null,
+      slugDraft: item.draft_data?.slug ?? null,
+      themeConfigDraft: item.draft_data?.themeConfig ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
   },
 
   updateForm: async (id: string, body: {
@@ -1178,15 +1329,58 @@ export const api = {
     formFlowDraft?: Record<string, any>;
     isPublish?: boolean;
   }): Promise<ScreeningForm> => {
-    const res = await fetchApi<{ success: boolean; form: ScreeningForm }>(`/crm/forms/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
+    const currentList = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms?id=eq.${id}`);
+    if (!currentList || currentList.length === 0) throw new Error('Formulário não encontrado');
+    const current = currentList[0];
+
+    let dbBody: Record<string, any> = {};
+
+    if (body.isPublish) {
+      const draft = current.draft_data || {};
+      dbBody = {
+        title: body.titleDraft ?? draft.title ?? current.title,
+        slug: body.slugDraft ?? draft.slug ?? current.slug,
+        theme_config: body.themeConfigDraft ?? draft.themeConfig ?? current.theme_config,
+        form_flow: body.formFlowDraft ?? draft.formFlow ?? current.form_flow,
+        draft_data: null,
+      };
+    } else {
+      const currentDraft = current.draft_data || {};
+      const updatedDraft = {
+        ...currentDraft,
+        ...(body.titleDraft !== undefined ? { title: body.titleDraft } : {}),
+        ...(body.slugDraft !== undefined ? { slug: body.slugDraft } : {}),
+        ...(body.themeConfigDraft !== undefined ? { themeConfig: body.themeConfigDraft } : {}),
+        ...(body.formFlowDraft !== undefined ? { formFlow: body.formFlowDraft } : {}),
+      };
+      dbBody = { draft_data: updatedDraft };
+    }
+
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+      headers: { 'Prefer': 'return=representation' }
     });
-    return res.form;
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config,
+      formFlow: item.form_flow,
+      titleDraft: item.draft_data?.title ?? null,
+      slugDraft: item.draft_data?.slug ?? null,
+      themeConfigDraft: item.draft_data?.themeConfig ?? null,
+      formFlowDraft: item.draft_data?.formFlow ?? null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
   },
 
   deleteForm: async (id: string): Promise<void> => {
-    await fetchApi(`/crm/forms/${id}`, {
+    await fetchApi(`${PGRST_BASE_URL}/screening_forms?id=eq.${id}`, {
       method: 'DELETE',
     });
   },
@@ -1230,10 +1424,18 @@ export const api = {
 
 
   checkSubdomainAvailability: async (slug: string, tenantId?: string): Promise<{ available: boolean; slug: string; fullUrl: string; reason: string }> => {
+    const normalized = slug.toLowerCase().trim();
     const query = tenantId 
-      ? `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}&tenantId=${encodeURIComponent(tenantId)}`
-      : `/crm/captacao/check-subdomain?slug=${encodeURIComponent(slug)}`;
-    return fetchApi<{ available: boolean; slug: string; fullUrl: string; reason: string }>(query);
+      ? `${PGRST_BASE_URL}/workspace_domains?subdomain=eq.${normalized}&workspace_id=neq.${tenantId}`
+      : `${PGRST_BASE_URL}/workspace_domains?subdomain=eq.${normalized}`;
+    const list = await fetchApi<any[]>(query);
+    const available = !list || list.length === 0;
+    return {
+      available,
+      slug: normalized,
+      fullUrl: `https://${normalized}.psi.app`,
+      reason: available ? 'Subdomínio disponível' : 'Subdomínio já em uso'
+    };
   },
 
   registerCustomHostname: async (pageId: string | null, domain: string, workspaceId?: string): Promise<{
@@ -1279,9 +1481,20 @@ export const api = {
     dnsRecords?: Array<{ type: string; name: string; value: string; description?: string; status?: string }>;
     updatedAt?: string;
   } | null> => {
-    const res = await fetchApi<any>(`/crm/captacao/workspace-domain?workspaceId=${encodeURIComponent(workspaceId)}`);
-    if (!res || res.found === false) return null;
-    return res;
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${workspaceId}`);
+    if (!list || list.length === 0) return null;
+    const item = list[0];
+    return {
+      found: true,
+      id: item.id,
+      workspaceId: item.workspace_id,
+      subdomain: item.subdomain,
+      customDomain: item.custom_domain,
+      cfHostnameId: item.cf_hostname_id,
+      dnsStatus: item.dns_status,
+      dnsRecords: item.dns_records,
+      updatedAt: item.updated_at,
+    };
   },
 
 

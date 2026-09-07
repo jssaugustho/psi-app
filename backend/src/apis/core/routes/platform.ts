@@ -164,6 +164,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       });
     } catch (err: any) {
       fastify.log.error(err);
+      (request.raw as any).errorStack = err.stack || String(err);
+      log({
+        name: err.name || 'SetupStatusError',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: err.message || String(err),
+        stack: err.stack,
+        url: request.url,
+        userAgent: (request.headers['user-agent'] as string) || null,
+        metadata: { requestId: (request.raw as any).requestId },
+      }).catch(() => {});
       return reply.status(500).send({
         error: 'Erro no servidor',
         message: 'Não foi possível checar o status de configuração da plataforma.',
@@ -181,11 +193,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const profile = await db.query.profiles.findFirst({
           where: eq(profiles.id, decoded.sub),
         });
@@ -329,6 +341,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
         log({
           name: err.name || 'CloudflareConfigError',
           type: 'error',
@@ -358,11 +371,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const profile = await db.query.profiles.findFirst({
           where: eq(profiles.id, decoded.sub),
         });
@@ -448,11 +461,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const profile = await db.query.profiles.findFirst({
           where: eq(profiles.id, decoded.sub),
         });
@@ -533,11 +546,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
   // Lista todas as Zones (Domínios) disponíveis na conta Cloudflare
   fastify.get('/cloudflare/zones', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const userToken = extractJwtFromRequest(request);
+      if (!userToken) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      verifyUserJwt(authHeader.split(' ')[1]);
+      verifyUserJwt(userToken);
 
       const queryApiToken = (request.query as any)?.api_token;
       let token = queryApiToken?.trim();
@@ -575,6 +588,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       return reply.send({ success: true, zones });
     } catch (err: any) {
       fastify.log.error(err);
+      (request.raw as any).errorStack = err.stack || String(err);
+      log({
+        name: err.name || 'CloudflareZonesError',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: err.message || String(err),
+        stack: err.stack,
+        url: request.url,
+        userAgent: (request.headers['user-agent'] as string) || null,
+        metadata: { requestId: (request.raw as any).requestId },
+      }).catch(() => {});
       return reply.status(500).send({ error: 'Erro interno', message: err.message });
     }
   });
@@ -583,11 +608,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
   // Testa a conexão do Token da API do Cloudflare, valida a Zone e verifica as permissões.
   fastify.post('/cloudflare/test-permissions', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const userToken = extractJwtFromRequest(request);
+      if (!userToken) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      verifyUserJwt(authHeader.split(' ')[1]);
+      verifyUserJwt(userToken);
 
       const body: any = request.body || {};
       const existingSettings = await db.query.platformSettings.findFirst();
@@ -655,6 +680,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       });
     } catch (err: any) {
       fastify.log.error(err);
+      (request.raw as any).errorStack = err.stack || String(err);
+      log({
+        name: err.name || 'CloudflarePermissionsError',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: err.message || String(err),
+        stack: err.stack,
+        url: request.url,
+        userAgent: (request.headers['user-agent'] as string) || null,
+        metadata: { requestId: (request.raw as any).requestId },
+      }).catch(() => {});
       return reply.status(500).send({ error: 'Erro de teste', message: err.message || 'Falha ao testar permissões.' });
     }
   });
@@ -676,11 +713,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     async (request, reply) => {
       try {
         // 1. Validar JWT
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         // 2. Buscar credenciais do R2
         const settings = await db.query.platformSettings.findFirst();
@@ -772,6 +809,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        log({
+          name: err.name || 'PresignUploadError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({
           error: 'Erro ao gerar URL de upload',
           message: err.message || 'Não foi possível gerar a Presigned URL.',
@@ -783,11 +832,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
   // POST /v1/platform/upload/direct (Fallback de upload multipart via API backend)
   fastify.post('/upload/direct', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const token = extractJwtFromRequest(request);
+      if (!token) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      verifyUserJwt(authHeader.split(' ')[1]);
+      verifyUserJwt(token);
 
       const data = await request.file();
       if (!data) {
@@ -871,6 +920,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       }
     } catch (err: any) {
       fastify.log.error(err);
+      (request.raw as any).errorStack = err.stack || String(err);
+      log({
+        name: err.name || 'DirectUploadError',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: err.message || String(err),
+        stack: err.stack,
+        url: request.url,
+        userAgent: (request.headers['user-agent'] as string) || null,
+        metadata: { requestId: (request.raw as any).requestId },
+      }).catch(() => {});
       return reply.status(500).send({
         error: 'Erro no Upload Direto',
         message: err.message || 'Falha ao processar upload direto.',
@@ -911,11 +972,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
 
         const query = request.query as any;
         const targetWorkspaceId = query.workspaceId || query.tenantId;
@@ -956,6 +1017,18 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         return reply.send(assets);
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        log({
+          name: err.name || 'GetMediaError',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack,
+          url: request.url,
+          userAgent: (request.headers['user-agent'] as string) || null,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
@@ -985,11 +1058,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
 
         const body = request.body as any;
         const targetWorkspaceId = body.workspaceId || body.tenantId;
@@ -1126,11 +1199,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
 
         const { id } = request.params;
 
@@ -1209,11 +1282,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         const body = request.body;
 
@@ -1310,11 +1383,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         const body = request.body;
         const existingSettings = await db.query.platformSettings.findFirst();
@@ -1398,11 +1471,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     async (request, reply) => {
       try {
         // Autenticação
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const profile = await db.query.profiles.findFirst({
           where: eq(profiles.id, decoded.sub),
         });
@@ -1525,11 +1598,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const profile = await db.query.profiles.findFirst({
           where: eq(profiles.id, decoded.sub),
         });
@@ -1636,11 +1709,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
   // ──────────────────────────────────────────────────────────────────────────
   fastify.get('/resend/dns', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const token = extractJwtFromRequest(request);
+      if (!token) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+      const decoded = verifyUserJwt(token);
       const profile = await db.query.profiles.findFirst({
         where: eq(profiles.id, decoded.sub),
       });
@@ -1752,11 +1825,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
   // ──────────────────────────────────────────────────────────────────────────
   fastify.post('/resend/verify', async (request, reply) => {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const token = extractJwtFromRequest(request);
+      if (!token) {
         return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
       }
-      const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+      const decoded = verifyUserJwt(token);
       const profile = await db.query.profiles.findFirst({
         where: eq(profiles.id, decoded.sub),
       });
@@ -1830,11 +1903,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         const { id } = request.params;
 
@@ -1950,11 +2023,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     '/workspaces/:id',
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const { id } = request.params as any;
 
         const targetWorkspace = await db.query.workspaces.findFirst({
@@ -2070,128 +2143,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
 
 
-  // GET /v1/platform/errors
-  // Lista logs de erro com filtros e paginação
-  fastify.get(
-    '/errors',
-    {
-      schema: {
-        querystring: z.object({
-          limit: z.coerce.number().default(100),
-          offset: z.coerce.number().default(0),
-          type: z.string().optional(),
-          serviceName: z.string().optional(),
-          severity: z.string().optional(),
-          name: z.string().optional(),
-          message: z.string().optional(),
-          userId: z.string().optional(),
-          sessionId: z.string().optional(),
-          requestId: z.string().optional(),
-          clientApp: z.string().optional(),
-          userRole: z.string().optional(),
-          startDate: z.string().optional(),
-          endDate: z.string().optional(),
-        }),
-      },
-    },
-    async (request, reply) => {
-      try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
-        }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-
-        const platformUserProfile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, decoded.sub),
-        });
-        
-        if (platformUserProfile?.role !== 'admin') {
-          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores da plataforma.' });
-        }
-
-        const { limit, offset, type, serviceName, severity, name, message, userId, sessionId, requestId, clientApp, userRole, startDate, endDate } = request.query;
-
-        const conditions = [];
-
-        if (type) {
-          conditions.push(eq(logs.type, type));
-        }
-        if (serviceName) {
-          conditions.push(eq(logs.serviceName, serviceName));
-        }
-        if (severity) {
-          conditions.push(eq(logs.severity, severity as any));
-        }
-        if (name) {
-          conditions.push(sql`${logs.name} ILIKE ${'%' + name + '%'}`);
-        }
-        if (message) {
-          conditions.push(sql`${logs.message} ILIKE ${'%' + message + '%'}`);
-        }
-        if (userId) {
-          conditions.push(eq(logs.userId, userId));
-        }
-        if (sessionId) {
-          conditions.push(eq(logs.sessionId, sessionId));
-        }
-        if (requestId) {
-          conditions.push(sql`${logs.metadata}->>'requestId' = ${requestId}`);
-        }
-        if (clientApp) {
-          conditions.push(eq(logs.clientApp, clientApp));
-        }
-        if (userRole) {
-          conditions.push(eq(logs.userRole, userRole));
-        }
-        if (startDate) {
-          conditions.push(gte(logs.createdAt, new Date(startDate)));
-        }
-        if (endDate) {
-          conditions.push(lte(logs.createdAt, new Date(endDate)));
-        }
-
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-        // Buscar registros e total
-        const logsList = await db.query.logs.findMany({
-          where: whereClause,
-          limit,
-          offset,
-          orderBy: [desc(logs.createdAt)],
-        });
-
-        const [totalCountResult] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(logs)
-          .where(whereClause);
-
-        return reply.send({
-          success: true,
-          logs: logsList,
-          total: totalCountResult?.count || 0,
-        });
-      } catch (err: any) {
-        fastify.log.error(err);
-        log({
-          name: err.name || 'GetErrorsError',
-          type: 'error',
-          severity: 'error',
-          serviceName: 'core-api',
-          message: err.message || String(err),
-          stack: err.stack,
-          url: request.url,
-          userAgent: request.headers['user-agent'] || null,
-        }).catch(() => {});
-        return reply.status(500).send({
-          error: 'Erro interno',
-          message: err.message || 'Não foi possível listar os logs de erro.',
-        });
-      }
-    }
-  );
-
-  // POST /v1/platform/errors (Recebe erros reportados client-side pelo Frontend)
+  // POST /v1/platform/errors (Recebe erros reportados client-side pelo Frontend para enfileiramento assíncrono)
   fastify.post(
     '/errors',
     {
@@ -2243,83 +2195,6 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       } catch (err: any) {
         fastify.log.error('Erro ao processar POST /platform/errors:', err);
         return reply.status(500).send({ error: 'Erro interno', message: 'Não foi possível salvar o erro.' });
-      }
-    }
-  );
-
-  // GET /v1/platform/audit-logs (Lista logs de auditoria de ações sensíveis)
-  fastify.get(
-    '/audit-logs',
-    {
-      schema: {
-        querystring: z.object({
-          limit: z.coerce.number().default(100),
-          offset: z.coerce.number().default(0),
-          action: z.string().optional(),
-          category: z.string().optional(),
-          serviceName: z.string().optional(),
-          status: z.string().optional(),
-          userId: z.string().optional(),
-          workspaceId: z.string().optional(),
-          startDate: z.string().optional(),
-          endDate: z.string().optional(),
-        }),
-      },
-    },
-    async (request, reply) => {
-      try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
-        }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-
-        const platformUserProfile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, decoded.sub),
-        });
-
-        if (platformUserProfile?.role !== 'admin') {
-          return reply.status(403).send({ error: 'Proibido', message: 'Acesso restrito a administradores da plataforma.' });
-        }
-
-        const { limit, offset, action, category, serviceName, status, userId, workspaceId, startDate, endDate } = request.query;
-
-        const conditions = [];
-
-        if (action) conditions.push(eq(auditLogs.action, action));
-        if (category) conditions.push(eq(auditLogs.category, category as any));
-        if (serviceName) conditions.push(eq(auditLogs.serviceName, serviceName));
-        if (status) conditions.push(eq(auditLogs.status, status as any));
-        if (userId) conditions.push(eq(auditLogs.userId, userId));
-        if (workspaceId) conditions.push(eq(auditLogs.workspaceId, workspaceId));
-        if (startDate) conditions.push(gte(auditLogs.createdAt, new Date(startDate)));
-        if (endDate) conditions.push(lte(auditLogs.createdAt, new Date(endDate)));
-
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-        const logsList = await db.query.auditLogs.findMany({
-          where: whereClause,
-          limit,
-          offset,
-          orderBy: [desc(auditLogs.createdAt)],
-        });
-
-        const [totalResult] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(auditLogs)
-          .where(whereClause);
-
-        return reply.send({
-          success: true,
-          logs: logsList,
-          total: totalResult?.count || 0,
-        });
-      } catch (err: any) {
-        fastify.log.error(err);
-        return reply.status(500).send({
-          error: 'Erro interno',
-          message: err.message || 'Não foi possível listar os logs de auditoria.',
-        });
       }
     }
   );

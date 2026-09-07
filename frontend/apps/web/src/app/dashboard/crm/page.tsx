@@ -345,10 +345,9 @@ export default function CrmPage() {
   // Buscar campos personalizados do formulário
   useEffect(() => {
     if (!tenantId) return;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
     fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${tenantId}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      credentials: 'include'
     })
       .then(r => r.json())
       .then(data => { if (data.fields) setCustomFieldDefs(data.fields); })
@@ -362,9 +361,9 @@ export default function CrmPage() {
   useEffect(() => {
     if (!tenantId) return;
 
-    const unsubscribe = subscribe('lead', (event) => {
-      // Ignora eventos que não pertencem ao tenant ativo
-      if (event.tenantId !== tenantId) return;
+    const unsubscribeLead = subscribe('lead', (event) => {
+      const targetWorkspace = event.workspaceId || event.workspace_id || event.tenantId;
+      if (targetWorkspace !== tenantId) return;
 
       switch (event.action) {
         case 'created':
@@ -379,8 +378,18 @@ export default function CrmPage() {
       }
     });
 
-    return () => unsubscribe();
-  }, [tenantId, subscribe, handleRealtimeContactCreated, handleRealtimeContactUpdated, handleRealtimeContactDeleted]);
+    const unsubscribeColumn = subscribe('pipeline_column', (event) => {
+      const targetWorkspace = event.workspaceId || event.workspace_id || event.tenantId;
+      if (targetWorkspace !== tenantId) return;
+
+      fetchCrmData(tenantId);
+    });
+
+    return () => {
+      unsubscribeLead();
+      unsubscribeColumn();
+    };
+  }, [tenantId, subscribe, handleRealtimeContactCreated, handleRealtimeContactUpdated, handleRealtimeContactDeleted, fetchCrmData]);
 
 
 

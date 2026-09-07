@@ -11,9 +11,13 @@ const PGRST_BASE_URL = env.NEXT_PUBLIC_POSTGREST_URL || (API_BASE_URL.endsWith('
 // instagram, is_online_service, default_site_avatar_url, traffic_sources,
 // default_traffic_source, created_at, updated_at
 // Branding (logos, cores) fica em visual_identities — não em workspaces
-const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source,createdAt:created_at,updatedAt:updated_at';
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source,createdAt:created_at,updatedAt:updated_at';
 
 const PROFILE_SELECT = 'id,nome:first_name,sobrenome:last_name,telefone:phone,email,cpf,crp,has_no_crp,avatar_url,role,created_at';
+
+const LOG_SELECT = 'id,type,name,message,stack,url,clientApp:client_app,userRole:user_role,userAgent:user_agent,userId:user_id,workspaceId:workspace_id,sessionId:session_id,serviceName:service_name,severity,metadata,createdAt:created_at';
+
+const AUDIT_LOG_SELECT = 'id,action,category,serviceName:service_name,status,userId:user_id,workspaceId:workspace_id,ip,userAgent:user_agent,details,createdAt:created_at';
 
 export interface User {
   id: string;
@@ -208,21 +212,16 @@ async function doRefresh(): Promise<string> {
   if (_refreshPromise) return _refreshPromise;
 
   _refreshPromise = (async () => {
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
-    if (!refreshToken) throw new Error('Sem refresh_token disponível');
-
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/v1' : API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: JSON.stringify({}),
+      credentials: 'include',
     });
 
     if (!response.ok) throw new Error('Refresh falhou');
 
     const data: RefreshTokenResponse = await response.json();
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    localStorage.setItem('token_expires_at', String(data.expires_at));
     return data.access_token;
   })().finally(() => {
     _refreshPromise = null;
@@ -256,39 +255,61 @@ export const apiConnection = {
 };
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  let resolvedEndpoint = endpoint;
+  let baseUrl = API_BASE_URL;
+
+  // Em ambiente de navegador (client side), converter URLs absolutas para a API/PostgREST
+  // em rotas relativas (/v1/... ou /rest/v1/...) para utilizar os rewrites Same-Origin do Next.js (next.config.ts).
+  if (typeof window !== 'undefined') {
+    if (resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(resolvedEndpoint);
+        if (parsedUrl.pathname.startsWith('/v1/') || parsedUrl.pathname.startsWith('/rest/v1/') || parsedUrl.pathname.startsWith('/auth/v1/')) {
+          resolvedEndpoint = parsedUrl.pathname + parsedUrl.search;
+        }
+      } catch {
+        // Ignora erro de parse
+      }
+    }
+    if (baseUrl && (baseUrl.startsWith('http://') || baseUrl.startsWith('https://'))) {
+      baseUrl = baseUrl.endsWith('/v1') ? '/v1' : '';
+    }
+  }
+
+  if (baseUrl.endsWith('/v1')) {
+    if (resolvedEndpoint.startsWith('/v1/')) {
+      resolvedEndpoint = resolvedEndpoint.slice(3);
+    } else if (resolvedEndpoint.startsWith('/rest/v1/')) {
+      baseUrl = baseUrl.slice(0, -3);
+    }
+  }
+
+  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
+    ? resolvedEndpoint
+    : `${baseUrl}${resolvedEndpoint}`;
+
+  const isPostgrest = url.includes('/rest/v1');
 
   const headers: Record<string, string> = {
-    'X-Client-App': 'admin',
-    ...(typeof window !== 'undefined' && window.location?.href ? { 'X-Client-Url': window.location.href } : {}),
     ...(options.headers as Record<string, string>),
   };
+
+  if (!isPostgrest) {
+    headers['X-Client-App'] = 'admin';
+    if (typeof window !== 'undefined' && window.location?.href) {
+      headers['X-Client-Url'] = window.location.href;
+    }
+  }
 
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  let resolvedEndpoint = endpoint;
-  if (API_BASE_URL.endsWith('/v1') && resolvedEndpoint.startsWith('/v1/')) {
-    resolvedEndpoint = resolvedEndpoint.slice(3);
-  }
-
-  const url = resolvedEndpoint.startsWith('http://') || resolvedEndpoint.startsWith('https://')
-    ? resolvedEndpoint
-    : `${API_BASE_URL}${resolvedEndpoint}`;
-
-  const isPostgrest = url.includes('/rest/v1');
   const fetchOptions: RequestInit = {
+    credentials: 'include',
     ...options,
     headers,
   };
-  if (!isPostgrest && options.credentials === undefined) {
-    fetchOptions.credentials = 'include';
-  }
 
   let response;
   try {
@@ -322,7 +343,8 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   const isAuthEndpoint = endpoint.includes('/auth/login') ||
                          endpoint.includes('/auth/register') ||
                          endpoint.includes('/auth/bootstrap') ||
-                         endpoint.includes('/auth/refresh');
+                         endpoint.includes('/auth/refresh') ||
+                         endpoint.includes('/auth/me');
 
   // Interceptor de 401: tenta renovar o token e repetir a requisição uma vez (apenas para rotas protegidas)
   if (response.status === 401 && !_isRetry && !isAuthEndpoint) {
@@ -339,7 +361,41 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}, _isRetry
   }
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || 'Erro na requisição');
+    const errorMsg = data.message || data.error || 'Erro na requisição';
+
+    const isPostgrest = url.includes('/rest/v1');
+    const isGoTrue = url.includes('/auth/v1');
+    const serviceName = isPostgrest ? 'postgrest' : isGoTrue ? 'gotrue' : 'core-api';
+
+    const isReportableError = response.status >= 500 || (isPostgrest && response.status === 400);
+
+    if (isReportableError) {
+      fetch(`${API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/v1' : API_BASE_URL}/platform/errors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-App': 'admin',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: isPostgrest ? 'PostgrestError' : isGoTrue ? 'GoTrueError' : 'ApiError',
+          message: `${response.status} ${response.statusText}: ${errorMsg}`,
+          stack: `URL: ${url}\nMethod: ${fetchOptions.method || 'GET'}\nBody: ${fetchOptions.body ? String(fetchOptions.body).substring(0, 500) : ''}`,
+          url: typeof window !== 'undefined' ? window.location.href : null,
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : null,
+          severity: 'error',
+          metadata: {
+            status: response.status,
+            url,
+            endpoint,
+            serviceName,
+            clientApp: 'admin',
+          }
+        }),
+      }).catch(err => console.error('Erro ao registrar log de erro na API admin:', err));
+    }
+
+    throw new Error(errorMsg);
   }
 
   return data as T;
@@ -350,13 +406,17 @@ export const api = {
   // Checar status de bootstrap do Admin inicial (Fastify REST API)
   getBootstrapStatus: () => fetchApi<BootstrapStatusResponse>('/auth/bootstrap/status'),
 
-  // Renovar access_token usando o refresh_token
-  // Nota: persiste automaticamente no localStorage via doRefresh() no fetchApi.
-  // Este método é chamado diretamente pelo AuthContext no ciclo proativo.
-  refreshToken: (refresh_token: string) =>
+  // Renovar access_token usando os cookies HttpOnly ou refresh_token de callback
+  refreshToken: (refresh_token?: string) =>
     fetchApi<RefreshTokenResponse>('/auth/refresh', {
       method: 'POST',
-      body: JSON.stringify({ refresh_token }),
+      body: JSON.stringify(refresh_token ? { refresh_token } : {}),
+    }),
+
+  // Encerrar a sessão do usuário no backend e revogar tokens
+  logout: () =>
+    fetchApi<{ message: string }>('/auth/logout', {
+      method: 'POST',
     }),
 
   // Realizar bootstrap do primeiro Admin
@@ -831,8 +891,8 @@ export const api = {
     return res[0]?.workspace || null;
   },
 
-  // Buscar logs de erros da plataforma
-  getErrorLogs: (filters: {
+  // Buscar logs de erros da plataforma (PostgREST com RLS)
+  getErrorLogs: async (filters: {
     limit?: number;
     offset?: number;
     type?: string;
@@ -848,17 +908,35 @@ export const api = {
     startDate?: string;
     endDate?: string;
   }) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, val]) => {
-      if (val !== undefined && val !== null && val !== '') {
-        params.append(key, String(val));
-      }
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const params = new URLSearchParams({
+      select: LOG_SELECT,
+      order: 'created_at.desc',
+      limit: String(limit),
+      offset: String(offset),
     });
-    return fetchApi<{ success: boolean; logs: ErrorLog[]; total: number }>(`/platform/errors?${params.toString()}`);
+
+    if (filters.type) params.set('type', `eq.${filters.type}`);
+    if (filters.serviceName) params.set('service_name', `eq.${filters.serviceName}`);
+    if (filters.severity) params.set('severity', `eq.${filters.severity}`);
+    if (filters.name) params.set('name', `ilike.*${filters.name}*`);
+    if (filters.message) params.set('message', `ilike.*${filters.message}*`);
+    if (filters.userId) params.set('user_id', `eq.${filters.userId}`);
+    if (filters.sessionId) params.set('session_id', `eq.${filters.sessionId}`);
+    if (filters.clientApp) params.set('client_app', `eq.${filters.clientApp}`);
+    if (filters.userRole) params.set('user_role', `eq.${filters.userRole}`);
+    if (filters.startDate) params.set('created_at', `gte.${filters.startDate}`);
+    if (filters.endDate) params.set('created_at', `lte.${filters.endDate}`);
+
+    const res = await fetchApi<ErrorLog[]>(`${PGRST_BASE_URL}/logs?${params.toString()}`);
+    const logs = Array.isArray(res) ? res : [];
+    return { success: true, logs, total: logs.length + offset };
   },
 
-  // Buscar logs de auditoria de ações sensíveis
-  getAuditLogs: (filters: {
+  // Buscar logs de auditoria de ações sensíveis (PostgREST com RLS)
+  getAuditLogs: async (filters: {
     limit?: number;
     offset?: number;
     action?: string;
@@ -870,13 +948,28 @@ export const api = {
     startDate?: string;
     endDate?: string;
   }) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, val]) => {
-      if (val !== undefined && val !== null && val !== '') {
-        params.append(key, String(val));
-      }
+    const limit = filters.limit ?? 50;
+    const offset = filters.offset ?? 0;
+
+    const params = new URLSearchParams({
+      select: AUDIT_LOG_SELECT,
+      order: 'created_at.desc',
+      limit: String(limit),
+      offset: String(offset),
     });
-    return fetchApi<{ success: boolean; logs: AuditLog[]; total: number }>(`/platform/audit-logs?${params.toString()}`);
+
+    if (filters.action) params.set('action', `ilike.*${filters.action}*`);
+    if (filters.category) params.set('category', `eq.${filters.category}`);
+    if (filters.serviceName) params.set('service_name', `eq.${filters.serviceName}`);
+    if (filters.status) params.set('status', `eq.${filters.status}`);
+    if (filters.userId) params.set('user_id', `eq.${filters.userId}`);
+    if (filters.workspaceId) params.set('workspace_id', `eq.${filters.workspaceId}`);
+    if (filters.startDate) params.set('created_at', `gte.${filters.startDate}`);
+    if (filters.endDate) params.set('created_at', `lte.${filters.endDate}`);
+
+    const res = await fetchApi<AuditLog[]>(`${PGRST_BASE_URL}/audit_logs?${params.toString()}`);
+    const logs = Array.isArray(res) ? res : [];
+    return { success: true, logs, total: logs.length + offset };
   },
 };
 

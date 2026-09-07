@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../../../shared/db';
 import { capturePages, contacts, pipelineColumns, interactionHistory, workspaceMembers, workspaces, workspaceDomains, visualIdentities, profiles } from '../../../shared/schema';
 import { eq, and, ne } from 'drizzle-orm';
-import { verifyUserJwt } from '../../../shared/auth';
+import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../../../shared/domainVerifier';
 import { scheduleDomainVerification } from '../../../consumers/domainVerifyConsumer';
 import { log } from '../../../shared/queue';
@@ -253,13 +253,13 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const token = extractJwtFromRequest(request);
+      if (!token) {
         return reply.status(401).send({ error: 'Não autorizado' });
       }
 
       try {
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const body = request.body as any;
         const targetWorkspaceId = body.workspaceId || body.tenantId;
         const { title, slug, crp, approach, address, titlePart1, titlePart2, description, whatsappMessageTemplate, logoText, primaryStart, primaryEnd, contrast, logoUrl, siteConfig } = body;
@@ -627,89 +627,7 @@ function validateCPF(cpf: string): boolean {
     }
   );
 
-  // GET /v1/crm/captacao/check-subdomain?slug=...&workspaceId=...
-  // Verifica se um subdomínio (slug) está livre para uso
-  fastify.get(
-    '/check-subdomain',
-    async (request, reply) => {
-      try {
-        const querySlug = (request.query as any)?.slug;
-        const queryWorkspaceId = (request.query as any)?.workspaceId || (request.query as any)?.tenantId;
 
-        if (!querySlug || typeof querySlug !== 'string') {
-          return reply.status(400).send({ error: 'Bad Request', message: 'Slug é obrigatório.' });
-        }
-
-        const normalizedSlug = querySlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-        if (normalizedSlug.length < 2) {
-          return reply.send({ available: false, reason: 'Slug muito curto (mínimo 2 caracteres).' });
-        }
-
-        // Tentar identificar o workspace do usuário via query ou token JWT
-        let currentWorkspaceId: string | null = typeof queryWorkspaceId === 'string' ? queryWorkspaceId : null;
-        const authHeader = request.headers.authorization;
-        if (!currentWorkspaceId && authHeader && authHeader.startsWith('Bearer ')) {
-          try {
-            const decoded = verifyUserJwt(authHeader.split(' ')[1]);
-            const member = await db.query.workspaceMembers.findFirst({
-              where: eq(workspaceMembers.userId, decoded.sub),
-            });
-            if (member) {
-              currentWorkspaceId = member.workspaceId;
-            }
-          } catch {
-            // Se token for inválido, segue verificação global
-          }
-        }
-
-        // 1. Checar se já existe em algum workspace_domains
-        const existingDomain = await db.query.workspaceDomains.findFirst({
-          where: eq(workspaceDomains.subdomain, normalizedSlug),
-        });
-
-        // 2. Checar se já existe em alguma página de captação
-        const existingPage = await db.query.capturePages.findFirst({
-          where: eq(capturePages.slug, normalizedSlug),
-        });
-
-        let isAvailable = true;
-        let reason = 'Subdomínio disponível!';
-
-        if (existingDomain) {
-          if (currentWorkspaceId && existingDomain.workspaceId === currentWorkspaceId) {
-            isAvailable = true;
-            reason = 'Subdomínio pertence ao seu próprio workspace e está disponível!';
-          } else {
-            isAvailable = false;
-            reason = 'Subdomínio já em uso por outro workspace.';
-          }
-        }
-
-        if (isAvailable && existingPage) {
-          if (currentWorkspaceId && existingPage.workspaceId === currentWorkspaceId) {
-            isAvailable = true;
-            reason = 'Subdomínio pertence ao seu workspace e está disponível!';
-          } else {
-            isAvailable = false;
-            reason = 'Subdomínio já em uso por outro site.';
-          }
-        }
-
-        const platformSet = await db.query.platformSettings.findFirst();
-        const baseDomain = platformSet?.baseDomain || 'theraos.app';
-
-        return reply.send({
-          available: isAvailable,
-          slug: normalizedSlug,
-          fullUrl: `https://${normalizedSlug}.${baseDomain}`,
-          reason,
-        });
-      } catch (err: any) {
-        fastify.log.error(err);
-        return reply.status(500).send({ error: 'Erro interno', message: err.message });
-      }
-    }
-  );
 
   // DELETE /v1/crm/captacao/pages/:id
   // Exclui uma página de captação e limpa registros associados
@@ -717,11 +635,11 @@ function validateCPF(cpf: string): boolean {
     '/pages/:id',
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        const decoded = verifyUserJwt(token);
         const { id } = request.params as any;
 
         const page = await db.query.capturePages.findFirst({
@@ -790,8 +708,24 @@ function validateCPF(cpf: string): boolean {
         return reply.send({ success: true, message: 'Página removida com sucesso.' });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        log({
+          name: 'captacao.delete_page_error',
+          type: 'error',
+          severity: 'error',
+          serviceName: 'core-api',
+          message: err.message || String(err),
+          stack: err.stack || null,
+          url: request.url,
+          clientApp: (request.raw as any).clientApp,
+          userRole: (request.raw as any).userRole,
+          userId: (request.raw as any).userId,
+          sessionId: (request.raw as any).sessionId,
+          metadata: { requestId: (request.raw as any).requestId },
+        }).catch(() => {});
         return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
+
     }
   );
 
@@ -802,11 +736,11 @@ function validateCPF(cpf: string): boolean {
     '/custom-hostname/register',
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        verifyUserJwt(authHeader.split(' ')[1]);
+        verifyUserJwt(token);
 
         const body: any = request.body || {};
         const { pageId, domain } = body;
@@ -834,7 +768,7 @@ function validateCPF(cpf: string): boolean {
         }
 
         // Resolver workspaceId do token JWT
-        const userPayload: any = verifyUserJwt(authHeader.split('Bearer ')[1]);
+        const userPayload: any = verifyUserJwt(token);
         const targetWorkspaceId = userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
 
         // Verificar se o domínio já está cadastrado em outro workspace (chave única global)
@@ -891,7 +825,7 @@ function validateCPF(cpf: string): boolean {
           });
         }
 
-        const token = settings.cloudflareApiToken;
+        const cfToken = settings.cloudflareApiToken;
         const zoneId = settings.cloudflareZoneId;
 
         // 1. Tentar criar o Custom Hostname no Cloudflare API
@@ -904,7 +838,7 @@ function validateCPF(cpf: string): boolean {
           {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${cfToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -929,7 +863,7 @@ function validateCPF(cpf: string): boolean {
               `https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?hostname=${encodeURIComponent(cleanDomain)}`,
               {
                 method: 'GET',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { Authorization: `Bearer ${cfToken}`, 'Content-Type': 'application/json' },
               }
             );
             const listData: any = await listRes.json().catch(() => ({}));
@@ -1020,7 +954,15 @@ function validateCPF(cpf: string): boolean {
               cleanDomain,
               hostnameId,
               60_000, // Primeira tentativa após 1 minuto
-              0
+              0,
+              {
+                requestId: (request.raw as any).requestId,
+                clientApp: (request.raw as any).clientApp || 'web',
+                userId: userPayload?.sub,
+                sessionId: (request.raw as any).sessionId || null,
+                userRole: (request.raw as any).userRole || 'psychologist',
+                workspaceId: targetWorkspaceId,
+              }
             );
           }
         }
@@ -1047,11 +989,11 @@ function validateCPF(cpf: string): boolean {
     '/custom-hostname/verify',
     async (request, reply) => {
       try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const token = extractJwtFromRequest(request);
+        if (!token) {
           return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
         }
-        const userPayload: any = verifyUserJwt(authHeader.split(' ')[1]);
+        const userPayload: any = verifyUserJwt(token);
 
         const body: any = request.body || {};
         const { domain } = body;
@@ -1125,51 +1067,6 @@ function validateCPF(cpf: string): boolean {
           cnameTarget: result.cnameTarget || cnameTarget,
           dnsRecords: result.dnsRecords,
           rateLimited: false,
-        });
-      } catch (err: any) {
-        fastify.log.error(err);
-        return reply.status(500).send({ error: 'Erro interno', message: err.message });
-      }
-    }
-  );
-
-  // GET /v1/crm/captacao/workspace-domain?workspaceId=...
-  // Retorna o estado atual de DNS de um workspace (carregado do banco, sem consultar CF)
-  fastify.get(
-    '/workspace-domain',
-    async (request, reply) => {
-      try {
-        const authHeader = request.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          return reply.status(401).send({ error: 'Não autorizado', message: 'Token JWT ausente.' });
-        }
-        const userPayload: any = verifyUserJwt(authHeader.split(' ')[1]);
-
-        const query: any = request.query || {};
-        const workspaceId = query.workspaceId || userPayload?.workspace_id || userPayload?.workspaceId || userPayload?.tenant_id || userPayload?.tenantId;
-
-        if (!workspaceId) {
-          return reply.status(400).send({ error: 'Bad Request', message: 'workspaceId é obrigatório.' });
-        }
-
-        const domainRecord = await db.query.workspaceDomains.findFirst({
-          where: eq(workspaceDomains.workspaceId, workspaceId),
-        });
-
-        if (!domainRecord) {
-          return reply.send({ found: false, domain: null });
-        }
-
-        return reply.send({
-          found: true,
-          id: domainRecord.id,
-          workspaceId: domainRecord.workspaceId,
-          subdomain: domainRecord.subdomain,
-          customDomain: domainRecord.customDomain,
-          cfHostnameId: domainRecord.cfHostnameId,
-          dnsStatus: domainRecord.dnsStatus,
-          dnsRecords: domainRecord.dnsRecords || [],
-          updatedAt: domainRecord.updatedAt,
         });
       } catch (err: any) {
         fastify.log.error(err);

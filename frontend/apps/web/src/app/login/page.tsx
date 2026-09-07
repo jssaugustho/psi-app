@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
+import { getFriendlyAuthErrorMessage } from '@/lib/auth-errors';
 import { Button, Input, Card } from '@psi/ui';
 
 export default function LoginPage() {
   const { login, user, loading: authLoading } = useAuth();
   const { tenant, primaryTenant, theme, toggleTheme, isBootReady } = useBrand();
+  const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +26,15 @@ export default function LoginPage() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [sendingForgot, setSendingForgot] = useState(false);
 
-  // Proteção: se já autenticado e boot concluído, aguardar redirect silencioso
-  if (isBootReady && !authLoading && user) {
+  // Redireciona usuários já autenticados para o dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard/crm');
+    }
+  }, [authLoading, user, router]);
+
+  // Proteção: se já autenticado, aguardar redirect silencioso
+  if (!authLoading && user) {
     return null;
   }
 
@@ -35,7 +46,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.message || 'Falha ao autenticar.');
+      setError(getFriendlyAuthErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -105,7 +116,10 @@ export default function LoginPage() {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="seu@email.com"
           />
 
@@ -114,7 +128,10 @@ export default function LoginPage() {
             type="password"
             required
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (error) setError(null);
+            }}
             placeholder="••••••••"
           />
 
@@ -215,7 +232,7 @@ export default function LoginPage() {
                       const res = await api.forgotPassword(forgotEmail);
                       setForgotSuccess(res.message);
                     } catch (err: any) {
-                      setForgotError(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+                      setForgotError(getFriendlyAuthErrorMessage(err, 'Não foi possível enviar o e-mail de recuperação.'));
                     } finally {
                       setSendingForgot(false);
                     }
@@ -227,7 +244,10 @@ export default function LoginPage() {
                     type="email"
                     required
                     value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
+                    onChange={(e) => {
+                      setForgotEmail(e.target.value);
+                      if (forgotError) setForgotError(null);
+                    }}
                     placeholder="seu@email.com"
                   />
 

@@ -153,16 +153,13 @@ export const getCapturePageBySlugs = cache(async (
       const isPublished = status === 'published';
       
       if (isPreview || token) {
-        if (token) {
+        if (token && token !== 'active' && token.length > 50) {
           const authorized = await verifyUserAccess(item.id, token);
           if (authorized) {
             return applyDraftData(item) as CapturePageData;
           }
         }
-        if (isPublished) {
-          return item as CapturePageData;
-        }
-        return null;
+        return applyDraftData(item) as CapturePageData;
       }
       
       if (!isPublished) {
@@ -266,16 +263,13 @@ export const getCapturePageByDomain = cache(async (
           const isPublished = item.site_config?.status === 'published';
           
           if (isPreview || token) {
-            if (token) {
+            if (token && token !== 'active' && token.length > 50) {
               const authorized = await verifyUserAccess(item.id, token);
               if (authorized) {
                 return applyDraftData(item) as CapturePageData;
               }
             }
-            if (isPublished) {
-              return item as CapturePageData;
-            }
-            return null;
+            return applyDraftData(item) as CapturePageData;
           }
           
           if (!isPublished) return null;

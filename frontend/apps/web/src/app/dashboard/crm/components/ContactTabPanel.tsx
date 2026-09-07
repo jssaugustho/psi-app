@@ -36,15 +36,19 @@ export function ContactTabPanel({ contact, columns, sources, tenantId, customFie
 
   useEffect(() => {
     const unsubscribe = subscribe('interaction_history', (event) => {
-      // Ignora se não for para o lead ativo
-      const eventContactId = event.data.contact_id || event.data.contactId;
+      const eventContactId = event.data?.contact_id || event.data?.contactId;
       if (eventContactId !== contact.id) return;
 
       if (event.action === 'created') {
+        const logData = event.data;
+        const normalizedLog: InteractionHistory = {
+          ...logData,
+          contact_id: logData.contact_id || logData.contactId,
+          workspace_id: logData.workspace_id || logData.workspaceId,
+        };
         setHistory((prev) => {
-          // Evita duplicar se já foi adicionado localmente pelo autor no formulário
-          if (prev.some((h) => h.id === event.data.id)) return prev;
-          return [event.data, ...prev];
+          if (prev.some((h) => h.id === normalizedLog.id)) return prev;
+          return [normalizedLog, ...prev];
         });
       }
     });

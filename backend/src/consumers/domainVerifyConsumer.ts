@@ -18,7 +18,7 @@
  *   - A fila adiciona delay mínimo de 3 minutos entre tentativas automáticas
  */
 
-import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime, log } from '../shared/queue';
+import { getChannel, assertQuorumQueue, publishToQueue, publishRealtime, log, RequiredQueueMetadata } from '../shared/queue';
 import { checkDomainOnCloudflare, persistDomainStatus } from '../shared/domainVerifier';
 import { db } from '../shared/db';
 import { workspaceDomains } from '../shared/schema';
@@ -36,6 +36,7 @@ export interface DomainVerifyMessage {
   cfHostnameId?: string | null;
   attempts: number;
   scheduledAt: string; // ISO8601
+  metadata?: RequiredQueueMetadata | Record<string, any> | null;
 }
 
 // ── Publicar mensagem de verificação na fila ───────────────────────────────────
@@ -44,7 +45,8 @@ export async function scheduleDomainVerification(
   domain: string,
   cfHostnameId?: string | null,
   delayMs = 0,
-  attempts = 0
+  attempts = 0,
+  metadata?: RequiredQueueMetadata | Record<string, any> | null
 ): Promise<void> {
   const message: DomainVerifyMessage = {
     workspaceId,
@@ -52,6 +54,7 @@ export async function scheduleDomainVerification(
     cfHostnameId,
     attempts,
     scheduledAt: new Date().toISOString(),
+    metadata,
   };
 
   if (delayMs > 0) {
@@ -116,9 +119,17 @@ export async function startDomainVerifyConsumer(): Promise<void> {
             type: 'audit',
             severity: 'info',
             serviceName: 'domain-verifier',
+            clientApp: (message.metadata as any)?.clientApp || 'workers',
+            userRole: (message.metadata as any)?.userRole || 'system',
             message: '[config:domain.verified] - success',
+            userId: (message.metadata as any)?.userId || null,
+            sessionId: (message.metadata as any)?.sessionId || null,
             workspaceId,
-            metadata: { domain, attempts },
+            metadata: {
+              ...(message.metadata || {}),
+              domain,
+              attempts,
+            },
           }).catch(() => {});
 
           await publishRealtime({
@@ -144,7 +155,8 @@ export async function startDomainVerifyConsumer(): Promise<void> {
             domain,
             cfHostnameId || result.hostnameId,
             RETRY_DELAY_MS,
-            nextAttempts
+            nextAttempts,
+            message.metadata
           );
           console.log(`⏳ ${domain} ainda pendente. Próxima verificação em ${RETRY_DELAY_MS / 60000} min (attempt ${nextAttempts + 1}/${MAX_ATTEMPTS})`);
         } else {
@@ -158,9 +170,17 @@ export async function startDomainVerifyConsumer(): Promise<void> {
             type: 'error',
             severity: 'warning',
             serviceName: 'domain-verifier',
+            clientApp: (message.metadata as any)?.clientApp || 'workers',
+            userRole: (message.metadata as any)?.userRole || 'system',
             message: `Tempo limite de verificação atingido para o domínio ${domain}`,
+            userId: (message.metadata as any)?.userId || null,
+            sessionId: (message.metadata as any)?.sessionId || null,
             workspaceId,
-            metadata: { domain, attempts }
+            metadata: {
+              ...(message.metadata || {}),
+              domain,
+              attempts,
+            },
           }).catch(() => {});
         }
 
@@ -173,10 +193,18 @@ export async function startDomainVerifyConsumer(): Promise<void> {
           type: 'error',
           severity: 'error',
           serviceName: 'domain-verifier',
+          clientApp: (message.metadata as any)?.clientApp || 'workers',
+          userRole: (message.metadata as any)?.userRole || 'system',
           message: err.message || String(err),
           stack: err.stack,
+          userId: (message.metadata as any)?.userId || null,
+          sessionId: (message.metadata as any)?.sessionId || null,
           workspaceId,
-          metadata: { domain, attempts }
+          metadata: {
+            ...(message.metadata || {}),
+            domain,
+            attempts,
+          },
         }).catch(() => {});
 
         // Requeue apenas se attempts < 3, senão descarta para DLQ (messages.dlq)

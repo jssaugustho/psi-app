@@ -98,6 +98,18 @@ export async function checkDomainOnCloudflare(
 
     const data: any = await res.json().catch(() => ({}));
 
+    if (!res.ok) {
+      const errorMsg = data?.errors?.[0]?.message || res.statusText || 'Erro na API do Cloudflare';
+      console.error(`❌ Cloudflare API HTTP ${res.status} para ${domain}:`, errorMsg, data);
+      return {
+        isActive: false,
+        status: `error_cf_${res.status}`,
+        dnsRecords: [],
+        cnameTarget,
+        rateLimited: false,
+      };
+    }
+
     // Normalizar resultado (response diferente entre GET by ID vs GET by hostname)
     const cfResult = cfHostnameId
       ? data.result           // GET by ID retorna objeto direto

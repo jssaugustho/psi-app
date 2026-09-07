@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
+import { getFriendlyAuthErrorMessage } from '@/lib/auth-errors';
 import { Button, Input, Card } from '@psi/ui';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, user, loading: authLoading } = useAuth();
   const { tenant, primaryTenant, bootstrapped, theme, toggleTheme } = useBrand();
+  const router = useRouter();
+
   const [nome, setNome] = useState('');
   const [sobrenome, setSobrenome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -20,6 +24,16 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard/crm');
+    }
+  }, [authLoading, user, router]);
+
+  if (!authLoading && user) {
+    return null;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -28,7 +42,7 @@ export default function RegisterPage() {
     try {
       await register(nome, sobrenome, telefone, email, password, cpf || undefined, hasNoCrp ? undefined : (crp || undefined), hasNoCrp);
     } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro ao cadastrar.');
+      setError(getFriendlyAuthErrorMessage(err, 'Ocorreu um erro ao cadastrar.'));
     } finally {
       setSubmitting(false);
     }

@@ -104,7 +104,30 @@ fastify.addHook('onRequest', async (request, reply) => {
   const requestId = reqIdHeader && reqIdHeader.trim() ? reqIdHeader.trim() : crypto.randomUUID();
 
   const rawClientApp = (request.headers['x-client-app'] || request.headers['X-Client-App']) as string | undefined;
-  const clientApp = rawClientApp && rawClientApp.trim() ? rawClientApp.trim().toLowerCase() : 'unknown';
+  let clientApp = rawClientApp && rawClientApp.trim() ? rawClientApp.trim().toLowerCase() : '';
+
+  if (!clientApp || clientApp === 'unknown') {
+    const referer = (request.headers['referer'] || request.headers['Referer'] || request.headers['origin'] || request.headers['Origin']) as string | undefined;
+    if (referer) {
+      if (referer.includes('/admin') || referer.includes(':3001') || referer.includes('admin.')) {
+        clientApp = 'admin';
+      } else if (referer.includes('/dashboard') || referer.includes(':3000') || referer.includes('app.')) {
+        clientApp = 'web';
+      } else if (referer.includes('/f/') || referer.includes('/p/') || referer.includes('/site/')) {
+        clientApp = 'sites';
+      }
+    }
+  }
+
+  if (!clientApp || clientApp === 'unknown') {
+    if (request.url.startsWith('/v1/platform') || request.url.startsWith('/platform')) {
+      clientApp = 'admin';
+    } else if (request.url.startsWith('/v1/crm') || request.url.startsWith('/v1/forms') || request.url.startsWith('/v1/media')) {
+      clientApp = 'web';
+    } else {
+      clientApp = 'core-api';
+    }
+  }
 
   const rawClientUrl = (request.headers['x-client-url'] || request.headers['X-Client-Url'] || request.headers['referer'] || request.headers['Referer']) as string | undefined;
   const clientUrl = rawClientUrl && rawClientUrl.trim() ? rawClientUrl.trim() : request.url;
@@ -127,6 +150,15 @@ fastify.addHook('onRequest', async (request, reply) => {
 
   reply.header('X-Request-ID', requestId);
 });
+
+// Hook Global para captura imediata de stack trace em qualquer erro disparado
+fastify.addHook('onError', async (request, reply, error) => {
+  if (error && error.stack) {
+    (request.raw as any).errorStack = error.stack;
+    (request.raw as any).errorMessage = error.message;
+  }
+});
+
 
 // ── Hook Global: Log de Acesso HTTP (onResponse) ────────────────────────────
 fastify.addHook('onResponse', async (request, reply) => {
@@ -154,7 +186,7 @@ fastify.addHook('onResponse', async (request, reply) => {
 
   log({
     name: 'http.access',
-    type: reply.statusCode >= 400 ? 'error' : 'http',
+    type: reply.statusCode >= 500 ? 'error' : 'http',
     severity: reply.statusCode >= 500 ? 'error' : reply.statusCode >= 400 ? 'warning' : 'info',
     serviceName: 'core-api',
     message: `Requisição HTTP ${request.method} ${request.url} finalizada com status ${reply.statusCode} em ${durationMs}ms.`,
@@ -272,20 +304,32 @@ const start = async () => {
       let currentUserId: string | null = null;
       let currentTenantId: string | null = null;
 
-      socket.on('subscribe', (data: { userId: string; tenantId: string }) => {
-        if (!data || !data.userId || !data.tenantId) return;
+      log({
+        name: 'websocket.connected',
+        type: 'audit',
+        severity: 'info',
+        serviceName: 'core-api',
+        message: `Cliente conectado via WebSocket: ${socket.id}`,
+        metadata: { socketId: socket.id, ip: socket.handshake.address },
+      }).catch(() => {});
+
+      socket.on('subscribe', (data: { userId: string; workspaceId?: string; tenantId?: string }) => {
+        const targetWorkspace = data?.workspaceId || data?.tenantId;
+        if (!data || !data.userId || !targetWorkspace) return;
         currentUserId = data.userId;
-        currentTenantId = data.tenantId;
+        currentTenantId = targetWorkspace;
 
         socket.join(`user:${data.userId}`);
-        socket.join(`tenant:${data.tenantId}`);
-        console.log(`🚪 Cliente ${socket.id} assinou user:${data.userId} e tenant:${data.tenantId}`);
+        socket.join(`workspace:${targetWorkspace}`);
+        socket.join(`tenant:${targetWorkspace}`);
+        console.log(`🚪 Cliente ${socket.id} assinou user:${data.userId} e workspace:${targetWorkspace}`);
 
         // Solicita sincronização imediata de presença para a nova conexão
         publishPresenceEvent({
           entity: 'presence',
           action: 'subscribe',
-          tenantId: data.tenantId,
+          workspaceId: targetWorkspace,
+          tenantId: targetWorkspace,
           userId: data.userId,
         });
       });
@@ -293,7 +337,12 @@ const start = async () => {
       // Assinatura autenticada com verificação de perfil 'admin' para Logs de Erro do Sistema
       socket.on('subscribe-admin-logs', async (data: { token?: string }) => {
         try {
-          const token = data?.token || socket.handshake.auth?.token;
+          const cookieHeader = socket.handshake.headers.cookie;
+          let token = data?.token || socket.handshake.auth?.token;
+          if (!token && cookieHeader) {
+            const match = cookieHeader.match(/(?:^|;\s*)(?:access_token|token)=([^;]+)/);
+            if (match) token = match[1];
+          }
           if (!token) {
             socket.emit('subscribed-admin-logs', { success: false, error: 'Token JWT de autenticação não fornecido.' });
             return;
@@ -319,18 +368,28 @@ const start = async () => {
           socket.emit('subscribed-admin-logs', { success: true });
         } catch (err: any) {
           console.warn(`⚠️ Tentativa não autorizada de assinar logs via WebSocket (${socket.id}):`, err.message || err);
+          log({
+            name: 'websocket.auth_failed',
+            type: 'error',
+            severity: 'warning',
+            serviceName: 'core-api',
+            message: `Falha na autenticação WebSocket para canal de admin logs: ${err.message || String(err)}`,
+            metadata: { socketId: socket.id, error: err.message },
+          }).catch(() => {});
           socket.emit('subscribed-admin-logs', { success: false, error: 'Falha na autenticação do socket de logs.' });
         }
       });
 
       socket.on('presence-pulse', (data: any) => {
-        if (!data || !data.userId || !data.tenantId) return;
+        const targetWorkspace = data?.workspaceId || data?.tenantId;
+        if (!data || !data.userId || !targetWorkspace) return;
 
         // Enfileira o pulso de presença para a Engine de Presença dedicada
         publishPresenceEvent({
           entity: 'presence',
           action: 'heartbeat',
-          tenantId: data.tenantId,
+          workspaceId: targetWorkspace,
+          tenantId: targetWorkspace,
           userId: data.userId,
           data: {
             userId: data.userId,
@@ -349,11 +408,22 @@ const start = async () => {
           publishPresenceEvent({
             entity: 'presence',
             action: 'leave',
+            workspaceId: currentTenantId,
             tenantId: currentTenantId,
             userId: currentUserId,
             data: { userId: currentUserId },
           });
         }
+        log({
+          name: 'websocket.disconnected',
+          type: 'audit',
+          severity: 'info',
+          serviceName: 'core-api',
+          message: `Cliente desconectado via WebSocket: ${socket.id}`,
+          userId: currentUserId,
+          workspaceId: currentTenantId,
+          metadata: { socketId: socket.id, userId: currentUserId, workspaceId: currentTenantId },
+        }).catch(() => {});
       });
     });
 
@@ -364,12 +434,19 @@ const start = async () => {
       if (item.type === 'system_error' || item.type === 'system_audit' || item.type === 'system_log') {
         io.to('platform:admin_logs').emit('realtime-event', item);
       } else if (item.entity === 'presence' && item.action === 'list') {
-        io.to(`tenant:${item.tenantId}`).emit('presence-list', item.data);
+        const targetWorkspace = item.workspaceId || item.workspace_id || item.tenantId;
+        if (targetWorkspace) {
+          io.to(`workspace:${targetWorkspace}`).emit('presence-list', item.data);
+          io.to(`tenant:${targetWorkspace}`).emit('presence-list', item.data);
+        }
       } else {
+        const targetWorkspace = item.workspaceId || item.workspace_id || item.tenantId;
+        if (targetWorkspace) {
+          io.to(`workspace:${targetWorkspace}`).emit('realtime-event', item);
+          io.to(`tenant:${targetWorkspace}`).emit('realtime-event', item);
+        }
         if (item.userId) {
           io.to(`user:${item.userId}`).emit('realtime-event', item);
-        } else if (item.tenantId) {
-          io.to(`tenant:${item.tenantId}`).emit('realtime-event', item);
         }
       }
     };

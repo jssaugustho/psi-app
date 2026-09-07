@@ -32,8 +32,8 @@ const globalPresence = new Map<string, Map<string, PresenceUser>>();
 // Timers de Grace Period para desconexões temporárias (3 segundos)
 const pendingLeaves = new Map<string, NodeJS.Timeout>();
 
-function broadcastPresenceList(tenantId: string) {
-  const usersMap = globalPresence.get(tenantId);
+function broadcastPresenceList(workspaceId: string) {
+  const usersMap = globalPresence.get(workspaceId);
   const activeUsersList = usersMap
     ? Array.from(usersMap.values()).map(({ lastSeen, ...u }) => u)
     : [];
@@ -42,16 +42,18 @@ function broadcastPresenceList(tenantId: string) {
   publishRealtimeEvent({
     entity: 'presence',
     action: 'list',
-    tenantId,
+    workspaceId,
+    tenantId: workspaceId,
     data: activeUsersList,
   });
 }
 
 function handlePresenceEvent(payload: any) {
-  const { action, tenantId, userId, data } = payload;
-  if (!tenantId || !userId) return;
+  const workspaceId = payload.workspaceId || payload.workspace_id || payload.tenantId;
+  const { action, userId, data } = payload;
+  if (!workspaceId || !userId) return;
 
-  const leaveKey = `${tenantId}:${userId}`;
+  const leaveKey = `${workspaceId}:${userId}`;
 
   // Se havia um temporizador de saída agendado (por refresh/troca de página), cancela-o
   if (pendingLeaves.has(leaveKey)) {
@@ -63,14 +65,14 @@ function handlePresenceEvent(payload: any) {
     // Agenda o expurgo do usuário com Grace Period de 3 segundos
     const timer = setTimeout(() => {
       pendingLeaves.delete(leaveKey);
-      const tenantMap = globalPresence.get(tenantId);
+      const tenantMap = globalPresence.get(workspaceId);
       if (tenantMap) {
         tenantMap.delete(userId);
         if (tenantMap.size === 0) {
-          globalPresence.delete(tenantId);
+          globalPresence.delete(workspaceId);
         }
       }
-      broadcastPresenceList(tenantId);
+      broadcastPresenceList(workspaceId);
     }, 3000);
 
     pendingLeaves.set(leaveKey, timer);
@@ -78,11 +80,11 @@ function handlePresenceEvent(payload: any) {
   }
 
   // Heartbeat / Subscribe / Update
-  if (!globalPresence.has(tenantId)) {
-    globalPresence.set(tenantId, new Map());
+  if (!globalPresence.has(workspaceId)) {
+    globalPresence.set(workspaceId, new Map());
   }
 
-  const tenantMap = globalPresence.get(tenantId)!;
+  const tenantMap = globalPresence.get(workspaceId)!;
   const isNewUser = !tenantMap.has(userId);
 
   tenantMap.set(userId, {
@@ -93,7 +95,7 @@ function handlePresenceEvent(payload: any) {
 
   // Dispara atualização de lista imediatamente se for novo usuário ou se solicitou subscribe/sync
   if (isNewUser || action === 'subscribe' || action === 'sync') {
-    broadcastPresenceList(tenantId);
+    broadcastPresenceList(workspaceId);
   }
 }
 

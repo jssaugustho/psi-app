@@ -81,6 +81,8 @@ function LockScreen() {
   );
 }
 
+import { ErrorProvider } from "@psi/ui";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -92,15 +94,17 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="min-h-full flex flex-col font-sans" suppressHydrationWarning>
-        <ApiStatusProvider>
-          <AuthProvider>
-            <BrandProvider>
-              <ProgressProvider>
-                {unlocked ? children : <LockScreen />}
-              </ProgressProvider>
-            </BrandProvider>
-          </AuthProvider>
-        </ApiStatusProvider>
+        <ErrorProvider clientApp="admin">
+          <ApiStatusProvider>
+            <AuthProvider>
+              <BrandProvider>
+                <ProgressProvider>
+                  {unlocked ? children : <LockScreen />}
+                </ProgressProvider>
+              </BrandProvider>
+            </AuthProvider>
+          </ApiStatusProvider>
+        </ErrorProvider>
       </body>
     </html>
   );

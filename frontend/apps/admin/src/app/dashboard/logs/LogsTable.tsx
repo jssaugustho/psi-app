@@ -23,6 +23,7 @@ interface LogsTableProps {
   loadLogs: () => void;
   expandedIds: Set<string>;
   toggleExpand: (id: string) => void;
+  updateRowHeight?: (id: string, height: number) => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
   handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
   totalHeight: number;
@@ -32,6 +33,440 @@ interface LogsTableProps {
   setRequestId: (v: string) => void;
   setClientApp: (v: string) => void;
   setUserRole: (v: string) => void;
+}
+
+interface LogRowItemProps {
+  row: { log: ErrorLog; offset: number; height: number };
+  isExpanded: boolean;
+  toggleExpand: (id: string) => void;
+  updateRowHeight?: (id: string, height: number) => void;
+  copiedStackId: string | null;
+  copyToClipboard: (text: string, id: string) => void;
+  setUserId: (v: string) => void;
+  setSessionId: (v: string) => void;
+  setRequestId: (v: string) => void;
+  setClientApp: (v: string) => void;
+  setUserRole: (v: string) => void;
+}
+
+function LogRowItem({
+  row,
+  isExpanded,
+  toggleExpand,
+  updateRowHeight,
+  copiedStackId,
+  copyToClipboard,
+  setUserId,
+  setSessionId,
+  setRequestId,
+  setClientApp,
+  setUserRole,
+}: LogRowItemProps) {
+  const itemRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!itemRef.current || !updateRowHeight) return;
+
+    const element = itemRef.current;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const measuredHeight = Math.ceil(
+          entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height
+        );
+        if (measuredHeight > 0) {
+          updateRowHeight(row.log.id, measuredHeight);
+        }
+      }
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [row.log.id, isExpanded, updateRowHeight]);
+
+  const dateStr = new Date(row.log.createdAt).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  const typeColor =
+    row.log.type === 'error' ? 'text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/10' :
+    row.log.type === 'audit' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
+    row.log.type === 'info' ? 'text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/10' :
+    row.log.type === 'system' ? 'text-teal-600 dark:text-teal-400 border-teal-500/30 bg-teal-500/10' :
+    row.log.type === 'dlq' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
+    row.log.type === 'warn' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
+    'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10';
+
+  const sevColor =
+    row.log.severity === 'fatal' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
+    row.log.severity === 'warning' || row.log.severity === 'warn' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
+    row.log.severity === 'info' ? 'text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/10' :
+    row.log.severity === 'debug' ? 'text-slate-600 dark:text-slate-400 border-slate-500/30 bg-slate-500/10' :
+    'text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/10';
+
+  const serviceColor =
+    row.log.serviceName === 'postgres' ? 'text-teal-600 dark:text-teal-400' :
+    row.log.serviceName === 'gotrue' ? 'text-blue-600 dark:text-blue-400' :
+    row.log.serviceName === 'postgrest' ? 'text-indigo-600 dark:text-indigo-400' :
+    row.log.serviceName === 'workers' ? 'text-amber-600 dark:text-amber-400' :
+    row.log.serviceName === 'frontend' ? 'text-pink-600 dark:text-pink-400' :
+    'text-emerald-600 dark:text-emerald-400';
+
+  const clientAppVal = row.log.clientApp || (row.log.metadata as any)?.clientApp || 'unknown';
+
+  const appColor =
+    clientAppVal === 'admin' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10' :
+    clientAppVal === 'web' ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500/30 bg-cyan-500/10' :
+    clientAppVal === 'sites' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
+    clientAppVal === 'workers' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
+    clientAppVal === 'core-api' ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
+    'text-slate-500 border-slate-500/20 bg-slate-500/10';
+
+  const roleLabelMap: Record<string, string> = {
+    admin: 'ADMINISTRADOR',
+    psychologist: 'PSICÓLOGO',
+    collaborator: 'COLABORADOR',
+    anon: 'VISITANTE / ANON',
+  };
+
+  const workerName = (row.log.metadata as any)?.workerName;
+
+  return (
+    <div
+      ref={itemRef}
+      style={{
+        position: 'absolute',
+        top: `${row.offset}px`,
+        left: 0,
+        width: '100%',
+      }}
+      className="border-b border-brand-divider overflow-hidden"
+    >
+      {/* Linha da Tabela (Header Alinhado no Mesmo Grid) */}
+      <div
+        onClick={() => toggleExpand(row.log.id)}
+        className={`px-6 py-3 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 select-none transition-colors grid grid-cols-[20px_125px_85px_80px_65px_70px_140px_1fr_75px] gap-3 items-center ${
+          isExpanded ? 'bg-black/5 dark:bg-white/5 border-l-2 border-brand-primary' : ''
+        }`}
+      >
+        <span className="opacity-40 text-center">
+          {isExpanded ? '▼' : '►'}
+        </span>
+
+        <span className="opacity-60 truncate">{dateStr}</span>
+
+        <span className={`font-semibold truncate ${serviceColor}`}>
+          [{row.log.serviceName}]
+        </span>
+
+        <span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase truncate max-w-full ${appColor}`}>
+            {clientAppVal}
+          </span>
+        </span>
+
+        <span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${typeColor}`}>
+            {row.log.type || 'ERROR'}
+          </span>
+        </span>
+
+        <span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${sevColor}`}>
+            {row.log.severity.toUpperCase()}
+          </span>
+        </span>
+
+        <span className="font-semibold truncate flex items-center gap-1" title={row.log.name || 'system.event'}>
+          {Boolean(row.log.stack || (row.log.metadata as any)?.stack || (row.log.metadata as any)?.stackTrace) && (
+            <span title="Possui Stack Trace (Clique para expandir)" className="text-xs shrink-0">🔥</span>
+          )}
+          <span className="truncate">{row.log.name || 'system.event'}</span>
+        </span>
+
+        <span className="opacity-80 truncate" title={row.log.message}>
+          {row.log.message}
+        </span>
+
+        {row.log.userId ? (
+          <span className="text-[11px] opacity-60 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded font-mono truncate hidden md:inline">
+            {row.log.userId.substring(0, 8)}...
+          </span>
+        ) : (
+          <span className="text-[11px] opacity-40 italic hidden md:inline">
+            Anon
+          </span>
+        )}
+      </div>
+
+      {/* Conteúdo Expandido com altura dinâmica e cores adaptativas do tema */}
+      {isExpanded && (
+        <div className="px-6 py-4 bg-black/[0.03] dark:bg-white/[0.02] border-t border-b border-brand-divider text-xs select-text space-y-4 transition-colors">
+          {/* Grid de Informações Principais em Cards Embutidos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card: Detalhes do Evento */}
+            <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-brand-divider shadow-xs">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-3 flex items-center gap-1.5">
+                <span>📋</span> DETALHES DO EVENTO
+              </h4>
+              <table className="w-full text-left font-mono text-xs">
+                <tbody>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2 w-28">Data / Hora:</td>
+                    <td className="opacity-90 font-semibold pb-2">{dateStr}</td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">Log ID:</td>
+                    <td className="opacity-90 pb-2 select-all font-semibold break-all">{row.log.id}</td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">App (Origem):</td>
+                    <td className="pb-2 break-all">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${appColor}`}>
+                          {clientAppVal}
+                        </span>
+                        {clientAppVal !== 'unknown' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClientApp(clientAppVal);
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-sans px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
+                            title="Filtrar tabela por este App"
+                          >
+                            <span>🔍 Filtrar Logs</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">User Role:</td>
+                    <td className="opacity-90 font-bold pb-2 uppercase text-indigo-600 dark:text-indigo-400">
+                      {roleLabelMap[row.log.userRole || 'anon'] || (row.log.userRole || 'ANON').toUpperCase()}
+                    </td>
+                  </tr>
+                  {workerName && (
+                    <tr>
+                      <td className="opacity-60 font-medium pr-4 pb-2">Worker Exec:</td>
+                      <td className="opacity-90 font-bold text-amber-600 dark:text-amber-400 pb-2 font-mono">
+                        ⚙️ {workerName}
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">Nome:</td>
+                    <td className="opacity-90 font-bold pb-2 break-all">{row.log.name || 'system.event'}</td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">Tipo:</td>
+                    <td className="opacity-90 font-bold pb-2 uppercase text-indigo-600 dark:text-indigo-400">{row.log.type || 'error'}</td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">Mensagem:</td>
+                    <td className={`font-semibold pb-2 leading-snug break-all ${
+                      row.log.severity === 'error' || row.log.severity === 'fatal' || row.log.type === 'error'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'opacity-90'
+                    }`}>
+                      {row.log.message}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">Serviço:</td>
+                    <td className="opacity-90 font-bold pb-2">{row.log.serviceName}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Card: Contexto do Cliente */}
+            <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-brand-divider shadow-xs">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-3 flex items-center gap-1.5">
+                <span>👤</span> CONTEXTO E RASTREAMENTO (TRACING)
+              </h4>
+              <table className="w-full text-left font-mono text-xs">
+                <tbody>
+                  {(() => {
+                    const reqId = (row.log.metadata as any)?.requestId;
+                    const sessId = row.log.sessionId || (row.log.metadata as any)?.sessionId;
+                    return (
+                      <>
+                        <tr>
+                          <td className="opacity-60 font-medium pr-4 pb-2 w-28">Request ID:</td>
+                          <td className="opacity-90 pb-2 break-all">
+                            {reqId ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">{reqId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRequestId(reqId);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
+                                  title="Filtrar tabela de logs por este Request ID"
+                                >
+                                  <span>🔍 Filtrar Logs</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="italic opacity-40 font-normal">Nenhum</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="opacity-60 font-medium pr-4 pb-2">User ID:</td>
+                          <td className="opacity-90 pb-2 break-all">
+                            {row.log.userId ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono font-semibold select-all">{row.log.userId}</span>
+
+                                {/* Botão 1: Abrir Perfil do Usuário */}
+                                <Link
+                                  href={`/dashboard/users/${row.log.userId}`}
+                                  target="_blank"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors font-medium cursor-pointer"
+                                  title="Ver perfil do usuário no Admin (Abre em nova aba)"
+                                >
+                                  <span>👤 Perfil</span>
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </Link>
+
+                                {/* Botão 2: Filtrar Tabela por este Usuário */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setUserId(row.log.userId!);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
+                                  title="Filtrar tabela de logs por este Usuário"
+                                >
+                                  <span>🔍 Filtrar Logs</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="italic opacity-40">Nenhum</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="opacity-60 font-medium pr-4 pb-2">Session ID:</td>
+                          <td className="opacity-90 pb-2 break-all">
+                            {sessId ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono select-all">{sessId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSessionId(sessId);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
+                                  title="Filtrar tabela de logs por este Session ID"
+                                >
+                                  <span>🔍 Filtrar Logs</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="italic opacity-40">Nenhuma</span>
+                            )}
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })()}
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">URL Origem:</td>
+                    <td className="opacity-90 pb-2 break-all">
+                      {row.log.url ? (
+                        <a href={row.log.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-600 dark:text-indigo-400 font-semibold">
+                          {row.log.url}
+                        </a>
+                      ) : (
+                        <span className="italic opacity-40">Nenhuma</span>
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="opacity-60 font-medium pr-4 pb-2">User Agent:</td>
+                    <td className="opacity-90 pb-2 break-all">
+                      {row.log.userAgent || <span className="italic opacity-40">Nenhum</span>}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Stack Trace em Card Destacado com Scroll Interno */}
+          {(() => {
+            const stackContent = row.log.stack || (row.log.metadata as any)?.stack || (row.log.metadata as any)?.stackTrace;
+            if (!stackContent) return null;
+
+            return (
+              <div className="p-4 rounded-xl bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 dark:border-red-500/30 shadow-xs">
+                <div className="flex justify-between items-center mb-2.5">
+                  <p className="font-bold text-[11px] uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                    <span>🔥</span> STACK TRACE DA EXCEÇÃO
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard(stackContent, `stack-${row.log.id}`);
+                    }}
+                    className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedStackId === `stack-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar Stack Trace'}
+                  </button>
+                </div>
+                <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-red-300 border border-neutral-800 text-[11px] overflow-x-auto max-h-80 overflow-y-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
+                  {stackContent}
+                </pre>
+              </div>
+            );
+          })()}
+
+          {/* Metadados Extras em Card Embutido com Scroll Interno */}
+          {row.log.metadata && Object.keys(row.log.metadata).length > 0 && (
+            <div className="p-4 rounded-xl bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 dark:border-indigo-500/30 shadow-xs">
+              <div className="flex justify-between items-center mb-2.5">
+                <p className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                  <span>⚙️</span> METADADOS ADICIONAIS
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(JSON.stringify(row.log.metadata, null, 2), `meta-${row.log.id}`);
+                  }}
+                  className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors font-medium flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedStackId === `meta-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar JSON'}
+                </button>
+              </div>
+              <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-emerald-400 border border-neutral-800 text-[11px] overflow-x-auto max-h-80 overflow-y-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
+                {JSON.stringify(row.log.metadata, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function LogsTable({
@@ -52,6 +487,7 @@ export function LogsTable({
   loadLogs,
   expandedIds,
   toggleExpand,
+  updateRowHeight,
   containerRef,
   handleScroll,
   totalHeight,
@@ -207,392 +643,22 @@ export function LogsTable({
           </div>
         ) : (
           <div style={{ height: `${totalHeight}px`, width: '100%', position: 'relative' }}>
-            {visibleRows.map((row) => {
-              const isExpanded = expandedIds.has(row.log.id);
-
-              const dateStr = new Date(row.log.createdAt).toLocaleString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              });
-
-              const typeColor =
-                row.log.type === 'error' ? 'text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/10' :
-                row.log.type === 'audit' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
-                row.log.type === 'info' ? 'text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/10' :
-                row.log.type === 'system' ? 'text-teal-600 dark:text-teal-400 border-teal-500/30 bg-teal-500/10' :
-                row.log.type === 'dlq' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
-                row.log.type === 'warn' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
-                'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10';
-
-              const sevColor =
-                row.log.severity === 'fatal' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
-                row.log.severity === 'warning' || row.log.severity === 'warn' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
-                row.log.severity === 'info' ? 'text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/10' :
-                row.log.severity === 'debug' ? 'text-slate-600 dark:text-slate-400 border-slate-500/30 bg-slate-500/10' :
-                'text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/10';
-
-              const serviceColor =
-                row.log.serviceName === 'postgres' ? 'text-teal-600 dark:text-teal-400' :
-                row.log.serviceName === 'gotrue' ? 'text-blue-600 dark:text-blue-400' :
-                row.log.serviceName === 'postgrest' ? 'text-indigo-600 dark:text-indigo-400' :
-                row.log.serviceName === 'workers' ? 'text-amber-600 dark:text-amber-400' :
-                row.log.serviceName === 'frontend' ? 'text-pink-600 dark:text-pink-400' :
-                'text-emerald-600 dark:text-emerald-400';
-
-              const clientAppVal = row.log.clientApp || (row.log.metadata as any)?.clientApp || 'unknown';
-
-              const appColor =
-                clientAppVal === 'admin' ? 'text-indigo-600 dark:text-indigo-400 border-indigo-500/30 bg-indigo-500/10' :
-                clientAppVal === 'web' ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500/30 bg-cyan-500/10' :
-                clientAppVal === 'sites' ? 'text-purple-600 dark:text-purple-400 border-purple-500/30 bg-purple-500/10' :
-                clientAppVal === 'workers' ? 'text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10' :
-                clientAppVal === 'core-api' ? 'text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
-                'text-slate-500 border-slate-500/20 bg-slate-500/10';
-
-              const roleLabelMap: Record<string, string> = {
-                admin: 'ADMINISTRADOR',
-                psychologist: 'PSICÓLOGO',
-                collaborator: 'COLABORADOR',
-                anon: 'VISITANTE / ANON',
-              };
-
-              const workerName = (row.log.metadata as any)?.workerName;
-
-              return (
-                <div
-                  key={row.log.id}
-                  style={{
-                    position: 'absolute',
-                    top: `${row.offset}px`,
-                    left: 0,
-                    width: '100%',
-                    height: `${row.height}px`,
-                  }}
-                  className="border-b border-brand-divider overflow-visible"
-                >
-                  {/* Linha da Tabela (Header Alinhado no Mesmo Grid) */}
-                  <div
-                    onClick={() => toggleExpand(row.log.id)}
-                    className={`px-6 py-3 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 select-none transition-colors grid grid-cols-[20px_125px_85px_80px_65px_70px_140px_1fr_75px] gap-3 items-center ${
-                      isExpanded ? 'bg-black/5 dark:bg-white/5 border-l-2 border-brand-primary' : ''
-                    }`}
-                  >
-                    <span className="opacity-40 text-center">
-                      {isExpanded ? '▼' : '►'}
-                    </span>
-
-                    <span className="opacity-60 truncate">{dateStr}</span>
-
-                    <span className={`font-semibold truncate ${serviceColor}`}>
-                      [{row.log.serviceName}]
-                    </span>
-
-                    <span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase truncate max-w-full ${appColor}`}>
-                        {clientAppVal}
-                      </span>
-                    </span>
-
-                    <span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${typeColor}`}>
-                        {row.log.type || 'ERROR'}
-                      </span>
-                    </span>
-
-                    <span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${sevColor}`}>
-                        {row.log.severity.toUpperCase()}
-                      </span>
-                    </span>
-
-                    <span className="font-semibold truncate" title={row.log.name || 'system.event'}>
-                      {row.log.name || 'system.event'}
-                    </span>
-
-                    <span className="opacity-80 truncate" title={row.log.message}>
-                      {row.log.message}
-                    </span>
-
-                    {row.log.userId ? (
-                      <span className="text-[11px] opacity-60 bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded font-mono truncate hidden md:inline">
-                        {row.log.userId.substring(0, 8)}...
-                      </span>
-                    ) : (
-                      <span className="text-[11px] opacity-40 italic hidden md:inline">
-                        Anon
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Conteúdo Expandido com altura dinâmica e cores adaptativas do tema */}
-                  {isExpanded && (
-                    <div className="px-6 py-4 bg-black/[0.03] dark:bg-white/[0.02] border-t border-b border-brand-divider text-xs select-text space-y-4 transition-colors">
-                      {/* Grid de Informações Principais em Cards Embutidos */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Card: Detalhes do Evento */}
-                        <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-brand-divider shadow-xs">
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-3 flex items-center gap-1.5">
-                            <span>📋</span> DETALHES DO EVENTO
-                          </h4>
-                          <table className="w-full text-left font-mono text-xs">
-                            <tbody>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2 w-28">Data / Hora:</td>
-                                <td className="opacity-90 font-semibold pb-2">{dateStr}</td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">Log ID:</td>
-                                <td className="opacity-90 pb-2 select-all font-semibold break-all">{row.log.id}</td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">App (Origem):</td>
-                                <td className="pb-2 break-all">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block uppercase ${appColor}`}>
-                                      {clientAppVal}
-                                    </span>
-                                    {clientAppVal !== 'unknown' && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setClientApp(clientAppVal);
-                                        }}
-                                        className="inline-flex items-center gap-1 text-[11px] font-sans px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
-                                        title="Filtrar tabela por este App"
-                                      >
-                                        <span>🔍 Filtrar Logs</span>
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">User Role:</td>
-                                <td className="opacity-90 font-bold pb-2 uppercase text-indigo-600 dark:text-indigo-400">
-                                  {roleLabelMap[row.log.userRole || 'anon'] || (row.log.userRole || 'ANON').toUpperCase()}
-                                </td>
-                              </tr>
-                              {workerName && (
-                                <tr>
-                                  <td className="opacity-60 font-medium pr-4 pb-2">Worker Exec:</td>
-                                  <td className="opacity-90 font-bold text-amber-600 dark:text-amber-400 pb-2 font-mono">
-                                    ⚙️ {workerName}
-                                  </td>
-                                </tr>
-                              )}
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">Nome:</td>
-                                <td className="opacity-90 font-bold pb-2 break-all">{row.log.name || 'system.event'}</td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">Tipo:</td>
-                                <td className="opacity-90 font-bold pb-2 uppercase text-indigo-600 dark:text-indigo-400">{row.log.type || 'error'}</td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">Mensagem:</td>
-                                <td className={`font-semibold pb-2 leading-snug break-all ${
-                                  row.log.severity === 'error' || row.log.severity === 'fatal' || row.log.type === 'error'
-                                    ? 'text-red-600 dark:text-red-400'
-                                    : 'opacity-90'
-                                }`}>
-                                  {row.log.message}
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">Serviço:</td>
-                                <td className="opacity-90 font-bold pb-2">{row.log.serviceName}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Card: Contexto do Cliente */}
-                        <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5 border border-brand-divider shadow-xs">
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider opacity-70 mb-3 flex items-center gap-1.5">
-                            <span>👤</span> CONTEXTO E RASTREAMENTO (TRACING)
-                          </h4>
-                          <table className="w-full text-left font-mono text-xs">
-                            <tbody>
-                              {(() => {
-                                const reqId = (row.log.metadata as any)?.requestId;
-                                const sessId = row.log.sessionId || (row.log.metadata as any)?.sessionId;
-                                return (
-                                  <>
-                                    <tr>
-                                      <td className="opacity-60 font-medium pr-4 pb-2 w-28">Request ID:</td>
-                                      <td className="opacity-90 pb-2 break-all">
-                                        {reqId ? (
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">{reqId}</span>
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setRequestId(reqId);
-                                              }}
-                                              className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
-                                              title="Filtrar tabela de logs por este Request ID"
-                                            >
-                                              <span>🔍 Filtrar Logs</span>
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <span className="italic opacity-40 font-normal">Nenhum</span>
-                                        )}
-                                      </td>
-                                    </tr>
-
-                                    <tr>
-                                      <td className="opacity-60 font-medium pr-4 pb-2">User ID:</td>
-                                      <td className="opacity-90 pb-2 break-all">
-                                        {row.log.userId ? (
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-mono font-semibold select-all">{row.log.userId}</span>
-
-                                            {/* Botão 1: Abrir Perfil do Usuário */}
-                                            <Link
-                                              href={`/dashboard/users/${row.log.userId}`}
-                                              target="_blank"
-                                              onClick={(e) => e.stopPropagation()}
-                                              className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors font-medium cursor-pointer"
-                                              title="Ver perfil do usuário no Admin (Abre em nova aba)"
-                                            >
-                                              <span>👤 Perfil</span>
-                                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                              </svg>
-                                            </Link>
-
-                                            {/* Botão 2: Filtrar Tabela por este Usuário */}
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setUserId(row.log.userId!);
-                                              }}
-                                              className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
-                                              title="Filtrar tabela de logs por este Usuário"
-                                            >
-                                              <span>🔍 Filtrar Logs</span>
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <span className="italic opacity-40">Nenhum</span>
-                                        )}
-                                      </td>
-                                    </tr>
-
-                                    <tr>
-                                      <td className="opacity-60 font-medium pr-4 pb-2">Session ID:</td>
-                                      <td className="opacity-90 pb-2 break-all">
-                                        {sessId ? (
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-mono select-all">{sessId}</span>
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSessionId(sessId);
-                                              }}
-                                              className="inline-flex items-center gap-1 text-[11px] font-sans px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors font-medium cursor-pointer"
-                                              title="Filtrar tabela de logs por este Session ID"
-                                            >
-                                              <span>🔍 Filtrar Logs</span>
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <span className="italic opacity-40">Nenhuma</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  </>
-                                );
-                              })()}
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">URL Origem:</td>
-                                <td className="opacity-90 pb-2 break-all">
-                                  {row.log.url ? (
-                                    <a href={row.log.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-600 dark:text-indigo-400 font-semibold">
-                                      {row.log.url}
-                                    </a>
-                                  ) : (
-                                    <span className="italic opacity-40">Nenhuma</span>
-                                  )}
-                                </td>
-                              </tr>
-                              <tr>
-                                <td className="opacity-60 font-medium pr-4 pb-2">User Agent:</td>
-                                <td className="opacity-90 pb-2 break-all">
-                                  {row.log.userAgent || <span className="italic opacity-40">Nenhum</span>}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* Stack Trace em Card Destacado */}
-                      {(() => {
-                        const stackContent = row.log.stack || (row.log.metadata as any)?.stack || (row.log.metadata as any)?.stackTrace;
-                        if (!stackContent) return null;
-
-                        return (
-                          <div className="p-4 rounded-xl bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 dark:border-red-500/30 shadow-xs">
-                            <div className="flex justify-between items-center mb-2.5">
-                              <p className="font-bold text-[11px] uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-1.5">
-                                <span>🔥</span> STACK TRACE DA EXCEÇÃO
-                              </p>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  copyToClipboard(stackContent, `stack-${row.log.id}`);
-                                }}
-                                className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium flex items-center gap-1 cursor-pointer"
-                              >
-                                {copiedStackId === `stack-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar Stack Trace'}
-                              </button>
-                            </div>
-                            <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-red-300 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
-                              {stackContent}
-                            </pre>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Metadados Extras em Card Embutido */}
-                      {row.log.metadata && Object.keys(row.log.metadata).length > 0 && (
-                        <div className="p-4 rounded-xl bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 dark:border-indigo-500/30 shadow-xs">
-                          <div className="flex justify-between items-center mb-2.5">
-                            <p className="font-bold text-[11px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                              <span>⚙️</span> METADADOS ADICIONAIS
-                            </p>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(JSON.stringify(row.log.metadata, null, 2), `meta-${row.log.id}`);
-                              }}
-                              className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors font-medium flex items-center gap-1 cursor-pointer"
-                            >
-                              {copiedStackId === `meta-${row.log.id}` ? '✓ Copiado!' : '📋 Copiar JSON'}
-                            </button>
-                          </div>
-                          <pre className="p-3.5 rounded-lg bg-neutral-900 dark:bg-neutral-950 text-emerald-400 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all select-text leading-relaxed font-mono shadow-inner">
-                            {JSON.stringify(row.log.metadata, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {visibleRows.map((row) => (
+              <LogRowItem
+                key={row.log.id}
+                row={row}
+                isExpanded={expandedIds.has(row.log.id)}
+                toggleExpand={toggleExpand}
+                updateRowHeight={updateRowHeight}
+                copiedStackId={copiedStackId}
+                copyToClipboard={copyToClipboard}
+                setUserId={setUserId}
+                setSessionId={setSessionId}
+                setRequestId={setRequestId}
+                setClientApp={setClientApp}
+                setUserRole={setUserRole}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -620,3 +686,5 @@ export function LogsTable({
     </Card>
   );
 }
+
+

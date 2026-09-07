@@ -178,6 +178,15 @@ export function isValidUuid(id?: string | null): boolean {
   return UUID_REGEX.test(id.trim());
 }
 
+export interface RequiredQueueMetadata {
+  requestId: string;
+  clientApp: 'web' | 'admin' | 'sites' | 'core-api' | 'workers' | string;
+  userId?: string | null;
+  sessionId?: string | null;
+  userRole?: string | null;
+  [key: string]: any;
+}
+
 export interface LogPayload {
   name?: string | null;
   type?: 'error' | 'audit' | 'info' | 'system' | 'warn' | 'dlq' | 'http' | string;
@@ -192,7 +201,7 @@ export interface LogPayload {
   userId?: string | null;
   workspaceId?: string | null;
   sessionId?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, any> | RequiredQueueMetadata | null;
 }
 
 export async function log(payload: LogPayload): Promise<boolean> {
@@ -208,14 +217,20 @@ export async function log(payload: LogPayload): Promise<boolean> {
     ? (payload.severity === 'fatal' ? 'fatal' : 'error')
     : (payload.severity || (defaultType === 'error' ? 'error' : 'info'));
 
+  const rawApp = payload.clientApp || (payload.metadata as any)?.clientApp;
+  const resolvedClientApp = (rawApp && rawApp !== 'unknown')
+    ? rawApp
+    : (payload.serviceName === 'frontend' ? 'web' : payload.serviceName || 'core-api');
+
   const sanitized: LogPayload = {
     ...payload,
     name: payload.name || (isErrorEvent ? 'system.error' : 'system.event'),
     type: defaultType,
     severity: defaultSeverity,
-    clientApp: payload.clientApp || (payload.metadata as any)?.clientApp || 'unknown',
+    clientApp: resolvedClientApp,
     userRole: payload.userRole || (payload.metadata as any)?.userRole || 'anon',
   };
+
 
   if (sanitized.userId && !isValidUuid(sanitized.userId)) {
     sanitized.metadata = {

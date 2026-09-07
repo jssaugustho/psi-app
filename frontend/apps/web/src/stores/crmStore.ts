@@ -225,18 +225,10 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     });
 
     try {
-      // 2. Persist update on backend
+      // 2. Persist update on backend (PostgreSQL trigger trg_auto_log_contact_changes automatically logs status_change)
       await api.updateContact(contactId, {
         status: toStatus,
         last_contact_at: new Date().toISOString(),
-      });
-
-      // 3. Create interaction log in timeline
-      await api.createInteractionHistory({
-        contact_id: contactId,
-        tenant_id: tenantId,
-        type: 'status_change',
-        notes: `Estágio alterado de "${fromStatus}" para "${toStatus}".`,
       });
     } catch (err) {
       // Revert if error
@@ -344,14 +336,24 @@ export const useCrmStore = create<CrmState>((set, get) => ({
 
   handleRealtimeContactCreated: (contact) => {
     const { contacts } = get();
-    if (contacts.some((c) => c.id === contact.id)) return;
-    set({ contacts: [contact, ...contacts] });
+    if (!contact) return;
+    const normalized: Contact = {
+      ...contact,
+      tenant_id: contact.tenant_id || (contact as any).workspace_id,
+    };
+    if (contacts.some((c) => c.id === normalized.id)) return;
+    set({ contacts: [normalized, ...contacts] });
   },
 
   handleRealtimeContactUpdated: (contact) => {
     const { contacts } = get();
+    if (!contact) return;
+    const normalized: Contact = {
+      ...contact,
+      tenant_id: contact.tenant_id || (contact as any).workspace_id,
+    };
     set({
-      contacts: contacts.map((c) => (c.id === contact.id ? { ...c, ...contact } : c)),
+      contacts: contacts.map((c) => (c.id === normalized.id ? { ...c, ...normalized } : c)),
     });
   },
 
