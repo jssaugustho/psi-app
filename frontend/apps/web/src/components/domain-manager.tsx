@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { Card, Input, DnsInstructions } from '@psi/ui';
 
-
 import {
   Globe,
   ShieldCheck,
@@ -68,15 +67,20 @@ export function DomainManager({
   className = '',
 }: DomainManagerProps) {
   // DNS Modal, Accordion & Status States
+  const [savedSubdomain, setSavedSubdomain] = useState<string>('');
   const [savedCustomDomain, setSavedCustomDomain] = useState<string>('');
   const [showDnsModal, setShowDnsModal] = useState(false);
   const [isDnsAccordionOpen, setIsDnsAccordionOpen] = useState(true);
   const [verifyingDns, setVerifyingDns] = useState(false);
   const [registeringCustom, setRegisteringCustom] = useState(false);
+  const [savingSubdomain, setSavingSubdomain] = useState(false);
+  const [subdomainSaveMsg, setSubdomainSaveMsg] = useState('');
+  const [subdomainSaveError, setSubdomainSaveError] = useState('');
   const [domainVerified, setDomainVerified] = useState<boolean | null>(null);
   const [domainStatus, setDomainStatus] = useState<string>('pending');
-  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; value: string; description: string; status?: string }>>([]);
+  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; name: string; value: string; description?: string; status?: string }>>([]);
   const [error, setError] = useState('');
+  const [customDomainMsg, setCustomDomainMsg] = useState('');
   const [rateLimitMsg, setRateLimitMsg] = useState('');
 
   const [baseDomain, setBaseDomain] = useState(process.env.NEXT_PUBLIC_BASE_DOMAIN || 'theraos.app');
@@ -116,46 +120,52 @@ export function DomainManager({
     if (!tenantId) return;
     api.getWorkspaceDomain(tenantId)
       .then((record: any) => {
-        if (!record || !record.customDomain) return;
-        setSavedCustomDomain(record.customDomain);
+        if (!record) return;
 
-        if (!customDomain) {
-          onCustomDomainChange(record.customDomain);
-        }
-        if (record.dnsRecords && record.dnsRecords.length > 0) {
-          setDnsRecords(record.dnsRecords as any);
-        }
-        if (record.dnsStatus) {
-          setDomainStatus(record.dnsStatus);
-          if (record.dnsStatus === 'active' || record.dnsStatus === 'verified') {
-            setDomainVerified(true);
-            setIsDnsAccordionOpen(false);
-          } else {
-            setIsDnsAccordionOpen(true);
+        if (record.subdomain) {
+          setSavedSubdomain(record.subdomain);
+          if (!subdomain) {
+            onSubdomainChange(record.subdomain);
           }
         }
 
-        // Consulta de atualização na Cloudflare em background ao abrir a tela (rate-limited a 15s)
-        api.verifyCustomHostname(record.customDomain, undefined, tenantId)
-          .then((res) => {
-            if (res.dnsRecords && res.dnsRecords.length > 0) {
-              setDnsRecords(res.dnsRecords as any);
-            }
-            if (res.sslActive || res.status === 'active' || res.status === 'verified') {
+        if (record.customDomain) {
+          setSavedCustomDomain(record.customDomain);
+          if (!customDomain) {
+            onCustomDomainChange(record.customDomain);
+          }
+          if (record.dnsRecords && record.dnsRecords.length > 0) {
+            setDnsRecords(record.dnsRecords as any);
+          }
+          if (record.dnsStatus) {
+            setDomainStatus(record.dnsStatus);
+            if (record.dnsStatus === 'active' || record.dnsStatus === 'verified') {
               setDomainVerified(true);
-              setDomainStatus('active');
               setIsDnsAccordionOpen(false);
-            } else if (res.status && !res.rateLimited) {
-              setDomainStatus(res.status);
+            } else {
+              setIsDnsAccordionOpen(true);
             }
-          })
-          .catch(() => {});
+          }
+
+          // Consulta de atualização na Cloudflare em background ao abrir a tela (rate-limited a 15s)
+          api.verifyCustomHostname(record.customDomain, undefined, tenantId)
+            .then((res) => {
+              if (res.dnsRecords && res.dnsRecords.length > 0) {
+                setDnsRecords(res.dnsRecords as any);
+              }
+              if (res.sslActive || res.status === 'active' || res.status === 'verified') {
+                setDomainVerified(true);
+                setDomainStatus('active');
+                setIsDnsAccordionOpen(false);
+              } else if (res.status && !res.rateLimited) {
+                setDomainStatus(res.status);
+              }
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {});
   }, [tenantId]);
-
-
-
 
   useEffect(() => {
     api.getPlatformSetupStatus()
@@ -165,42 +175,111 @@ export function DomainManager({
       .catch(() => {});
   }, []);
 
-  // Internal subdomain availability checker
-  const handleCheckSubdomain = useCallback(async (subToCheck: string) => {
-    if (onCheckSubdomain) {
-      onCheckSubdomain(subToCheck);
+  // Internal subdomain availability checker via Debounce (400ms)
+  useEffect(() => {
+    const cleanSub = subdomain.trim().toLowerCase();
+    setSubdomainSaveMsg('');
+    setSubdomainSaveError('');
+
+    if (!cleanSub || cleanSub.length < 3) {
+      if (externalSubdomainAvailable === undefined) {
+        setInternalSubdomainAvailable(null);
+      }
       return;
     }
 
-    if (!subToCheck.trim()) {
-      setInternalSubdomainAvailable(null);
+    // Se for o subdomínio já salvo para o workspace, marca como disponível imediatamente
+    if (savedSubdomain && cleanSub === savedSubdomain.toLowerCase()) {
+      if (externalSubdomainAvailable === undefined) {
+        setInternalSubdomainAvailable(true);
+      }
       return;
     }
-    setInternalCheckingSubdomain(true);
+
+    const timer = setTimeout(async () => {
+      if (onCheckSubdomain) {
+        onCheckSubdomain(cleanSub);
+      } else {
+        setInternalCheckingSubdomain(true);
+        try {
+          const res = await api.checkSubdomainAvailability(cleanSub, tenantId);
+          setInternalSubdomainAvailable(res.available);
+        } catch {
+          setInternalSubdomainAvailable(null);
+        } finally {
+          setInternalCheckingSubdomain(false);
+        }
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [subdomain, savedSubdomain, tenantId, onCheckSubdomain, externalSubdomainAvailable]);
+
+  // Salvar Subdomínio Individual (Verifica disponibilidade e salva de uma só vez)
+  const handleSaveSubdomain = async () => {
+    const cleanSub = subdomain.trim().toLowerCase();
+    if (!cleanSub || cleanSub.length < 3) {
+      setSubdomainSaveError('O subdomínio deve ter pelo menos 3 caracteres.');
+      return;
+    }
+
+    setSavingSubdomain(true);
+    setSubdomainSaveError('');
+    setSubdomainSaveMsg('');
+
     try {
-      const res = await api.checkSubdomainAvailability(subToCheck, tenantId);
-      setInternalSubdomainAvailable(res.available);
-    } catch {
-      setInternalSubdomainAvailable(null);
-    } finally {
-      setInternalCheckingSubdomain(false);
-    }
-  }, [tenantId, onCheckSubdomain]);
+      // 1. Checar disponibilidade no ato do clique (caso não seja o já salvo)
+      if (!savedSubdomain || cleanSub !== savedSubdomain.toLowerCase()) {
+        let available = internalSubdomainAvailable;
+        if (available === null || available === undefined || isCheckingSubdomain) {
+          const checkRes = await api.checkSubdomainAvailability(cleanSub, tenantId);
+          available = checkRes.available;
+          setInternalSubdomainAvailable(available);
+        }
 
-  // Salvar Domínio & Registrar no Cloudflare
+        if (!available) {
+          setSubdomainSaveError('Subdomínio já em uso. Escolha outro nome.');
+          setSavingSubdomain(false);
+          return;
+        }
+      }
+
+      // 2. Persistir no banco de dados
+      if (tenantId) {
+        if (!savedSubdomain) {
+          await api.createWorkspaceDomain(tenantId, cleanSub, savedCustomDomain || null);
+        } else {
+          await api.updateWorkspaceDomain(tenantId, cleanSub, savedCustomDomain || null);
+        }
+      }
+
+      setSavedSubdomain(cleanSub);
+      setSubdomainSaveMsg('Subdomínio verificado e salvo com sucesso!');
+      setForceEditSubdomain(false);
+    } catch (err: any) {
+      setSubdomainSaveError(err.message || 'Erro ao salvar o subdomínio.');
+    } finally {
+      setSavingSubdomain(false);
+    }
+  };
+
+  // Salvar Domínio Próprio & Registrar no Cloudflare (Verifica e registra em uma só etapa)
   const handleSaveCustomDomain = async () => {
-    if (!customDomain.trim()) {
+    const cleanCustom = customDomain.trim().toLowerCase();
+    if (!cleanCustom) {
       setError('Digite o seu domínio próprio antes de salvar.');
       return;
     }
     setRegisteringCustom(true);
     setError('');
+    setCustomDomainMsg('');
     setRateLimitMsg('');
 
     try {
-      const res = await api.registerCustomHostname(null, customDomain.trim(), tenantId);
-      const registeredDomain = res.hostname || customDomain.trim();
+      const res = await api.registerCustomHostname(null, cleanCustom, tenantId);
+      const registeredDomain = res.hostname || cleanCustom;
       setSavedCustomDomain(registeredDomain);
+      setCustomDomainMsg('Domínio próprio verificado e registrado no Cloudflare!');
 
       if (res.dnsRecords && res.dnsRecords.length > 0) {
         setDnsRecords(res.dnsRecords as any);
@@ -224,8 +303,6 @@ export function DomainManager({
     }
   };
 
-
-
   // Verify Custom Domain DNS propagation (manual)
   const handleVerifyDomainDns = async () => {
     if (!customDomain.trim()) return;
@@ -235,7 +312,6 @@ export function DomainManager({
     try {
       const res = await api.verifyCustomHostname(customDomain.trim(), undefined, tenantId);
 
-      // Atualizar dnsRecords com status por registro (se retornado)
       if (res.dnsRecords && res.dnsRecords.length > 0) {
         setDnsRecords(res.dnsRecords as any);
       }
@@ -258,6 +334,26 @@ export function DomainManager({
     }
   };
 
+  const cleanSubdomainInput = subdomain.trim().toLowerCase();
+  const isSubdomainFormatValid = cleanSubdomainInput.length >= 3 && /^[a-z0-9-]+$/.test(cleanSubdomainInput);
+  const isSubdomainChanged = !savedSubdomain || cleanSubdomainInput !== savedSubdomain.toLowerCase();
+  const isSaveSubdomainDisabled =
+    !isSubdomainFormatValid ||
+    isSubdomainAvailable === false ||
+    !isSubdomainChanged ||
+    savingSubdomain;
+
+  const cleanCustomInput = customDomain.trim().toLowerCase();
+  const isCustomDomainFormatValid = cleanCustomInput.length > 0 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/i.test(cleanCustomInput);
+  const isCustomDomainChanged = cleanCustomInput !== savedCustomDomain.toLowerCase();
+  const isSaveCustomDomainDisabled =
+    !cleanCustomInput ||
+    !isCustomDomainFormatValid ||
+    !isCustomDomainChanged ||
+    registeringCustom;
+
+  // Determinar se o domínio próprio é o único funcionando ativamente
+  const isCustomDomainActive = (domainVerified === true || domainStatus === 'active' || domainStatus === 'verified') && Boolean(savedCustomDomain);
 
   const activeDomainPrefix = customDomain.trim()
     ? customDomain.trim()
@@ -267,14 +363,15 @@ export function DomainManager({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* 1. Domínio Principal do Site */}
+      {/* 1. DOMÍNIO PRINCIPAL DO SITE */}
       <div className="space-y-4">
         <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block uppercase tracking-wider">
           1. Domínio Principal do Site
         </label>
 
-        {/* MODO READ-ONLY SUBDOMÍNIO (SE A CONTA JÁ POSSUI SUBDOMÍNIO) */}
+        {/* CARD 1: SUBDOMÍNIO GRATUITO THERAOS */}
         {isSubdomainLocked && subdomain ? (
+          /* MODO READ-ONLY SUBDOMÍNIO */
           <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4 shadow-sm">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="space-y-1">
@@ -310,17 +407,35 @@ export function DomainManager({
                   https://{subdomain}.{baseDomain}
                 </span>
               </div>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Ativo
-              </span>
+              {isCustomDomainActive ? (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                  Endereço Secundário
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Domínio Ativo do Site
+                </span>
+              )}
             </div>
           </div>
         ) : (
           /* MODO EDITÁVEL SUBDOMÍNIO */
           <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4 shadow-sm">
-            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-              Escolher Subdomínio Gratuito (Ex: minha-clinica.{baseDomain})
-            </label>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                Escolher Subdomínio Gratuito (Ex: minha-clinica.{baseDomain})
+              </label>
+              {!isCustomDomainActive ? (
+                <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Domínio Ativo do Site
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                  Endereço Secundário
+                </span>
+              )}
+            </div>
+
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
               <div className="flex items-center flex-1 min-w-0 rounded-xl overflow-hidden border border-[var(--surface-border)] bg-slate-100/60 dark:bg-black/30 shadow-sm focus-within:border-[var(--brand-gradient-start)] transition-all">
                 <span className="h-10 px-3 flex items-center shrink-0 border-r border-[var(--surface-border)] text-xs font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-200/80 dark:bg-zinc-800/80 select-none whitespace-nowrap">
@@ -340,30 +455,65 @@ export function DomainManager({
                   .{baseDomain}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCheckSubdomain(subdomain)}
-                disabled={isCheckingSubdomain}
-                className="h-10 px-4 rounded-xl border border-[var(--surface-border)] bg-slate-200/80 hover:bg-slate-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-200 text-xs font-semibold shrink-0 cursor-pointer transition-colors whitespace-nowrap disabled:opacity-50"
-              >
-                {isCheckingSubdomain ? 'Verificando...' : 'Verificar'}
-              </button>
             </div>
 
-            {isSubdomainAvailable === true && (
+            {/* STATUS AUTOMÁTICO DE DISPONIBILIDADE DO SUBDOMÍNIO (SEM BOTÃO VERIFICAR) */}
+            {isCheckingSubdomain && (
+              <p className="text-xs text-amber-500 font-bold flex items-center gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Verificando disponibilidade...
+              </p>
+            )}
+
+            {!isCheckingSubdomain && isSubdomainAvailable === true && (
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Subdomínio disponível!
               </p>
             )}
-            {isSubdomainAvailable === false && (
+
+            {!isCheckingSubdomain && isSubdomainAvailable === false && (
               <p className="text-xs text-red-500 dark:text-red-400 font-bold flex items-center gap-1">
                 <AlertCircle className="h-3.5 w-3.5" /> Subdomínio já em uso. Escolha outro nome.
+              </p>
+            )}
+
+            {!isCheckingSubdomain && subdomain.trim().length > 0 && !isSubdomainFormatValid && (
+              <p className="text-xs text-amber-500 font-bold flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5" /> Mínimo 3 caracteres (apenas letras, números e hífen).
+              </p>
+            )}
+
+            {/* BOTÃO INDIVIDUAL: SALVAR SUBDOMÍNIO */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleSaveSubdomain}
+                disabled={isSaveSubdomainDisabled}
+                className="h-9 px-4 rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
+              >
+                {savingSubdomain ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                )}
+                <span>{savingSubdomain ? 'Salvando Subdomínio...' : 'Salvar Subdomínio'}</span>
+              </button>
+            </div>
+
+            {subdomainSaveMsg && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 pt-1">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {subdomainSaveMsg}
+              </p>
+            )}
+
+            {subdomainSaveError && (
+              <p className="text-xs text-rose-500 dark:text-rose-400 font-bold flex items-center gap-1 pt-1">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {subdomainSaveError}
               </p>
             )}
           </div>
         )}
 
-        {/* DOMÍNIO PRÓPRIO (SE A CONTA JÁ POSSUI OU SE DESEJA CONECTAR) */}
+        {/* CARD 2: DOMÍNIO PRÓPRIO CUSTOMIZADO */}
         {isCustomDomainLocked && customDomain ? (
           /* MODO READ-ONLY DOMÍNIO PRÓPRIO */
           <div className="p-4 rounded-2xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 space-y-3">
@@ -372,8 +522,8 @@ export function DomainManager({
                 Domínio Próprio Customizado
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Verificado & Ativo
+                <span className="text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> DOMÍNIO ATIVO DO SITE
                 </span>
                 <button
                   type="button"
@@ -422,21 +572,21 @@ export function DomainManager({
             </div>
           </div>
         ) : (
-          /* EDITÁVEL DOMÍNIO PRÓPRIO */
+          /* MODO EDITÁVEL DOMÍNIO PRÓPRIO */
           <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
                 Conectar Seu Domínio Próprio (Opcional - Ex: www.suaclinica.com.br)
               </label>
 
-              {/* Status Badge */}
+              {/* Status Badges */}
               {verifyingDns ? (
                 <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Verificando DNS...
                 </span>
-              ) : domainVerified === true || domainStatus === 'active' || domainStatus === 'verified' ? (
+              ) : isCustomDomainActive ? (
                 <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Domínio Verificado e Ativo!
+                  <CheckCircle2 className="h-3.5 w-3.5" /> DOMÍNIO ATIVO DO SITE
                 </span>
               ) : customDomain.trim() ? (
                 <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
@@ -445,45 +595,50 @@ export function DomainManager({
               ) : null}
             </div>
 
-
             <Input
               type="text"
               value={customDomain}
               onChange={(e) => {
                 onCustomDomainChange(e.target.value.toLowerCase());
                 setDomainVerified(null);
+                setCustomDomainMsg('');
               }}
               placeholder="Ex: www.geovannabastos.com.br"
               className="brand-input text-xs font-mono"
             />
 
-            {/* Botões de Ação do Domínio Próprio */}
+            {/* BOTÕES DE AÇÃO INDIVIDUAIS DO DOMÍNIO PRÓPRIO */}
             <div className="flex items-center gap-2 flex-wrap pt-1">
               <button
                 type="button"
                 onClick={handleSaveCustomDomain}
-                disabled={!customDomain.trim() || registeringCustom}
-                className="h-9 px-4 rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+                disabled={isSaveCustomDomainDisabled}
+                className="h-9 px-4 rounded-xl bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:active:scale-100"
               >
                 {registeringCustom ? (
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <ShieldCheck className="h-3.5 w-3.5" />
                 )}
-                <span>{registeringCustom ? 'Registrando no Cloudflare...' : 'Salvar Domínio'}</span>
+                <span>{registeringCustom ? 'Registrando no Cloudflare...' : 'Salvar Domínio Próprio'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleVerifyDomainDns}
                 disabled={!customDomain.trim() || verifyingDns}
-                className="h-9 px-4 rounded-xl border border-[var(--surface-border)] bg-slate-200/80 hover:bg-slate-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                className="h-9 px-4 rounded-xl border border-[var(--surface-border)] bg-slate-200/80 hover:bg-slate-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${verifyingDns ? 'animate-spin' : ''}`} />
                 <span>{verifyingDns ? 'Verificando...' : 'Checar Apontamento Agora'}</span>
               </button>
             </div>
 
+            {customDomainMsg && (
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 pt-1">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> {customDomainMsg}
+              </p>
+            )}
 
             {error && (
               <p className="text-[11px] text-rose-500 dark:text-rose-400 font-bold flex items-center gap-1 pt-1">
@@ -497,9 +652,8 @@ export function DomainManager({
               </p>
             )}
 
-            {/* Acordeon Inline de Registros DNS — Exibe SOMENTE se o domínio estiver salvo e retornado da Cloudflare */}
+            {/* Acordeon Inline de Registros DNS */}
             {Boolean(savedCustomDomain) && customDomain.trim().toLowerCase() === savedCustomDomain.toLowerCase() && dnsRecords.length > 0 && (
-
               <div className="mt-4 rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden bg-slate-50/50 dark:bg-zinc-950/40 transition-all shadow-sm">
                 <button
                   type="button"
@@ -543,13 +697,13 @@ export function DomainManager({
             )}
 
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
-              💡 Clique em <strong>Salvar Domínio</strong> para registrar o seu domínio e extrair os registros de apontamento diretamente da Cloudflare.
+              💡 Clique em <strong>Salvar Domínio Próprio</strong> para registrar o seu domínio e extrair os registros de apontamento diretamente da Cloudflare.
             </p>
           </div>
         )}
       </div>
 
-      {/* 2. Endereço da Página no seu site (Caminho - Opcional para o Wizard) */}
+      {/* 2. ENDEREÇO DA PÁGINA NO SEU SITE (SLUG OPCIONAL PARA O WIZARD) */}
       {showSlugInput && onSlugChange && (
         <div className="space-y-2.5 pt-3 border-t border-[var(--surface-border)]">
           <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block uppercase tracking-wider">
@@ -623,4 +777,5 @@ export function DomainManager({
     </div>
   );
 }
+
 

@@ -14,6 +14,7 @@ export default function AdminGlobalError({
     <ErrorView
       error={error}
       reset={reset}
+      clientApp="admin"
       homePath="/dashboard"
       title="Falha no Portal Admin"
       description="Ocorreu um erro ao carregar os módulos administrativos. Verifique o estado do sistema ou tente novamente."

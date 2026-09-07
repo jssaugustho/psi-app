@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Sparkles, Check, ChevronDown, MapPin, Phone, MessageSquare, ArrowRight, Menu, X, Image as ImageIcon } from 'lucide-react'
+import { Sparkles, Check, ChevronDown, MapPin, Phone, MessageSquare, ArrowRight, Menu, X, Image as ImageIcon, Globe, Share2, Stethoscope } from 'lucide-react'
 import { TypeformModal } from './TypeformModal'
-import { BrandLogo } from '@psi/ui'
+import { BrandLogo, toE164 } from '@psi/ui'
 import { useUTMParams } from '../hooks/useUTMParams'
 
 
@@ -17,6 +17,10 @@ interface CapturePageRendererProps {
     siteConfig: any;
     dictionary: any;
     formFlow: any;
+    ctaType?: string | null;
+    ctaWhatsappMessage?: string | null;
+    ctaExternalUrl?: string | null;
+    formId?: string | null;
   };
   tenant: {
     id: string;
@@ -36,6 +40,7 @@ interface CapturePageRendererProps {
     defaultSiteLogoUrl?: string | null;
     defaultSiteFaviconUrl?: string | null;
     defaultSiteLogoConfig?: any;
+    socialLinks?: any;
   };
 }
 
@@ -43,6 +48,34 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
   const [page, setPage] = useState(initialPage)
   const [tenant, setTenant] = useState(initialTenant)
   const [modalOpen, setModalOpen] = useState(false)
+
+  const handleCtaClick = () => {
+    const ctaType = page.ctaType || page.siteConfig?.ctaType || 'form';
+
+    if (ctaType === 'whatsapp') {
+      const activeSocial = getEffectiveSocialLinks();
+      const whatsappNum = activeSocial.whatsapp || tenant.phone;
+      const cleanDigits = whatsappNum ? toE164(whatsappNum).replace(/\D/g, '') : '';
+      const message = page.ctaWhatsappMessage || page.siteConfig?.ctaWhatsappMessage || 'Olá! Gostaria de agendar uma consulta.';
+      const encodedMessage = encodeURIComponent(message);
+      const waUrl = cleanDigits ? `https://wa.me/${cleanDigits}?text=${encodedMessage}` : `https://wa.me/?text=${encodedMessage}`;
+      window.open(waUrl, '_blank');
+      return;
+    }
+
+    if (ctaType === 'external_url') {
+      const targetUrl = page.ctaExternalUrl || page.siteConfig?.ctaExternalUrl;
+      if (targetUrl) {
+        const url = targetUrl.startsWith('http://') || targetUrl.startsWith('https://') ? targetUrl : `https://${targetUrl}`;
+        window.open(url, '_blank');
+      } else {
+        setModalOpen(true);
+      }
+      return;
+    }
+
+    setModalOpen(true);
+  };
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isPreview, setIsPreview] = useState(false)
@@ -159,8 +192,72 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
     { id: 'faq', type: 'faq', isActive: true },
     { id: 'space', type: 'space', isActive: true }
   ];
-  const sections = cfg.sections || defaultSections;
-  const activeSections = sections.filter((s: any) => s.isActive);
+  const sections = cfg?.sections || defaultSections;
+  const activeSections = sections.filter((s: any) => s.isActive !== false);
+
+  const getEffectiveSocialLinks = () => {
+    let raw: any = {};
+    if (cfg.hasSocialLinksOverride && cfg.socialLinks) {
+      raw = cfg.socialLinks;
+    } else {
+      raw = (tenant as any).social_links || (tenant as any).socialLinks || {};
+    }
+
+    const whatsappNum = raw.whatsappNumber || raw.whatsapp || tenant.phone;
+    const whatsappMsg = raw.whatsappMessage || '';
+    const instagramVal = raw.instagram || (tenant as any).instagram;
+    const linkedinVal = raw.linkedin;
+    const doctoraliaVal = raw.doctoralia;
+    const xVal = raw.x;
+    const youtubeVal = raw.youtube;
+    const facebookVal = raw.facebook;
+    const tiktokVal = raw.tiktok;
+    const otherVal = raw.other || [];
+
+    const formatUrl = (val?: string, platform?: string, extraMsg?: string) => {
+      if (!val) return '';
+      const v = val.trim();
+      if (platform === 'whatsapp') {
+        if (v.startsWith('http://') || v.startsWith('https://')) {
+          if (extraMsg && !v.includes('text=')) {
+            const sep = v.includes('?') ? '&' : '?';
+            return `${v}${sep}text=${encodeURIComponent(extraMsg)}`;
+          }
+          return v;
+        }
+        let digits = v.replace(/\D/g, '');
+        if (digits.length === 10 || digits.length === 11) {
+          digits = `55${digits}`;
+        }
+        if (!digits) return '';
+        const query = extraMsg ? `?text=${encodeURIComponent(extraMsg)}` : '';
+        return `https://wa.me/${digits}${query}`;
+      }
+      if (v.startsWith('http://') || v.startsWith('https://')) return v;
+      if (platform === 'instagram') return `https://instagram.com/${v.replace('@', '')}`;
+      if (platform === 'linkedin') return `https://linkedin.com/in/${v}`;
+      if (platform === 'doctoralia') return `https://doctoralia.com.br/${v}`;
+      if (platform === 'x') return `https://x.com/${v.replace('@', '')}`;
+      if (platform === 'youtube') return `https://youtube.com/${v.startsWith('@') ? v : `@${v}`}`;
+      if (platform === 'facebook') return `https://facebook.com/${v}`;
+      if (platform === 'tiktok') return `https://tiktok.com/${v.startsWith('@') ? v : `@${v}`}`;
+      return `https://${v}`;
+    };
+
+    return {
+      whatsapp: whatsappNum ? formatUrl(whatsappNum, 'whatsapp', whatsappMsg) : null,
+      instagram: instagramVal ? formatUrl(instagramVal, 'instagram') : null,
+      linkedin: linkedinVal ? formatUrl(linkedinVal, 'linkedin') : null,
+      doctoralia: doctoraliaVal ? formatUrl(doctoraliaVal, 'doctoralia') : null,
+      x: xVal ? formatUrl(xVal, 'x') : null,
+      youtube: youtubeVal ? formatUrl(youtubeVal, 'youtube') : null,
+      facebook: facebookVal ? formatUrl(facebookVal, 'facebook') : null,
+      tiktok: tiktokVal ? formatUrl(tiktokVal, 'tiktok') : null,
+      other: otherVal.map((o: any) => ({ label: o.label, url: formatUrl(o.url) })),
+    };
+  };
+
+  const activeSocial = getEffectiveSocialLinks();
 
   const getSectionNavInfo = (section: any) => {
     const isSemantic = ['diagnostic', 'about', 'process', 'space', 'faq'].includes(section.type);
@@ -272,16 +369,28 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
     });
   };
 
-  // Helper to render text with click-to-edit capabilities inside the editor iframe
+  // Helper to render text with click-to-edit capabilities inside the editor iframe (No hardcoded text fallbacks in live sites)
   const renderEditableText = (
     field: string,
     content: string | undefined,
-    fallback: string,
+    fallbackHint: string,
     className = ""
   ) => {
-    const text = content || fallback;
-    const parsed = parseParagraphMarkdown(text);
-    if (!isPreview) return <span className={className}>{parsed}</span>;
+    const hasValue = Boolean(content && content.trim());
+    const rawText = hasValue ? content!.trim() : '';
+
+    if (!isPreview) {
+      if (!hasValue) return null;
+      const parsed = parseParagraphMarkdown(rawText);
+      return <span className={className}>{parsed}</span>;
+    }
+
+    // In preview mode (editor iframe): display visual placeholder if text is empty so editor sees it needs filling
+    const parsed = hasValue ? parseParagraphMarkdown(rawText) : (
+      <span className="italic text-red-400/90 text-xs border border-dashed border-red-400/40 rounded px-1.5 py-0.5 bg-red-500/10 font-sans select-none">
+        [Campo Vazio - {fallbackHint || 'Preencher'}]
+      </span>
+    );
 
     return (
       <span
@@ -336,12 +445,24 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
   const renderEditableTitle = (
     field: string,
     content: string | undefined,
-    fallback: string,
+    fallbackHint: string,
     className = ""
   ) => {
-    const text = content || fallback;
-    const parsed = parseHighlightText(text);
-    if (!isPreview) return <span className={className}>{parsed}</span>;
+    const hasValue = Boolean(content && content.trim());
+    const rawText = hasValue ? content!.trim() : '';
+
+    if (!isPreview) {
+      if (!hasValue) return null;
+      const parsed = parseHighlightText(rawText);
+      return <span className={className}>{parsed}</span>;
+    }
+
+    // In preview mode (editor iframe): display visual placeholder if title is empty so editor sees it needs filling
+    const parsed = hasValue ? parseHighlightText(rawText) : (
+      <span className="italic text-red-400/90 text-sm border border-dashed border-red-400/40 rounded px-1.5 py-0.5 bg-red-500/10 font-sans select-none">
+        [Título Vazio - {fallbackHint || 'Preencher'}]
+      </span>
+    );
 
     return (
       <span
@@ -354,7 +475,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
       >
         {parsed}
         <span className="absolute -top-4 right-0 bg-blue-600 text-white text-[8px] font-semibold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-md font-sans uppercase tracking-wider">
-          Editar Título
+          Editar
         </span>
       </span>
     );
@@ -585,7 +706,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
 
           <div className="hidden md:flex">
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={handleCtaClick}
               className="h-10 px-5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer"
             >
               {renderEditableText('hero.ctaPrimary', dict.hero?.ctaPrimary, 'Iniciar Triagem')}
@@ -625,7 +746,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
           </nav>
           <div>
             <button
-              onClick={() => { setMobileMenuOpen(false); setModalOpen(true); }}
+              onClick={() => { setMobileMenuOpen(false); handleCtaClick(); }}
               className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] shadow-lg cursor-pointer"
             >
               {renderEditableText('hero.ctaPrimary', dict.hero?.ctaPrimary, 'Iniciar Triagem')}
@@ -656,7 +777,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center md:justify-start w-full md:w-auto">
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={handleCtaClick}
               className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-xs sm:text-sm uppercase tracking-wider border-none"
             >
               {renderEditableText('hero.ctaPrimary', dict.hero?.ctaPrimary, 'Agendar Consulta')}
@@ -816,7 +937,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
 
                   <div className="pt-4 w-full flex flex-col sm:flex-row items-center justify-center md:justify-start">
                     <button
-                      onClick={() => setModalOpen(true)}
+                      onClick={handleCtaClick}
                       className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer text-xs sm:text-sm uppercase tracking-wider border-none"
                     >
                       {renderEditableText('about.cta', dict.about?.cta, 'Fazer Triagem')}
@@ -857,7 +978,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                       {renderEditableText('process.step1.description', dict.process?.step1?.description, 'Preencha o formulário online rápido para que eu possa avaliar suas demandas e agilizar o primeiro contato.')}
                     </p>
                     <button
-                      onClick={() => setModalOpen(true)}
+                      onClick={handleCtaClick}
                       className="text-xs font-bold text-[var(--brand-gradient-start)] hover:text-white transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-none p-0"
                     >
                       {renderEditableText('process.step1.cta', dict.process?.step1?.cta, 'Iniciar Triagem')} ➔
@@ -1137,7 +1258,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                     {section.ctaText && (
                       <div className="pt-2 w-full sm:w-auto flex justify-center md:justify-start">
                         <button
-                          onClick={() => setModalOpen(true)}
+                          onClick={handleCtaClick}
                           className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer border-none"
                         >
                           {renderEditableText(`${section.id}.ctaText`, section.ctaText, 'Fazer Agendamento')}
@@ -1229,7 +1350,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                     <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center items-center w-full">
                       {section.ctaText && (
                         <button
-                          onClick={() => setModalOpen(true)}
+                          onClick={handleCtaClick}
                           className={`w-full sm:w-auto px-8 h-12 font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none flex items-center justify-center gap-2 ${
                             bgStyle === 'gradient'
                               ? 'bg-white text-zinc-900 hover:bg-white/90 shadow-xl'
@@ -1242,7 +1363,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                       {section.settings?.showSecondaryCta && tenant.phone && (
                         <button
                           onClick={() => {
-                            window.open(`https://wa.me/55${tenant.phone?.replace(/\D/g, '')}`, '_blank');
+                            const digits = toE164(tenant.phone || '').replace(/\D/g, '');
+                            window.open(`https://wa.me/${digits}`, '_blank');
                           }}
                           className={`w-full sm:w-auto px-8 h-12 font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border flex items-center justify-center gap-2 ${
                             bgStyle === 'gradient'
@@ -1316,7 +1438,7 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                       <div className="pt-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-center md:justify-start w-full">
                         {section.ctaText && (
                           <button
-                            onClick={() => setModalOpen(true)}
+                            onClick={handleCtaClick}
                             className="w-full sm:w-auto px-8 h-12 bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer border-none flex items-center justify-center gap-2"
                           >
                             {renderEditableText(`${section.id}.ctaText`, section.ctaText, 'Iniciar Triagem')}
@@ -1325,7 +1447,8 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
                         {section.ctaSecondaryText && tenant.phone && (
                           <button
                             onClick={() => {
-                              window.open(`https://wa.me/55${tenant.phone?.replace(/\D/g, '')}`, '_blank');
+                              const digits = toE164(tenant.phone || '').replace(/\D/g, '');
+                              window.open(`https://wa.me/${digits}`, '_blank');
                             }}
                             className="w-full sm:w-auto px-8 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-[var(--brand-text-color)] font-semibold text-xs sm:text-sm uppercase tracking-wider rounded-xl transition-all duration-300 cursor-pointer shadow-sm flex items-center justify-center gap-2"
                           >
@@ -1476,15 +1599,63 @@ export function CapturePageRenderer({ page: initialPage, tenant: initialTenant }
           </div>
 
           <div className="space-y-4 flex flex-col items-center md:items-start w-full">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--brand-text-color)] mb-4">Contato</h4>
+            <h4 className="font-bold text-xs uppercase tracking-wider text-[var(--brand-text-color)] mb-4">Contato & Redes</h4>
             {tenant.phone && (
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <Phone className="h-4 w-4 text-[var(--brand-gradient-start)]" />
                 <span className="font-medium text-[var(--brand-text-color)]">{tenant.phone}</span>
               </div>
             )}
+
+            {/* Ícones de Redes Sociais */}
+            {(activeSocial.whatsapp || activeSocial.instagram || activeSocial.linkedin || activeSocial.doctoralia || activeSocial.x || activeSocial.youtube || activeSocial.facebook || activeSocial.tiktok || activeSocial.other.length > 0) && (
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1 pb-2">
+                {activeSocial.whatsapp && (
+                  <a href={activeSocial.whatsapp} target="_blank" rel="noopener noreferrer" title="WhatsApp" className="h-8 w-8 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 flex items-center justify-center transition-all">
+                    <Phone className="h-4 w-4" />
+                  </a>
+                )}
+                {activeSocial.instagram && (
+                  <a href={activeSocial.instagram} target="_blank" rel="noopener noreferrer" title="Instagram" className="h-8 w-8 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 border border-pink-500/20 flex items-center justify-center transition-all">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                  </a>
+                )}
+                {activeSocial.linkedin && (
+                  <a href={activeSocial.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn" className="h-8 w-8 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 flex items-center justify-center transition-all">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                  </a>
+                )}
+                {activeSocial.doctoralia && (
+                  <a href={activeSocial.doctoralia} target="_blank" rel="noopener noreferrer" title="Doctoralia" className="h-8 w-8 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 flex items-center justify-center transition-all">
+                    <Stethoscope className="h-4 w-4" />
+                  </a>
+                )}
+                {activeSocial.x && (
+                  <a href={activeSocial.x} target="_blank" rel="noopener noreferrer" title="X (Twitter)" className="h-8 w-8 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/20 flex items-center justify-center transition-all">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  </a>
+                )}
+                {activeSocial.youtube && (
+                  <a href={activeSocial.youtube} target="_blank" rel="noopener noreferrer" title="YouTube" className="h-8 w-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 flex items-center justify-center transition-all">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                  </a>
+                )}
+                {activeSocial.facebook && (
+                  <a href={activeSocial.facebook} target="_blank" rel="noopener noreferrer" title="Facebook" className="h-8 w-8 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 flex items-center justify-center transition-all">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  </a>
+                )}
+                {activeSocial.other.map((link: any, idx: number) => (
+                  <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" title={link.label} className="h-8 px-2.5 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/20 flex items-center gap-1 text-[11px] font-semibold transition-all">
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>{link.label}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={handleCtaClick}
               className="h-10 px-5 rounded-xl text-xs font-semibold uppercase tracking-wider bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-[var(--brand-contrast-color)] shadow-lg shadow-[var(--brand-gradient-start)]/20 hover:opacity-90 transform hover:-translate-y-0.5 transition-all cursor-pointer flex items-center justify-center gap-2 w-full border-none"
             >
               <MessageSquare className="h-4 w-4" />

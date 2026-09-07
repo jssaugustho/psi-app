@@ -27,29 +27,32 @@ export function getWorkspaceVisualIdentity(
   const cachedWorkspace = !workspace ? loadUserWorkspaceBackup<Workspace>() : null;
   const activeWorkspace = workspace || cachedWorkspace;
 
-  const vi = customVisualIdentity || activeWorkspace?.visualIdentity;
+  let rawVi: any = customVisualIdentity || activeWorkspace?.visualIdentity;
+  if (Array.isArray(rawVi)) {
+    rawVi = rawVi[0] || null;
+  }
 
-  const logoUrl = vi?.logoUrl || activeWorkspace?.defaultSiteLogoUrl || activeWorkspace?.logoLightUrl || activeWorkspace?.logoDarkUrl || null;
-  const faviconUrl = vi?.faviconUrl || activeWorkspace?.defaultSiteFaviconUrl || activeWorkspace?.iconLightUrl || activeWorkspace?.iconDarkUrl || null;
+  const logoUrl = rawVi?.logoUrl || rawVi?.logo_url || activeWorkspace?.defaultSiteLogoUrl || activeWorkspace?.logoLightUrl || activeWorkspace?.logoDarkUrl || null;
+  const faviconUrl = rawVi?.faviconUrl || rawVi?.favicon_url || activeWorkspace?.defaultSiteFaviconUrl || activeWorkspace?.iconLightUrl || activeWorkspace?.iconDarkUrl || null;
 
-  const logoConfig = vi?.logoConfig || activeWorkspace?.defaultSiteLogoConfig || {
+  const logoConfig = rawVi?.logoConfig || rawVi?.logo_config || activeWorkspace?.defaultSiteLogoConfig || {
     mode: 'html',
     text: activeWorkspace?.name || 'Clínica',
     iconType: 'psi',
   };
 
-  const primaryColor = vi?.primaryColor || activeWorkspace?.gradientColorStart || activeWorkspace?.defaultSitePrimaryColor || '#7C3AED';
-  const secondaryColor = vi?.secondaryColor || activeWorkspace?.gradientColorEnd || activeWorkspace?.defaultSiteSecondaryColor || '#A855F7';
-  const contrastColor = vi?.contrastColor || activeWorkspace?.contrastColor || '#FFFFFF';
+  const primaryColor = rawVi?.primaryColor || rawVi?.primary_color || activeWorkspace?.defaultSitePrimaryColor || activeWorkspace?.gradientColorStart || '#7C3AED';
+  const secondaryColor = rawVi?.secondaryColor || rawVi?.secondary_color || activeWorkspace?.defaultSiteSecondaryColor || activeWorkspace?.gradientColorEnd || '#A855F7';
+  const contrastColor = rawVi?.contrastColor || rawVi?.contrast_color || activeWorkspace?.contrastColor || '#FFFFFF';
 
-  const bgColor = vi?.bgColor || activeWorkspace?.bgDarkColor || '#09090B';
-  const cardColor = vi?.cardColor || activeWorkspace?.cardDarkColor || '#18181B';
-  const textColor = vi?.textColor || activeWorkspace?.textDarkColor || '#F4F4F5';
+  const bgColor = rawVi?.bgColor || rawVi?.bg_color || activeWorkspace?.bgDarkColor || '#09090B';
+  const cardColor = rawVi?.cardColor || rawVi?.card_color || activeWorkspace?.cardDarkColor || '#18181B';
+  const textColor = rawVi?.textColor || rawVi?.text_color || activeWorkspace?.textDarkColor || '#F4F4F5';
 
-  let fontHeading = vi?.fontHeading || 'Playfair Display';
+  let fontHeading = rawVi?.fontHeading || rawVi?.font_heading || 'Playfair Display';
   if (fontHeading === 'serif') fontHeading = 'Playfair Display';
 
-  let fontBody = vi?.fontBody || 'Inter';
+  let fontBody = rawVi?.fontBody || rawVi?.font_body || 'Inter';
   if (fontBody === 'sans') fontBody = 'Inter';
 
   return {

@@ -8,7 +8,7 @@ import { api, Workspace } from '@/lib/api';
 import { Card, Input, Button, Textarea } from '@psi/ui';
 import { BrandIdentityManager } from '@/components/brand-identity-manager';
 import { DomainManager } from '@/components/domain-manager';
-import { Building2, Palette, Globe, User as UserIcon, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Building2, Palette, Globe, User as UserIcon, ChevronRight, ArrowLeft, Share2, Plus, Trash2 } from 'lucide-react';
 
 const DEFAULT_SPECIALTIES_PRESETS = [
   'Terapia Cognitivo-Comportamental (TCC)',
@@ -22,10 +22,11 @@ const DEFAULT_SPECIALTIES_PRESETS = [
 ];
 
 const STEPS = [
-  { id: 1, label: 'Workspace',  Icon: Building2 },
-  { id: 2, label: 'Perfil',    Icon: UserIcon   },
-  { id: 3, label: 'Identidade', Icon: Palette    },
-  { id: 4, label: 'Domínio',   Icon: Globe      },
+  { id: 1, label: 'Workspace', Icon: Building2 },
+  { id: 2, label: 'Perfil', Icon: UserIcon },
+  { id: 3, label: 'Redes', Icon: Share2 },
+  { id: 4, label: 'Identidade', Icon: Palette },
+  { id: 5, label: 'Domínio', Icon: Globe },
 ];
 
 export default function OnboardingPage() {
@@ -48,7 +49,19 @@ export default function OnboardingPage() {
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [newSpecialty, setNewSpecialty] = useState('');
 
-  // ─── Etapa 4: Domínio ────────────────────────────────────────────────────
+  // ─── Etapa 3: Links e Redes Sociais ────────────────────────────────────────
+  const [whatsapp, setWhatsapp] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [doctoralia, setDoctoralia] = useState('');
+  const [xLink, setXLink] = useState('');
+  const [youtube, setYoutube] = useState('');
+  const [facebook, setFacebook] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [otherLinks, setOtherLinks] = useState<Array<{ label: string; url: string }>>([]);
+  const [newOtherLabel, setNewOtherLabel] = useState('');
+  const [newOtherUrl, setNewOtherUrl] = useState('');
+
+  // ─── Etapa 5: Domínio ────────────────────────────────────────────────────
   const [subdomain, setSubdomain] = useState('');
   const [customDomain, setCustomDomain] = useState('');
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
@@ -107,6 +120,18 @@ export default function OnboardingPage() {
   const handleRemoveSpecialty = (idx: number) =>
     setSpecialties(p => p.filter((_, i) => i !== idx));
 
+  // ─── Outras Redes Sociais ──────────────────────────────────────────────────
+  const handleAddOtherLink = () => {
+    if (newOtherLabel.trim() && newOtherUrl.trim()) {
+      setOtherLinks(prev => [...prev, { label: newOtherLabel.trim(), url: newOtherUrl.trim() }]);
+      setNewOtherLabel('');
+      setNewOtherUrl('');
+    }
+  };
+  const handleRemoveOtherLink = (idx: number) => {
+    setOtherLinks(prev => prev.filter((_, i) => i !== idx));
+  };
+
   // ─── Submit: Etapa 1 ─────────────────────────────────────────────────────
   const handleCreateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +171,34 @@ export default function OnboardingPage() {
       setStep(3);
     } catch (err: any) {
       setError(err.message || 'Falha ao salvar o perfil.');
+    } finally { setSubmitting(false); }
+  };
+
+  // ─── Submit: Etapa 3 (Redes Sociais) ───────────────────────────────────────
+  const handleSaveSocialLinks = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!createdWorkspace) return;
+    setSubmitting(true);
+    try {
+      const socialLinksData = {
+        whatsapp: whatsapp.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        linkedin: linkedin.trim() || undefined,
+        doctoralia: doctoralia.trim() || undefined,
+        x: xLink.trim() || undefined,
+        youtube: youtube.trim() || undefined,
+        facebook: facebook.trim() || undefined,
+        tiktok: tiktok.trim() || undefined,
+        other: otherLinks.length > 0 ? otherLinks : undefined,
+      };
+      await api.updateTenantBranding(createdWorkspace.id, {
+        socialLinks: socialLinksData,
+        instagram: instagram.trim() || undefined,
+      });
+      setStep(4);
+    } catch (err: any) {
+      setError(err.message || 'Falha ao salvar redes sociais.');
     } finally { setSubmitting(false); }
   };
 
@@ -392,26 +445,117 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {/* ──── ETAPA 3: Identidade Visual ──── */}
-        {step === 3 && createdWorkspace && (
+        {/* ──── ETAPA 3: Links e Redes Sociais ──── */}
+        {step === 3 && (
+          <>
+            <PageHeader title="Links & Redes Sociais" subtitle="Configure as redes sociais do seu consultório. Nenhuma é obrigatória." />
+            <ErrorBanner />
+            <form onSubmit={handleSaveSocialLinks} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>WhatsApp Profissional</label>
+                  <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="(11) 99999-9999 ou link wa.me" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Instagram Profissional</label>
+                  <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@seu.perfil ou link completo" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>LinkedIn</label>
+                  <Input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="https://linkedin.com/in/seu-perfil" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Doctoralia</label>
+                  <Input value={doctoralia} onChange={(e) => setDoctoralia(e.target.value)} placeholder="https://doctoralia.com.br/psicologo/..." />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>X / Twitter</label>
+                  <Input value={xLink} onChange={(e) => setXLink(e.target.value)} placeholder="@seu_usuario ou link" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>YouTube</label>
+                  <Input value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/@seu-canal" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>TikTok</label>
+                  <Input value={tiktok} onChange={(e) => setTiktok(e.target.value)} placeholder="@seu.tiktok" />
+                </div>
+              </div>
+
+              {/* Links adicionais customizados */}
+              <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
+                <label className="block text-xs font-semibold" style={{ color: 'var(--brand-text-color)', opacity: 0.8 }}>Outras Redes ou Links Personalizados</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newOtherLabel}
+                    onChange={(e) => setNewOtherLabel(e.target.value)}
+                    placeholder="Nome (ex: Podcast, Site Pessoal)"
+                    className="w-1/3"
+                  />
+                  <Input
+                    value={newOtherUrl}
+                    onChange={(e) => setNewOtherUrl(e.target.value)}
+                    placeholder="URL (https://...)"
+                    className="flex-1"
+                  />
+                  <Button type="button" onClick={handleAddOtherLink} className="shrink-0 bg-violet-600 hover:bg-violet-500">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {otherLinks.length > 0 && (
+                  <div className="space-y-1.5 pt-2">
+                    {otherLinks.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-[var(--surface-card)] border border-[var(--surface-border)] text-xs">
+                        <span className="font-semibold" style={{ color: 'var(--brand-text-color)' }}>{item.label}: <span className="font-normal opacity-80">{item.url}</span></span>
+                        <button type="button" onClick={() => handleRemoveOtherLink(idx)} className="text-rose-400 hover:text-rose-300 bg-transparent border-none cursor-pointer p-1">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <BackButton toStep={2} />
+                <Button type="submit" submitting={submitting} className="flex-1">
+                  Salvar & Continuar <ChevronRight className="w-4 h-4 ml-1 inline" />
+                </Button>
+                <button type="button" onClick={() => setStep(4)} className="text-sm font-medium brand-text-muted hover:opacity-80 bg-transparent border-none cursor-pointer whitespace-nowrap">
+                  Pular etapa
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* ──── ETAPA 4: Identidade Visual ──── */}
+        {step === 4 && createdWorkspace && (
           <>
             <PageHeader title="Identidade Visual" subtitle="Personalize a aparência do seu site. Você pode alterar isso depois." />
             <ErrorBanner />
             <BrandIdentityManager
               workspace={createdWorkspace}
-              onSaved={() => setStep(4)}
+              onSaved={() => setStep(5)}
               saveButtonLabel="Salvar & Continuar"
               showSkip
-              onSkip={() => setStep(4)}
+              onSkip={() => setStep(5)}
             />
             <div className="mt-4">
-              <BackButton toStep={2} />
+              <BackButton toStep={3} />
             </div>
           </>
         )}
 
-        {/* ──── ETAPA 4: Domínio ──── */}
-        {step === 4 && createdWorkspace && (
+        {/* ──── ETAPA 5: Domínio ──── */}
+        {step === 5 && createdWorkspace && (
           <>
             <PageHeader title="Endereço de Acesso" subtitle="Defina o subdomínio do seu workspace na plataforma." />
             <ErrorBanner />
@@ -425,7 +569,7 @@ export default function OnboardingPage() {
               tenantId={createdWorkspace.id}
             />
             <div className="flex gap-3 mt-6">
-              <BackButton toStep={3} />
+              <BackButton toStep={4} />
               <Button
                 type="button"
                 onClick={handleFinish}

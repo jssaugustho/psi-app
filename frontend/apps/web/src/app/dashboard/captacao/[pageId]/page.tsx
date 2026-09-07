@@ -3604,7 +3604,11 @@ export default function PageEditor({ params }: PageProps) {
           seoConfigDraft: page.seoConfig,
           siteConfigDraft: page.siteConfig,
           dictionaryDraft: page.dictionary,
-          formFlowDraft: updatedFlow
+          formFlowDraft: updatedFlow,
+          ctaTypeDraft: page.ctaType,
+          ctaWhatsappMessageDraft: page.ctaWhatsappMessage,
+          ctaExternalUrlDraft: page.ctaExternalUrl,
+          formIdDraft: page.formId,
         };
 
         if (isDraft) {
@@ -3615,6 +3619,10 @@ export default function PageEditor({ params }: PageProps) {
           updatePayload.siteConfig = page.siteConfig;
           updatePayload.dictionary = page.dictionary;
           updatePayload.formFlow = updatedFlow;
+          updatePayload.ctaType = page.ctaType;
+          updatePayload.ctaWhatsappMessage = page.ctaWhatsappMessage;
+          updatePayload.ctaExternalUrl = page.ctaExternalUrl;
+          updatePayload.formId = page.formId;
         }
 
         await api.updateCapturePage(page.id, updatePayload);
@@ -3628,6 +3636,10 @@ export default function PageEditor({ params }: PageProps) {
     page?.title,
     page?.slug,
     page?.customDomain,
+    page?.ctaType,
+    page?.ctaWhatsappMessage,
+    page?.ctaExternalUrl,
+    page?.formId,
     JSON.stringify(page?.seoConfig),
     JSON.stringify(page?.siteConfig),
     JSON.stringify(page?.dictionary),
@@ -4144,6 +4156,77 @@ export default function PageEditor({ params }: PageProps) {
     }
   };
 
+  const validatePageTextsForPublish = (targetPage: any): string[] => {
+    const errors: string[] = [];
+    if (!targetPage) return errors;
+
+    const dict = targetPage.dictionary || {};
+    const cfg = targetPage.siteConfig || {};
+    const sections = cfg.sections || [];
+    const activeSections = sections.filter((s: any) => s.isActive !== false);
+
+    if (!targetPage.title || !targetPage.title.trim()) {
+      errors.push('O Nome da Página / Título Principal é obrigatório.');
+    }
+
+    for (const sec of activeSections) {
+      const type = sec.type;
+
+      if (type === 'hero') {
+        const heroTitle = dict.hero?.title || (dict.hero?.titlePart1 && dict.hero?.titlePart2 ? `${dict.hero.titlePart1} ${dict.hero.titlePart2}` : '');
+        if (!heroTitle || !heroTitle.trim()) {
+          errors.push('Seção Hero: O Título da Capa é obrigatório.');
+        }
+        if (!dict.hero?.description || !dict.hero.description.trim()) {
+          errors.push('Seção Hero: A Descrição da Capa é obrigatória.');
+        }
+      }
+
+      if (type === 'about') {
+        if (!dict.about?.title || !dict.about.title.trim()) {
+          errors.push('Seção Sobre Mim: O Título da Seção é obrigatório.');
+        }
+        if (!dict.about?.description1 || !dict.about.description1.trim()) {
+          errors.push('Seção Sobre Mim: A Biografia/Descrição da Terapeuta é obrigatória.');
+        }
+      }
+
+      if (type === 'diagnostic') {
+        if (!dict.diagnostic?.title || !dict.diagnostic.title.trim()) {
+          errors.push('Seção Especialidades: O Título da Seção é obrigatório.');
+        }
+      }
+
+      if (type === 'process') {
+        if (!dict.process?.title || !dict.process.title.trim()) {
+          errors.push('Seção Como Funciona: O Título da Seção é obrigatório.');
+        }
+      }
+
+      if (type === 'space') {
+        if (!dict.space?.title || !dict.space.title.trim()) {
+          errors.push('Seção O Consultório: O Título do Espaço é obrigatório.');
+        }
+      }
+
+      if (type === 'faq') {
+        if (!dict.faq?.title || !dict.faq.title.trim()) {
+          errors.push('Seção FAQ: O Título das Dúvidas Frequentes é obrigatório.');
+        }
+      }
+    }
+
+    const ctaType = targetPage.ctaType || cfg.ctaType || 'form';
+    if (ctaType === 'external_url') {
+      const extUrl = targetPage.ctaExternalUrl || cfg.ctaExternalUrl || '';
+      if (!extUrl || !extUrl.trim()) {
+        errors.push('Destino CTA: A URL do Link Externo é obrigatória.');
+      }
+    }
+
+    return errors;
+  };
+
   // Publish changes to database
   const handlePublish = async () => {
     if (!page) return;
@@ -4155,6 +4238,8 @@ export default function PageEditor({ params }: PageProps) {
     }
 
     setSaving(true);
+    setError('');
+    setSuccess('');
     setError('');
     setSuccess('');
 
@@ -4188,6 +4273,13 @@ export default function PageEditor({ params }: PageProps) {
       edges: compiledEdges
     };
 
+    const validationErrors = validatePageTextsForPublish(page);
+    if (validationErrors.length > 0) {
+      setSaving(false);
+      setError(`Impossível publicar: Preencha os campos obrigatórios vazios antes de publicar:\n• ${validationErrors.join('\n• ')}`);
+      return;
+    }
+
     try {
       const isDraft = page.siteConfig?.status === 'draft';
       const updatePayload: any = {
@@ -4197,7 +4289,11 @@ export default function PageEditor({ params }: PageProps) {
         seoConfigDraft: page.seoConfig,
         siteConfigDraft: page.siteConfig,
         dictionaryDraft: page.dictionary,
-        formFlowDraft: updatedFlow
+        formFlowDraft: updatedFlow,
+        ctaTypeDraft: page.ctaType,
+        ctaWhatsappMessageDraft: page.ctaWhatsappMessage,
+        ctaExternalUrlDraft: page.ctaExternalUrl,
+        formIdDraft: page.formId,
       };
 
       if (isDraft) {
@@ -4208,6 +4304,10 @@ export default function PageEditor({ params }: PageProps) {
         updatePayload.siteConfig = page.siteConfig;
         updatePayload.dictionary = page.dictionary;
         updatePayload.formFlow = updatedFlow;
+        updatePayload.ctaType = page.ctaType;
+        updatePayload.ctaWhatsappMessage = page.ctaWhatsappMessage;
+        updatePayload.ctaExternalUrl = page.ctaExternalUrl;
+        updatePayload.formId = page.formId;
       }
 
       await api.updateCapturePage(page.id, updatePayload);
@@ -5813,6 +5913,111 @@ export default function PageEditor({ params }: PageProps) {
                   <p className="text-[10px] text-slate-500">
                     Resumo do site exibido logo abaixo do título nas pesquisas do Google.
                   </p>
+                </div>
+
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">🎯 Destino do Botão Principal (CTA)</h3>
+                
+                <div className="space-y-3">
+                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">
+                    O que acontece quando o paciente clica no CTA do site?
+                  </label>
+                  
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage({ ...page, ctaType: 'form' });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                        (page.ctaType || 'form') === 'form'
+                          ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 ring-1 ring-[var(--brand-gradient-start)]'
+                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 shrink-0">
+                        📋
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">Formulário de Triagem Interno</div>
+                        <div className="text-[10px] text-slate-500">Abre o modal de triagem e captação de dados clínica.</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage({ ...page, ctaType: 'whatsapp' });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                        page.ctaType === 'whatsapp'
+                          ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500'
+                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+                        💬
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">Conversa Direta no WhatsApp</div>
+                        <div className="text-[10px] text-slate-500">Redireciona o paciente direto para o seu WhatsApp de atendimento.</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage({ ...page, ctaType: 'external_url' });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                        page.ctaType === 'external_url'
+                          ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
+                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 shrink-0">
+                        🌐
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">Link / URL Externa</div>
+                        <div className="text-[10px] text-slate-500">Redireciona para um sistema de agendamento (Calendly, Google Forms, etc.).</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {page.ctaType === 'whatsapp' && (
+                    <div className="space-y-1 pt-2 animate-in fade-in duration-200">
+                      <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Mensagem Inicial do WhatsApp</label>
+                      <textarea
+                        rows={3}
+                        className="w-full p-2.5 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition-colors resize-y min-h-[68px]"
+                        placeholder="Ex: Olá! Vim pelo seu site e gostaria de agendar uma consulta."
+                        value={page.ctaWhatsappMessage || ''}
+                        onChange={(e) => {
+                          setPage({ ...page, ctaWhatsappMessage: e.target.value });
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {page.ctaType === 'external_url' && (
+                    <div className="space-y-1 pt-2 animate-in fade-in duration-200">
+                      <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Link Externo de Destino</label>
+                      <Input
+                        type="text"
+                        className="brand-input font-mono"
+                        placeholder="https://calendly.com/sua-agenda"
+                        value={page.ctaExternalUrl || ''}
+                        onChange={(e) => {
+                          setPage({ ...page, ctaExternalUrl: e.target.value });
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">Redirecionamento Pós-Triagem</h3>

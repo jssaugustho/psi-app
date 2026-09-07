@@ -51,6 +51,10 @@ export interface CapturePageData {
   site_config: any;
   dictionary: any;
   form_flow: any;
+  cta_type?: string | null;
+  cta_whatsapp_message?: string | null;
+  cta_external_url?: string | null;
+  form_id?: string | null;
   title_draft?: string | null;
   slug_draft?: string | null;
   custom_domain_draft?: string | null;
@@ -79,6 +83,8 @@ export interface CapturePageData {
     text_dark_color: string | null;
     logo_light_url?: string | null;
     logo_dark_url?: string | null;
+    instagram?: string | null;
+    social_links?: any;
   };
 }
 

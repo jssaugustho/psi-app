@@ -43,6 +43,13 @@
       "when": 1788450951480,
       "tag": "0005_lumpy_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788763293818,
+      "tag": "0006_puzzling_paibok",
+      "breakpoints": true
     }
   ]
 }

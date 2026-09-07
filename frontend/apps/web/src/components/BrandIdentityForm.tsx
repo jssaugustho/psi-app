@@ -282,6 +282,9 @@ export function BrandIdentityForm({
     };
   }, [logoUrl, faviconUrl]);
 
+  const activeBgColor = bgColor || '#FAFAFA';
+  const activeTextColor = getContrastColor(activeBgColor);
+
   return (
     <div className="space-y-6">
       {/* 1. Logotipo e Ícone */}
@@ -304,12 +307,30 @@ export function BrandIdentityForm({
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Se não enviado, o sistema utilizará o Nome da Psicóloga em formato tipográfico.</p>
             {logoUrl ? (
-              <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/40">
-                <div className="flex items-center gap-2 max-w-[80%]">
-                  <img src={logoUrl} alt="Logo" className="h-7 object-contain rounded" />
-                  <span className="text-[11px] text-slate-650 dark:text-slate-400 truncate font-semibold">Logotipo ativo</span>
+              <div
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border transition-all"
+                style={{
+                  backgroundColor: activeBgColor,
+                  borderColor: activeTextColor === '#FFFFFF' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
+                }}
+              >
+                <div className="flex items-center gap-2.5 max-w-[80%]">
+                  <img src={logoUrl} alt="Logo" className="h-8 w-auto max-w-[160px] object-contain rounded shrink-0" />
+                  <span
+                    className="text-[11px] truncate font-semibold"
+                    style={{ color: activeTextColor }}
+                  >
+                    Logotipo ativo
+                  </span>
                 </div>
-                <button type="button" onClick={() => setLogoUrl('')} className="text-xs text-red-500 dark:text-red-400 hover:underline font-semibold cursor-pointer bg-transparent border-none">Remover</button>
+                <button
+                  type="button"
+                  onClick={() => setLogoUrl('')}
+                  className="text-xs font-semibold cursor-pointer bg-transparent border-none shrink-0 hover:underline"
+                  style={{ color: activeTextColor === '#FFFFFF' ? '#F87171' : '#DC2626' }}
+                >
+                  Remover
+                </button>
               </div>
             ) : (
               <button
@@ -330,12 +351,30 @@ export function BrandIdentityForm({
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">Ícone exibido na aba do navegador e no símbolo decorativo da marca.</p>
             {faviconUrl ? (
-              <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/40">
-                <div className="flex items-center gap-2">
-                  <img src={faviconUrl} alt="Favicon" className="h-7 w-7 object-contain rounded-md" />
-                  <span className="text-[11px] text-slate-650 dark:text-slate-405 truncate font-semibold">Ícone ativo</span>
+              <div
+                className="flex items-center justify-between gap-3 p-3 rounded-xl border transition-all"
+                style={{
+                  backgroundColor: activeBgColor,
+                  borderColor: activeTextColor === '#FFFFFF' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)',
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <img src={faviconUrl} alt="Favicon" className="h-8 w-8 object-contain rounded-md shrink-0" />
+                  <span
+                    className="text-[11px] truncate font-semibold"
+                    style={{ color: activeTextColor }}
+                  >
+                    Ícone ativo
+                  </span>
                 </div>
-                <button type="button" onClick={() => setFaviconUrl('')} className="text-xs text-red-500 dark:text-red-400 hover:underline font-semibold cursor-pointer bg-transparent border-none">Remover</button>
+                <button
+                  type="button"
+                  onClick={() => setFaviconUrl('')}
+                  className="text-xs font-semibold cursor-pointer bg-transparent border-none shrink-0 hover:underline"
+                  style={{ color: activeTextColor === '#FFFFFF' ? '#F87171' : '#DC2626' }}
+                >
+                  Remover
+                </button>
               </div>
             ) : (
               <button

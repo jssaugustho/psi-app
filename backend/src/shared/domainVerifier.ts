@@ -12,6 +12,7 @@
 import { db } from './db';
 import { workspaceDomains, platformSettings } from './schema';
 import { eq } from 'drizzle-orm';
+import { log } from './queue';
 
 // ── Rate Limiter simples em memória ──────────────────────────────────────────
 // Mapeia domain → timestamp da última consulta à CF API
@@ -82,6 +83,15 @@ export async function checkDomainOnCloudflare(
   const token = settings.cloudflareApiToken;
   const zoneId = settings.cloudflareZoneId;
 
+  log({
+    name: 'cloudflare.check_status_start',
+    type: 'info',
+    severity: 'info',
+    serviceName: 'core-api',
+    message: `Iniciando verificação de status no Cloudflare para o domínio "${domain}"`,
+    metadata: { domain, cfHostnameId, zoneId },
+  }).catch(() => {});
+
   try {
     // Usar cf_hostname_id se disponível (mais eficiente), senão buscar por hostname
     const endpoint = cfHostnameId
@@ -101,6 +111,14 @@ export async function checkDomainOnCloudflare(
     if (!res.ok) {
       const errorMsg = data?.errors?.[0]?.message || res.statusText || 'Erro na API do Cloudflare';
       console.error(`❌ Cloudflare API HTTP ${res.status} para ${domain}:`, errorMsg, data);
+      log({
+        name: 'cloudflare.check_status_error',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'core-api',
+        message: `Falha na API do Cloudflare (HTTP ${res.status}) ao verificar "${domain}": ${errorMsg}`,
+        metadata: { domain, status: res.status, errorMsg },
+      }).catch(() => {});
       return {
         isActive: false,
         status: `error_cf_${res.status}`,
@@ -171,6 +189,15 @@ export async function checkDomainOnCloudflare(
         }
       });
     }
+
+    log({
+      name: 'cloudflare.check_status_success',
+      type: 'info',
+      severity: 'info',
+      serviceName: 'core-api',
+      message: `Consulta ao Cloudflare finalizada para "${domain}": status "${globalStatus}", ssl "${sslStatus}"`,
+      metadata: { domain, globalStatus, sslStatus, isActive, hostnameId: cfResult.id },
+    }).catch(() => {});
 
     return {
       isActive,

@@ -1,6 +1,7 @@
 import { db } from '../shared/db';
 import { emailLogs } from '../shared/schema';
 import { eq, and, gt, count } from 'drizzle-orm';
+import { log } from '../shared/queue';
 
 // ── 1. Cache de Verificação de Domínio no Resend (TTL: 10 Minutos) ───────────
 interface CachedDomainStatus {
@@ -28,6 +29,15 @@ export async function checkDomainVerifiedCached(
     return { isVerified: cached.isVerified, verifyError: cached.verifyError };
   }
 
+  log({
+    name: 'resend.check_domain_start',
+    type: 'info',
+    severity: 'info',
+    serviceName: 'email-worker',
+    message: `Consultando API do Resend para checar status do domínio de envio "${targetDomain}"`,
+    metadata: { domain: targetDomain },
+  }).catch(() => {});
+
   let isVerified = false;
   let verifyError = '';
 
@@ -39,6 +49,14 @@ export async function checkDomainVerifiedCached(
     if (!listRes.ok) {
       const err = await listRes.json().catch(() => ({}));
       verifyError = `Erro ao listar domínios no Resend: ${(err as any).message || listRes.statusText}`;
+      log({
+        name: 'resend.check_domain_error',
+        type: 'error',
+        severity: 'error',
+        serviceName: 'email-worker',
+        message: `Falha na API do Resend ao consultar domínio "${targetDomain}": ${verifyError}`,
+        metadata: { domain: targetDomain, error: verifyError },
+      }).catch(() => {});
     } else {
       const listData = (await listRes.json()) as {
         data?: { id: string; name: string; status: string }[];
@@ -51,9 +69,29 @@ export async function checkDomainVerifiedCached(
       } else {
         isVerified = true;
       }
+
+      log({
+        name: isVerified ? 'resend.check_domain_success' : 'resend.check_domain_warning',
+        type: isVerified ? 'info' : 'warning',
+        severity: isVerified ? 'info' : 'warning',
+        serviceName: 'email-worker',
+        message: isVerified
+          ? `Domínio "${targetDomain}" verificado com sucesso no Resend.`
+          : `Aviso na verificação do domínio "${targetDomain}" no Resend: ${verifyError}`,
+        metadata: { domain: targetDomain, isVerified, verifyError, status: domainEntry?.status },
+      }).catch(() => {});
     }
   } catch (err: any) {
     verifyError = `Falha ao conectar com o Resend para verificar domínio: ${err.message}`;
+    log({
+      name: 'resend.check_domain_error',
+      type: 'error',
+      severity: 'error',
+      serviceName: 'email-worker',
+      message: `Erro de conexão ao verificar domínio "${targetDomain}" no Resend: ${err.message}`,
+      stack: err.stack,
+      metadata: { domain: targetDomain, error: err.message },
+    }).catch(() => {});
   }
 
   // Armazena no cache se verificado (se falhar na API, usa TTL mais curto de 1 min para tentar novamente depois)

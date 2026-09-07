@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useBrand } from '@/context/BrandContext';
 import { api } from '@/lib/api';
-import { Card, Button, Input, LoadingSpinner, BrandModal, DnsInstructions, BrandLogo } from '@psi/ui';
+import { Card, Button, Input, LoadingSpinner, BrandModal, DnsInstructions, BrandLogo, PhoneInput } from '@psi/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,6 +33,7 @@ import {
   Share2,
   FileText,
   Eye,
+  EyeOff,
   FolderOpen,
   Trash2
 } from 'lucide-react';
@@ -42,6 +43,19 @@ import { BrandIdentityForm } from '@/components/BrandIdentityForm';
 import { MediaLibraryModal } from '@/components/media-library-modal';
 import { FontPicker } from '@/components/FontPicker';
 import { DomainManager } from '@/components/domain-manager';
+
+const SUGGESTED_NETWORKS = [
+  'Instagram',
+  'LinkedIn',
+  'Doctoralia',
+  'YouTube',
+  'TikTok',
+  'X (Twitter)',
+  'Facebook',
+  'Threads',
+  'Pinterest',
+  'Podcast',
+];
 
 const DEFAULT_TEMPLATE_MODEL = {
   siteConfig: {
@@ -59,20 +73,30 @@ const DEFAULT_TEMPLATE_MODEL = {
       gallery: [],
     },
     theme: {
-      fontFamily: 'Inter',
+      fontFamily: 'Playfair Display',
       colors: {
-        primaryStart: '#CC8667',
-        primaryEnd: '#AA5533',
+        primaryStart: '#7C3AED',
+        primaryEnd: '#A855F7',
         contrast: '#FFFFFF',
-        bgDark: '#FAFAFA',
-        textDark: '#18181B',
+        bgDark: '#09090B',
+        textDark: '#F4F4F5',
       }
     }
   },
   dictionary: {
+    nav: {
+      about: 'Sobre',
+      services: 'Especialidades',
+      process: 'Como Funciona',
+      space: 'Consultório',
+      faq: 'Dúvidas',
+      contact: 'Agendar'
+    },
     hero: {
       badge: 'Atendimento Online & Presencial',
       title: 'Psicologia Clínica & Saúde Emocional',
+      titlePart1: 'Terapia para recuperar o seu ',
+      titlePart2: 'equilíbrio interior',
       description: 'Cuidado clínico ético e acolhedor para ajudar você a superar desafios emocionais, desenvolver o autoconhecimento e viver com mais leveza.',
       ctaPrimary: 'Iniciar Triagem',
       ctaSecondary: 'Saiba Mais',
@@ -80,28 +104,82 @@ const DEFAULT_TEMPLATE_MODEL = {
       badgeApproach: 'Abordagem TCC',
       badgeEthic: 'Sigilo Ético',
     },
+    diagnostic: {
+      badge: 'Especialidades',
+      title: 'Como a terapia pode ajudar você',
+      description: 'Encontre um espaço clínico especializado para trabalhar as demandas que impedem o seu bem-estar diário.',
+      card1Title: 'Ansiedade e Cansaço Físico',
+      card1Desc: 'Sente que está sempre no seu limite, com a mente acelerada e o corpo exausto? A terapia ajuda a identificar os gatilhos e encontrar formas saudáveis de lidar com o estresse.',
+      card2Title: 'Dificuldade de Relacionamento',
+      card2Desc: 'Conflitos frequentes no trabalho, na família ou no namoro? Compreender a sua forma de se relacionar é o primeiro passo para construir conexões mais saudáveis.',
+      card3Title: 'Busca de Sentido e Propósito',
+      card3Desc: 'Momento de transição de carreira, luto ou crises existenciais? O suporte terapêutico oferece um espaço de escuta sem julgamentos para você se reconectar consigo mesmo.'
+    },
     about: {
-      badge: 'Sobre a Psicóloga',
-      title: 'Acolhimento humanizado focado em transformação',
-      bio: 'Sou especialista em psicologia clínica com foco em ansiedade, depressão e desenvolvimento pessoal. Meu trabalho é oferecer um espaço seguro para que você possa ressignificar suas dores e alcançar seu bem-estar.',
+      badge: 'Sua Psicóloga',
+      title: 'Conheça mais sobre a sua terapeuta',
+      bio: 'Sou graduada em Psicologia com foco em psicoterapia clínica. Meu compromisso é fornecer um espaço acolhedor e sigiloso para que possamos juntos trabalhar nas suas dores e metas de crescimento pessoal.',
+      description1: 'Sou graduada em Psicologia com foco em psicoterapia clínica. Meu compromisso é fornecer um espaço acolhedor e sigiloso para que possamos juntos trabalhar nas suas dores e metas de crescimento pessoal.',
+      description2: 'Acredito em uma psicologia acessível, ética e integrada, respeitando a subjetividade de cada paciente e oferecendo ferramentas práticas para o dia a dia.',
+      badgeTitle: 'Psicologia Clínica',
+      points: [
+        'Especialista em Saúde Mental',
+        'Experiência com ansiedade, relacionamentos e burnout',
+        'Registro ativo no CRP e atendimento ético'
+      ],
+      cta: 'Fazer Triagem'
     },
     process: {
-      badge: 'Como Funciona',
-      title: 'Seu processo terapêutico em passos simples',
-      steps: [
-        { title: '1. Triagem Inicial', description: 'Preencha um breve formulário para entendermos sua demanda.' },
-        { title: '2. Agendamento', description: 'Escolhemos o melhor horário para sua sessão online ou presencial.' },
-        { title: '3. Primeira Sessão', description: 'Realizamos a primeira consulta de acolhimento e alinhamento de objetivos.' }
-      ]
+      badge: 'O Processo',
+      title: 'Como funciona a jornada de terapia',
+      description: 'Um passo a passo simples focado no seu acolhimento desde o primeiro contato.',
+      step1: {
+        title: 'Triagem Online',
+        description: 'Você preenche o formulário online rápido para que eu possa avaliar suas demandas e agilizar o primeiro contato.',
+        cta: 'Iniciar Triagem'
+      },
+      step2: {
+        title: 'Primeiro Contato',
+        description: 'Eu entrarei em contato pessoalmente via WhatsApp para alinharmos o formato do atendimento (online ou presencial), valores e horários.'
+      },
+      step3: {
+        title: 'Primeira Sessão',
+        description: 'Damos início às sessões clínicas, focando no seu desenvolvimento pessoal e no seu autoconhecimento.'
+      }
     },
     faq: {
-      badge: 'Dúvidas Frequentes',
-      title: 'Perguntas mais comuns sobre a terapia',
+      badge: 'Dúvidas',
+      title: 'Perguntas Frequentes',
+      description: 'Esclareça suas principais dúvidas sobre o processo terapêutico.',
       items: [
-        { question: 'Como funciona a primeira consulta?', answer: 'A primeira consulta é um momento de escuta e acolhimento para compreendermos suas necessidades e definirmos a frequência das sessões.' },
-        { question: 'As sessões online possuem a mesma eficácia?', answer: 'Sim. A terapia online possui regulamentação pelo CFP e a mesma eficácia comprovada do atendimento presencial.' },
-        { question: 'Qual é a duração de cada sessão?', answer: 'Cada sessão individual dura em média 50 minutos.' }
+        {
+          question: 'Como funciona a primeira consulta?',
+          answer: 'A primeira consulta é um momento de escuta e acolhimento para compreendermos suas necessidades e definirmos a frequência das sessões.'
+        },
+        {
+          question: 'As sessões online possuem a mesma eficácia?',
+          answer: 'Sim. A terapia online possui regulamentação pelo CFP e a mesma eficácia comprovada do atendimento presencial.'
+        },
+        {
+          question: 'Qual é a duração de cada sessão?',
+          answer: 'Cada sessão individual dura em média 50 minutos.'
+        }
       ]
+    },
+    space: {
+      badge: 'O Consultório',
+      title: 'Nosso Espaço Físico',
+      description: 'Um ambiente aconchegante, tranquilo e planejado para garantir o seu conforto e privacidade em cada sessão presencial.',
+      addressLabel: 'Endereço Clínico'
+    },
+    footer: {
+      description: 'Cuidado e ética para a sua saúde mental.',
+      crpLabel: 'Conselho Regional de Psicologia',
+      navHeader: 'Navegação',
+      serviceHeader: 'Especialidades',
+      servicePoints: ['Terapia TCC', 'Ansiedade & Burnout', 'Relacionamentos'],
+      scheduleLabel: 'Horário de Atendimento',
+      rights: 'Todos os direitos reservados.'
     }
   },
   formFlow: {
@@ -282,6 +360,14 @@ function SocialCoverBanner({
   );
 }
 
+interface StackedSocialInput {
+  id: string;
+  presetKey?: string;
+  label: string;
+  url: string;
+  error?: string;
+}
+
 export default function NovaPaginaCaptacaoPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -297,14 +383,16 @@ export default function NovaPaginaCaptacaoPage() {
   const [newSlug, setNewSlug] = useState('');
   
   // Visual & Brand states initialized from psychologist's site default branding
+  const [workspaceVisualIdentity, setWorkspaceVisualIdentity] = useState<any>(null);
+  const [brandIdentityMode, setBrandIdentityMode] = useState<'inherit' | 'custom'>('inherit');
   const [selectedPalette, setSelectedPalette] = useState(COLOR_PALETTES[0]);
   const [isCustomColor, setIsCustomColor] = useState(false);
-  const [customPrimaryStart, setCustomPrimaryStart] = useState(tenant?.defaultSitePrimaryColor || primaryTenant?.defaultSitePrimaryColor || '#CC8667');
-  const [customPrimaryEnd, setCustomPrimaryEnd] = useState(tenant?.defaultSiteSecondaryColor || primaryTenant?.defaultSiteSecondaryColor || '#E6A88A');
-  const [customContrast, setCustomContrast] = useState(tenant?.contrastColor || primaryTenant?.contrastColor || '#FFFFFF');
-  const [customBgColor, setCustomBgColor] = useState('#F8FAFC');
-  const [newLogoUrl, setNewLogoUrl] = useState(tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || '');
-  const [newFaviconUrl, setNewFaviconUrl] = useState(tenant?.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || '');
+  const [customPrimaryStart, setCustomPrimaryStart] = useState((tenant as any)?.gradientColorStart || '#7C3AED');
+  const [customPrimaryEnd, setCustomPrimaryEnd] = useState((tenant as any)?.gradientColorEnd || '#A855F7');
+  const [customContrast, setCustomContrast] = useState((tenant as any)?.contrastColor || '#FFFFFF');
+  const [customBgColor, setCustomBgColor] = useState((tenant as any)?.bgDarkColor || '#09090B');
+  const [newLogoUrl, setNewLogoUrl] = useState('');
+  const [newFaviconUrl, setNewFaviconUrl] = useState('');
   const [uploadTarget, setUploadTarget] = useState<'logo' | 'favicon'>('logo');
 
   // Font Typography states
@@ -329,6 +417,22 @@ export default function NovaPaginaCaptacaoPage() {
       api.getWorkspaceDomain(tenant.id)
         .then(setWorkspaceDomain)
         .catch(err => console.warn('Erro ao carregar domínio do workspace:', err));
+
+      api.getVisualIdentity(tenant.id)
+        .then((vi) => {
+          if (vi) {
+            setWorkspaceVisualIdentity(vi);
+            setCustomPrimaryStart(vi.primaryColor || (tenant as any)?.gradientColorStart || '#7C3AED');
+            setCustomPrimaryEnd(vi.secondaryColor || (tenant as any)?.gradientColorEnd || '#A855F7');
+            setCustomContrast(vi.contrastColor || (tenant as any)?.contrastColor || '#FFFFFF');
+            setCustomBgColor(vi.bgColor || (tenant as any)?.bgDarkColor || '#09090B');
+            if (vi.fontHeading) setFontHeading(vi.fontHeading);
+            if (vi.fontBody) setFontBody(vi.fontBody);
+            if (vi.logoUrl) setNewLogoUrl(vi.logoUrl);
+            if (vi.faviconUrl) setNewFaviconUrl(vi.faviconUrl);
+          }
+        })
+        .catch(err => console.warn('Erro ao carregar identidade visual do workspace:', err));
     }
   }, [tenant?.id]);
 
@@ -368,6 +472,149 @@ export default function NovaPaginaCaptacaoPage() {
   const [seoAllowIndexing, setSeoAllowIndexing] = useState(true);
   const [seoLibraryOpen, setSeoLibraryOpen] = useState(false);
   const [seoPreviewTab, setSeoPreviewTab] = useState<'google' | 'social'>('google');
+
+  // Redes Sociais & Override states
+  const [socialLinksMode, setSocialLinksMode] = useState<'inherit' | 'custom'>('inherit');
+  const [siteWhatsappNumber, setSiteWhatsappNumber] = useState('');
+  const [siteWhatsappMessage, setSiteWhatsappMessage] = useState('Olá! Vim pelo seu site e gostaria de agendar uma consulta.');
+  const [siteShowWhatsapp, setSiteShowWhatsapp] = useState(true);
+  const [siteInstagram, setSiteInstagram] = useState('');
+  const [siteLinkedin, setSiteLinkedin] = useState('');
+  const [siteOtherLinks, setSiteOtherLinks] = useState<Array<{ label: string; url: string }>>([]);
+  const [stackedSiteOtherInputs, setStackedSiteOtherInputs] = useState<StackedSocialInput[]>([]);
+
+  const handleSelectCustomSocialLinks = () => {
+    setSocialLinksMode('custom');
+    const wsSocial = (tenant as any)?.socialLinks || (tenant as any)?.social_links || (primaryTenant as any)?.socialLinks || {};
+    if (!siteWhatsappNumber) {
+      setSiteWhatsappNumber(wsSocial.whatsappNumber || wsSocial.whatsapp || (tenant as any)?.phone || '');
+    }
+    if (!siteWhatsappMessage && wsSocial.whatsappMessage) {
+      setSiteWhatsappMessage(wsSocial.whatsappMessage);
+    }
+    const existingInsta = wsSocial.instagram || (tenant as any)?.instagram || '';
+    const existingLinkedin = wsSocial.linkedin || '';
+    setSiteOtherLinks((prev) => {
+      let updated = [...prev];
+      if (siteOtherLinks.length === 0 && wsSocial.other) {
+        updated = [...wsSocial.other];
+      }
+      if (existingInsta && !updated.some((l) => l.label.toLowerCase() === 'instagram')) {
+        updated.unshift({ label: 'Instagram', url: existingInsta });
+      }
+      if (existingLinkedin && !updated.some((l) => l.label.toLowerCase() === 'linkedin')) {
+        updated.unshift({ label: 'LinkedIn', url: existingLinkedin });
+      }
+      return updated;
+    });
+  };
+
+  const normalizeWebUrl = (rawUrl: string): string => {
+    let trimmed = rawUrl.trim();
+    if (!trimmed) return '';
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
+  const isValidWebUrl = (rawUrl: string): boolean => {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return false;
+    const normalized = normalizeWebUrl(trimmed);
+    try {
+      const parsed = new URL(normalized);
+      const parts = parsed.hostname.split('.');
+      return parts.length >= 2 && parts.every((p) => p.length > 0);
+    } catch {
+      return false;
+    }
+  };
+
+  const handleToggleSiteOtherChip = (chipName: string) => {
+    if (chipName === 'outros') {
+      const newCustomItem: StackedSocialInput = {
+        id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        label: '',
+        url: '',
+      };
+      setStackedSiteOtherInputs((prev) => [...prev, newCustomItem]);
+    } else {
+      setStackedSiteOtherInputs((prev) => {
+        const exists = prev.some((item) => item.presetKey === chipName);
+        if (exists) {
+          return prev.filter((item) => item.presetKey !== chipName);
+        }
+        return [
+          ...prev,
+          {
+            id: `preset-${chipName}`,
+            presetKey: chipName,
+            label: chipName,
+            url: '',
+          },
+        ];
+      });
+    }
+  };
+
+  const handleUpdateStackedSiteOtherInput = (id: string, field: 'label' | 'url', value: string) => {
+    setStackedSiteOtherInputs((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value, error: undefined } : item))
+    );
+  };
+
+  const handleRemoveStackedSiteOtherInput = (id: string) => {
+    setStackedSiteOtherInputs((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleAddStackedSiteOtherLink = (id: string) => {
+    const target = stackedSiteOtherInputs.find((item) => item.id === id);
+    if (!target) return;
+
+    const labelToSave = target.label.trim();
+    if (!labelToSave) {
+      setStackedSiteOtherInputs((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, error: 'Por favor, informe o nome da rede.' } : item))
+      );
+      return;
+    }
+
+    if (!isValidWebUrl(target.url)) {
+      setStackedSiteOtherInputs((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, error: 'Insira uma URL válida (ex: https://doctoralia.com.br/perfil ou instagram.com/perfil).' }
+            : item
+        )
+      );
+      return;
+    }
+
+    const finalUrl = normalizeWebUrl(target.url);
+    setSiteOtherLinks((prev) => [...prev, { label: labelToSave, url: finalUrl }]);
+    setStackedSiteOtherInputs((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleRemoveSiteOtherLink = (idx: number) => {
+    setSiteOtherLinks((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // CTA Destination states
+  const [ctaType, setCtaType] = useState<'form' | 'whatsapp' | 'external_url'>('form');
+  const [ctaWhatsappMessage, setCtaWhatsappMessage] = useState('Olá! Vim pelo seu site e gostaria de agendar uma consulta.');
+  const [ctaExternalUrl, setCtaExternalUrl] = useState('');
+  const [formChoiceMode, setFormChoiceMode] = useState<'new' | 'existing'>('new');
+  const [selectedFormId, setSelectedFormId] = useState<string>('');
+  const [existingScreeningForms, setExistingScreeningForms] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (tenant?.id) {
+      api.getScreeningForms(tenant.id)
+        .then(setExistingScreeningForms)
+        .catch(err => console.warn('Erro ao carregar formulários do workspace:', err));
+    }
+  }, [tenant?.id]);
 
   // Draft Storage & Auto-save Logic (Multi-draft support)
   const draftsStorageKey = tenant?.id ? `psi_page_drafts_${tenant.id}` : 'psi_page_drafts_global';
@@ -410,8 +657,20 @@ export default function NovaPaginaCaptacaoPage() {
     setSeoSocialImage('');
     setSeoKeywords(draftToLoad.seoKeywords || '');
     setSeoAllowIndexing(draftToLoad.seoAllowIndexing !== undefined ? draftToLoad.seoAllowIndexing : true);
+    setCtaType(draftToLoad.ctaType || 'form');
+    setCtaWhatsappMessage(draftToLoad.ctaWhatsappMessage || 'Olá! Vim pelo seu site e gostaria de agendar uma consulta.');
+    setCtaExternalUrl(draftToLoad.ctaExternalUrl || '');
+    setFormChoiceMode(draftToLoad.formChoiceMode || 'new');
+    setSelectedFormId(draftToLoad.selectedFormId || '');
+    setSocialLinksMode(draftToLoad.socialLinksMode || 'inherit');
+    setSiteWhatsappNumber(draftToLoad.siteWhatsappNumber || draftToLoad.siteWhatsapp || '');
+    setSiteWhatsappMessage(draftToLoad.siteWhatsappMessage || 'Olá! Vim pelo seu site e gostaria de agendar uma consulta.');
+    setSiteShowWhatsapp(draftToLoad.siteShowWhatsapp !== undefined ? draftToLoad.siteShowWhatsapp : true);
+    setSiteInstagram(draftToLoad.siteInstagram || '');
+    setSiteLinkedin(draftToLoad.siteLinkedin || '');
+    setSiteOtherLinks(draftToLoad.siteOtherLinks || []);
     
-    if (draftToLoad.currentStep && draftToLoad.currentStep >= 1 && draftToLoad.currentStep <= 5) {
+    if (draftToLoad.currentStep && draftToLoad.currentStep >= 1 && draftToLoad.currentStep <= 7) {
       setCurrentStep(draftToLoad.currentStep);
     } else {
       setCurrentStep(1);
@@ -679,6 +938,13 @@ export default function NovaPaginaCaptacaoPage() {
           seoDescription,
           seoKeywords,
           seoAllowIndexing,
+          socialLinksMode,
+          siteWhatsappNumber,
+          siteWhatsappMessage,
+          siteShowWhatsapp,
+          siteInstagram,
+          siteLinkedin,
+          siteOtherLinks,
         };
 
         await api.updateCapturePage(currentDraftId, {
@@ -728,6 +994,12 @@ export default function NovaPaginaCaptacaoPage() {
     seoDescription,
     seoKeywords,
     seoAllowIndexing,
+    socialLinksMode,
+    siteWhatsappNumber,
+    siteWhatsappMessage,
+    siteInstagram,
+    siteLinkedin,
+    siteOtherLinks,
   ]);
   const handleDiscardDraft = async () => {
     if (currentDraftId && !currentDraftId.startsWith('draft_')) {
@@ -764,9 +1036,10 @@ export default function NovaPaginaCaptacaoPage() {
       .then((vi) => {
         if (!vi) return;
 
-        // Se já tivermos restaurado um rascunho com valores preenchidos, não sobrescreve
-        if (hasDraftRestored) return;
+        // Armazena a identidade visual real do workspace (tabela visual_identities)
+        setWorkspaceVisualIdentity(vi);
 
+        // Preenche os valores base customizados se ainda não houver imagem/cor definida pelo usuário
         if (vi.primaryColor) setCustomPrimaryStart(vi.primaryColor);
         if (vi.secondaryColor) setCustomPrimaryEnd(vi.secondaryColor);
         if (vi.contrastColor) setCustomContrast(vi.contrastColor);
@@ -776,9 +1049,8 @@ export default function NovaPaginaCaptacaoPage() {
         if (vi.fontHeading) setFontHeading(vi.fontHeading);
         if (vi.fontBody) setFontBody(vi.fontBody);
 
-        // Se a cor primária coincidir com uma paleta conhecida, atualiza a paleta selecionada
         const matchingPalette = COLOR_PALETTES.find(
-          p => p.primaryStart.toLowerCase() === vi.primaryColor.toLowerCase()
+          p => p.primaryStart.toLowerCase() === (vi.primaryColor || '').toLowerCase()
         );
         if (matchingPalette) {
           setSelectedPalette(matchingPalette);
@@ -788,7 +1060,7 @@ export default function NovaPaginaCaptacaoPage() {
         }
       })
       .catch((err) => console.warn('Erro ao obter identidade visual para o wizard:', err));
-  }, [tenant, primaryTenant, hasDraftRestored]);
+  }, [tenant, primaryTenant]);
 
   const hasInitializedTitle = useRef(false);
 
@@ -844,7 +1116,7 @@ export default function NovaPaginaCaptacaoPage() {
   }, [tenant?.id, newTitle]);
 
   useEffect(() => {
-    if (currentStep === 3) {
+    if (currentStep === 6) {
       checkRootAvailabilityAndSetDefaultSlug();
     }
   }, [currentStep, checkRootAvailabilityAndSetDefaultSlug]);
@@ -860,23 +1132,52 @@ export default function NovaPaginaCaptacaoPage() {
     }
   };
 
-  // Compute active colors
-  const activePrimaryStart = isCustomColor ? customPrimaryStart : selectedPalette.primaryStart;
-  const activePrimaryEnd = isCustomColor ? customPrimaryEnd : selectedPalette.primaryEnd;
-  const activeContrast = isCustomColor ? customContrast : selectedPalette.contrast;
-  const activeBgColor = isCustomColor ? customBgColor : '#09090B';
+  // Compute active brand identity directly from workspaceVisualIdentity / tenant when in 'inherit' mode
+  const activePrimaryStart = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.primaryColor || tenant?.defaultSitePrimaryColor || tenant?.gradientColorStart || primaryTenant?.gradientColorStart || '#7C3AED')
+    : (isCustomColor ? customPrimaryStart : selectedPalette.primaryStart);
+
+  const activePrimaryEnd = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.secondaryColor || tenant?.defaultSiteSecondaryColor || tenant?.gradientColorEnd || primaryTenant?.gradientColorEnd || '#A855F7')
+    : (isCustomColor ? customPrimaryEnd : selectedPalette.primaryEnd);
+
+  const activeContrast = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.contrastColor || tenant?.contrastColor || primaryTenant?.contrastColor || '#FFFFFF')
+    : (isCustomColor ? customContrast : selectedPalette.contrast);
+
+  const activeBgColor = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.bgColor || (tenant as any)?.bgDarkColor || '#09090B')
+    : (isCustomColor ? customBgColor : '#09090B');
+
+  const activeFontHeading = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.fontHeading || (tenant as any)?.defaultSiteFontHeading || (primaryTenant as any)?.defaultSiteFontHeading || 'Playfair Display')
+    : fontHeading;
+
+  const activeFontBody = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.fontBody || (tenant as any)?.defaultSiteFontBody || (primaryTenant as any)?.defaultSiteFontBody || 'Plus Jakarta Sans')
+    : fontBody;
+
+  const activeLogoUrl = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.logoUrl || tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || '')
+    : newLogoUrl;
+
+  const activeFaviconUrl = brandIdentityMode === 'inherit'
+    ? (workspaceVisualIdentity?.faviconUrl || tenant?.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || '')
+    : newFaviconUrl;
 
   // Compute logo configuration dynamically
-  const wizardLogoConfig = {
-    ...(tenant?.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || { mode: 'html', iconType: 'psi' } as any),
-    text: newTitle.trim() || tenant?.defaultSiteLogoConfig?.text || 'Psicologia'
-  };
+  const wizardLogoConfig = brandIdentityMode === 'inherit' && workspaceVisualIdentity?.logoConfig
+    ? workspaceVisualIdentity.logoConfig
+    : {
+        ...(tenant?.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || { mode: 'html', iconType: 'psi' } as any),
+        text: newTitle.trim() || tenant?.defaultSiteLogoConfig?.text || 'Psicologia'
+      };
 
   // Form submit -> create page and redirect
   const handleCreatePage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    for (let step = 1; step <= 3; step++) {
+    for (let step = 1; step <= 6; step++) {
       if (!validateStep(step)) {
         setCurrentStep(step);
         return;
@@ -887,24 +1188,98 @@ export default function NovaPaginaCaptacaoPage() {
     setError('');
 
     try {
-      const templateModel = DEFAULT_TEMPLATE_MODEL;
+      // Cadeia de Herança do Template Inicial:
+      // 1ª Prioridade: Herdar do último site editado no mesmo consultório
+      // 2ª Prioridade: Usar modelo global da plataforma
+      let templateModel = DEFAULT_TEMPLATE_MODEL;
+
+      if (tenant?.id) {
+        try {
+          const workspacePages = await api.getCapturePages(tenant.id);
+          const previousPages = workspacePages.filter(
+            (p) => p.id !== currentDraftId && (!p.siteConfig?.isWizardDraft && !p.siteConfigDraft?.isWizardDraft)
+          );
+          if (previousPages.length > 0) {
+            previousPages.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+            const lastEditedPage = previousPages[0];
+            const dictToInherit = lastEditedPage.dictionaryDraft || lastEditedPage.dictionary;
+            const cfgToInherit = lastEditedPage.siteConfigDraft || lastEditedPage.siteConfig;
+            const flowToInherit = lastEditedPage.formFlowDraft || lastEditedPage.formFlow;
+
+            if (dictToInherit && Object.keys(dictToInherit).length > 0) {
+              templateModel = {
+                siteConfig: cfgToInherit || DEFAULT_TEMPLATE_MODEL.siteConfig,
+                dictionary: {
+                  ...DEFAULT_TEMPLATE_MODEL.dictionary,
+                  ...dictToInherit,
+                  nav: { ...DEFAULT_TEMPLATE_MODEL.dictionary.nav, ...(dictToInherit.nav || {}) },
+                  hero: { ...DEFAULT_TEMPLATE_MODEL.dictionary.hero, ...(dictToInherit.hero || {}) },
+                  diagnostic: { ...DEFAULT_TEMPLATE_MODEL.dictionary.diagnostic, ...(dictToInherit.diagnostic || {}) },
+                  about: { ...DEFAULT_TEMPLATE_MODEL.dictionary.about, ...(dictToInherit.about || {}) },
+                  process: { ...DEFAULT_TEMPLATE_MODEL.dictionary.process, ...(dictToInherit.process || {}) },
+                  faq: { ...DEFAULT_TEMPLATE_MODEL.dictionary.faq, ...(dictToInherit.faq || {}) },
+                  space: { ...DEFAULT_TEMPLATE_MODEL.dictionary.space, ...(dictToInherit.space || {}) },
+                  footer: { ...DEFAULT_TEMPLATE_MODEL.dictionary.footer, ...(dictToInherit.footer || {}) },
+                },
+                formFlow: flowToInherit || DEFAULT_TEMPLATE_MODEL.formFlow,
+              };
+            }
+          }
+        } catch (errInherit) {
+          console.warn('Aviso: Erro ao buscar último site do consultório para herança, usando modelo global:', errInherit);
+        }
+      }
+
       let baseSiteConfig = JSON.parse(JSON.stringify(templateModel.siteConfig));
       let baseDictionary = JSON.parse(JSON.stringify(templateModel.dictionary));
       let baseFormFlow = JSON.parse(JSON.stringify(templateModel.formFlow));
 
+      const hasBrandOverride = brandIdentityMode === 'custom';
+      const hasSocialOverride = socialLinksMode === 'custom';
+
+      const buildWhatsappUrl = () => {
+        const num = siteWhatsappNumber.trim();
+        if (!num) return undefined;
+        if (num.startsWith('http://') || num.startsWith('https://')) return num;
+        let digits = num.replace(/\D/g, '');
+        if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+        if (!digits) return undefined;
+        const query = siteWhatsappMessage.trim() ? `?text=${encodeURIComponent(siteWhatsappMessage.trim())}` : '';
+        return `https://wa.me/${digits}${query}`;
+      };
+
+      const instaItem = siteOtherLinks.find((l) => l.label.toLowerCase() === 'instagram');
+      const linkedinItem = siteOtherLinks.find((l) => l.label.toLowerCase() === 'linkedin');
+      const instagramUrl = instaItem ? instaItem.url : siteInstagram.trim() || undefined;
+      const linkedinUrl = linkedinItem ? linkedinItem.url : siteLinkedin.trim() || undefined;
+
+      const socialLinksToSave = socialLinksMode === 'custom' ? {
+        whatsappNumber: siteWhatsappNumber.trim() || undefined,
+        whatsappMessage: siteWhatsappMessage.trim() || undefined,
+        whatsappShowOnSite: siteShowWhatsapp,
+        whatsapp: buildWhatsappUrl(),
+        instagram: instagramUrl,
+        linkedin: linkedinUrl,
+        other: siteOtherLinks.length > 0 ? siteOtherLinks : undefined,
+      } : undefined;
+
       // Inject custom site defaults if provided
       baseSiteConfig = {
         ...baseSiteConfig,
-        logoUrl: newLogoUrl.trim() || tenant?.defaultSiteLogoUrl || primaryTenant?.defaultSiteLogoUrl || undefined,
-        logoConfig: tenant?.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || { mode: 'html', text: newTitle.trim(), iconType: 'psi' },
-        faviconUrl: newFaviconUrl.trim() || tenant?.defaultSiteFaviconUrl || primaryTenant?.defaultSiteFaviconUrl || undefined,
+        hasBrandIdentityOverride: hasBrandOverride,
+        hasSocialLinksOverride: hasSocialOverride,
+        hasProfileOverride: false,
+        logoUrl: hasBrandOverride && newLogoUrl.trim() ? newLogoUrl.trim() : undefined,
+        logoConfig: hasBrandOverride ? (tenant?.defaultSiteLogoConfig || primaryTenant?.defaultSiteLogoConfig || { mode: 'html', text: newTitle.trim(), iconType: 'psi' }) : undefined,
+        faviconUrl: hasBrandOverride && newFaviconUrl.trim() ? newFaviconUrl.trim() : undefined,
+        socialLinks: socialLinksToSave,
         images: {
           hero: '',
           portrait: '',
           officeSpace: '',
           gallery: [],
         },
-        theme: {
+        theme: hasBrandOverride ? {
           ...(baseSiteConfig.theme || {}),
           typography: {
             fontHeading,
@@ -918,7 +1293,7 @@ export default function NovaPaginaCaptacaoPage() {
             bgDark: activeBgColor,
             textDark: '#18181B',
           }
-        }
+        } : undefined
       };
 
       let activeSocialImage = seoSocialImage.trim();
@@ -942,7 +1317,7 @@ export default function NovaPaginaCaptacaoPage() {
       const isSlugAvailable = await validateSlugAvailability(effectiveSlug);
       if (!isSlugAvailable) {
         setSubmitting(false);
-        setCurrentStep(3);
+        setCurrentStep(6);
         return;
       }
 
@@ -956,7 +1331,7 @@ export default function NovaPaginaCaptacaoPage() {
       }
 
       const draftData = {
-        currentStep: 5,
+        currentStep: 6,
         logoUrl: newLogoUrl,
         faviconUrl: newFaviconUrl,
         isCustomColor,
@@ -975,12 +1350,20 @@ export default function NovaPaginaCaptacaoPage() {
         seoDescription,
         seoKeywords,
         seoAllowIndexing,
+        socialLinksMode,
+        siteWhatsappNumber,
+        siteWhatsappMessage,
+        siteInstagram,
+        siteLinkedin,
+        siteOtherLinks,
       };
 
       const finalSiteConfig = {
         ...baseSiteConfig,
         status: 'draft',
         isWizardDraft: false,
+        hasSocialLinksOverride: socialLinksMode === 'custom',
+        socialLinks: socialLinksToSave,
         theme: {
           colors: {
             primaryStart: activePrimaryStart,
@@ -996,10 +1379,38 @@ export default function NovaPaginaCaptacaoPage() {
         ...draftData
       };
 
+      // Lógica de Vínculo/Criação de Formulário de Triagem
+      let targetFormId: string | null = null;
+      if (ctaType === 'form' && tenant?.id) {
+        if (formChoiceMode === 'existing' && selectedFormId && existingScreeningForms.length > 0) {
+          targetFormId = selectedFormId;
+        } else {
+          try {
+            const newFormTitle = `Formulário - ${newTitle.trim() || 'Triagem Inicial'}`;
+            const newFormSlug = `triagem-${effectiveSlug || Math.random().toString(36).substring(2, 8)}`;
+            const createdForm = await api.createScreeningForm({
+              workspaceId: tenant.id,
+              title: newFormTitle,
+              slug: newFormSlug,
+              formFlow: baseFormFlow,
+            });
+            if (createdForm?.id) {
+              targetFormId = createdForm.id;
+            }
+          } catch (formErr) {
+            console.warn('Aviso: Erro ao criar formulário autônomo no banco, mantendo fluxo da página:', formErr);
+          }
+        }
+      }
+
       await api.updateCapturePage(currentDraftId, {
         title: newTitle.trim(),
         slug: effectiveSlug,
         customDomain: customDomainInput || null,
+        ctaType,
+        ctaWhatsappMessage: ctaType === 'whatsapp' ? ctaWhatsappMessage : null,
+        ctaExternalUrl: ctaType === 'external_url' ? ctaExternalUrl : null,
+        formId: targetFormId,
         seoConfig,
         siteConfig: finalSiteConfig,
         dictionary: baseDictionary,
@@ -1007,6 +1418,10 @@ export default function NovaPaginaCaptacaoPage() {
         titleDraft: newTitle.trim(),
         slugDraft: effectiveSlug,
         customDomainDraft: customDomainInput || null,
+        ctaTypeDraft: ctaType,
+        ctaWhatsappMessageDraft: ctaType === 'whatsapp' ? ctaWhatsappMessage : null,
+        ctaExternalUrlDraft: ctaType === 'external_url' ? ctaExternalUrl : null,
+        formIdDraft: targetFormId,
         seoConfigDraft: seoConfig,
         siteConfigDraft: finalSiteConfig,
         dictionaryDraft: baseDictionary,
@@ -1321,7 +1736,7 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
   const validateStep = (stepToValidate: number): boolean => {
     setError('');
 
-    // Etapa 1: Nome da Psicóloga & Logotipo
+    // Etapa 1: Nome da Psicóloga
     if (stepToValidate === 1) {
       const trimmedTitle = newTitle.trim();
       if (!trimmedTitle) {
@@ -1353,8 +1768,69 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
       }
     }
 
-    // Etapa 3: Escolha do Endereço na Internet (Domínio & Slug)
+    // Etapa 3: Links & Redes Sociais
     if (stepToValidate === 3) {
+      if (socialLinksMode === 'custom') {
+        const num = siteWhatsappNumber.trim();
+        if (!num) {
+          setError('O número do WhatsApp é obrigatório ao personalizar os links e redes sociais do site.');
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Etapa 4: Destino CTA
+    if (stepToValidate === 4) {
+      if (ctaType === 'external_url') {
+        const url = ctaExternalUrl.trim();
+        if (!url) {
+          setError('A URL do link externo é obrigatória para continuar.');
+          return false;
+        }
+        if (!isValidWebUrl(url)) {
+          setError('Informe uma URL válida de link externo (ex: https://calendly.com/seu-perfil ou instagram.com/perfil).');
+          return false;
+        }
+      } else if (ctaType === 'whatsapp') {
+        const num = (siteWhatsappNumber.trim() || (tenant as any)?.socialLinks?.whatsappNumber || (tenant as any)?.social_links?.whatsappNumber || (tenant as any)?.phone || (primaryTenant as any)?.phone || '').trim();
+        if (!num) {
+          setError('Informe o número do WhatsApp de atendimento para continuar.');
+          return false;
+        }
+      } else if (ctaType === 'form') {
+        if (existingScreeningForms.length > 0 && formChoiceMode === 'existing' && !selectedFormId) {
+          setError('Selecione qual formulário do consultório você deseja reutilizar.');
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // Etapa 5: SEO & Compartilhamento
+    if (stepToValidate === 5) {
+      const trimmedSeoTitle = seoTitle.trim();
+      if (!trimmedSeoTitle) {
+        setError('O Meta Title de SEO é obrigatório para continuar.');
+        return false;
+      }
+      if (trimmedSeoTitle.length < 2) {
+        setError('O Meta Title de SEO deve conter pelo menos 2 caracteres.');
+        return false;
+      }
+      const trimmedSeoDesc = seoDescription.trim();
+      if (!trimmedSeoDesc) {
+        setError('A Meta Description de SEO é obrigatória para continuar.');
+        return false;
+      }
+      if (trimmedSeoDesc.length < 10) {
+        setError('A Meta Description de SEO deve conter pelo menos 10 caracteres.');
+        return false;
+      }
+    }
+
+    // Etapa 6: Escolha do Endereço na Internet (Domínio & Slug)
+    if (stepToValidate === 6) {
       if (!hasAccountDomainConfigured) {
         if (domainMode === 'subdomain') {
           const sub = (subdomainInput || workspaceDomain?.subdomain || '').trim().toLowerCase();
@@ -1390,28 +1866,6 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
           setError('O endereço da página (slug) deve conter apenas letras minúsculas, números e hífens.');
           return false;
         }
-      }
-    }
-
-    // Etapa 4: SEO & Redes Sociais
-    if (stepToValidate === 4) {
-      const trimmedSeoTitle = seoTitle.trim();
-      if (!trimmedSeoTitle) {
-        setError('O Meta Title de SEO é obrigatório para continuar.');
-        return false;
-      }
-      if (trimmedSeoTitle.length < 2) {
-        setError('O Meta Title de SEO deve conter pelo menos 2 caracteres.');
-        return false;
-      }
-      const trimmedSeoDesc = seoDescription.trim();
-      if (!trimmedSeoDesc) {
-        setError('A Meta Description de SEO é obrigatória para continuar.');
-        return false;
-      }
-      if (trimmedSeoDesc.length < 10) {
-        setError('A Meta Description de SEO deve conter pelo menos 10 caracteres.');
-        return false;
       }
     }
 
@@ -1460,6 +1914,33 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
     }
 
     if (stepToCheck === 3) {
+      if (socialLinksMode === 'custom') {
+        const num = siteWhatsappNumber.trim();
+        if (!num) return false;
+      }
+      return true;
+    }
+
+    if (stepToCheck === 4) {
+      if (ctaType === 'external_url') {
+        const url = ctaExternalUrl.trim();
+        if (!url || !isValidWebUrl(url)) return false;
+      } else if (ctaType === 'whatsapp') {
+        const num = (siteWhatsappNumber.trim() || (tenant as any)?.socialLinks?.whatsappNumber || (tenant as any)?.social_links?.whatsappNumber || (tenant as any)?.phone || (primaryTenant as any)?.phone || '').trim();
+        if (!num) return false;
+      } else if (ctaType === 'form') {
+        if (existingScreeningForms.length > 0 && formChoiceMode === 'existing' && !selectedFormId) return false;
+      }
+      return true;
+    }
+
+    if (stepToCheck === 5) {
+      const trimmedSeoTitle = seoTitle.trim();
+      const trimmedSeoDesc = seoDescription.trim();
+      return Boolean(trimmedSeoTitle && trimmedSeoTitle.length >= 2 && trimmedSeoDesc && trimmedSeoDesc.length >= 10);
+    }
+
+    if (stepToCheck === 6) {
       if (checkingSlug) return false;
       if (!hasAccountDomainConfigured) {
         if (domainMode === 'subdomain') {
@@ -1481,14 +1962,34 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
       return true;
     }
 
-    if (stepToCheck === 4) {
-      const trimmedSeoTitle = seoTitle.trim();
-      const trimmedSeoDesc = seoDescription.trim();
-      return Boolean(trimmedSeoTitle && trimmedSeoTitle.length >= 2 && trimmedSeoDesc && trimmedSeoDesc.length >= 10);
-    }
-
     return true;
-  }, [newTitle, isCustomColor, customPrimaryStart, customPrimaryEnd, customContrast, domainMode, subdomainInput, workspaceDomain?.subdomain, checkingSubdomain, subdomainAvailable, customDomainInput, newSlug, checkingSlug, hasAccountDomainConfigured, seoTitle, seoDescription]);
+  }, [
+    newTitle,
+    isCustomColor,
+    customPrimaryStart,
+    customPrimaryEnd,
+    customContrast,
+    socialLinksMode,
+    siteWhatsappNumber,
+    ctaType,
+    ctaExternalUrl,
+    formChoiceMode,
+    selectedFormId,
+    existingScreeningForms.length,
+    tenant,
+    primaryTenant,
+    domainMode,
+    subdomainInput,
+    workspaceDomain?.subdomain,
+    checkingSubdomain,
+    subdomainAvailable,
+    customDomainInput,
+    newSlug,
+    checkingSlug,
+    hasAccountDomainConfigured,
+    seoTitle,
+    seoDescription
+  ]);
 
   const handleStepClick = async (targetStep: number) => {
     setError('');
@@ -1501,10 +2002,10 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
         setCurrentStep(step);
         return;
       }
-      if (step === 3) {
+      if (step === 6) {
         const isSlugAvailable = await validateSlugAvailability(newSlug);
         if (!isSlugAvailable) {
-          setCurrentStep(3);
+          setCurrentStep(6);
           return;
         }
       }
@@ -1515,7 +2016,7 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
   const nextStep = async () => {
     if (!validateStep(currentStep)) return;
 
-    if (currentStep === 3) {
+    if (currentStep === 6) {
       const isSlugAvailable = await validateSlugAvailability(newSlug);
       if (!isSlugAvailable) return;
 
@@ -1524,7 +2025,7 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
       }
     }
 
-    setCurrentStep((prev) => Math.min(prev + 1, 5));
+    setCurrentStep((prev) => Math.min(prev + 1, 7));
   };
 
   const prevStep = () => {
@@ -1564,13 +2065,15 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
             </div>
           )}
 
-          <div className="flex items-center gap-2 glass-md p-1.5 rounded-xl border border-[var(--surface-border)] overflow-x-auto">
+          <div className="flex items-center gap-1.5 glass-md p-1.5 rounded-xl border border-[var(--surface-border)] overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {[
               { num: 1, title: 'Nome' },
-              { num: 2, title: 'Identidade Visual' },
-              { num: 3, title: 'Escolha de Endereço' },
-              { num: 4, title: 'SEO & Redes Sociais' },
-              { num: 5, title: 'Revisão' }
+              { num: 2, title: 'Identidade' },
+              { num: 3, title: 'Redes' },
+              { num: 4, title: 'Destino CTA' },
+              { num: 5, title: 'SEO' },
+              { num: 6, title: 'Endereço' },
+              { num: 7, title: 'Revisão' }
             ].map((s) => {
               const isActive = currentStep === s.num;
               const isDone = currentStep > s.num;
@@ -1579,18 +2082,27 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
                   key={s.num}
                   type="button"
                   onClick={() => handleStepClick(s.num)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                  title={`Etapa ${s.num}: ${s.title}`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md'
+                      ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white shadow-md ring-1 ring-white/20'
                       : isDone
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/5'
                   }`}
                 >
-                  <span className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-slate-200 dark:bg-black/20 text-slate-700 dark:text-slate-200">
+                  <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    isActive
+                      ? 'bg-white/20 text-white'
+                      : isDone
+                      ? 'bg-emerald-500/20 text-emerald-500'
+                      : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-slate-400'
+                  }`}>
                     {isDone ? <Check className="h-3 w-3" /> : s.num}
                   </span>
-                  <span className="hidden sm:inline">{s.title}</span>
+                  <span className={isActive ? 'inline font-bold' : 'hidden xl:inline opacity-75'}>
+                    {s.title}
+                  </span>
                 </button>
               );
             })}
@@ -1631,7 +2143,7 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
-                    Etapa 1 de 4
+                    Etapa 1 de 7
                   </span>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Nome da Psicóloga / Página</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1649,112 +2161,843 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
                     placeholder="Ex: Dra. Geovanna Bastos - Psicologia Clínica"
                     value={newTitle}
                     onChange={handleTitleChange}
-                    className={`brand-input text-sm h-11 transition-all ${
-                      !newTitle.trim() || newTitle.trim().length < 2 ? '!border-red-500 focus:!border-red-500 focus:!ring-2 focus:!ring-red-500/20' : ''
-                    }`}
+                    className="brand-input text-xs h-10"
                   />
-                  {!newTitle.trim() ? (
-                    <span className="text-[11px] font-semibold text-red-500 dark:text-red-400 flex items-center gap-1.5 pt-0.5 animate-in fade-in duration-200">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
-                      <span>O Nome da Psicóloga / Página é obrigatório para continuar.</span>
-                    </span>
-                  ) : newTitle.trim().length < 2 ? (
-                    <span className="text-[11px] font-semibold text-red-500 dark:text-red-400 flex items-center gap-1.5 pt-0.5 animate-in fade-in duration-200">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
-                      <span>O nome deve conter pelo menos 2 caracteres.</span>
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                      Este nome aparecerá em destaque no cabeçalho e títulos principais do site.
+                  {!newTitle.trim() && (
+                    <span className="text-[10px] text-red-500 font-medium flex items-center gap-1 pt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>O nome da página é obrigatório.</span>
                     </span>
                   )}
                 </div>
               </div>
             )}
 
-            {/* ETAPA 2: Identidade Visual & Estilo da Marca */}
+            {/* ETAPA 2: Identidade Visual */}
             {currentStep === 2 && (
-              <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
-                    Etapa 2 de 4
+                    Etapa 2 de 7
                   </span>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Identidade Visual & Estilo da Marca</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Identidade Visual da Página</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Defina o logotipo, as cores e as fontes para personalizar a identidade do seu site.
+                    Defina se este site usará a identidade visual do consultório ou se terá cores, logotipo e tipografia próprios.
                   </p>
                 </div>
 
-                <BrandIdentityForm
-                  previewTitle={newTitle}
-                  tenantId={tenant?.id || primaryTenant?.id || ''}
-                  logoUrl={newLogoUrl}
-                  setLogoUrl={setNewLogoUrl}
-                  faviconUrl={newFaviconUrl}
-                  setFaviconUrl={setNewFaviconUrl}
-                  primaryColor={customPrimaryStart}
-                  setPrimaryColor={setCustomPrimaryStart}
-                  secondaryColor={customPrimaryEnd}
-                  setSecondaryColor={setCustomPrimaryEnd}
-                  contrastColor={customContrast}
-                  setContrastColor={setCustomContrast}
-                  bgColor={customBgColor}
-                  setBgColor={setCustomBgColor}
-                  fontHeading={fontHeading}
-                  setFontHeading={setFontHeading}
-                  fontBody={fontBody}
-                  setFontBody={setFontBody}
-                  isCustomColor={isCustomColor}
-                  setIsCustomColor={setIsCustomColor}
-                  selectedPalette={selectedPalette}
-                  setSelectedPalette={setSelectedPalette}
-                  themeColorClass="text-[var(--brand-gradient-start)]"
-                />
+                {/* Card de Opção: Herança vs Personalização */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandIdentityMode('inherit');
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                      brandIdentityMode === 'inherit'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Usar Marca do Consultório</span>
+                      {brandIdentityMode === 'inherit' && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                          Herança Ativa
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Herda automaticamente as cores, logotipo e fontes definidos no seu Consultório.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBrandIdentityMode('custom');
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                      brandIdentityMode === 'custom'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Personalizar para Este Site</span>
+                      {brandIdentityMode === 'custom' && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          Personalizado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Cria uma identidade exclusiva (cores, fontes e logotipo) apenas para esta página.
+                    </p>
+                  </button>
+                </div>
+
+                {brandIdentityMode === 'custom' ? (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Identidade Visual Personalizada</span>
+                      <button
+                        type="button"
+                        onClick={() => setBrandIdentityMode('inherit')}
+                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold bg-transparent border-none cursor-pointer"
+                      >
+                        ↺ Restaurar padrão do consultório
+                      </button>
+                    </div>
+
+                    <BrandIdentityForm
+                      previewTitle={newTitle}
+                      tenantId={tenant?.id || ''}
+                      logoUrl={newLogoUrl}
+                      setLogoUrl={setNewLogoUrl}
+                      faviconUrl={newFaviconUrl}
+                      setFaviconUrl={setNewFaviconUrl}
+                      primaryColor={activePrimaryStart}
+                      setPrimaryColor={setCustomPrimaryStart}
+                      secondaryColor={activePrimaryEnd}
+                      setSecondaryColor={setCustomPrimaryEnd}
+                      contrastColor={activeContrast}
+                      setContrastColor={setCustomContrast}
+                      bgColor={customBgColor}
+                      setBgColor={setCustomBgColor}
+                      fontHeading={fontHeading}
+                      setFontHeading={setFontHeading}
+                      fontBody={fontBody}
+                      setFontBody={setFontBody}
+                      isCustomColor={isCustomColor}
+                      setIsCustomColor={setIsCustomColor}
+                      selectedPalette={selectedPalette}
+                      setSelectedPalette={setSelectedPalette}
+                      themeColorClass="text-[var(--brand-gradient-start)]"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-5 rounded-2xl glass-sm border border-[var(--surface-border)] space-y-5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-3">
+                      <div className="flex items-center gap-2">
+                        <Palette className="h-4 w-4 text-emerald-500" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          Identidade Herdada do Consultório
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                        Ativa por Padrão
+                      </span>
+                    </div>
+
+                    {/* Grid de Cores do Workspace (4 Cores) */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block">
+                        Cores do Consultório
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-2.5 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 space-y-1.5">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block truncate">Cor Primária</span>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-lg border border-black/10 shadow-xs shrink-0" style={{ backgroundColor: activePrimaryStart }} />
+                            <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">{activePrimaryStart}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 space-y-1.5">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block truncate">Cor Secundária</span>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-lg border border-black/10 shadow-xs shrink-0" style={{ backgroundColor: activePrimaryEnd }} />
+                            <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">{activePrimaryEnd}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 space-y-1.5">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block truncate">Fundo do Site</span>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-lg border border-black/10 shadow-xs shrink-0" style={{ backgroundColor: activeBgColor }} />
+                            <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">{activeBgColor}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 space-y-1.5">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block truncate">Contraste / Texto</span>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-lg border border-black/10 shadow-xs shrink-0" style={{ backgroundColor: activeContrast }} />
+                            <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">{activeContrast}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preview de Logotipo e Ícone (Favicon) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block">
+                          Logotipo do Consultório
+                        </span>
+                        <div className="p-3 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 flex items-center gap-3 min-h-[52px]">
+                          {activeLogoUrl ? (
+                            <img src={activeLogoUrl} alt="Logo" className="h-8 max-w-[140px] object-contain" />
+                          ) : (
+                            <BrandLogo
+                              logoConfig={wizardLogoConfig}
+                              title={newTitle || 'Psicologia'}
+                              primaryStart={activePrimaryStart}
+                              primaryEnd={activePrimaryEnd}
+                              contrastColor={activeContrast}
+                              fontHeading={activeFontHeading}
+                              textColor="currentColor"
+                              size="md"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block">
+                          Ícone / Favicon
+                        </span>
+                        <div className="p-3 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 flex items-center gap-3 min-h-[52px]">
+                          {activeFaviconUrl ? (
+                            <img src={activeFaviconUrl} alt="Favicon" className="h-7 w-7 rounded-lg object-contain" />
+                          ) : (
+                            <div
+                              className="h-7 w-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-xs"
+                              style={{ background: `linear-gradient(135deg, ${activePrimaryStart}, ${activePrimaryEnd})` }}
+                            >
+                              Ψ
+                            </div>
+                          )}
+                          <span className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
+                            {activeFaviconUrl ? 'Ícone personalizado' : 'Ícone monograma padrão'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preview de Tipografia (Heading + Body) */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider block">
+                        Tipografia Herdada
+                      </span>
+                      <div className="p-4 rounded-xl border border-[var(--surface-border)] bg-white/40 dark:bg-black/20 space-y-2">
+                        <div>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold block">Título ({activeFontHeading}):</span>
+                          <p className="text-sm font-bold text-slate-900 dark:text-white" style={{ fontFamily: `'${activeFontHeading}', serif` }}>
+                            {newTitle || 'Psicologia Clínica & Saúde Emocional'}
+                          </p>
+                        </div>
+                        <div className="pt-1 border-t border-slate-100 dark:border-zinc-800">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold block">Corpo ({activeFontBody}):</span>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 font-light" style={{ fontFamily: `'${activeFontBody}', sans-serif` }}>
+                            Acolhimento ético e especializado para o seu desenvolvimento pessoal.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ETAPA 3: Escolha de Endereço (Domínio da Plataforma ou Próprio + Slug da Página) */}
+            {/* ETAPA 3: Links & Redes Sociais */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
-                    Etapa 3 de 4
+                    Etapa 3 de 7
                   </span>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Escolha do Endereço na Internet</h2>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Links & Redes Sociais</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Configure o subdomínio gratuito do TheraOS ou conecte seu domínio próprio, e defina o endereço da página.
+                    Defina se este site usará os links das redes sociais do consultório ou se terá links personalizados.
                   </p>
                 </div>
 
-                <DomainManager
-                  tenantId={tenant?.id}
-                  subdomain={subdomainInput || workspaceDomain?.subdomain || ''}
-                  onSubdomainChange={(val) => {
-                    setSubdomainInput(val);
-                    setSubdomainAvailable(null);
-                  }}
-                  customDomain={customDomainInput}
-                  onCustomDomainChange={setCustomDomainInput}
-                  domainMode={domainMode}
-                  onDomainModeChange={setDomainMode}
-                  readOnlySubdomain={Boolean(workspaceDomain?.subdomain)}
-                  readOnlyCustomDomain={Boolean(workspaceDomain?.customDomain)}
-                  showSlugInput={true}
-                  slug={newSlug}
-                  onSlugChange={setNewSlug}
-                  subdomainAvailable={subdomainAvailable}
-                  checkingSubdomain={checkingSubdomain}
-                  onCheckSubdomain={checkSubdomain}
-                />
+                {/* Card de Opção: Herança vs Personalização */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSocialLinksMode('inherit');
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                      socialLinksMode === 'inherit'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Usar Redes do Consultório</span>
+                      {socialLinksMode === 'inherit' && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                          Herança Ativa
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Sempre reflete os dados definidos nas Configurações do Consultório.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSelectCustomSocialLinks}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                      socialLinksMode === 'custom'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">Personalizar para Este Site</span>
+                      {socialLinksMode === 'custom' && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          Personalizado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Cria uma versão própria exclusiva para esta página de captação.
+                    </p>
+                  </button>
+                </div>
+
+                {socialLinksMode === 'custom' ? (
+                  <div className="space-y-5 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Links Personalizados do Site</span>
+                      <button
+                        type="button"
+                        onClick={() => setSocialLinksMode('inherit')}
+                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold bg-transparent border-none cursor-pointer"
+                      >
+                        ↺ Restaurar padrão do consultório
+                      </button>
+                    </div>
+
+                    {/* WhatsApp: Número + Visibilidade + Mensagem Padrão */}
+                    <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-3">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        💬 WhatsApp
+                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Coluna 1: Número do WhatsApp */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+                            Número do WhatsApp <span className="text-rose-500">*</span>
+                          </label>
+                          <PhoneInput
+                            value={siteWhatsappNumber}
+                            onChange={(e164) => setSiteWhatsappNumber(e164)}
+                            defaultCountry="BR"
+                            error={!siteWhatsappNumber.trim()}
+                          />
+                        </div>
+
+                        {/* Coluna 2: Interruptor de Contato Direto via WhatsApp */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+                            Contato Direto no Site
+                          </label>
+                          <div className="h-9 px-3 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5 truncate mr-2">
+                              {siteShowWhatsapp ? (
+                                <>
+                                  <Eye className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                  <span className="truncate">Permitir contato direto</span>
+                                </>
+                              ) : (
+                                <>
+                                  <EyeOff className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  <span className="truncate">Oculto (Exige triagem)</span>
+                                </>
+                              )}
+                            </span>
+
+                            {/* Interruptor (Toggle Switch) */}
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={siteShowWhatsapp}
+                              onClick={() => setSiteShowWhatsapp(!siteShowWhatsapp)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+                                siteShowWhatsapp ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-700'
+                              }`}
+                              title={siteShowWhatsapp ? 'Permitir que visitantes entrem em contato direto pelo WhatsApp' : 'Ocultar WhatsApp para exigir preenchimento de formulário de triagem'}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                  siteShowWhatsapp ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mensagem Padrão (Full Width) */}
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+                            Mensagem Padrão (ao Clicar)
+                          </label>
+                          <textarea
+                            rows={3}
+                            placeholder="ex: Olá! Vim pelo seu site e gostaria de agendar uma consulta."
+                            value={siteWhatsappMessage}
+                            onChange={(e) => setSiteWhatsappMessage(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition-colors resize-y min-h-[68px]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Outras Redes / Links Personalizados */}
+                    <div className="space-y-3 pt-3 border-t border-[var(--surface-border)]">
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                          Outras Redes Sociais & Links Personalizados
+                        </span>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Clique nas redes para abrir o campo de link correspondente. Você pode selecionar várias opções ao mesmo tempo:
+                        </p>
+                      </div>
+
+                      {/* Chips de Sugestão de Redes Prontas + Outros */}
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {SUGGESTED_NETWORKS.map((net) => {
+                          const isInputActive = stackedSiteOtherInputs.some((item) => item.presetKey === net);
+                          const isAlreadyAdded = siteOtherLinks.some((item) => item.label.toLowerCase() === net.toLowerCase());
+                          return (
+                            <button
+                              key={net}
+                              type="button"
+                              onClick={() => handleToggleSiteOtherChip(net)}
+                              className={`text-[11px] px-3 py-1.5 rounded-xl transition-all border cursor-pointer flex items-center gap-1 ${
+                                isInputActive
+                                  ? 'bg-indigo-600 text-white border-indigo-500 font-semibold shadow-xs ring-2 ring-indigo-500/30'
+                                  : isAlreadyAdded
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium'
+                                  : 'bg-slate-100 dark:bg-zinc-800/80 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-zinc-700/60'
+                              }`}
+                            >
+                              <span>+ {net}</span>
+                              {isAlreadyAdded && <Check className="w-3 h-3 text-emerald-500 ml-0.5" />}
+                            </button>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSiteOtherChip('outros')}
+                          className="text-[11px] px-3 py-1.5 rounded-xl transition-all border cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 font-medium"
+                        >
+                          ✨ + Outros (Personalizado)
+                        </button>
+                      </div>
+
+                      {/* Pilha de Caixas de Entrada Ativas (Stacked Inputs) */}
+                      {stackedSiteOtherInputs.length > 0 && (
+                        <div className="space-y-2.5 pt-1">
+                          {stackedSiteOtherInputs.map((item) => (
+                            <div
+                              key={item.id}
+                              className="p-3.5 rounded-xl bg-slate-100/80 dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 space-y-2.5 animate-in fade-in duration-200 shadow-xs"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {item.presetKey ? (
+                                    <>
+                                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Link para:</span>
+                                      <span className="px-2.5 py-0.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs">
+                                        {item.presetKey}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      ✏️ Link Personalizado
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveStackedSiteOtherInput(item.id)}
+                                  className="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1 bg-transparent border-none cursor-pointer"
+                                  title="Remover campo"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Remover</span>
+                                </button>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row items-center gap-2">
+                                {!item.presetKey && (
+                                  <div className="w-full sm:w-64 shrink-0">
+                                    <Input
+                                      type="text"
+                                      value={item.label}
+                                      onChange={(e) => handleUpdateStackedSiteOtherInput(item.id, 'label', e.target.value)}
+                                      placeholder="Nome da rede (ex: Substack)"
+                                      className="brand-input text-xs h-9"
+                                    />
+                                  </div>
+                                )}
+                                <div className="w-full sm:flex-1">
+                                  <Input
+                                    type="text"
+                                    value={item.url}
+                                    onChange={(e) => handleUpdateStackedSiteOtherInput(item.id, 'url', e.target.value)}
+                                    placeholder={
+                                      item.presetKey
+                                        ? `URL do perfil no ${item.presetKey} (ex: https://...)`
+                                        : 'URL (ex: https://...)'
+                                    }
+                                    className="brand-input text-xs h-9"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddStackedSiteOtherLink(item.id);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  onClick={() => handleAddStackedSiteOtherLink(item.id)}
+                                  className="brand-accent text-white text-xs font-bold h-9 px-4 rounded-xl flex items-center gap-1.5 shrink-0 cursor-pointer w-full sm:w-auto"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  <span>Adicionar {item.presetKey ? item.presetKey : ''}</span>
+                                </Button>
+                              </div>
+
+                              {item.error && (
+                                <div className="flex items-center gap-1.5 text-xs text-rose-500 font-medium pt-0.5 animate-in fade-in">
+                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{item.error}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {siteOtherLinks.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                          {siteOtherLinks.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl glass-sm border border-[var(--surface-border)] text-xs">
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {item.label}: <span className="font-normal text-slate-500 dark:text-slate-400">{item.url}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSiteOtherLink(idx)}
+                                className="text-red-500 hover:text-red-400 bg-transparent border-none cursor-pointer p-1"
+                                title="Remover link"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl glass-sm border border-[var(--surface-border)] space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Redes Herdadas do Consultório:
+                    </span>
+                    {(() => {
+                      const wsSocial = (tenant as any)?.socialLinks || (tenant as any)?.social_links || (primaryTenant as any)?.socialLinks || {};
+                      const items: Array<{ label: string; value: string }> = [];
+                      const num = wsSocial.whatsappNumber || wsSocial.whatsapp || (tenant as any)?.phone;
+                      if (num) items.push({ label: 'WhatsApp', value: wsSocial.whatsappMessage ? `${num} ("${wsSocial.whatsappMessage}")` : num });
+                      if (wsSocial.instagram || (tenant as any)?.instagram) items.push({ label: 'Instagram', value: wsSocial.instagram || (tenant as any)?.instagram });
+                      if (wsSocial.linkedin) items.push({ label: 'LinkedIn', value: wsSocial.linkedin });
+                      if (wsSocial.doctoralia) items.push({ label: 'Doctoralia', value: wsSocial.doctoralia });
+                      if (wsSocial.other && Array.isArray(wsSocial.other)) {
+                        wsSocial.other.forEach((o: any) => { if (o.label && o.url) items.push({ label: o.label, value: o.url }); });
+                      }
+                      if (items.length === 0) {
+                        return <span className="text-xs text-slate-400 italic block">Nenhuma rede social configurada no consultório.</span>;
+                      }
+                      return (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {items.map((item, idx) => (
+                            <span key={idx} className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
+                              <strong>{item.label}:</strong> {item.value}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ETAPA 4: Otimização SEO & Redes Sociais */}
+            {/* ETAPA 4: Destino do CTA da Página */}
             {currentStep === 4 && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
-                    Etapa 4 de 5
+                    Etapa 4 de 7
+                  </span>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Destino do Botão Principal (CTA)</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Defina o que acontece quando o visitante clica nos botões de agendamento e chamada do seu site.
+                  </p>
+                </div>
+
+                {/* 3 Radio Cards para Tipo de CTA */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCtaType('form')}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      ctaType === 'form'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">Formulário Interno</span>
+                        {ctaType === 'form' && (
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            Ativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Abre um modal de triagem e captura os dados diretamente no seu CRM.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCtaType('whatsapp')}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      ctaType === 'whatsapp'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">WhatsApp Direto</span>
+                        {ctaType === 'whatsapp' && (
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            Ativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Abre a conversa do WhatsApp com uma mensagem inicial pré-formatada.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCtaType('external_url')}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      ctaType === 'external_url'
+                        ? 'border-[var(--brand-gradient-start)] bg-indigo-50/50 dark:bg-indigo-950/20 shadow-sm'
+                        : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">Link / URL Externa</span>
+                        {ctaType === 'external_url' && (
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                            Ativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        Redireciona para um link externo (Calendly, Google Forms, Doctoralia).
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Opções Específicas baseadas no ctaType */}
+                {ctaType === 'form' && (
+                  <div className="space-y-4 pt-2 border-t border-[var(--surface-border)]">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Opções do Formulário de Triagem
+                    </span>
+                    {existingScreeningForms.length > 0 ? (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setFormChoiceMode('new')}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              formChoiceMode === 'new'
+                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            <span className="text-xs block font-bold">✨ Criar Novo Formulário Padrão</span>
+                            <span className="text-[10px] opacity-80 block pt-0.5">Instancia um modelo completo com perguntas essenciais.</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setFormChoiceMode('existing')}
+                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                              formChoiceMode === 'existing'
+                                ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            <span className="text-xs block font-bold">📋 Reutilizar Formulário Existente</span>
+                            <span className="text-[10px] opacity-80 block pt-0.5">Vincule um formulário já criado em outro site do consultório.</span>
+                          </button>
+                        </div>
+
+                        {formChoiceMode === 'existing' && (
+                          <div className="space-y-2 pt-2">
+                            <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+                              Selecione o Formulário do Consultório
+                            </label>
+                            <div className="grid grid-cols-1 gap-2">
+                              {existingScreeningForms.map((f) => (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  onClick={() => setSelectedFormId(f.id)}
+                                  className={`p-3 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                                    selectedFormId === f.id
+                                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-100 font-medium'
+                                      : 'border-[var(--surface-border)] bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  <div className="space-y-0.5">
+                                    <span className="text-xs font-semibold block">{f.title}</span>
+                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-mono">/{f.slug}</span>
+                                  </div>
+                                  {selectedFormId === f.id && (
+                                    <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/50 dark:border-indigo-800/30 text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2.5">
+                        <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span>Um novo formulário de triagem será criado e vinculado a esta página automaticamente.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {ctaType === 'whatsapp' && (
+                  <div className="space-y-4 pt-2 border-t border-[var(--surface-border)]">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                          Número do WhatsApp para Atendimento
+                        </label>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                          (Preenchido na Etapa 3 ou Consultório)
+                        </span>
+                      </div>
+                      <PhoneInput
+                        value={siteWhatsappNumber || (tenant as any)?.socialLinks?.whatsappNumber || (tenant as any)?.social_links?.whatsappNumber || (tenant as any)?.phone || (primaryTenant as any)?.phone || ''}
+                        onChange={(val) => setSiteWhatsappNumber(val)}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Mensagem Inicial do WhatsApp
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={ctaWhatsappMessage}
+                        onChange={(e) => setCtaWhatsappMessage(e.target.value)}
+                        placeholder="ex: Olá! Vim pelo seu site e gostaria de agendar uma consulta."
+                        className="w-full p-3 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                        Sugestões Rápida de Mensagem (Clique para Aplicar):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          `Olá! Gostaria de agendar uma consulta com ${newTitle || 'a profissional'}.`,
+                          `Olá! Vi seu site e quero tirar dúvidas sobre o atendimento online.`,
+                          `Olá! Gostaria de saber mais informações sobre horários e valores.`
+                        ].map((sug, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setCtaWhatsappMessage(sug)}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-zinc-700 transition-all cursor-pointer"
+                          >
+                            + "{sug.substring(0, 35)}..."
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {ctaType === 'external_url' && (
+                  <div className="space-y-3 pt-2 border-t border-[var(--surface-border)]">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        URL do Link Externo <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="url"
+                        placeholder="https://calendly.com/seu-perfil"
+                        value={ctaExternalUrl}
+                        onChange={(e) => setCtaExternalUrl(e.target.value)}
+                        className={`brand-input text-xs h-10 ${
+                          !ctaExternalUrl.trim() || !isValidWebUrl(ctaExternalUrl)
+                            ? '!border-red-500/80 focus:!border-red-500'
+                            : ''
+                        }`}
+                      />
+                      {!ctaExternalUrl.trim() ? (
+                        <span className="text-[10px] text-red-500 font-medium flex items-center gap-1 pt-0.5">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>A URL do link externo é obrigatória para continuar.</span>
+                        </span>
+                      ) : !isValidWebUrl(ctaExternalUrl) ? (
+                        <span className="text-[10px] text-red-500 font-medium flex items-center gap-1 pt-0.5">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>Informe um formato de URL válido (ex: https://calendly.com/seu-perfil).</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                          Endereço externo completo para onde o visitante será redirecionado ao clicar no botão principal.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ETAPA 5: Otimização SEO & Redes Sociais */}
+            {currentStep === 5 && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
+                    Etapa 5 de 7
                   </span>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Otimização SEO & Redes Sociais</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -2142,12 +3385,44 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
               </div>
             )}
 
-            {/* ETAPA 5: Revisão & Instanciação */}
-            {currentStep === 5 && (
+            {/* ETAPA 6: Escolha de Endereço */}
+            {currentStep === 6 && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
-                    Etapa 5 de 5
+                    Etapa 6 de 7
+                  </span>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Escolha do Endereço na Internet</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Configure o subdomínio gratuito do TheraOS ou conecte seu domínio próprio, e defina o endereço da página.
+                  </p>
+                </div>
+
+                <DomainManager
+                  tenantId={tenant?.id}
+                  subdomain={subdomainInput || workspaceDomain?.subdomain || ''}
+                  onSubdomainChange={(val) => {
+                    setSubdomainInput(val);
+                  }}
+                  customDomain={customDomainInput}
+                  onCustomDomainChange={setCustomDomainInput}
+                  domainMode={domainMode}
+                  onDomainModeChange={setDomainMode}
+                  readOnlySubdomain={Boolean(workspaceDomain?.subdomain)}
+                  readOnlyCustomDomain={Boolean(workspaceDomain?.customDomain)}
+                  showSlugInput={true}
+                  slug={newSlug}
+                  onSlugChange={setNewSlug}
+                />
+              </div>
+            )}
+
+            {/* ETAPA 7: Revisão & Instanciação */}
+            {currentStep === 7 && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-1 border-b border-[var(--surface-border)] pb-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-gradient-start)] block">
+                    Etapa 7 de 7
                   </span>
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Revisão & Instanciação</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -2282,7 +3557,7 @@ function getContrastColor(hexColor: string): '#FFFFFF' | '#000000' {
 
               {/* Right Action Button: Avançar / Criar Página */}
               <div className="flex items-center gap-3">
-                {currentStep < 5 ? (
+                {currentStep < 7 ? (
                   <Button
                     type="button"
                     variant="primary"

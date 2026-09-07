@@ -3,23 +3,8 @@
 import React, { useState, useEffect, useTransition } from "react"
 import { X, ArrowRight, ArrowLeft, Check, Sparkles, MessageSquare } from "lucide-react"
 
-// Country configuration for phone masks (copied from reference)
-export interface CountryConfig {
-  code: string;
-  flag: string;
-  name: string;
-  dialCode: string;
-  mask: string;
-  placeholder: string;
-}
-
-const countriesList: CountryConfig[] = [
-  { code: "BR", flag: "🇧🇷", name: "Brasil", dialCode: "+55", mask: "(99) 99999-9999", placeholder: "(11) 99999-9999" },
-  { code: "PT", flag: "🇵🇹", name: "Portugal", dialCode: "+351", mask: "999 999 999", placeholder: "912 345 678" },
-  { code: "US", flag: "🇺🇸", name: "EUA", dialCode: "+1", mask: "(999) 999-9999", placeholder: "(201) 555-0123" },
-  { code: "ES", flag: "🇪🇸", name: "Espanha", dialCode: "+34", mask: "999 999 999", placeholder: "612 345 678" },
-  { code: "GB", flag: "🇬🇧", name: "Reino Unido", dialCode: "+44", mask: "9999 999999", placeholder: "7700 900077" },
-];
+import { COUNTRY_LIST, CountryConfig } from '@psi/ui';
+const countriesList = COUNTRY_LIST;
 
 export interface FormNode {
   id: string;

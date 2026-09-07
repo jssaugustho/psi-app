@@ -14,6 +14,7 @@ export default function SitesGlobalError({
     <ErrorView
       error={error}
       reset={reset}
+      clientApp="sites"
       homePath="/"
       title="Página Indisponível"
       description="Desculpe pelo inconveniente. Ocorreu um erro ao renderizar esta página de captação."

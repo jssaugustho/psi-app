@@ -19,6 +19,18 @@ export const profiles = pgTable('profiles', {
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
 
+export interface SocialLinks {
+  whatsapp?: string;
+  instagram?: string;
+  linkedin?: string;
+  doctoralia?: string;
+  x?: string;
+  youtube?: string;
+  facebook?: string;
+  tiktok?: string;
+  other?: Array<{ label: string; url: string }>;
+}
+
 // ── 2. Workspaces (Consultórios / Clínicas / Espaços de Trabalho) ───────────
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -31,6 +43,7 @@ export const workspaces = pgTable('workspaces', {
   specialties: jsonb('specialties').$type<string[]>(),
   cityState: text('city_state'),
   instagram: text('instagram'),
+  socialLinks: jsonb('social_links').$type<SocialLinks>().default({}).notNull(),
   isOnlineService: boolean('is_online_service').default(true).notNull(),
   defaultSiteAvatarUrl: text('default_site_avatar_url'),
 

@@ -29,6 +29,7 @@ const CreatePageBodySchema = z.object({
   contrast: z.string().optional(),
   logoUrl: z.string().optional(),
   siteConfig: z.any().optional(),
+  formId: z.string().uuid().optional().nullable(),
 });
 
 const SubmitFormBodySchema = z.object({
@@ -63,6 +64,7 @@ const defaultDictionary = {
   },
   hero: {
     badge: "Atendimento Online & Presencial",
+    title: "Psicologia Clínica & Saúde Emocional",
     titlePart1: "Terapia para recuperar o seu ",
     titlePart2: "equilíbrio interior",
     description: "Cuidado clínico ético e acolhedor para ajudar você a superar desafios emocionais, desenvolver o autoconhecimento e viver com mais leveza.",
@@ -364,21 +366,32 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
           }
         };
 
+        // Cadeia de Herança do Template Inicial:
+        // 1ª Prioridade: Buscar o último site editado no mesmo consultório
+        // 2ª Prioridade: Utilizar o modelo default global da plataforma
+        const lastEditedPage = await db.query.capturePages.findFirst({
+          where: eq(capturePages.workspaceId, targetWorkspaceId),
+          orderBy: (pages, { desc }) => [desc(pages.updatedAt)],
+        });
+
+        const inheritedDictionary = (lastEditedPage?.dictionary as any) || defaultDictionary;
+        const inheritedFormFlow = (lastEditedPage?.formFlow as any) || defaultFormFlow;
+
         const customDictionary = {
-          ...defaultDictionary,
+          ...inheritedDictionary,
           hero: {
-            ...defaultDictionary.hero,
-            titlePart1: titlePart1 || defaultDictionary.hero.titlePart1,
-            titlePart2: titlePart2 || defaultDictionary.hero.titlePart2,
-            description: description || defaultDictionary.hero.description,
+            ...(inheritedDictionary.hero || {}),
+            ...(titlePart1 ? { titlePart1 } : {}),
+            ...(titlePart2 ? { titlePart2 } : {}),
+            ...(description ? { description } : {}),
           }
         };
 
         const customFormFlow = {
-          ...defaultFormFlow,
+          ...inheritedFormFlow,
           settings: {
-            ...defaultFormFlow.settings,
-            whatsappMessageTemplate: whatsappMessageTemplate || defaultFormFlow.settings.whatsappMessageTemplate,
+            ...(inheritedFormFlow.settings || {}),
+            ...(whatsappMessageTemplate ? { whatsappMessageTemplate } : {}),
           }
         };
 
@@ -397,6 +410,7 @@ export async function captacaoRoutes(fastifyApp: FastifyInstance) {
             siteConfig: customSiteConfig,
             dictionary: customDictionary,
             formFlow: customFormFlow,
+            formId: body.formId || null,
           })
           .returning();
 
@@ -571,6 +585,7 @@ function validateCPF(cpf: string): boolean {
             emergencyContactPhone: emergencyPhone ? ('+' + emergencyPhone.replace(/\D/g, '')) : null,
             customFieldValues,
             capturePageId: pageId || null,
+            formId: pageRecord?.formId || null,
             utmSource: 'Landing Page',
           })
           .returning();

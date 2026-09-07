@@ -14,6 +14,7 @@ export default function WebGlobalError({
     <ErrorView
       error={error}
       reset={reset}
+      clientApp="web"
       homePath="/dashboard"
       title="Ops! Erro ao carregar o Painel"
       description="Desculpe pelo inconveniente. Ocorreu uma falha durante a exibição desta área. Tente recarregar a página."

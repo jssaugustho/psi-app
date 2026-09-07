@@ -27,10 +27,10 @@ export function BrandIdentityManager({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const [primaryColor, setPrimaryColor] = useState(visualIdentity.primaryColor || '#458270');
-  const [secondaryColor, setSecondaryColor] = useState(visualIdentity.secondaryColor || '#A64E2B');
-  const [contrastColor, setContrastColor] = useState(visualIdentity.contrastColor || '#FFFFFF');
-  const [bgColor, setBgColor] = useState(visualIdentity.bgColor || '#09090B');
+  const [primaryColor, setPrimaryColor] = useState(visualIdentity.primaryColor || workspace.gradientColorStart || '#7C3AED');
+  const [secondaryColor, setSecondaryColor] = useState(visualIdentity.secondaryColor || workspace.gradientColorEnd || '#A855F7');
+  const [contrastColor, setContrastColor] = useState(visualIdentity.contrastColor || workspace.contrastColor || '#FFFFFF');
+  const [bgColor, setBgColor] = useState(visualIdentity.bgColor || workspace.bgDarkColor || '#09090B');
   const [logoUrl, setLogoUrl] = useState(visualIdentity.logoUrl || '');
   const [faviconUrl, setFaviconUrl] = useState(visualIdentity.faviconUrl || '');
   const [fontHeading, setFontHeading] = useState(visualIdentity.fontHeading || 'Playfair Display');
@@ -45,10 +45,10 @@ export function BrandIdentityManager({
       api.getVisualIdentity(workspace.id)
         .then((vi) => {
           if (vi) {
-            setPrimaryColor(vi.primaryColor || '#458270');
-            setSecondaryColor(vi.secondaryColor || '#A64E2B');
-            setContrastColor(vi.contrastColor || '#FFFFFF');
-            setBgColor(vi.bgColor || '#09090B');
+            setPrimaryColor(vi.primaryColor || workspace.gradientColorStart || '#7C3AED');
+            setSecondaryColor(vi.secondaryColor || workspace.gradientColorEnd || '#A855F7');
+            setContrastColor(vi.contrastColor || workspace.contrastColor || '#FFFFFF');
+            setBgColor(vi.bgColor || workspace.bgDarkColor || '#09090B');
             setLogoUrl(vi.logoUrl || '');
             setFaviconUrl(vi.faviconUrl || '');
             setFontHeading(vi.fontHeading || 'Playfair Display');

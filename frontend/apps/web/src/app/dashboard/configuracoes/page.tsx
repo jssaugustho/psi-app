@@ -8,7 +8,7 @@ const PGRST_BASE_URL = API_BASE_URL.endsWith('/v1')
   ? API_BASE_URL.slice(0, -3) + '/rest/v1'
   : API_BASE_URL + '/rest/v1';
 
-const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source';
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,socialLinks:social_links,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,trafficSources:traffic_sources,defaultTrafficSource:default_traffic_source,visualIdentity:visual_identities(*)';
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();

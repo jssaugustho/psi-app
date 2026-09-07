@@ -70,6 +70,40 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     return `${prefix}••••••••••••••••••••••••`;
   }
 
+  function logApiEvent(
+    request: any,
+    name: string,
+    message: string,
+    options: {
+      type?: 'info' | 'error' | 'warning' | 'http';
+      severity?: 'info' | 'error' | 'warning';
+      stack?: string | null;
+      workspaceId?: string | null;
+      metadata?: Record<string, any>;
+    } = {}
+  ) {
+    const rawReq = request?.raw || {};
+    log({
+      name,
+      type: options.type || 'info',
+      severity: options.severity || 'info',
+      serviceName: 'core-api',
+      message,
+      stack: options.stack || null,
+      userId: rawReq.userId || null,
+      sessionId: rawReq.sessionId || null,
+      workspaceId: options.workspaceId || null,
+      clientApp: rawReq.clientApp || null,
+      userRole: rawReq.userRole || null,
+      url: request?.url || null,
+      userAgent: (request?.headers?.['user-agent'] as string) || null,
+      metadata: {
+        requestId: rawReq.requestId || null,
+        ...(options.metadata || {}),
+      },
+    }).catch(() => {});
+  }
+
   // GET /v1/platform/setup/status
   fastify.get('/setup/status', async (request, reply) => {
     try {
@@ -736,6 +770,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const { filename, content_type, upload_type } = request.body;
 
+        logApiEvent(request, 'r2.presign_start', `Solicitando Presigned URL no Cloudflare R2 para "${filename}" (${content_type}, tipo: ${upload_type})`, {
+          metadata: { filename, content_type, upload_type },
+        });
+
         // 3. Enforce MIME type rules per upload_type — server-side, cannot be bypassed
         const ALL_IMAGE_MIMES  = ['image/webp', 'image/jpeg', 'image/jpg', 'image/png', 'image/svg+xml'];
         const FONT_SAFE_MIMES   = [
@@ -802,6 +840,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const publicUrl = `${publicDomain}/${fileKey}`;
 
+        logApiEvent(request, 'r2.presign_generated', `Presigned URL do Cloudflare R2 gerada com sucesso para chave "${fileKey}"`, {
+          metadata: { fileKey, publicUrl, upload_type, filename },
+        });
+
         return reply.send({
           upload_url: uploadUrl,
           public_url: publicUrl,
@@ -810,17 +852,12 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       } catch (err: any) {
         fastify.log.error(err);
         (request.raw as any).errorStack = err.stack || String(err);
-        log({
-          name: err.name || 'PresignUploadError',
+        logApiEvent(request, 'r2.presign_error', `Falha ao gerar Presigned URL no Cloudflare R2: ${err.message || String(err)}`, {
           type: 'error',
           severity: 'error',
-          serviceName: 'core-api',
-          message: err.message || String(err),
           stack: err.stack,
-          url: request.url,
-          userAgent: (request.headers['user-agent'] as string) || null,
-          metadata: { requestId: (request.raw as any).requestId },
-        }).catch(() => {});
+          metadata: { filename: request.body?.filename, upload_type: request.body?.upload_type },
+        });
         return reply.status(500).send({
           error: 'Erro ao gerar URL de upload',
           message: err.message || 'Não foi possível gerar a Presigned URL.',
@@ -869,6 +906,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       const uniqueFileName = `${cleanName}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
       const fileKey = `media/${uploadType}/${uniqueFileName}`;
 
+      logApiEvent(request, 'r2.upload_direct_start', `Iniciando upload direto para o Cloudflare R2 (arquivo: "${filename}", mimetype: "${mimetype}")`, {
+        metadata: { filename, mimetype, uploadType, fileKey },
+      });
+
       try {
         const s3Client = new S3Client({
           region: 'auto',
@@ -894,6 +935,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
 
         const publicUrl = `${publicDomain}/${fileKey}`;
 
+        logApiEvent(request, 'r2.upload_direct_success', `Upload direto enviado com sucesso para o Cloudflare R2 (chave: "${fileKey}")`, {
+          metadata: { fileKey, publicUrl, uploadType },
+        });
+
         return reply.send({
           url: publicUrl,
           public_url: publicUrl,
@@ -912,6 +957,12 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const host = request.headers.host || `localhost:${process.env.PORT || 5000}`;
         const localUrl = `${protocol}://${host}/v1/platform/files/${uploadType}/${uniqueFileName}`;
 
+        logApiEvent(request, 'r2.upload_direct_fallback_local', `Falha no PutObject S3 (${s3Err.message}). Utilizando fallback de armazenamento local para "${uniqueFileName}"`, {
+          type: 'warning',
+          severity: 'warning',
+          metadata: { localUrl, fileKey, s3Error: s3Err.message },
+        });
+
         return reply.send({
           url: localUrl,
           public_url: localUrl,
@@ -921,17 +972,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
     } catch (err: any) {
       fastify.log.error(err);
       (request.raw as any).errorStack = err.stack || String(err);
-      log({
-        name: err.name || 'DirectUploadError',
+      logApiEvent(request, 'r2.upload_direct_error', `Falha no processamento de upload direto: ${err.message || String(err)}`, {
         type: 'error',
         severity: 'error',
-        serviceName: 'core-api',
-        message: err.message || String(err),
         stack: err.stack,
-        url: request.url,
-        userAgent: (request.headers['user-agent'] as string) || null,
-        metadata: { requestId: (request.raw as any).requestId },
-      }).catch(() => {});
+      });
       return reply.status(500).send({
         error: 'Erro no Upload Direto',
         message: err.message || 'Falha ao processar upload direto.',
@@ -1067,6 +1112,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const body = request.body as any;
         const targetWorkspaceId = body.workspaceId || body.tenantId;
 
+        logApiEvent(request, 'media.asset_register_start', `Registrando novo ativo de mídia "${body.name}" na biblioteca do workspace "${targetWorkspaceId}"`, {
+          workspaceId: targetWorkspaceId,
+          metadata: { name: body.name, key: body.key, mimeType: body.mimeType, fileSize: body.fileSize, usageContext: body.usageContext },
+        });
+
         // Validar se o usuário pertence ao workspace
         const targetWorkspace = await db.query.workspaces.findFirst({
           where: eq(workspaces.id, targetWorkspaceId),
@@ -1131,6 +1181,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           });
 
           if (oldCrop) {
+            logApiEvent(request, 'r2.delete_old_crop_start', `Iniciando remoção do arquivo de corte antigo "${oldCrop.key}" no Cloudflare R2`, {
+              workspaceId: targetWorkspaceId,
+              metadata: { oldCropId: oldCrop.id, oldCropKey: oldCrop.key },
+            });
+
             // 1. Excluir do Cloudflare R2
             try {
               const settings = await db.query.platformSettings.findFirst();
@@ -1150,9 +1205,20 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
                     Key: oldCrop.key,
                   })
                 );
+
+                logApiEvent(request, 'r2.delete_old_crop_success', `Arquivo antigo "${oldCrop.key}" removido do Cloudflare R2 com sucesso`, {
+                  workspaceId: targetWorkspaceId,
+                  metadata: { oldCropKey: oldCrop.key },
+                });
               }
-            } catch (s3Err) {
+            } catch (s3Err: any) {
               fastify.log.warn({ err: s3Err }, `Falha ao excluir R2 object ${oldCrop.key}`);
+              logApiEvent(request, 'r2.delete_old_crop_error', `Falha ao remover arquivo antigo "${oldCrop.key}" do R2: ${s3Err.message}`, {
+                type: 'warning',
+                severity: 'warning',
+                workspaceId: targetWorkspaceId,
+                metadata: { oldCropKey: oldCrop.key, error: s3Err.message },
+              });
             }
 
             // 2. Remover do banco de dados
@@ -1178,9 +1244,27 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           })
           .returning();
 
+        logApiEvent(request, 'media.asset_registered', `Ativo de mídia "${newAsset.name}" registrado com sucesso na biblioteca (ID: ${newAsset.id})`, {
+          workspaceId: targetWorkspaceId,
+          metadata: {
+            assetId: newAsset.id,
+            url: newAsset.url,
+            key: newAsset.key,
+            isCropped: newAsset.isCropped,
+            usageContext: newAsset.usageContext,
+          },
+        });
+
         return reply.send(newAsset);
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        logApiEvent(request, 'media.asset_register_error', `Erro ao registrar ativo de mídia: ${err.message || String(err)}`, {
+          type: 'error',
+          severity: 'error',
+          stack: err.stack,
+          workspaceId: request.body?.workspaceId || request.body?.tenantId,
+        });
         return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
@@ -1206,6 +1290,10 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         const decoded = verifyUserJwt(token);
 
         const { id } = request.params;
+
+        logApiEvent(request, 'media.asset_delete_start', `Solicitada a exclusão do ativo de mídia ID "${id}"`, {
+          metadata: { id },
+        });
 
         // Buscar asset
         const asset = await db.query.mediaAssets.findFirst({
@@ -1241,6 +1329,11 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
         try {
           const settings = await db.query.platformSettings.findFirst();
           if (settings && settings.cloudflareAccountId && settings.r2BucketName && settings.r2AccessKeyId && settings.r2SecretAccessKey) {
+            logApiEvent(request, 'r2.delete_object_start', `Solicitando remoção do objeto "${asset.key}" no Cloudflare R2`, {
+              workspaceId: asset.workspaceId,
+              metadata: { key: asset.key, assetId: asset.id },
+            });
+
             const s3Client = new S3Client({
               region: 'auto',
               endpoint: `https://${settings.cloudflareAccountId.trim()}.r2.cloudflarestorage.com`,
@@ -1256,17 +1349,41 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
                 Key: asset.key,
               })
             );
+
+            logApiEvent(request, 'r2.delete_object_success', `Objeto "${asset.key}" excluído do Cloudflare R2 com sucesso`, {
+              workspaceId: asset.workspaceId,
+              metadata: { key: asset.key, assetId: asset.id },
+            });
           }
-        } catch (s3Err) {
+        } catch (s3Err: any) {
           fastify.log.warn({ err: s3Err }, `Falha ao excluir R2 object ${asset.key}`);
+          logApiEvent(request, 'r2.delete_object_error', `Falha ao excluir objeto "${asset.key}" no Cloudflare R2: ${s3Err.message}`, {
+            type: 'warning',
+            severity: 'warning',
+            workspaceId: asset.workspaceId,
+            metadata: { key: asset.key, assetId: asset.id, error: s3Err.message },
+          });
         }
 
         // 2. Remover do banco de dados
         await db.delete(mediaAssets).where(eq(mediaAssets.id, id));
 
+        logApiEvent(request, 'media.asset_deleted', `Ativo de mídia "${asset.name}" (ID: ${id}) excluído do banco de dados`, {
+          workspaceId: asset.workspaceId,
+          metadata: { id: asset.id, name: asset.name, key: asset.key },
+        });
+
         return reply.send({ message: 'Asset removido com sucesso.' });
       } catch (err: any) {
         fastify.log.error(err);
+        (request.raw as any).errorStack = err.stack || String(err);
+        const targetId = (request.params as any)?.id;
+        logApiEvent(request, 'media.asset_delete_error', `Erro ao excluir ativo de mídia ID "${targetId || 'desconhecido'}": ${err.message || String(err)}`, {
+          type: 'error',
+          severity: 'error',
+          stack: err.stack,
+          metadata: { id: targetId },
+        });
         return reply.status(500).send({ error: 'Erro interno', message: err.message });
       }
     }
@@ -2155,6 +2272,7 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           url: z.string().optional().nullable(),
           userAgent: z.string().optional().nullable(),
           serviceName: z.string().default('frontend'),
+          clientApp: z.string().optional().nullable(),
           severity: z.enum(['error', 'warning', 'fatal', 'info']).default('error'),
           metadata: z.record(z.any()).optional().nullable(),
         }),
@@ -2171,9 +2289,9 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
           } catch {}
         }
 
-        const { name, message, stack, url, userAgent, serviceName, severity, metadata } = request.body;
+        const { name, message, stack, url, userAgent, serviceName, severity, metadata, clientApp: bodyClientApp } = request.body;
 
-        const clientApp = (request.raw as any).clientApp || 'unknown';
+        const clientApp = bodyClientApp || (request.raw as any).clientApp || 'web';
         const userRole = (request.raw as any).userRole || 'anon';
 
         await log({
@@ -2198,6 +2316,17 @@ export async function platformRoutes(fastifyApp: FastifyInstance) {
       }
     }
   );
+
+  // Alias POST /v1/platform/logs
+  fastify.post('/logs', fastify.getSchema('/v1/platform/errors') ? {} : {}, async (req, rep) => {
+    // Reutiliza a rota de errors
+    return fastify.inject({
+      method: 'POST',
+      url: '/v1/platform/errors',
+      payload: req.body as any,
+      headers: req.headers as any,
+    }).then(res => rep.status(res.statusCode).send(res.json()));
+  });
 }
 
 

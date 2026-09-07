@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrandLogo, BrandLogoProps } from './brand-logo';
 import { Button } from './button';
+import { loadPlatformBrandBackup } from './brand-storage';
 
 export interface ErrorViewProps {
   error?: (Error & { digest?: string }) | null;
@@ -10,6 +11,7 @@ export interface ErrorViewProps {
   homePath?: string;
   title?: string;
   description?: string;
+  clientApp?: 'web' | 'admin' | 'sites' | string;
   logoProps?: BrandLogoProps;
 }
 
@@ -19,10 +21,74 @@ export function ErrorView({
   homePath = '/',
   title = 'Ops! Algo não saiu como esperado',
   description = 'Desculpe pelo inconveniente. Ocorreu uma falha inesperada durante o processamento da página.',
+  clientApp = 'web',
   logoProps,
 }: ErrorViewProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [logSent, setLogSent] = useState(false);
+
+  // 1. Resolução do Logotipo Oficial da Plataforma (Platform Brand)
+  const [platformBrand, setPlatformBrand] = useState<any>(null);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+
+  useEffect(() => {
+    // Carrega ativamente a Marca da Plataforma do cache
+    const brand = loadPlatformBrandBackup();
+    if (brand) {
+      setPlatformBrand(brand);
+    }
+
+    if (typeof window !== 'undefined') {
+      const isDark = document.documentElement.classList.contains('dark') ||
+        (!document.documentElement.classList.contains('light') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      setIsDarkTheme(isDark);
+    }
+  }, []);
+
+  const platformLogoUrl = logoProps?.logoUrl ||
+    (isDarkTheme
+      ? (platformBrand?.logoDarkUrl || platformBrand?.logoLightUrl)
+      : (platformBrand?.logoLightUrl || platformBrand?.logoDarkUrl));
+
+  const platformTitle = logoProps?.title || platformBrand?.name || 'Psi App';
+
+  // 2. Envio automático do erro para o backend (/v1/platform/errors -> RabbitMQ system.logs)
+  useEffect(() => {
+    if (!error || logSent) return;
+
+    const dispatchErrorLog = async () => {
+      try {
+        const payload = {
+          name: error.name || 'UnhandledClientError',
+          message: error.message || 'Erro no cliente sem mensagem detalhada',
+          stack: error.stack || null,
+          url: typeof window !== 'undefined' ? window.location.href : null,
+          clientApp,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          severity: 'error',
+          metadata: {
+            digest: error.digest || null,
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        const res = await fetch('/v1/platform/errors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          setLogSent(true);
+        }
+      } catch (err) {
+        console.warn('⚡ Falha ao notificar o serviço de logs da plataforma:', err);
+      }
+    };
+
+    dispatchErrorLog();
+  }, [error, clientApp, logSent]);
 
   const handleReload = () => {
     if (reset) {
@@ -34,7 +100,7 @@ export function ErrorView({
 
   const handleCopyError = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard && error) {
-      const details = `Error: ${error.message || 'Desconhecido'}\nDigest: ${error.digest || 'N/A'}\nStack: ${error.stack || 'N/A'}`;
+      const details = `Error: ${error.message || 'Desconhecido'}\nDigest: ${error.digest || 'N/A'}\nApp: ${clientApp}\nURL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}\nStack: ${error.stack || 'N/A'}`;
       navigator.clipboard.writeText(details);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -42,53 +108,62 @@ export function ErrorView({
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none font-sans">
-      {/* Background Gradient Orbs */}
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none font-sans relative overflow-hidden bg-slate-950 text-slate-100">
+      {/* Background Orbs & Ambient Glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
         <div
-          className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-3xl opacity-20"
-          style={{ background: 'var(--brand-gradient-start, #4F46E5)' }}
+          className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full blur-[120px] opacity-25"
+          style={{ background: 'var(--brand-gradient-start, #6366F1)' }}
         />
         <div
-          className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-3xl opacity-20"
-          style={{ background: 'var(--brand-gradient-end, #06B6D4)' }}
+          className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full blur-[120px] opacity-25"
+          style={{ background: 'var(--brand-gradient-end, #8B5CF6)' }}
         />
       </div>
 
-      {/* Outer Card */}
-      <div className="w-full max-w-lg glass-lg rounded-3xl p-6 sm:p-10 border border-brand-divider shadow-2xl space-y-6 animate-page-enter">
-        {/* Brand Header */}
-        <div className="flex justify-center mb-2">
-          <BrandLogo size="md" {...logoProps} />
+      {/* Main Glassmorphic Error Card */}
+      <div className="w-full max-w-lg glass-lg rounded-3xl p-6 sm:p-10 border border-white/10 shadow-2xl space-y-6 animate-page-enter backdrop-blur-xl bg-slate-900/80">
+        {/* Platform Brand Header (Official Platform Logo ONLY) */}
+        <div className="flex justify-center mb-1">
+          <BrandLogo
+            logoUrl={platformLogoUrl}
+            title={platformTitle}
+            fallbackText={platformTitle}
+            size="md"
+            {...logoProps}
+          />
         </div>
 
-        {/* Warning Icon Badge */}
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-inner">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
+        {/* Warning Badge with Subtle Pulse */}
+        <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-2xl bg-amber-500/20 blur-md animate-pulse" />
+          <div className="relative w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
         </div>
 
-        {/* Text Details */}
+        {/* Title & User-friendly Description */}
         <div className="space-y-2 select-text">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight opacity-90">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             {title}
           </h1>
-          <p className="text-xs sm:text-sm opacity-60 leading-relaxed max-w-md mx-auto">
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-md mx-auto">
             {description}
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Primary Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Button
             onClick={handleReload}
             variant="primary"
-            className="!py-3 flex-1 flex items-center justify-center gap-2 text-sm font-semibold"
+            className="!py-3 flex-1 flex items-center justify-center gap-2 text-sm font-semibold shadow-lg shadow-indigo-500/20"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path
@@ -100,13 +175,10 @@ export function ErrorView({
             <span>Tentar Novamente</span>
           </Button>
 
-          <a
-            href={homePath}
-            className="flex-1"
-          >
+          <a href={homePath} className="flex-1">
             <Button
               variant="secondary"
-              className="!py-3 w-full flex items-center justify-center gap-2 text-sm font-semibold"
+              className="!py-3 w-full flex items-center justify-center gap-2 text-sm font-semibold border-white/10 hover:bg-white/5"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path
@@ -120,33 +192,43 @@ export function ErrorView({
           </a>
         </div>
 
-        {/* Technical Error Details Accordion */}
+        {/* Technical Error Accordion & Logging Status */}
         {error && (
-          <div className="pt-2 text-left border-t border-brand-divider">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="w-full flex justify-between items-center py-2 text-xs font-semibold opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-            >
-              <span>{showDetails ? 'Ocultar detalhes técnicos' : 'Exibir detalhes técnicos'}</span>
-              <span className="text-[10px]">{showDetails ? '▲' : '▼'}</span>
-            </button>
+          <div className="pt-3 text-left border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <span>{showDetails ? 'Ocultar detalhes técnicos' : 'Exibir detalhes técnicos'}</span>
+                <span className="text-[10px]">{showDetails ? '▲' : '▼'}</span>
+              </button>
+
+              {logSent && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Registrado no sistema
+                </span>
+              )}
+            </div>
 
             {showDetails && (
-              <div className="mt-2 space-y-2 animate-fade-in select-text">
+              <div className="mt-3 space-y-2 animate-fade-in select-text">
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-mono opacity-50">Log de Exceção:</span>
+                  <span className="text-[11px] font-mono text-slate-400">Log de Exceção:</span>
                   <button
                     type="button"
                     onClick={handleCopyError}
-                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300 hover:bg-white/20 transition-all cursor-pointer"
                   >
                     {copied ? '✓ Copiado' : '📋 Copiar'}
                   </button>
                 </div>
-                <pre className="p-3 rounded-xl bg-neutral-900 dark:bg-neutral-950 text-red-300 border border-neutral-800 text-[11px] overflow-x-auto custom-scrollbar font-mono leading-relaxed max-h-40 whitespace-pre-wrap break-all">
-                  {error.message || 'Erro sem mensagem explícita'}
+                <pre className="p-3 rounded-xl bg-slate-950 text-red-300 border border-slate-800 text-[11px] overflow-x-auto custom-scrollbar font-mono leading-relaxed max-h-44 whitespace-pre-wrap break-all shadow-inner">
+                  {`[${error.name || 'Error'}] ${error.message || 'Sem mensagem explícita'}`}
                   {error.digest && `\nDigest: ${error.digest}`}
+                  {error.stack && `\n\nStack:\n${error.stack}`}
                 </pre>
               </div>
             )}

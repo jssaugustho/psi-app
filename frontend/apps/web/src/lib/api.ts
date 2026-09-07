@@ -6,7 +6,21 @@ const PGRST_BASE_URL = typeof window !== 'undefined'
   ? '/rest/v1'
   : (API_BASE_URL.endsWith('/v1') ? API_BASE_URL.slice(0, -3) + '/rest/v1' : API_BASE_URL + '/rest/v1');
 
-const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source,webhook_secret';
+const TENANT_SELECT = 'id,name,ownerId:owner_id,crp,bio,specialties,cityState:city_state,instagram,socialLinks:social_links,isOnlineService:is_online_service,defaultSiteAvatarUrl:default_site_avatar_url,traffic_sources,default_traffic_source,webhook_secret,visualIdentity:visual_identities(*)';
+
+export interface SocialLinks {
+  whatsapp?: string;
+  whatsappNumber?: string;
+  whatsappMessage?: string;
+  instagram?: string;
+  linkedin?: string;
+  doctoralia?: string;
+  x?: string;
+  youtube?: string;
+  facebook?: string;
+  tiktok?: string;
+  other?: Array<{ label: string; url: string }>;
+}
 
 export interface User {
   id: string;
@@ -78,6 +92,7 @@ export interface Workspace {
   specialties?: string[] | null;
   cityState?: string | null;
   instagram?: string | null;
+  socialLinks?: SocialLinks | null;
   isOnlineService?: boolean;
   defaultSiteAvatarUrl?: string | null;
   traffic_sources?: string[];
@@ -730,6 +745,8 @@ export const api = {
     if (body.specialties !== undefined) dbBody.specialties = body.specialties;
     if (body.cityState !== undefined) dbBody.city_state = body.cityState;
     if (body.instagram !== undefined) dbBody.instagram = body.instagram;
+    if (body.socialLinks !== undefined) dbBody.social_links = body.socialLinks;
+    if ((body as any).social_links !== undefined) dbBody.social_links = (body as any).social_links;
     if (body.isOnlineService !== undefined) dbBody.is_online_service = body.isOnlineService;
     if (body.defaultSiteAvatarUrl !== undefined) dbBody.default_site_avatar_url = body.defaultSiteAvatarUrl;
     if (body.traffic_sources !== undefined) dbBody.traffic_sources = body.traffic_sources;
@@ -1022,6 +1039,10 @@ export const api = {
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
+      ctaType: item.cta_type || 'form',
+      ctaWhatsappMessage: item.cta_whatsapp_message || null,
+      ctaExternalUrl: item.cta_external_url || null,
+      formId: item.form_id || null,
       customDomain: item.custom_domain,
       seoConfig: item.seo_config,
       siteConfig: item.site_config,
@@ -1034,6 +1055,10 @@ export const api = {
       siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
       dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
       formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
+      ctaTypeDraft: item.draft_data?.ctaType ?? null,
+      ctaWhatsappMessageDraft: item.draft_data?.ctaWhatsappMessage ?? null,
+      ctaExternalUrlDraft: item.draft_data?.ctaExternalUrl ?? null,
+      formIdDraft: item.draft_data?.formId ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     }));
@@ -1049,6 +1074,10 @@ export const api = {
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
+      ctaType: item.cta_type || 'form',
+      ctaWhatsappMessage: item.cta_whatsapp_message || null,
+      ctaExternalUrl: item.cta_external_url || null,
+      formId: item.form_id || null,
       customDomain: item.custom_domain,
       seoConfig: item.seo_config,
       siteConfig: item.site_config,
@@ -1061,6 +1090,10 @@ export const api = {
       siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
       dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
       formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
+      ctaTypeDraft: item.draft_data?.ctaType ?? null,
+      ctaWhatsappMessageDraft: item.draft_data?.ctaWhatsappMessage ?? null,
+      ctaExternalUrlDraft: item.draft_data?.ctaExternalUrl ?? null,
+      formIdDraft: item.draft_data?.formId ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -1088,6 +1121,10 @@ export const api = {
     siteConfig?: any;
     dictionary?: any;
     formFlow?: any;
+    ctaType?: 'whatsapp' | 'external_url' | 'form';
+    ctaWhatsappMessage?: string;
+    ctaExternalUrl?: string;
+    formId?: string;
   }): Promise<{ success: boolean; page: CapturePage }> => {
     const res = await fetchApi<{ success: boolean; page: any }>('/crm/captacao', {
       method: 'POST',
@@ -1101,6 +1138,10 @@ export const api = {
         title: res.page.title,
         slug: res.page.slug,
         isActive: res.page.isActive ?? res.page.is_active,
+        ctaType: res.page.ctaType || res.page.cta_type || 'form',
+        ctaWhatsappMessage: res.page.ctaWhatsappMessage || res.page.cta_whatsapp_message || null,
+        ctaExternalUrl: res.page.ctaExternalUrl || res.page.cta_external_url || null,
+        formId: res.page.formId || res.page.form_id || null,
         customDomain: res.page.customDomain ?? res.page.custom_domain,
         seoConfig: res.page.seoConfig || res.page.seo_config,
         siteConfig: res.page.siteConfig || res.page.site_config,
@@ -1113,6 +1154,10 @@ export const api = {
         siteConfigDraft: res.page.draft_data?.siteConfig ?? res.page.site_config_draft ?? null,
         dictionaryDraft: res.page.draft_data?.dictionary ?? res.page.dictionary_draft ?? null,
         formFlowDraft: res.page.draft_data?.formFlow ?? res.page.form_flow_draft ?? null,
+        ctaTypeDraft: res.page.draft_data?.ctaType ?? null,
+        ctaWhatsappMessageDraft: res.page.draft_data?.ctaWhatsappMessage ?? null,
+        ctaExternalUrlDraft: res.page.draft_data?.ctaExternalUrl ?? null,
+        formIdDraft: res.page.draft_data?.formId ?? null,
         createdAt: res.page.createdAt || res.page.created_at,
         updatedAt: res.page.updatedAt || res.page.updated_at,
       }
@@ -1130,6 +1175,10 @@ export const api = {
     if (body.title !== undefined) dbBody.title = body.title;
     if (body.slug !== undefined) dbBody.slug = body.slug;
     if (body.isActive !== undefined) dbBody.is_active = body.isActive;
+    if (body.ctaType !== undefined) dbBody.cta_type = body.ctaType;
+    if (body.ctaWhatsappMessage !== undefined) dbBody.cta_whatsapp_message = body.ctaWhatsappMessage;
+    if (body.ctaExternalUrl !== undefined) dbBody.cta_external_url = body.ctaExternalUrl;
+    if (body.formId !== undefined) dbBody.form_id = body.formId;
     if (body.customDomain !== undefined) dbBody.custom_domain = body.customDomain;
     if (body.seoConfig !== undefined) dbBody.seo_config = body.seoConfig;
     if (body.siteConfig !== undefined) dbBody.site_config = body.siteConfig;
@@ -1145,6 +1194,10 @@ export const api = {
     if (body.siteConfigDraft !== undefined) updatedDraftData.siteConfig = body.siteConfigDraft;
     if (body.dictionaryDraft !== undefined) updatedDraftData.dictionary = body.dictionaryDraft;
     if (body.formFlowDraft !== undefined) updatedDraftData.formFlow = body.formFlowDraft;
+    if (body.ctaTypeDraft !== undefined) updatedDraftData.ctaType = body.ctaTypeDraft;
+    if (body.ctaWhatsappMessageDraft !== undefined) updatedDraftData.ctaWhatsappMessage = body.ctaWhatsappMessageDraft;
+    if (body.ctaExternalUrlDraft !== undefined) updatedDraftData.ctaExternalUrl = body.ctaExternalUrlDraft;
+    if (body.formIdDraft !== undefined) updatedDraftData.formId = body.formIdDraft;
 
     // Se houve qualquer atualização de rascunho, atualiza draft_data no DB
     if (
@@ -1154,7 +1207,11 @@ export const api = {
       body.seoConfigDraft !== undefined ||
       body.siteConfigDraft !== undefined ||
       body.dictionaryDraft !== undefined ||
-      body.formFlowDraft !== undefined
+      body.formFlowDraft !== undefined ||
+      body.ctaTypeDraft !== undefined ||
+      body.ctaWhatsappMessageDraft !== undefined ||
+      body.ctaExternalUrlDraft !== undefined ||
+      body.formIdDraft !== undefined
     ) {
       dbBody.draft_data = updatedDraftData;
     }
@@ -1174,6 +1231,10 @@ export const api = {
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
+      ctaType: item.cta_type || 'form',
+      ctaWhatsappMessage: item.cta_whatsapp_message || null,
+      ctaExternalUrl: item.cta_external_url || null,
+      formId: item.form_id || null,
       customDomain: item.custom_domain,
       seoConfig: item.seo_config,
       siteConfig: item.site_config,
@@ -1186,6 +1247,10 @@ export const api = {
       siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
       dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
       formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
+      ctaTypeDraft: item.draft_data?.ctaType ?? null,
+      ctaWhatsappMessageDraft: item.draft_data?.ctaWhatsappMessage ?? null,
+      ctaExternalUrlDraft: item.draft_data?.ctaExternalUrl ?? null,
+      formIdDraft: item.draft_data?.formId ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -1594,7 +1659,7 @@ export const api = {
 
 
   getVisualIdentity: async (workspaceId: string): Promise<any | null> => {
-    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}`);
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/visual_identities?workspace_id=eq.${workspaceId}&order=is_workspace_default.desc,created_at.desc&limit=1`);
     if (res && res.length > 0) {
       const item = res[0];
       return {
@@ -1603,6 +1668,9 @@ export const api = {
         primaryColor: item.primary_color,
         secondaryColor: item.secondary_color,
         contrastColor: item.contrast_color,
+        bgColor: item.bg_color,
+        cardColor: item.card_color,
+        textColor: item.text_color,
         logoUrl: item.logo_url,
         faviconUrl: item.favicon_url,
         fontHeading: item.font_heading,
@@ -1657,6 +1725,62 @@ export const api = {
       });
       return res[0];
     }
+  },
+
+  getScreeningForms: async (workspaceId: string): Promise<ScreeningForm[]> => {
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms?workspace_id=eq.${workspaceId}&order=created_at.desc`);
+    return res.map(item => ({
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config || {},
+      formFlow: item.form_flow || {},
+      titleDraft: item.draft_data?.title || null,
+      slugDraft: item.draft_data?.slug || null,
+      themeConfigDraft: item.draft_data?.themeConfig || null,
+      formFlowDraft: item.draft_data?.formFlow || null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    }));
+  },
+
+  createScreeningForm: async (body: {
+    workspaceId: string;
+    title: string;
+    slug?: string;
+    themeConfig?: any;
+    formFlow?: any;
+  }): Promise<ScreeningForm> => {
+    const slug = body.slug || `triagem-${Math.random().toString(36).substring(2, 9)}`;
+    const dbBody = {
+      workspace_id: body.workspaceId,
+      title: body.title,
+      slug,
+      is_active: true,
+      theme_config: body.themeConfig || {},
+      form_flow: body.formFlow || {}
+    };
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/screening_forms`, {
+      method: 'POST',
+      body: JSON.stringify(dbBody),
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+    const item = res[0];
+    return {
+      id: item.id,
+      tenantId: item.workspace_id,
+      title: item.title,
+      slug: item.slug,
+      isActive: item.is_active,
+      themeConfig: item.theme_config || {},
+      formFlow: item.form_flow || {},
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    };
   },
 };
 

@@ -137,7 +137,11 @@ export default async function PreviewCapturePage({ params, searchParams }: PageP
         customDomain: pageData.custom_domain,
         siteConfig: pageData.site_config,
         dictionary: pageData.dictionary,
-        formFlow: pageData.form_flow
+        formFlow: pageData.form_flow,
+        ctaType: pageData.cta_type,
+        ctaWhatsappMessage: pageData.cta_whatsapp_message,
+        ctaExternalUrl: pageData.cta_external_url,
+        formId: pageData.form_id,
       }}
       tenant={{
         id: pageData.tenants.id,

@@ -76,6 +76,11 @@ export default function CaptacaoPage() {
           };
         });
 
+      if (regularPages.length === 0 && wizardDrafts.length === 0) {
+        router.replace('/dashboard/captacao/nova?fresh=true');
+        return;
+      }
+
       setPages(regularPages);
       setDrafts(wizardDrafts);
       setWorkspaceDomain(domainData);
@@ -84,7 +89,7 @@ export default function CaptacaoPage() {
     } finally {
       setLoading(false);
     }
-  }, [tenant]);
+  }, [tenant, router]);
 
   useEffect(() => {
     if (tenant) {
@@ -196,7 +201,7 @@ export default function CaptacaoPage() {
   const handleDeletePage = async (id: string) => {
     try {
       await api.deleteCapturePage(id);
-      setPages(prev => prev.filter(p => p.id !== id));
+      await loadPages();
     } catch (err: any) {
       setError('Erro ao excluir página: ' + err.message);
     }
