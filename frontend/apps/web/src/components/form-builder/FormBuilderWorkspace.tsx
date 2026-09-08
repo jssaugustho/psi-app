@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { api, ScreeningForm } from '@/lib/api';
 import { useRealtime } from '@/context/RealtimeContext';
@@ -344,19 +344,22 @@ export function FormBuilderWorkspace({
     applyState
   );
 
-  // Set initial state for history once loaded
+  // Garante que setInitialState é chamado apenas UMA vez, quando o formulário terminar de carregar
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (form && nodes.length > 0) {
+    if (!loading && form && nodes.length > 0 && !initializedRef.current) {
+      initializedRef.current = true;
       setInitialState({ titleDraft, themeConfigDraft, nodes, edges });
     }
-  }, [form, nodes, edges, titleDraft, themeConfigDraft, setInitialState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, form]);
 
-  // Track state changes for Undo/Redo
+  // Registra mudanças no histórico de Undo/Redo
+  // Guard: só registra após o carregamento inicial concluir, nunca durante a hidratação
   useEffect(() => {
-    if (!loading && form) {
-      recordChange({ titleDraft, themeConfigDraft, nodes, edges });
-    }
-  }, [nodes, edges, titleDraft, themeConfigDraft, loading, form, recordChange]);
+    if (loading || !form || !initializedRef.current) return;
+    recordChange({ titleDraft, themeConfigDraft, nodes, edges });
+  }, [nodes, edges, titleDraft, themeConfigDraft, loading, recordChange]);
 
   // WebSocket / Realtime Sync setup
   useEffect(() => {
@@ -1233,7 +1236,7 @@ export function FormBuilderWorkspace({
                       </label>
                       <textarea
                         rows={6}
-                        className="w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-800 focus:border-[var(--brand-gradient-start)] outline-none text-white placeholder:text-muted-foreground/40 resize-none font-sans"
+                        className="nowheel nodrag nopan custom-scrollbar w-full text-xs p-2.5 bg-zinc-900 rounded-xl border border-zinc-800 focus:border-[var(--brand-gradient-start)] outline-none text-white placeholder:text-muted-foreground/40 resize-y min-h-[100px] max-h-[500px] font-sans"
                         placeholder="Escreva a minuta do contrato aqui..."
                         value={String(selectedNode.data?.contractText || '')}
                         onChange={(e) => updateSelectedNodeData('contractText', e.target.value)}

@@ -104,7 +104,7 @@ export default async function CustomDomainCapturePage({ params, searchParams }: 
     <CapturePageRenderer
       page={{
         id: pageData.id,
-        tenantId: pageData.tenant_id,
+        tenantId: pageData.workspace_id,
         title: pageData.title,
         slug: pageData.slug,
         customDomain: pageData.custom_domain,

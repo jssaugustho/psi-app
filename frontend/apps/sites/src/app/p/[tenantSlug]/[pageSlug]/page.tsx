@@ -131,7 +131,7 @@ export default async function PreviewCapturePage({ params, searchParams }: PageP
     <CapturePageRenderer
       page={{
         id: pageData.id,
-        tenantId: pageData.tenant_id,
+        tenantId: pageData.workspace_id,
         title: pageData.title,
         slug: pageData.slug,
         customDomain: pageData.custom_domain,

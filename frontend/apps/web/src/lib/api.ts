@@ -1330,7 +1330,11 @@ export const api = {
       isActive: item.is_active,
       customDomain: item.custom_domain,
       seoConfig: item.seo_config,
-      siteConfig: item.site_config,
+      siteConfig: {
+        ...(item.site_config || {}),
+        status: 'published',
+        isWizardDraft: false,
+      },
       dictionary: item.dictionary,
       formFlow: item.form_flow,
       titleDraft: null,

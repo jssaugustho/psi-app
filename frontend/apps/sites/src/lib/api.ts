@@ -37,7 +37,8 @@ function handleFetchError(err: any) {
 
 export interface CapturePageData {
   id: string;
-  tenant_id: string;
+  workspace_id: string;
+  tenant_id?: string; // alias retrocompat — usar workspace_id
   title: string;
   slug: string;
   is_active: boolean;

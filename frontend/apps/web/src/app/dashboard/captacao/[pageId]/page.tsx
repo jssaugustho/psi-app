@@ -1293,7 +1293,7 @@ const CustomContractNode = ({ data }: any) => {
           <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Minuta Jurídica do Termo</label>
           <textarea
             rows={4}
-            className="nowheel nodrag nopan w-full text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none font-sans"
+            className="nowheel nodrag nopan custom-scrollbar w-full text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500 resize-y min-h-[80px] max-h-[500px] font-sans"
             placeholder="Escreva os termos de aceite legal do contrato aqui..."
             value={data.node.data.contractText || ''}
             onChange={(e) => data.onUpdate('contractText', e.target.value)}
@@ -4118,7 +4118,15 @@ export default function PageEditor({ params }: PageProps) {
         slug: pageData.slugDraft || pageData.slug,
         customDomain: pageData.customDomainDraft || pageData.customDomain,
         seoConfig: pageData.seoConfigDraft || pageData.seoConfig,
-        siteConfig: pageData.siteConfigDraft || pageData.siteConfig,
+        // Merge siteConfig draft com publicado, mas NUNCA deixar o draft sobrescrever o status publicado
+        siteConfig: pageData.siteConfigDraft
+          ? {
+              ...(pageData.siteConfig || {}),
+              ...pageData.siteConfigDraft,
+              // O status real sempre vem do campo publicado, nunca do draft
+              status: (pageData.siteConfig as any)?.status,
+            }
+          : pageData.siteConfig,
         dictionary: pageData.dictionaryDraft || pageData.dictionary,
         formFlow: pageData.formFlowDraft || pageData.formFlow,
         ctaType: (pageData as any).ctaTypeDraft !== undefined && (pageData as any).ctaTypeDraft !== null ? (pageData as any).ctaTypeDraft : (pageData.ctaType || 'form'),
@@ -4502,8 +4510,18 @@ export default function PageEditor({ params }: PageProps) {
 
       const res = await api.publishCapturePage(page.id);
 
-      setPage(res);
-      setLastPublishedPage(res);
+      // Força status 'published' no estado local imediatamente para evitar race-condition
+      // com efeitos que possam re-aplicar o draft antes da próxima renderização
+      const publishedRes: typeof res = {
+        ...res,
+        siteConfig: {
+          ...(res.siteConfig || {}),
+          status: 'published',
+          isWizardDraft: false,
+        },
+      };
+      setPage(publishedRes);
+      setLastPublishedPage(publishedRes);
       setHasUnsavedChanges(false);
       setSuccess('Página publicada com sucesso!');
     } catch (err: any) {
