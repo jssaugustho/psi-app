@@ -145,7 +145,7 @@ export function FontPicker({
           </div>
 
           {/* Font options scroll list */}
-          <div className="max-h-56 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+          <div className="nowheel max-h-56 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
             {filteredFonts.map((font) => {
               const isSelected = value === font.name;
               return (

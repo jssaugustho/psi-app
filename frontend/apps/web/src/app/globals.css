@@ -294,3 +294,53 @@ html.light .custom-scrollbar::-webkit-scrollbar-thumb:active {
 .editor-scrollbar::-webkit-scrollbar-thumb:active {
   background: color-mix(in srgb, var(--brand-gradient-start, #CC8667) 65%, transparent);
 }
+
+/* ── React Flow Controls Theme Customization ── */
+.react-flow__controls {
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid var(--surface-border) !important;
+  background: color-mix(in srgb, var(--brand-gradient-start) 8%, var(--mix-base)) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 2px !important;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--surface-border) !important;
+  color: #f4f4f5 !important;
+  fill: #f4f4f5 !important;
+  transition: all 0.2s ease !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--surface-hover) !important;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor !important;
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
+
+html.light .react-flow__controls-button {
+  color: #0f172a !important;
+  fill: #0f172a !important;
+}
+

@@ -6,12 +6,14 @@ import { api, ScreeningForm } from '@/lib/api';
 import { useRealtime } from '@/context/RealtimeContext';
 import { useBrand } from '@/context/BrandContext';
 import { useEditorHistory } from '@/hooks/useEditorHistory';
-import { Card, Button, Input } from '@psi/ui';
+import { Card, Button, Input, BrandModal } from '@psi/ui';
 import { FontPicker } from '@/components/FontPicker';
+import { FormDestinationSettings } from './FormDestinationSettings';
 import {
   Plus, Save, Undo, Redo, RefreshCw, AlertTriangle, Check, Sparkles, Trash2, Palette,
   Layers, HelpCircle, X, ChevronRight, Sliders, ArrowLeft, Sun, Moon, ExternalLink,
-  PanelLeft, PanelLeftClose, User, Phone, Mail, CheckSquare, FileText, Eye
+  PanelLeft, PanelLeftClose, User, Phone, Mail, CheckSquare, FileText, Eye, Target,
+  UserCheck, UserPlus, Info
 } from 'lucide-react';
 
 import {
@@ -37,16 +39,56 @@ const CustomNode = ({ data, selected }: { data: any; selected: boolean }) => {
     switch (type) {
       case 'start': return <Sparkles className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
       case 'nome': return <User className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
-      case 'celular': return <Phone className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
+      case 'celular':
+      case 'celular_custom': return <Phone className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
       case 'email': return <Mail className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
+      case 'maioridade': return <UserCheck className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
+      case 'responsavel': return <UserPlus className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
       case 'seletor': return <CheckSquare className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
+      case 'aviso':
+      case 'mensagem': return <Info className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
       default: return <FileText className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />;
     }
   };
 
+  if (isStart) {
+    return (
+      <div
+        className={`nowheel px-4 py-3 rounded-2xl border transition-all duration-200 min-w-[210px] shadow-xl flex items-center justify-between gap-3 ${
+          selected
+            ? 'border-[var(--brand-gradient-start)] ring-2 ring-[var(--brand-gradient-start)]/40 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white'
+            : 'border-[var(--surface-border)] bg-white/95 dark:bg-zinc-950/90 text-slate-900 dark:text-white hover:border-zinc-400 dark:hover:border-zinc-700'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/30 shrink-0">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-900 dark:text-white">Início do Formulário</span>
+              <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 uppercase tracking-wider">
+                INÍCIO
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5 leading-none">
+              Ponto de partida do fluxo
+            </span>
+          </div>
+        </div>
+
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="w-3.5 h-3.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-md"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`px-4 py-3 rounded-2xl border transition-all duration-200 min-w-[240px] shadow-xl ${
+      className={`nowheel px-4 py-3 rounded-2xl border transition-all duration-200 min-w-[240px] shadow-xl ${
         selected
           ? 'border-[var(--brand-gradient-start)] ring-2 ring-[var(--brand-gradient-start)]/40 bg-white dark:bg-zinc-950 text-slate-900 dark:text-white'
           : 'border-[var(--surface-border)] bg-white/95 dark:bg-zinc-950/90 text-slate-900 dark:text-white hover:border-zinc-400 dark:hover:border-zinc-700'
@@ -79,21 +121,24 @@ const CustomNode = ({ data, selected }: { data: any; selected: boolean }) => {
         <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5 leading-tight">{data.placeholder}</p>
       )}
 
-      {/* Render options preview if selector */}
-      {data.type === 'seletor' && data.options && data.options.length > 0 ? (
+      {/* Render options preview if maioridade (with handles) */}
+      {data.type === 'maioridade' && data.options && data.options.length > 0 ? (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1 relative pr-4">
-          {data.options.map((opt: any, idx: number) => (
-            <div key={idx} className="text-[9px] px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 truncate relative">
-              • {opt.label || opt.value}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={`opt_${idx}`}
-                style={{ top: '50%', transform: 'translateY(-50%)', right: '-12px' }}
-                className="w-2.5 h-2.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-sm"
-              />
-            </div>
-          ))}
+          {data.options.map((opt: any, idx: number) => {
+            const handleId = opt.value === 'sim' || idx === 0 ? 'source-maior' : 'source-menor';
+            return (
+              <div key={idx} className="text-[9px] px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 truncate relative flex items-center justify-between">
+                <span>• {opt.label || opt.value}</span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={handleId}
+                  style={{ top: '50%', transform: 'translateY(-50%)', right: '-12px' }}
+                  className="w-2.5 h-2.5 !bg-[var(--brand-gradient-start)] border-2 border-white dark:border-zinc-950 shadow-sm"
+                />
+              </div>
+            );
+          })}
         </div>
       ) : data.options && data.options.length > 0 ? (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1">
@@ -105,7 +150,7 @@ const CustomNode = ({ data, selected }: { data: any; selected: boolean }) => {
         </div>
       ) : null}
 
-      {data.type !== 'seletor' && (
+      {data.type !== 'maioridade' && (
         <Handle
           type="source"
           position={Position.Right}
@@ -123,6 +168,7 @@ const nodeTypes = {
   email: CustomNode,
   cpf: CustomNode,
   maioridade: CustomNode,
+  responsavel: CustomNode,
   emergencia: CustomNode,
   contrato: CustomNode,
   texto: CustomNode,
@@ -135,6 +181,18 @@ interface FormBuilderWorkspaceProps {
   initialForm?: ScreeningForm;
   mode?: 'standalone' | 'embedded';
   onSave?: (form: ScreeningForm) => void;
+  initialCtaConfig?: {
+    ctaType?: 'form' | 'whatsapp' | 'external_url';
+    ctaWhatsappMessage?: string;
+    ctaExternalUrl?: string;
+    whatsappMessageTemplate?: string;
+  };
+  onSaveCtaConfig?: (config: {
+    ctaType: 'form' | 'whatsapp' | 'external_url';
+    ctaWhatsappMessage?: string;
+    ctaExternalUrl?: string;
+    whatsappMessageTemplate?: string;
+  }) => void;
 }
 
 export function FormBuilderWorkspace({
@@ -142,6 +200,8 @@ export function FormBuilderWorkspace({
   initialForm,
   mode = 'standalone',
   onSave,
+  initialCtaConfig,
+  onSaveCtaConfig,
 }: FormBuilderWorkspaceProps) {
   const { subscribe } = useRealtime();
   const { tenant, theme, toggleTheme } = useBrand();
@@ -149,9 +209,30 @@ export function FormBuilderWorkspace({
   const [loading, setLoading] = useState(!initialForm && !!formId);
   const [publishing, setPublishing] = useState(false);
 
-  // Layout states
+  // Checar se o formulário já tem vínculo/ID existente
+  const isFormLinked = Boolean(formId || initialForm?.id);
+
+  // Layout & Navigation states
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [workspaceTab, setWorkspaceTab] = useState<'flow' | 'theme'>('flow');
+  const [workspaceTab, setWorkspaceTab] = useState<'flow' | 'destino' | 'theme'>('flow');
+  const [destinationModalOpen, setDestinationModalOpen] = useState(false);
+  const [isDestinationSetupComplete, setIsDestinationSetupComplete] = useState(isFormLinked);
+
+  // Destino & Pós-Triagem states
+  const [ctaType, setCtaType] = useState<'form' | 'whatsapp' | 'external_url'>(
+    initialCtaConfig?.ctaType || (initialForm as any)?.ctaType || 'form'
+  );
+  const [ctaWhatsappMessage, setCtaWhatsappMessage] = useState(
+    initialCtaConfig?.ctaWhatsappMessage || (initialForm as any)?.ctaWhatsappMessage || ''
+  );
+  const [ctaExternalUrl, setCtaExternalUrl] = useState(
+    initialCtaConfig?.ctaExternalUrl || (initialForm as any)?.ctaExternalUrl || ''
+  );
+  const [whatsappMessageTemplate, setWhatsappMessageTemplate] = useState(
+    initialCtaConfig?.whatsappMessageTemplate ||
+      (initialForm as any)?.formFlow?.settings?.whatsappMessageTemplate ||
+      'Olá! Preenchi a triagem inicial pelo seu site e gostaria de agendar minha sessão. Meu nome é {{nome}}.'
+  );
 
   // Staging / Conflict warnings
   const [hasRemoteConflict, setHasRemoteConflict] = useState(false);
@@ -171,16 +252,12 @@ export function FormBuilderWorkspace({
 
   // Buscar variáveis do CRM ao montar
   useEffect(() => {
-    const workspaceId = tenant?.id;
-    if (!workspaceId) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${workspaceId}`, {
-      credentials: 'include'
-    })
-      .then(r => r.json())
-      .then(data => { if (data.fields) setCrmCustomFields(data.fields); })
+    const wsId = tenant?.id || (form as any)?.workspace_id || (form as any)?.workspaceId;
+    if (!wsId) return;
+    api.getCustomFieldDefs(wsId)
+      .then(defs => setCrmCustomFields(defs))
       .catch(() => {});
-  }, [tenant?.id]);
+  }, [tenant?.id, (form as any)?.workspace_id, (form as any)?.workspaceId]);
 
   // Form title and theme draft state
   const [titleDraft, setTitleDraft] = useState(initialForm?.titleDraft || initialForm?.title || '');
@@ -318,7 +395,10 @@ export function FormBuilderWorkspace({
         placeholder: placeholder || (type === 'seletor' ? '' : 'Escreva sua resposta aqui...'),
         isRequired: true,
         type,
-        options: options || (type === 'seletor' ? [
+        options: options || (type === 'maioridade' ? [
+          { label: 'Sim, sou maior de idade', value: 'sim' },
+          { label: 'Não, sou menor de idade', value: 'nao' },
+        ] : type === 'seletor' ? [
           { label: 'Opção 1', value: 'Opção 1' },
           { label: 'Opção 2', value: 'Opção 2' },
         ] : undefined),
@@ -382,10 +462,29 @@ export function FormBuilderWorkspace({
 
   const handleDeleteSelectedNode = () => {
     if (!selectedNodeId) return;
+    const targetNode = nodes.find((n) => n.id === selectedNodeId);
+    if (targetNode?.type === 'start' || (targetNode?.data as any)?.type === 'start') {
+      return;
+    }
     setNodes((nds) => nds.filter((n) => n.id !== selectedNodeId));
     setEdges((eds) => eds.filter((e) => e.source !== selectedNodeId && e.target !== selectedNodeId));
     setSelectedNodeId(null);
   };
+
+  const onNodesDelete = useCallback(
+    (deletedNodes: Node[]) => {
+      const hasStart = deletedNodes.some((n) => n.type === 'start' || (n.data as any)?.type === 'start');
+      if (hasStart) {
+        setNodes((nds) => {
+          const startExists = nds.some((n) => n.type === 'start' || (n.data as any)?.type === 'start');
+          if (startExists) return nds;
+          const originalStart = nodes.find((n) => n.type === 'start' || (n.data as any)?.type === 'start');
+          return originalStart ? [...nds, originalStart] : nds;
+        });
+      }
+    },
+    [nodes, setNodes]
+  );
 
   // Auto-save draft to database (1.5s debounce)
   useEffect(() => {
@@ -610,6 +709,25 @@ export function FormBuilderWorkspace({
               <span>Fluxograma</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => {
+                if (isFormLinked) {
+                  setDestinationModalOpen(true);
+                } else {
+                  setWorkspaceTab('destino');
+                }
+              }}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                workspaceTab === 'destino'
+                  ? 'brand-accent text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Target className="h-3.5 w-3.5" />
+              <span>Destino</span>
+            </button>
+
             {mode === 'standalone' && (
               <button
                 onClick={() => setWorkspaceTab('theme')}
@@ -689,7 +807,76 @@ export function FormBuilderWorkspace({
       </div>
 
       {/* Main Workspace Body */}
-      {workspaceTab === 'flow' ? (
+      {!isDestinationSetupComplete ? (
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-[#09090b] flex items-center justify-center">
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="text-center space-y-1.5 border-b border-slate-200 dark:border-zinc-800 pb-4">
+              <span className="px-3 py-1 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 text-xs font-bold uppercase tracking-wider">
+                Passo 1: Configuração do Destino
+              </span>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Defina para onde o paciente será direcionado
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-zinc-400">
+                Configure a ação do botão principal do site e a mensagem pós-triagem antes de editar o fluxograma.
+              </p>
+            </div>
+
+            <FormDestinationSettings
+              ctaType={ctaType}
+              setCtaType={setCtaType}
+              ctaWhatsappMessage={ctaWhatsappMessage}
+              setCtaWhatsappMessage={setCtaWhatsappMessage}
+              ctaExternalUrl={ctaExternalUrl}
+              setCtaExternalUrl={setCtaExternalUrl}
+              whatsappMessageTemplate={whatsappMessageTemplate}
+              setWhatsappMessageTemplate={setWhatsappMessageTemplate}
+              showConfirmButton={true}
+              confirmButtonText="Confirmar e Abrir Fluxograma"
+              onConfirm={() => {
+                setIsDestinationSetupComplete(true);
+                setWorkspaceTab('flow');
+                if (onSaveCtaConfig) {
+                  onSaveCtaConfig({
+                    ctaType,
+                    ctaWhatsappMessage,
+                    ctaExternalUrl,
+                    whatsappMessageTemplate,
+                  });
+                }
+              }}
+            />
+          </div>
+        </div>
+      ) : workspaceTab === 'destino' ? (
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-[#09090b] flex items-start justify-center">
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900/90 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl space-y-6">
+            <FormDestinationSettings
+              ctaType={ctaType}
+              setCtaType={setCtaType}
+              ctaWhatsappMessage={ctaWhatsappMessage}
+              setCtaWhatsappMessage={setCtaWhatsappMessage}
+              ctaExternalUrl={ctaExternalUrl}
+              setCtaExternalUrl={setCtaExternalUrl}
+              whatsappMessageTemplate={whatsappMessageTemplate}
+              setWhatsappMessageTemplate={setWhatsappMessageTemplate}
+              showConfirmButton={true}
+              confirmButtonText="Salvar Configurações de Destino"
+              onConfirm={() => {
+                if (onSaveCtaConfig) {
+                  onSaveCtaConfig({
+                    ctaType,
+                    ctaWhatsappMessage,
+                    ctaExternalUrl,
+                    whatsappMessageTemplate,
+                  });
+                }
+                setWorkspaceTab('flow');
+              }}
+            />
+          </div>
+        </div>
+      ) : workspaceTab === 'flow' ? (
         <div className="flex-1 flex overflow-hidden relative">
           {/* Left Toolbar: Node Spawner & Selected Node Editor */}
           <div
@@ -824,23 +1011,23 @@ export function FormBuilderWorkspace({
 
                   <button
                     type="button"
-                    disabled={isTemplateAdded('emergencia')}
-                    onClick={() => handleAddNode('emergencia', 'Contato de Emergência')}
+                    disabled={isTemplateAdded('responsavel')}
+                    onClick={() => handleAddNode('responsavel', 'Como se chama o seu responsável legal?', 'Nome do responsável')}
                     className={`p-2.5 rounded-xl text-left transition-all flex items-center gap-2.5 group ${
-                      isTemplateAdded('emergencia')
+                      isTemplateAdded('responsavel')
                         ? 'opacity-40 cursor-not-allowed bg-slate-200/10 dark:bg-zinc-900/10 border border-transparent'
                         : 'glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-[var(--brand-gradient-start)] cursor-pointer'
                     }`}
                   >
                     <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/15 text-[var(--brand-gradient-start)] shrink-0">
-                      <User className="h-4 w-4" />
+                      <UserPlus className="h-4 w-4" />
                     </div>
                     <div>
-                      <span className={`text-xs font-bold block ${!isTemplateAdded('emergencia') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
-                        Contato de Emergência
+                      <span className={`text-xs font-bold block ${!isTemplateAdded('responsavel') ? 'group-hover:text-[var(--brand-gradient-start)]' : ''} text-slate-800 dark:text-slate-200`}>
+                        Dados do Responsável
                       </span>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
-                        {isTemplateAdded('emergencia') ? 'Já adicionado' : 'Coleta nome, parentesco e celular'}
+                        {isTemplateAdded('responsavel') ? 'Já adicionado' : 'Coleta nome e contato do responsável'}
                       </span>
                     </div>
                   </button>
@@ -943,10 +1130,10 @@ export function FormBuilderWorkspace({
                     { key: 'nome', label: 'Nome Completo', required: true },
                     { key: 'celular', label: 'WhatsApp / Celular', required: true },
                     { key: 'maioridade', label: 'Maioridade', required: true },
+                    { key: 'responsavel', label: 'Dados do Responsável', required: false },
                     { key: 'contrato', label: 'TCLE / Consentimento', required: true },
                     { key: 'email', label: 'E-mail', required: false },
                     { key: 'cpf', label: 'CPF', required: false },
-                    { key: 'emergencia', label: 'Contato de Emergência', required: false },
                   ].map(sysField => {
                     const inUse = nodes.some(n => n.type === sysField.key);
                     return (
@@ -992,7 +1179,7 @@ export function FormBuilderWorkspace({
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[var(--brand-gradient-start)]/20 text-[var(--brand-gradient-start)] border border-[var(--brand-gradient-start)]/30">
                       {String(selectedNode.data.type || 'campo')}
                     </span>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">Editar Pergunta</span>
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Detalhes do Bloco</span>
                   </div>
                   <button
                     type="button"
@@ -1003,18 +1190,29 @@ export function FormBuilderWorkspace({
                   </button>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                      Título da Pergunta
-                    </label>
-                    <Input
-                      type="text"
-                      className="brand-input text-xs"
-                      value={String(selectedNode.data?.title || '')}
-                      onChange={(e) => updateSelectedNodeData('title', e.target.value)}
-                    />
+                {selectedNode.type === 'start' || (selectedNode.data as any)?.type === 'start' ? (
+                  <div className="p-3.5 rounded-xl bg-[var(--brand-gradient-start)]/10 border border-[var(--brand-gradient-start)]/20 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-[var(--brand-gradient-start)]">
+                      <Sparkles className="h-4 w-4" />
+                      <span>Bloco Inicial Obrigatório</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-zinc-300 leading-relaxed">
+                      Este nó apenas sinaliza a origem do fluxograma. Ele não coleta informações e não pode ser excluído. O preenchimento pelo paciente iniciará na primeira pergunta conectada a este bloco.
+                    </p>
                   </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                        Título da Pergunta
+                      </label>
+                      <Input
+                        type="text"
+                        className="brand-input text-xs"
+                        value={String(selectedNode.data?.title || '')}
+                        onChange={(e) => updateSelectedNodeData('title', e.target.value)}
+                      />
+                    </div>
 
                   <div className="space-y-1">
                     <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
@@ -1043,55 +1241,94 @@ export function FormBuilderWorkspace({
                     </div>
                   )}
 
-                  {['texto', 'paragrafo', 'seletor'].includes((selectedNode.data as any).type) && (
-                    <div className="space-y-3 pt-2 border-t border-[var(--surface-border)]">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                          Variável do CRM
-                        </label>
-                        {/* Combobox: existentes do CRM + digitar nova */}
-                        <select
-                          className="w-full text-xs bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-slate-200 focus:border-[var(--brand-gradient-start)] outline-none cursor-pointer"
-                          value={String(selectedNode.data?.variableKey || '')}
-                          onChange={(e) => {
-                            const chosen = e.target.value;
-                            updateSelectedNodeData('variableKey', chosen);
-                            const def = crmCustomFields.find(f => f.key === chosen);
-                            if (def) updateSelectedNodeData('variableLabel', def.name);
-                          }}
-                        >
-                          <option value="">— Selecionar ou criar nova —</option>
-                          {crmCustomFields.map(f => (
-                            <option key={f.key} value={f.key}>{f.name} ({f.key})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                          Chave da Variável (se nova)
-                        </label>
+                  {/* Seção Universal de Variáveis do CRM (Exibida em TODAS as etapas) */}
+                  <div className="space-y-3 pt-3 border-t border-[var(--surface-border)] bg-slate-900/50 dark:bg-zinc-900/60 p-3 rounded-xl border border-slate-700/40 dark:border-zinc-800">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-[var(--brand-gradient-start)]" />
+                        Variável de Destino no CRM
+                      </label>
+                      {['nome', 'celular', 'email', 'cpf', 'maioridade', 'responsavel', 'contrato'].includes(selectedNode.type || (selectedNode.data as any)?.type) && (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                          Sistema
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
+                        Vincular a Variável Cadastrada
+                      </label>
+                      <select
+                        className="w-full text-xs bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-slate-200 focus:border-[var(--brand-gradient-start)] outline-none cursor-pointer"
+                        value={String(selectedNode.data?.variableKey || selectedNode.type || (selectedNode.data as any)?.type || '')}
+                        onChange={(e) => {
+                          const chosen = e.target.value;
+                          updateSelectedNodeData('variableKey', chosen);
+                          const def = crmCustomFields.find(f => f.key === chosen);
+                          if (def) updateSelectedNodeData('variableLabel', def.name);
+                        }}
+                      >
+                        <option value={String(selectedNode.type || (selectedNode.data as any)?.type || '')}>
+                          — {String(selectedNode.type || (selectedNode.data as any)?.type)} (padrão desta etapa) —
+                        </option>
+                        {crmCustomFields.map(f => (
+                          <option key={f.key} value={f.key}>{f.name} ({f.key})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
+                        Chave da Variável no Banco (`variableKey`)
+                      </label>
+                      <Input
+                        type="text"
+                        className="brand-input text-xs font-mono"
+                        placeholder="ex: queixa_principal"
+                        value={String(selectedNode.data?.variableKey || selectedNode.type || (selectedNode.data as any)?.type || '')}
+                        onChange={(e) => updateSelectedNodeData('variableKey', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
+                        Rótulo de Exibição no CRM
+                      </label>
+                      <div className="flex gap-2">
                         <Input
                           type="text"
-                          className="brand-input text-xs font-mono"
-                          placeholder="ex: queixa_principal"
-                          value={String(selectedNode.data?.variableKey || '')}
-                          onChange={(e) => updateSelectedNodeData('variableKey', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
-                          Rótulo no CRM
-                        </label>
-                        <Input
-                          type="text"
-                          className="brand-input text-xs"
+                          className="brand-input text-xs flex-1"
                           placeholder="ex: Queixa Principal"
-                          value={String(selectedNode.data?.variableLabel || '')}
+                          value={String(selectedNode.data?.variableLabel || selectedNode.data?.title || '')}
                           onChange={(e) => updateSelectedNodeData('variableLabel', e.target.value)}
                         />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const key = String(selectedNode.data?.variableKey || selectedNode.type || (selectedNode.data as any)?.type || '').trim();
+                            const name = String(selectedNode.data?.variableLabel || selectedNode.data?.title || '').trim() || key;
+                            const wsId = tenant?.id || (form as any)?.workspace_id || (form as any)?.workspaceId;
+                            if (!key || !wsId) return;
+                            try {
+                              const created = await api.createCustomFieldDef(wsId, { key, name });
+                              setCrmCustomFields(prev => {
+                                if (prev.some(f => f.key === created.key)) return prev;
+                                return [...prev, created];
+                              });
+                              updateSelectedNodeData('variableKey', created.key);
+                              updateSelectedNodeData('variableLabel', created.name);
+                            } catch (err) {
+                              console.error('Erro ao salvar variável no CRM:', err);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[10px] bg-[var(--brand-gradient-start)] text-white font-bold rounded-lg hover:opacity-90 transition-all shrink-0 cursor-pointer border-none"
+                        >
+                          Salvar no CRM
+                        </button>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {selectedNode.data.type === 'seletor' && (
                     <div className="space-y-2 pt-2 border-t border-[var(--surface-border)]">
@@ -1141,16 +1378,23 @@ export function FormBuilderWorkspace({
                   </div>
 
                   <div className="pt-2">
-                    <Button
-                      type="button"
-                      onClick={handleDeleteSelectedNode}
-                      className="w-full h-8 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Excluir Bloco
-                    </Button>
+                    {selectedNode.type === 'start' || (selectedNode.data as any)?.type === 'start' ? (
+                      <div className="w-full h-8 text-[11px] bg-slate-500/10 text-slate-400 border border-slate-500/20 font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
+                        Nó de início (obrigatório)
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleDeleteSelectedNode}
+                        className="w-full h-8 text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir Bloco
+                      </Button>
+                    )}
                   </div>
                 </div>
+                )}
               </div>
             ) : (
               <div className="border-t border-[var(--surface-border)] pt-4 text-center space-y-2">
@@ -1168,11 +1412,13 @@ export function FormBuilderWorkspace({
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
+              onNodesDelete={onNodesDelete}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNodeId(node.id)}
               fitView
+              colorMode={theme === 'dark' ? 'dark' : 'light'}
               className={theme === 'dark' ? 'bg-[#09090b]' : 'bg-[#f8fafc]'}
             >
               <Controls />
@@ -1299,7 +1545,7 @@ export function FormBuilderWorkspace({
               <div className="rounded-2xl border border-[var(--surface-border)] p-6 bg-slate-900 text-white shadow-2xl space-y-6 relative overflow-hidden">
                 <div className="space-y-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-slate-300">
-                    Pergunta 1 de {nodes.length || 3}
+                    Pergunta 1 de {nodes.filter(n => n.type !== 'start').length || 3}
                   </span>
                   <h2
                     className="text-xl font-bold leading-snug"
@@ -1374,6 +1620,42 @@ export function FormBuilderWorkspace({
             </div>
           </div>
         </div>
+      )}
+      {destinationModalOpen && (
+        <BrandModal
+          isOpen={destinationModalOpen}
+          onClose={() => setDestinationModalOpen(false)}
+          maxWidth="max-w-3xl"
+        >
+          <div className="p-6 max-h-[85vh] overflow-y-auto custom-scrollbar space-y-4">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-zinc-800 pb-3">
+              Configurações de Destino do CTA
+            </h3>
+            <FormDestinationSettings
+              ctaType={ctaType}
+              setCtaType={setCtaType}
+              ctaWhatsappMessage={ctaWhatsappMessage}
+              setCtaWhatsappMessage={setCtaWhatsappMessage}
+              ctaExternalUrl={ctaExternalUrl}
+              setCtaExternalUrl={setCtaExternalUrl}
+              whatsappMessageTemplate={whatsappMessageTemplate}
+              setWhatsappMessageTemplate={setWhatsappMessageTemplate}
+              showConfirmButton={true}
+              confirmButtonText="Salvar Destino"
+              onConfirm={() => {
+                setDestinationModalOpen(false);
+                if (onSaveCtaConfig) {
+                  onSaveCtaConfig({
+                    ctaType,
+                    ctaWhatsappMessage,
+                    ctaExternalUrl,
+                    whatsappMessageTemplate,
+                  });
+                }
+              }}
+            />
+          </div>
+        </BrandModal>
       )}
     </div>
   );

@@ -345,12 +345,8 @@ export default function CrmPage() {
   // Buscar campos personalizados do formulário
   useEffect(() => {
     if (!tenantId) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    fetch(`${apiUrl}/crm/forms/custom-fields?workspaceId=${tenantId}`, {
-      credentials: 'include'
-    })
-      .then(r => r.json())
-      .then(data => { if (data.fields) setCustomFieldDefs(data.fields); })
+    api.getCustomFieldDefs(tenantId)
+      .then(defs => setCustomFieldDefs(defs))
       .catch(() => {});
   }, [tenantId]);
 

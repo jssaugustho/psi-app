@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useCrmStore } from '@/stores/crmStore';
 import { Contact, PipelineColumn } from '@/lib/api';
 import { 
@@ -48,6 +48,26 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId, custom
 
   // Campos personalizados — estado local do JSONB
   const [customFields, setCustomFields] = useState<Record<string, any>>(contact.custom_field_values || {});
+
+  // Mesclar definições de campos com variáveis ad-hoc presentes no lead
+  const allFieldDefs = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; type: string; options?: string[] | null }>();
+    (customFieldDefs || []).forEach((def) => {
+      map.set(def.key, def);
+    });
+
+    Object.keys(customFields || {}).forEach((key) => {
+      if (!map.has(key)) {
+        const humanName = key
+          .replace(/_/g, ' ')
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        map.set(key, { key, name: humanName, type: 'text' });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [customFieldDefs, customFields]);
 
   // Estados de salvamento
   const [saving, setSaving] = useState(false);
@@ -389,18 +409,18 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId, custom
         </div>
 
         {/* Dados da Triagem — Campos Personalizados do Formulário */}
-        {customFieldDefs.length > 0 && (
+        {allFieldDefs.length > 0 && (
           <>
             <div className="px-4 py-2 bg-white/[0.02] border-t border-[var(--surface-border)]">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Layers className="w-3 h-3" /> Dados da Triagem
+                <Layers className="w-3 h-3 text-[var(--brand-gradient-start)]" /> Dados da Triagem & Variáveis
               </span>
             </div>
-            {customFieldDefs.map((fieldDef) => {
+            {allFieldDefs.map((fieldDef) => {
               const val = customFields[fieldDef.key];
               return (
                 <div key={fieldDef.key} className="grid grid-cols-3 items-center min-h-[44px]">
-                  <div className="pl-4 text-slate-400 text-xs truncate pr-2">
+                  <div className="pl-4 text-slate-400 text-xs truncate pr-2" title={fieldDef.name}>
                     {fieldDef.name}
                   </div>
                   <div className="col-span-2 pr-4">
@@ -438,7 +458,7 @@ export function ContactFieldsPanel({ contact, columns, sources, tenantId, custom
                     ) : (
                       <input
                         type="text"
-                        value={val || ''}
+                        value={val !== undefined && val !== null ? (typeof val === 'object' ? JSON.stringify(val) : String(val)) : ''}
                         onChange={(e) => {
                           const updated = { ...customFields, [fieldDef.key]: e.target.value };
                           setCustomFields(updated);

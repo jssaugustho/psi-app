@@ -7,6 +7,7 @@ import { eq, and, count } from 'drizzle-orm';
 import { verifyUserJwt, extractJwtFromRequest } from '../../../shared/auth';
 import { publishRealtime, log } from '../../../shared/queue';
 import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
+import { autoRegisterCustomFields } from './crm';
 
 const defaultFormFlow = {
   nodes: [
@@ -27,6 +28,7 @@ const defaultFormFlow = {
       position: { x: 460, y: 150 },
       data: {
         title: "Qual é o seu nome completo?",
+        subtitle: "Como gostaria de ser chamado(a) pelo seu terapeuta.",
         placeholder: "Escreva seu nome completo...",
         isRequired: true,
         buttonText: "Avançar"
@@ -48,25 +50,25 @@ const defaultFormFlow = {
       }
     },
     {
-      id: "celular",
-      type: "celular",
-      position: { x: 1220, y: 150 },
+      id: "responsavel",
+      type: "responsavel",
+      position: { x: 1220, y: 320 },
       data: {
-        title: "Qual é o seu WhatsApp para contato?",
-        subtitle: "Usaremos para confirmar o horário e enviar o link da sessão.",
-        placeholder: "(11) 99999-9999",
+        title: "Dados do Responsável Legal",
+        subtitle: "Por você ser menor de idade, informe o nome, grau de parentesco e telefone de contato do seu responsável.",
         isRequired: true,
         buttonText: "Avançar"
       }
     },
     {
-      id: "emergencia",
-      type: "emergencia",
+      id: "celular",
+      type: "celular",
       position: { x: 1600, y: 150 },
       data: {
-        title: "Contato de Emergência",
-        subtitle: "Informe nome, telefone e parentesco de uma pessoa de confiança para suporte em caso de necessidade.",
-        isRequired: false,
+        title: "Qual é o seu WhatsApp para contato?",
+        subtitle: "Usaremos para confirmar o horário e enviar o link da sessão.",
+        placeholder: "(11) 99999-9999",
+        isRequired: true,
         buttonText: "Avançar"
       }
     },
@@ -87,8 +89,9 @@ const defaultFormFlow = {
     { id: "e-start-nome", source: "start", target: "nome" },
     { id: "e-nome-maioridade", source: "nome", target: "maioridade" },
     { id: "e-maioridade-celular", source: "maioridade", target: "celular", sourceHandle: "source-maior" },
-    { id: "e-celular-emergencia", source: "celular", target: "emergencia" },
-    { id: "e-emergencia-contrato", source: "emergencia", target: "contrato" }
+    { id: "e-maioridade-responsavel", source: "maioridade", target: "responsavel", sourceHandle: "source-menor" },
+    { id: "e-responsavel-celular", source: "responsavel", target: "celular" },
+    { id: "e-celular-contrato", source: "celular", target: "contrato" }
   ],
   settings: {
     successAction: "whatsapp" as const,
@@ -326,7 +329,7 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
         }
 
         for (const [key, val] of Object.entries(responses)) {
-          if (['nome', 'celular', 'email', 'cpf', 'maioridade', 'emergencia', 'contrato', 'responsavelNome', 'responsavelCpf', 'responsavelTelefone'].includes(key)) {
+          if (['nome', 'celular', 'email', 'cpf', 'maioridade', 'emergencia', 'contrato', 'responsavelNome', 'responsavelRelacao', 'responsavelParentesco', 'responsavelCpf', 'responsavelTelefone'].includes(key)) {
             continue;
           }
           const node = flowNodes.find((n: any) => n.id === key);
@@ -339,8 +342,13 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
 
         // Responsável Legal
         const parentName = responses.responsavelNome || null;
+        const parentRelation = responses.responsavelRelacao || responses.responsavelParentesco || null;
         const parentCpf = responses.responsavelCpf || null;
         const parentPhone = responses.responsavelTelefone || null;
+
+        if (parentRelation) {
+          customFieldValues.responsavel_parentesco = parentRelation;
+        }
 
         const cleanParentCpf = parentCpf ? parentCpf.replace(/\D/g, '') : null;
         const cleanParentPhone = parentPhone ? ('+' + parentPhone.replace(/\D/g, '')) : null;
@@ -403,6 +411,8 @@ export async function formsRoutes(fastifyApp: FastifyInstance) {
             utmContent: utmContent || null,
           })
           .returning();
+
+        await autoRegisterCustomFields(targetWorkspaceId, customFieldValues);
 
         await db.insert(interactionHistory).values({
           contactId: newContact.id,

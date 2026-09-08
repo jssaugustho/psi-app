@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import {
   X, ArrowLeft, ArrowRight, Check, Sparkles, Smartphone, Monitor, RotateCcw,
-  CheckCircle2, ShieldCheck, User, Phone, Mail, FileText, AlertCircle, Sun, Moon
+  CheckCircle2, ShieldCheck, User, Phone, Mail, FileText, AlertCircle, Sun, Moon, Info
 } from 'lucide-react';
 
 interface CountryConfig {
@@ -21,6 +21,19 @@ const countriesList: CountryConfig[] = [
   { code: "US", flag: "🇺🇸", name: "Estados Unidos", dialCode: "+1", mask: "(999) 999-9999", placeholder: "(555) 000-0000" },
   { code: "ES", flag: "🇪🇸", name: "Espanha", dialCode: "+34", mask: "999 999 999", placeholder: "612 345 678" },
   { code: "GB", flag: "🇬🇧", name: "Reino Unido", dialCode: "+44", mask: "9999 999999", placeholder: "7700 900077" },
+];
+
+export const KINSHIP_OPTIONS = [
+  'Mãe',
+  'Pai',
+  'Tutor(a) / Guardião(ã) Legal',
+  'Avô / Avó',
+  'Tio / Tia',
+  'Irmão / Irmã',
+  'Cônjuge / Companheiro(a)',
+  'Filho / Filha',
+  'Amigo(a) / Próximo(a)',
+  'Outro',
 ];
 
 export interface TypeformPreviewModalProps {
@@ -75,7 +88,7 @@ export function TypeformPreviewModal({
 
   const [deviceMode, setDeviceMode] = useState<'desktop' | 'mobile'>('desktop');
   const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
-  const [currentNodeId, setCurrentNodeId] = useState<string>('start');
+  const [currentNodeId, setCurrentNodeId] = useState<string>('');
   const [history, setHistory] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -90,6 +103,7 @@ export function TypeformPreviewModal({
   const [maioridade, setMaioridade] = useState('');
   const [isUnderageResponsible, setIsUnderageResponsible] = useState(false);
   const [responsibleName, setResponsibleName] = useState('');
+  const [responsibleRelation, setResponsibleRelation] = useState('');
   const [responsiblePhone, setResponsiblePhone] = useState('');
   const [emergencyName, setEmergencyName] = useState('');
   const [emergencyKinship, setEmergencyKinship] = useState('');
@@ -97,16 +111,22 @@ export function TypeformPreviewModal({
   const [contractAccepted, setContractAccepted] = useState(false);
   const [customAnswers, setCustomAnswers] = useState<Record<string, any>>({});
 
-  // Reset simulator when opening
-  useEffect(() => {
-    if (open) {
-      handleReset();
+  const getFirstStepNodeId = (nodesList: any[], edgesList: any[]): string => {
+    const startNode = nodesList.find((n: any) => n.type === 'start');
+    if (startNode) {
+      const firstEdge = edgesList.find((e: any) => e.source === startNode.id);
+      if (firstEdge && firstEdge.target) {
+        const targetNode = nodesList.find((n: any) => n.id === firstEdge.target && n.type !== 'start');
+        if (targetNode) return targetNode.id;
+      }
     }
-  }, [open]);
+    const firstNonStart = nodesList.find((n: any) => n.type !== 'start');
+    return firstNonStart ? firstNonStart.id : (nodesList[0]?.id || '');
+  };
 
   const handleReset = () => {
-    const startNode = nodes.find((n: any) => n.type === 'start');
-    setCurrentNodeId(startNode ? startNode.id : (nodes[0]?.id || 'start'));
+    const initialId = getFirstStepNodeId(nodes, edges);
+    setCurrentNodeId(initialId);
     setHistory([]);
     setIsSubmitted(false);
     setErrorMsg('');
@@ -117,6 +137,7 @@ export function TypeformPreviewModal({
     setMaioridade('');
     setIsUnderageResponsible(false);
     setResponsibleName('');
+    setResponsibleRelation('');
     setResponsiblePhone('');
     setEmergencyName('');
     setEmergencyKinship('');
@@ -125,9 +146,20 @@ export function TypeformPreviewModal({
     setCustomAnswers({});
   };
 
+  useEffect(() => {
+    if (open) {
+      handleReset();
+    }
+  }, [open]);
+
   if (!open) return null;
 
-  const currentNode = nodes.find((n: any) => n.id === currentNodeId);
+  const totalStepNodes = nodes.filter((n: any) => n.type !== 'start');
+  let currentNode = nodes.find((n: any) => n.id === currentNodeId && n.type !== 'start');
+  if (!currentNode) {
+    const firstId = getFirstStepNodeId(nodes, edges);
+    currentNode = nodes.find((n: any) => n.id === firstId && n.type !== 'start') || totalStepNodes[0] || nodes[0];
+  }
 
   // Phone formatting
   const handlePhoneChange = (val: string) => {
@@ -158,11 +190,23 @@ export function TypeformPreviewModal({
     setErrorMsg('');
   };
 
-  // Branching node resolution
+  // Branching node resolution with fallback
   const resolveNextNodeId = (): string | null => {
     if (!currentNode) return null;
 
-    // 1. Selector branching by option handle
+    // 1. Maioridade branching: 'source-maior' vs 'source-menor'
+    if (currentNode.type === 'maioridade') {
+      const isMaior = maioridade === 'Sim' || maioridade === 'sim' || maioridade === 'true';
+      const targetHandles = isMaior
+        ? ['source-maior', 'source-sim', 'opt_0', 'option-0']
+        : ['source-menor', 'source-nao', 'opt_1', 'option-1'];
+      const matchingEdge = edges.find((e: any) => e.source === currentNode.id && targetHandles.includes(e.sourceHandle || ''));
+      if (matchingEdge && nodes.some((n: any) => n.id === matchingEdge.target)) {
+        return matchingEdge.target;
+      }
+    }
+
+    // 2. Selector branching by option handle (legacy edges)
     if (currentNode.type === 'seletor' || currentNode.type === 'escolha' || currentNode.type === 'escolha_multipla') {
       const selectedValue = customAnswers[currentNode.id];
       const options = currentNode.data?.options || [];
@@ -172,27 +216,29 @@ export function TypeformPreviewModal({
         const handle1 = `opt_${optionIndex}`;
         const handle2 = `option-${optionIndex}`;
         const matchingEdge = edges.find((e: any) => e.source === currentNode.id && (e.sourceHandle === handle1 || e.sourceHandle === handle2));
-        if (matchingEdge) {
+        if (matchingEdge && nodes.some((n: any) => n.id === matchingEdge.target)) {
           return matchingEdge.target;
         }
       }
     }
 
-    // 2. Maioridade branching: 'source-maior' vs 'source-menor'
-    if (currentNode.type === 'maioridade') {
-      const isMaior = maioridade === 'Sim' || maioridade === 'sim' || maioridade === 'true';
-      const targetHandles = isMaior
-        ? ['source-maior', 'source-sim', 'opt_0', 'option-0']
-        : ['source-menor', 'source-nao', 'opt_1', 'option-1'];
-      const matchingEdge = edges.find((e: any) => e.source === currentNode.id && targetHandles.includes(e.sourceHandle || ''));
-      if (matchingEdge) {
-        return matchingEdge.target;
+    // 3. Fallback to any outgoing edge originating from currentNode.id
+    const outgoingEdge = edges.find((e: any) => e.source === currentNode.id);
+    if (outgoingEdge && nodes.some((n: any) => n.id === outgoingEdge.target)) {
+      return outgoingEdge.target;
+    }
+
+    // 4. Ultimate Fallback: next node in array order (skipping 'start' node)
+    const currentIndex = nodes.findIndex((n: any) => n.id === currentNode.id);
+    if (currentIndex !== -1) {
+      for (let i = currentIndex + 1; i < nodes.length; i++) {
+        if (nodes[i].type !== 'start') {
+          return nodes[i].id;
+        }
       }
     }
 
-    // 3. Default edge connection
-    const outgoingEdge = edges.find((e: any) => e.source === currentNode.id);
-    return outgoingEdge ? outgoingEdge.target : null;
+    return null;
   };
 
   // Step Validation
@@ -212,7 +258,7 @@ export function TypeformPreviewModal({
       }
     }
 
-    if (currentNode.type === 'celular' || currentNode.type === 'contato') {
+    if (currentNode.type === 'celular' || currentNode.type === 'celular_custom' || currentNode.type === 'contato') {
       const clean = rawPhone.replace(/\D/g, '');
       if (isRequired && clean.length < 9) {
         setErrorMsg('Informe um número de WhatsApp válido.');
@@ -240,21 +286,18 @@ export function TypeformPreviewModal({
         setErrorMsg('Selecione se você é maior ou menor de idade.');
         return false;
       }
-      if (maioridade === 'Não' && isUnderageResponsible) {
-        if (!responsibleName.trim()) {
-          setErrorMsg('Informe o nome do responsável legal.');
-          return false;
-        }
-        if (!responsiblePhone.trim() || responsiblePhone.replace(/\D/g, '').length < 8) {
-          setErrorMsg('Informe o WhatsApp do responsável legal.');
-          return false;
-        }
+    }
+
+    if (currentNode.type === 'responsavel' || currentNode.type === 'responsavel_legal') {
+      if (isRequired && (!responsibleName.trim() || !responsibleRelation.trim() || responsiblePhone.replace(/\D/g, '').length < 8)) {
+        setErrorMsg('Informe o nome, grau de parentesco e telefone do responsável legal.');
+        return false;
       }
     }
 
     if (currentNode.type === 'emergencia') {
       if (isRequired) {
-        if (!emergencyName.trim() || !emergencyKinship.trim() || !emergencyPhone.trim()) {
+        if (!emergencyName.trim() || !emergencyKinship.trim() || emergencyPhone.replace(/\D/g, '').length < 8) {
           setErrorMsg('Preencha todos os campos do contato de emergência.');
           return false;
         }
@@ -314,7 +357,7 @@ export function TypeformPreviewModal({
   const contrast = brandColors?.contrast || '#ffffff';
   const isLight = previewTheme === 'light';
 
-  const progressPercent = Math.min(100, Math.round(((history.length + 1) / Math.max(nodes.length, 1)) * 100));
+  const progressPercent = Math.min(100, Math.round(((history.length + 1) / Math.max(totalStepNodes.length, 1)) * 100));
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -455,7 +498,7 @@ export function TypeformPreviewModal({
                 <span className={isLight ? 'text-slate-600' : 'text-zinc-400'}>Triagem Clínica</span>
               </div>
               <span className={`text-[10px] font-semibold ${isLight ? 'text-slate-400' : 'text-zinc-500'}`}>
-                {history.length + 1} de {Math.max(nodes.length, 1)}
+                {history.length + 1} de {Math.max(totalStepNodes.length, 1)}
               </span>
             </div>
 
@@ -518,26 +561,6 @@ export function TypeformPreviewModal({
 
                   {/* Dynamic Inputs by Type */}
                   <div className="pt-2">
-                    {/* START NODE */}
-                    {currentNode.type === 'start' && (
-                      <div className="text-center py-6 space-y-5">
-                        <p className={`text-xs max-w-md mx-auto leading-relaxed ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                          {currentNode.data?.subtitle || 'Preencha os dados e siga as etapas para iniciarmos o acompanhamento.'}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleNext}
-                          className="px-6 py-3 rounded-xl font-bold text-xs flex items-center gap-2 mx-auto shadow-lg transition-all cursor-pointer hover:opacity-95 active:scale-[0.98]"
-                          style={{
-                            background: `linear-gradient(135deg, ${primaryStart}, ${primaryEnd})`,
-                            color: contrast,
-                          }}
-                        >
-                          {currentNode.data?.buttonText || 'Iniciar'}
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
 
                     {/* TEXT / NOME */}
                     {(currentNode.type === 'nome' || currentNode.type === 'texto') && (
@@ -579,7 +602,7 @@ export function TypeformPreviewModal({
                     )}
 
                     {/* CELULAR / WHATSAPP */}
-                    {(currentNode.type === 'celular' || currentNode.type === 'contato') && (
+                    {(currentNode.type === 'celular' || currentNode.type === 'celular_custom' || currentNode.type === 'contato') && (
                       <div className="flex gap-2 items-center">
                         <select
                           value={selectedPhoneCountry.code}
@@ -611,6 +634,21 @@ export function TypeformPreviewModal({
                               : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
                           }`}
                         />
+                      </div>
+                    )}
+
+                    {/* AVISO / MENSAGEM */}
+                    {(currentNode.type === 'aviso' || currentNode.type === 'mensagem') && (
+                      <div className={`p-4 rounded-2xl border text-left space-y-2 ${
+                        isLight ? 'bg-blue-50/60 border-blue-200/80 text-blue-900' : 'bg-blue-950/30 border-blue-800/50 text-blue-200'
+                      }`}>
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                          <Info className="w-4 h-4 shrink-0 text-blue-500" />
+                          <span>Informação Importante</span>
+                        </div>
+                        <p className="text-xs opacity-90 leading-relaxed font-sans">
+                          {currentNode.data?.subtitle || 'Leia atentamente as orientações antes de prosseguir.'}
+                        </p>
                       </div>
                     )}
 
@@ -674,7 +712,6 @@ export function TypeformPreviewModal({
                             type="button"
                             onClick={() => {
                               setMaioridade('Não');
-                              setIsUnderageResponsible(true);
                               setErrorMsg('');
                             }}
                             className={`p-3.5 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer ${
@@ -688,67 +725,115 @@ export function TypeformPreviewModal({
                             Não (Menor de idade)
                           </button>
                         </div>
+                      </div>
+                    )}
 
-                        {maioridade === 'Não' && (
-                          <div className={`p-4 rounded-xl border space-y-3 mt-3 animate-in fade-in duration-200 ${
-                            isLight ? 'bg-amber-50/50 border-amber-200' : 'bg-amber-500/5 border-amber-500/30'
-                          }`}>
-                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
-                              Dados do Responsável Legal
-                            </span>
-                            <input
-                              type="text"
-                              value={responsibleName}
-                              onChange={(e) => { setResponsibleName(e.target.value); setErrorMsg(''); }}
-                              placeholder="Nome do Responsável"
-                              className={`w-full text-xs p-2.5 rounded-lg border outline-none ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
-                              }`}
-                            />
-                            <input
-                              type="tel"
-                              value={responsiblePhone}
-                              onChange={(e) => { setResponsiblePhone(e.target.value); setErrorMsg(''); }}
-                              placeholder="WhatsApp do Responsável"
-                              className={`w-full text-xs p-2.5 rounded-lg border outline-none ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
-                              }`}
-                            />
-                          </div>
-                        )}
+                    {/* RESPONSAVEL LEGAL */}
+                    {(currentNode.type === 'responsavel' || currentNode.type === 'responsavel_legal') && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                            Nome do Responsável Legal:
+                          </label>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={responsibleName}
+                            onChange={(e) => { setResponsibleName(e.target.value); setErrorMsg(''); }}
+                            placeholder="Ex: Carlos Silva"
+                            className={`w-full text-base p-3.5 rounded-xl border outline-none transition-all ${
+                              isLight
+                                ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)]'
+                                : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)]'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                            Grau de Parentesco / Relação:
+                          </label>
+                          <select
+                            value={responsibleRelation}
+                            onChange={(e) => { setResponsibleRelation(e.target.value); setErrorMsg(''); }}
+                            className={`w-full text-base p-3.5 rounded-xl border outline-none transition-all cursor-pointer ${
+                              isLight
+                                ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-[var(--brand-gradient-start)]'
+                                : 'bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-[var(--brand-gradient-start)]'
+                            }`}
+                          >
+                            <option value="">Selecione o grau de parentesco...</option>
+                            {KINSHIP_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                            WhatsApp / Celular do Responsável:
+                          </label>
+                          <input
+                            type="tel"
+                            value={responsiblePhone}
+                            onChange={(e) => { setResponsiblePhone(e.target.value); setErrorMsg(''); }}
+                            placeholder="(11) 99999-9999"
+                            className={`w-full text-base p-3.5 rounded-xl border outline-none transition-all ${
+                              isLight
+                                ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)]'
+                                : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)]'
+                            }`}
+                          />
+                        </div>
                       </div>
                     )}
 
                     {/* CONTATO DE EMERGENCIA */}
                     {currentNode.type === 'emergencia' && (
                       <div className="space-y-3">
-                        <input
-                          type="text"
-                          value={emergencyName}
-                          onChange={(e) => { setEmergencyName(e.target.value); setErrorMsg(''); }}
-                          placeholder="Nome do contato de emergência"
-                          className={`w-full text-xs p-3 rounded-xl border outline-none ${
-                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
-                          }`}
-                        />
-                        <input
-                          type="text"
-                          value={emergencyKinship}
-                          onChange={(e) => { setEmergencyKinship(e.target.value); setErrorMsg(''); }}
-                          placeholder="Grau de parentesco (Ex: Mãe, Irmão, Cônjuge)"
-                          className={`w-full text-xs p-3 rounded-xl border outline-none ${
-                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
-                          }`}
-                        />
-                        <input
-                          type="tel"
-                          value={emergencyPhone}
-                          onChange={(e) => { setEmergencyPhone(e.target.value); setErrorMsg(''); }}
-                          placeholder="Telefone / WhatsApp de emergência"
-                          className={`w-full text-xs p-3 rounded-xl border outline-none ${
-                            isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
-                          }`}
-                        />
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                            Nome do Contato de Emergência:
+                          </label>
+                          <input
+                            type="text"
+                            value={emergencyName}
+                            onChange={(e) => { setEmergencyName(e.target.value); setErrorMsg(''); }}
+                            placeholder="Ex: Maria Silva"
+                            className={`w-full text-sm p-3 rounded-xl border outline-none ${
+                              isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                            Grau de Parentesco / Relação:
+                          </label>
+                          <select
+                            value={emergencyKinship}
+                            onChange={(e) => { setEmergencyKinship(e.target.value); setErrorMsg(''); }}
+                            className={`w-full text-sm p-3 rounded-xl border outline-none cursor-pointer ${
+                              isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+                            }`}
+                          >
+                            <option value="">Selecione o grau de parentesco...</option>
+                            {KINSHIP_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
+                            Telefone Celular de Emergência:
+                          </label>
+                          <input
+                            type="tel"
+                            value={emergencyPhone}
+                            onChange={(e) => { setEmergencyPhone(e.target.value); setErrorMsg(''); }}
+                            placeholder="(11) 99999-9999"
+                            className={`w-full text-sm p-3 rounded-xl border outline-none ${
+                              isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+                            }`}
+                          />
+                        </div>
                       </div>
                     )}
 

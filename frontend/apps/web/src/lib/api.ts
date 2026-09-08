@@ -1,4 +1,5 @@
 import { compressImage, type UploadType } from '@psi/image-utils';
+import { getDefaultFormFlow } from './defaultFormTemplate';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -932,6 +933,44 @@ export const api = {
     });
   },
 
+  // --- CRM: Custom Field Definitions ---
+  getCustomFieldDefs: async (workspaceId: string): Promise<Array<{ id: string; workspace_id: string; key: string; name: string; type: string; options?: string[] | null }>> => {
+    if (!workspaceId) return [];
+    try {
+      const res = await fetchApi<{ success: boolean; customFields: any[] }>(`/v1/crm/custom-fields?workspace_id=${workspaceId}`);
+      return (res.customFields || []).map((f: any) => ({
+        ...f,
+        workspace_id: f.workspace_id || f.workspaceId || workspaceId,
+      }));
+    } catch {
+      const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/custom_field_definitions?workspace_id=eq.${workspaceId}`).catch(() => []);
+      return (res || []).map((f: any) => ({
+        ...f,
+        workspace_id: f.workspace_id || f.workspaceId || workspaceId,
+      }));
+    }
+  },
+
+  createCustomFieldDef: async (workspaceId: string, data: { key: string; name: string; type?: string; options?: string[] }): Promise<{ id: string; key: string; name: string; type: string }> => {
+    const res = await fetchApi<{ success: boolean; customField: any }>(`/v1/crm/custom-fields`, {
+      method: 'POST',
+      body: JSON.stringify({ workspace_id: workspaceId, ...data }),
+    });
+    return res.customField;
+  },
+
+  deleteCustomFieldDef: async (id: string, workspaceId: string): Promise<void> => {
+    try {
+      await fetchApi(`/v1/crm/custom-fields/${id}?workspace_id=${workspaceId}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      await fetchApi(`${PGRST_BASE_URL}/custom_field_definitions?id=eq.${id}&workspace_id=eq.${workspaceId}`, {
+        method: 'DELETE',
+      });
+    }
+  },
+
   // --- CRM: Contacts ---
   getContacts: async (tenantId: string): Promise<Contact[]> => {
     return fetchApi<Contact[]>(`${PGRST_BASE_URL}/contacts?workspace_id=eq.${tenantId}&order=created_at.desc`);
@@ -1348,7 +1387,7 @@ export const api = {
         slug,
         is_active: true,
         theme_config: body.themeConfig || {},
-        form_flow: body.formFlow || {},
+        form_flow: (body.formFlow && Object.keys(body.formFlow).length > 0) ? body.formFlow : getDefaultFormFlow(),
       }),
       headers: { 'Prefer': 'return=representation' }
     });

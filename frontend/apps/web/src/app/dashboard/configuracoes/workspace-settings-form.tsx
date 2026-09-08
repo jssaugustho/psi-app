@@ -908,23 +908,110 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
 
       {/* Conteúdo Aba Mídias */}
       {activeTab === 'midias' && (
-        <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-violet-400" />
-              Biblioteca de Fotos & Logotipos
-            </h3>
-            <Button
-              type="button"
-              onClick={() => {
-                setMediaTarget(null);
-                setMediaModalOpen(true);
-              }}
-              className="bg-violet-600 hover:bg-violet-500 text-xs"
-            >
-              Abrir Gerenciador de Arquivos
-            </Button>
+        <Card className="p-6 bg-white dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800/80 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-zinc-800 pb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-violet-400" />
+                Biblioteca de Fotos & Logotipos
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                Visualize, envie e gerencie todas as imagens salvas para este consultório.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  setMediaTarget(null);
+                  setMediaModalOpen(true);
+                }}
+                className="bg-violet-600 hover:bg-violet-500 text-xs flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Enviar / Cortar Imagem</span>
+              </Button>
+            </div>
           </div>
+
+          {loadingTabMedia ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-3">
+              <RefreshCw className="w-6 h-6 animate-spin text-violet-500" />
+              <p className="text-xs">Carregando imagens da biblioteca...</p>
+            </div>
+          ) : tabMediaAssets.length === 0 ? (
+            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 bg-slate-50/50 dark:bg-black/10 space-y-3">
+              <ImageIcon className="w-10 h-10 mx-auto text-slate-400 dark:text-zinc-600" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Nenhuma imagem na biblioteca</h4>
+                <p className="text-xs text-slate-500 dark:text-zinc-500 max-w-sm mx-auto">
+                  Envie fotos de perfil, logotipos e ilustrações para utilizar nos seus sites e materiais clínicos.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => {
+                  setMediaTarget(null);
+                  setMediaModalOpen(true);
+                }}
+                className="bg-violet-600 hover:bg-violet-500 text-xs"
+              >
+                Enviar Primeira Imagem
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {tabMediaAssets.map((asset) => (
+                <div
+                  key={asset.id}
+                  className="group relative rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/80 overflow-hidden shadow-xs hover:border-violet-500/50 transition-all flex flex-col justify-between"
+                >
+                  <div className="aspect-square w-full relative bg-slate-100 dark:bg-zinc-950 flex items-center justify-center overflow-hidden p-2">
+                    <img
+                      src={asset.url}
+                      alt={asset.name}
+                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-200"
+                    />
+                  </div>
+                  <div className="p-2.5 bg-white dark:bg-zinc-900 border-t border-slate-100 dark:border-zinc-800 space-y-2">
+                    <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 truncate" title={asset.name}>
+                      {asset.name}
+                    </p>
+                    <div className="flex items-center justify-between gap-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyAssetUrl(asset.id, asset.url)}
+                        className="text-[11px] font-medium text-slate-600 dark:text-zinc-400 hover:text-violet-500 dark:hover:text-violet-400 flex items-center gap-1 bg-transparent border-none cursor-pointer"
+                        title="Copiar URL pública da imagem"
+                      >
+                        {copiedAssetId === asset.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-emerald-500 font-bold">Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Link</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTabAsset(asset.id)}
+                        disabled={deletingAssetId === asset.id}
+                        className="text-rose-500 hover:text-rose-400 p-1 rounded-md hover:bg-rose-500/10 transition-colors bg-transparent border-none cursor-pointer"
+                        title="Excluir imagem da biblioteca"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
@@ -933,7 +1020,12 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
         <MediaLibraryModal
           tenantId={currentWorkspace.id}
           isOpen={mediaModalOpen}
-          onClose={() => setMediaModalOpen(false)}
+          onClose={() => {
+            setMediaModalOpen(false);
+            if (activeTab === 'midias') {
+              fetchTabMedia();
+            }
+          }}
           resolution={mediaTarget === 'favicon' ? { width: 128, height: 128 } : { width: 400, height: 120 }}
           type={mediaTarget === 'logo' || mediaTarget === 'favicon' ? 'logotipo' : 'imagem'}
           onSelectImage={(asset: any) => {
@@ -945,6 +1037,9 @@ export function WorkspaceSettingsForm({ tenant, workspace, initialUser }: Worksp
               setFaviconUrl(url);
             }
             setMediaModalOpen(false);
+            if (activeTab === 'midias') {
+              fetchTabMedia();
+            }
           }}
           uploadType={mediaTarget === 'favicon' ? 'icon' : mediaTarget === 'logo' ? 'logo' : 'asset'}
         />

@@ -4,19 +4,24 @@ import React, { useState, useEffect, useCallback, useMemo, use, useRef } from 'r
 import { useRouter } from 'next/navigation';
 import { useBrand } from '@/context/BrandContext';
 import { api, CapturePage } from '@/lib/api';
-import { Card, Button, Input, BrandModal, ConfirmModal } from '@psi/ui';
+import { getDefaultFormFlow } from '@/lib/defaultFormTemplate';
+import { Card, Button, Input, BrandModal, ConfirmModal, Select } from '@psi/ui';
 import { MediaLibraryModal } from '@/components/media-library-modal';
 import { LogoOptionModal } from '@/components/logo-option-modal';
 import { LogoBuilderModal } from '@/components/logo-builder-modal';
 import { FontPicker } from '@/components/FontPicker';
 import { TypeformPreviewModal } from '@/components/TypeformPreviewModal';
+import { FormDestinationSettings } from '@/components/form-builder/FormDestinationSettings';
+import { FormManagerSelect } from '@/components/FormManagerSelect';
+import { VariableCombobox } from '@/components/form-builder/VariableCombobox';
+import { FormVariablesModal } from '@/components/form-builder/FormVariablesModal';
 import {
   ArrowLeft, Save, Sparkles, AlertCircle, Layout, GitBranch, Settings, Palette,
   Plus, Trash2, ExternalLink, RefreshCw, Eye, HelpCircle, Check, Play, Maximize2, Minimize2, Globe,
   Monitor, Smartphone, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Undo, Redo,
   Upload, Image as ImageIcon, Loader2, MapPin, ArrowUp, ArrowDown, GripVertical,
-  PanelLeft, PanelLeftClose, Sun, Moon, User, Phone, Mail, CheckSquare, FileText, MessageSquare,
-  ShieldCheck, Sliders, AlignLeft, X
+  PanelLeft, PanelLeftClose, Sun, Moon, User, UserPlus, Phone, Mail, CheckSquare, FileText, MessageSquare,
+  ShieldCheck, Sliders, AlignLeft, X, Target, Info
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -751,6 +756,21 @@ const getNodeConfig = (type: string) => {
         icon: Phone,
         isStrictRequired: true,
       };
+    case 'celular_custom':
+      return {
+        label: 'WhatsApp / Celular',
+        accentBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        icon: Phone,
+        isStrictRequired: false,
+      };
+    case 'aviso':
+    case 'mensagem':
+      return {
+        label: 'Aviso / Mensagem',
+        accentBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        icon: Info,
+        isStrictRequired: false,
+      };
     case 'maioridade':
       return {
         label: 'Validação de Maioridade',
@@ -786,6 +806,14 @@ const getNodeConfig = (type: string) => {
         icon: AlertCircle,
         isStrictRequired: false,
       };
+    case 'responsavel':
+    case 'responsavel_legal':
+      return {
+        label: 'Contato do Responsável Legal',
+        accentBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+        icon: UserPlus,
+        isStrictRequired: false,
+      };
     case 'seletor':
     case 'escolha':
     case 'escolha_multipla':
@@ -814,70 +842,29 @@ const getNodeConfig = (type: string) => {
 
 // React Flow Custom Node Components (Estilo Typebot)
 const CustomStartNode = ({ data }: any) => {
-  const config = getNodeConfig('start');
-  const IconComp = config.icon;
   const isSelected = data.isSelected;
 
   return (
     <div 
-      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+      className={`nowheel w-[240px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
         isSelected 
-          ? 'border-purple-500 ring-2 ring-purple-500/30' 
+          ? 'border-emerald-500 ring-2 ring-emerald-500/30' 
           : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 dark:bg-zinc-900/80 border-b border-slate-200/80 dark:border-zinc-800/80 rounded-t-2xl">
+      <div className="flex items-center justify-between px-3.5 py-3 bg-emerald-500/10 dark:bg-emerald-500/10 rounded-2xl">
         <div className="flex items-center gap-2 min-w-0">
-          <div className={`p-1.5 rounded-lg shrink-0 border ${config.accentBg}`}>
-            <IconComp className="w-3.5 h-3.5" />
+          <div className="p-1.5 rounded-lg shrink-0 border bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
-            {config.label}
+          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+            Início do Fluxo
           </span>
         </div>
-        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wide shrink-0">
           Início
         </span>
-      </div>
-
-      {/* Body */}
-      <div className="p-3.5 space-y-3">
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-emerald-500" />
-            Mensagem de Boas-vindas
-          </label>
-          <input
-            type="text"
-            className="nodrag nopan w-full text-xs font-semibold px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-            value={data.node?.data?.title || data.title || ''}
-            onChange={(e) => data.onUpdate('title', e.target.value)}
-            placeholder="Ex: Bem-vinda(o) ao Atendimento Psicológico"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <input
-            type="text"
-            className="nodrag nopan w-full text-[11px] px-3 py-1.5 rounded-lg bg-slate-50/50 dark:bg-zinc-900/50 border border-slate-200/70 dark:border-zinc-800/70 text-slate-600 dark:text-slate-300 placeholder:text-slate-400/80 outline-none focus:border-purple-500 transition-all"
-            placeholder="Subtítulo ou mensagem de apoio (opcional)..."
-            value={data.node?.data?.subtitle || ''}
-            onChange={(e) => data.onUpdate('subtitle', e.target.value)}
-          />
-        </div>
-
-        {/* CTA Button Label */}
-        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 font-medium">Botão Inicial:</span>
-          <input
-            type="text"
-            className="nodrag nopan text-right text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-900 border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 text-purple-600 dark:text-purple-400 focus:border-purple-500 outline-none w-28"
-            placeholder="Iniciar ➔"
-            value={data.node?.data?.buttonText || ''}
-            onChange={(e) => data.onUpdate('buttonText', e.target.value)}
-          />
-        </div>
       </div>
 
       <Handle
@@ -899,7 +886,7 @@ const CustomStepNode = ({ data }: any) => {
 
   return (
     <div 
-      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+      className={`nowheel w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
         isSelected 
           ? 'border-purple-500 ring-2 ring-purple-500/30' 
           : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
@@ -973,7 +960,7 @@ const CustomStepNode = ({ data }: any) => {
         </div>
 
         {/* Specific Input Previews */}
-        {nodeType === 'celular' || nodeType === 'contato' ? (
+        {nodeType === 'celular' || nodeType === 'celular_custom' || nodeType === 'contato' ? (
           <div className="space-y-1 pt-1">
             <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Formato de Coleta</label>
             <div className="px-3 py-2 rounded-xl bg-slate-100/80 dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 flex items-center gap-2">
@@ -986,6 +973,14 @@ const CustomStepNode = ({ data }: any) => {
                 value={data.node.data.placeholder || '(11) 99999-9999'}
                 onChange={(e) => data.onUpdate('placeholder', e.target.value)}
               />
+            </div>
+          </div>
+        ) : nodeType === 'aviso' || nodeType === 'mensagem' ? (
+          <div className="space-y-1.5 pt-1">
+            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Etapa Informativa</label>
+            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <Info className="w-4 h-4 shrink-0 text-blue-500" />
+              <span>Exibe mensagem informativa e botão para avançar (Sem resposta do paciente).</span>
             </div>
           </div>
         ) : nodeType === 'maioridade' ? (
@@ -1002,13 +997,13 @@ const CustomStepNode = ({ data }: any) => {
               </div>
             </div>
           </div>
-        ) : nodeType === 'emergencia' ? (
+        ) : nodeType === 'responsavel' || nodeType === 'emergencia' ? (
           <div className="space-y-1.5 pt-1">
             <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Campos Inclusos</label>
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
-              <div className="flex items-center gap-1.5">• Nome do Contato</div>
-              <div className="flex items-center gap-1.5">• Grau de Parentesco</div>
-              <div className="flex items-center gap-1.5">• Telefone com WhatsApp</div>
+              <div className="flex items-center gap-1.5">• {nodeType === 'responsavel' ? 'Nome do Responsável' : 'Nome do Contato'}</div>
+              <div className="flex items-center gap-1.5">• Grau de Parentesco (Seletor)</div>
+              <div className="flex items-center gap-1.5">• Telefone Celular</div>
             </div>
           </div>
         ) : (
@@ -1035,7 +1030,7 @@ const CustomStepNode = ({ data }: any) => {
               onChange={(e) => data.onUpdate('buttonText', e.target.value)}
             />
           </div>
-          {!isStrictRequired && (
+          {!isStrictRequired && nodeType !== 'aviso' && nodeType !== 'mensagem' && (
             <label className="nodrag nopan flex items-center gap-1 cursor-pointer text-[10px] text-slate-500 select-none">
               <input
                 type="checkbox"
@@ -1047,6 +1042,35 @@ const CustomStepNode = ({ data }: any) => {
             </label>
           )}
         </div>
+
+        {/* CRM Variable Section */}
+        {nodeType !== 'aviso' && nodeType !== 'mensagem' && (
+          <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Target className="w-3 h-3 text-purple-500" />
+                Variável no CRM
+              </label>
+              {isStrictRequired ? (
+                <span className="text-[9px] font-mono font-bold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20 uppercase">
+                  {data.node.type === 'nome' ? 'nome' : data.node.type === 'maioridade' ? 'maioridade' : data.node.type === 'celular' ? 'celular' : (data.node.data.variableKey || data.node.type)}
+                </span>
+              ) : (
+                <span className="text-[9px] text-slate-400 font-mono">slug DB</span>
+              )}
+            </div>
+            {!isStrictRequired && (
+              <VariableCombobox
+                value={data.node.data.variableKey || (data.node.type === 'cpf' ? 'cpf' : data.node.type === 'email' ? 'email' : data.node.type === 'celular_custom' ? 'celular_secundario' : data.node.type === 'contato' ? 'contato_secundario' : data.node.type) || ''}
+                onChange={(key) => data.onUpdate('variableKey', key)}
+                customFieldDefs={data.customFieldDefs}
+                onRegisterNewVariable={data.onRegisterNewVariable}
+                disabled={isStrictRequired}
+                disabledBadge={data.node.type === 'nome' ? 'nome' : data.node.type === 'maioridade' ? 'maioridade' : data.node.type === 'celular' ? 'celular' : undefined}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       <Handle
@@ -1066,7 +1090,7 @@ const CustomMaioridadeNode = ({ data }: any) => {
 
   return (
     <div 
-      className={`w-[340px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+      className={`nowheel w-[340px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
         isSelected 
           ? 'border-purple-500 ring-2 ring-purple-500/30' 
           : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
@@ -1193,6 +1217,17 @@ const CustomMaioridadeNode = ({ data }: any) => {
             onChange={(e) => data.onUpdate('buttonText', e.target.value)}
           />
         </div>
+
+        {/* CRM Variable Section */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+          <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <Target className="w-3 h-3 text-amber-500" />
+            Variável no CRM
+          </label>
+          <span className="text-[9px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 uppercase">
+            maioridade
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -1205,7 +1240,7 @@ const CustomContractNode = ({ data }: any) => {
 
   return (
     <div 
-      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+      className={`nowheel w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
         isSelected 
           ? 'border-purple-500 ring-2 ring-purple-500/30' 
           : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
@@ -1258,7 +1293,7 @@ const CustomContractNode = ({ data }: any) => {
           <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Minuta Jurídica do Termo</label>
           <textarea
             rows={4}
-            className="nodrag nopan w-full text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none font-sans"
+            className="nowheel nodrag nopan w-full text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none font-sans"
             placeholder="Escreva os termos de aceite legal do contrato aqui..."
             value={data.node.data.contractText || ''}
             onChange={(e) => data.onUpdate('contractText', e.target.value)}
@@ -1286,6 +1321,23 @@ const CustomContractNode = ({ data }: any) => {
             Obrigatório
           </label>
         </div>
+
+        {/* CRM Variable Section */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Target className="w-3 h-3 text-rose-500" />
+              Variável no CRM
+            </label>
+            <span className="text-[9px] text-slate-400 font-mono">slug DB</span>
+          </div>
+          <VariableCombobox
+            value={data.node.data.variableKey || 'termo_consentimento'}
+            onChange={(key) => data.onUpdate('variableKey', key)}
+            customFieldDefs={data.customFieldDefs}
+            onRegisterNewVariable={data.onRegisterNewVariable}
+          />
+        </div>
       </div>
 
       <Handle
@@ -1306,7 +1358,7 @@ const CustomSelectorNode = ({ data }: any) => {
 
   return (
     <div 
-      className={`w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
+      className={`nowheel w-[320px] rounded-2xl border transition-all duration-200 shadow-xl bg-white dark:bg-zinc-950 text-slate-900 dark:text-slate-100 relative ${
         isSelected 
           ? 'border-purple-500 ring-2 ring-purple-500/30' 
           : 'border-slate-200/90 dark:border-zinc-800/90 hover:border-slate-300 dark:hover:border-zinc-700'
@@ -1384,7 +1436,7 @@ const CustomSelectorNode = ({ data }: any) => {
             </label>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="nowheel space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
             {options.map((opt: any, idx: number) => (
               <div key={idx} className="relative flex items-center gap-1.5">
                 <div className="w-5 h-5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold flex items-center justify-center shrink-0">
@@ -1456,6 +1508,23 @@ const CustomSelectorNode = ({ data }: any) => {
             />
             Obrigatório
           </label>
+        </div>
+
+        {/* CRM Variable Section */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800/80 space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Target className="w-3 h-3 text-purple-500" />
+              Variável no CRM
+            </label>
+            <span className="text-[9px] text-slate-400 font-mono">slug DB</span>
+          </div>
+          <VariableCombobox
+            value={data.node.data.variableKey || 'opcao_selecionada'}
+            onChange={(key) => data.onUpdate('variableKey', key)}
+            customFieldDefs={data.customFieldDefs}
+            onRegisterNewVariable={data.onRegisterNewVariable}
+          />
         </div>
       </div>
     </div>
@@ -1644,14 +1713,49 @@ export default function PageEditor({ params }: PageProps) {
   const router = useRouter();
 
   const [workspaceDomain, setWorkspaceDomain] = useState<any>(null);
+  const [availableForms, setAvailableForms] = useState<any[]>([]);
+  const [customFieldDefs, setCustomFieldDefs] = useState<any[]>([]);
+  const [isVariablesModalOpen, setIsVariablesModalOpen] = useState(false);
+
+  const refreshCustomFields = useCallback(async () => {
+    if (tenant?.id) {
+      try {
+        const defs = await api.getCustomFieldDefs(tenant.id);
+        setCustomFieldDefs(defs);
+      } catch (err) {
+        console.warn('Erro ao carregar variáveis customizadas do CRM:', err);
+      }
+    }
+  }, [tenant?.id]);
+
+  const handleRegisterNewVariable = useCallback(async (varKey: string) => {
+    if (!tenant?.id || !varKey) return;
+    try {
+      const sanitizedKey = varKey.toLowerCase().trim().replace(/\s+/g, '_');
+      await api.createCustomFieldDef(tenant.id, {
+        key: sanitizedKey,
+        name: varKey.trim(),
+        type: 'text',
+      });
+      await refreshCustomFields();
+    } catch (err) {
+      console.error('Erro ao cadastrar nova variável:', err);
+    }
+  }, [tenant?.id, refreshCustomFields]);
 
   useEffect(() => {
     if (tenant?.id) {
       api.getWorkspaceDomain(tenant.id)
         .then(setWorkspaceDomain)
         .catch(err => console.warn('Erro ao carregar domínio do workspace:', err));
+
+      api.getForms(tenant.id)
+        .then(setAvailableForms)
+        .catch(err => console.warn('Erro ao carregar formulários do workspace:', err));
+
+      refreshCustomFields();
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, refreshCustomFields]);
 
   const [page, setPage] = useState<CapturePage | null>(null);
   const [lastPublishedPage, setLastPublishedPage] = useState<CapturePage | null>(null);
@@ -1671,6 +1775,78 @@ export default function PageEditor({ params }: PageProps) {
   const [isFormPreviewOpen, setIsFormPreviewOpen] = useState(false);
   const [isMissingStepsModalOpen, setIsMissingStepsModalOpen] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  // Form Selection handler that updates formId and populates formFlow into canvas
+  const handleFormSelect = useCallback((selectedId: string, customForms?: any[]) => {
+    if (!page) return;
+    const formsList = customForms || availableForms;
+    const selectedForm = formsList.find((f: any) => f.id === selectedId);
+    let newFormFlow = selectedForm?.formFlowDraft || selectedForm?.formFlow;
+
+    if (!newFormFlow || !Array.isArray(newFormFlow.nodes) || newFormFlow.nodes.length === 0) {
+      newFormFlow = getDefaultFormFlow();
+    }
+
+    // Reset React Flow canvas nodes/edges state so it rebuilds cleanly for the selected form
+    setNodes([]);
+    setEdges([]);
+
+    setPage(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        formId: selectedId,
+        formFlow: newFormFlow,
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, [page, availableForms, setNodes, setEdges]);
+
+  // Form Creation handler
+  const handleCreateForm = useCallback(async (title: string) => {
+    if (!tenant?.id) return;
+    const defaultFlow = getDefaultFormFlow();
+    const newForm = await api.createForm({
+      title,
+      tenantId: tenant.id,
+      formFlow: defaultFlow,
+    });
+
+    const updatedList = await api.getForms(tenant.id);
+    setAvailableForms(updatedList);
+
+    // Automatically select the newly created form, passing updatedList so handleFormSelect finds the newly created form synchronously
+    handleFormSelect(newForm.id, updatedList);
+  }, [tenant?.id, handleFormSelect]);
+
+  // Form Rename handler
+  const handleRenameForm = useCallback(async (formId: string, newTitle: string) => {
+    if (!tenant?.id) return;
+    await api.updateForm(formId, {
+      titleDraft: newTitle,
+      isPublish: true,
+    });
+    const updatedList = await api.getForms(tenant.id);
+    setAvailableForms(updatedList);
+  }, [tenant?.id]);
+
+  // Form Delete handler
+  const handleDeleteForm = useCallback(async (formId: string) => {
+    if (!tenant?.id) return;
+    await api.deleteForm(formId);
+    const updatedList = await api.getForms(tenant.id);
+    setAvailableForms(updatedList);
+
+    // If active form was deleted, select another form
+    if (page?.formId === formId) {
+      const nextFormId = updatedList[0]?.id || null;
+      if (nextFormId) {
+        handleFormSelect(nextFormId);
+      } else {
+        setPage(prev => (prev ? { ...prev, formId: null } : prev));
+      }
+    }
+  }, [tenant?.id, page?.formId, handleFormSelect]);
 
   // Live preview refresh counter
   const [previewKey, setPreviewKey] = useState(0);
@@ -3945,6 +4121,10 @@ export default function PageEditor({ params }: PageProps) {
         siteConfig: pageData.siteConfigDraft || pageData.siteConfig,
         dictionary: pageData.dictionaryDraft || pageData.dictionary,
         formFlow: pageData.formFlowDraft || pageData.formFlow,
+        ctaType: (pageData as any).ctaTypeDraft !== undefined && (pageData as any).ctaTypeDraft !== null ? (pageData as any).ctaTypeDraft : (pageData.ctaType || 'form'),
+        ctaWhatsappMessage: (pageData as any).ctaWhatsappMessageDraft !== undefined && (pageData as any).ctaWhatsappMessageDraft !== null ? (pageData as any).ctaWhatsappMessageDraft : (pageData.ctaWhatsappMessage || ''),
+        ctaExternalUrl: (pageData as any).ctaExternalUrlDraft !== undefined && (pageData as any).ctaExternalUrlDraft !== null ? (pageData as any).ctaExternalUrlDraft : (pageData.ctaExternalUrl || ''),
+        formId: (pageData as any).formIdDraft !== undefined ? (pageData as any).formIdDraft : (pageData.formId || null),
       };
       
       setPage(pageWithDrafts);
@@ -3959,6 +4139,10 @@ export default function PageEditor({ params }: PageProps) {
         siteConfig: pageData.siteConfig,
         dictionary: pageData.dictionary,
         formFlow: pageData.formFlow,
+        ctaType: pageData.ctaType || 'form',
+        ctaWhatsappMessage: pageData.ctaWhatsappMessage || '',
+        ctaExternalUrl: pageData.ctaExternalUrl || '',
+        formId: pageData.formId || null,
       };
       setLastPublishedPage(lastPublished);
 
@@ -3970,7 +4154,9 @@ export default function PageEditor({ params }: PageProps) {
         pageData.seoConfigDraft !== null ||
         pageData.siteConfigDraft !== null ||
         pageData.dictionaryDraft !== null ||
-        pageData.formFlowDraft !== null;
+        pageData.formFlowDraft !== null ||
+        (pageData as any).ctaTypeDraft !== null ||
+        (pageData as any).formIdDraft !== null;
       setHasUnsavedChanges(hasDraft);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar os dados da página.');
@@ -4044,6 +4230,8 @@ export default function PageEditor({ params }: PageProps) {
           node,
           isSelected: selectedNodeId === node.id,
           contractTitle: undefined,
+          customFieldDefs,
+          onRegisterNewVariable: handleRegisterNewVariable,
           onDelete: handleDeleteNode,
           onUpdate: (field: string, value: any) => updateNodeData(node.id, field, value),
         }
@@ -4079,7 +4267,7 @@ export default function PageEditor({ params }: PageProps) {
       }
       return prevEdges;
     });
-  }, [formFlowNodes, formFlowEdges, selectedNodeId]);
+  }, [formFlowNodes, formFlowEdges, selectedNodeId, customFieldDefs, handleRegisterNewVariable]);
 
   // Connect visual nodes in React Flow & sync immediately to page.formFlow.edges
   const onConnect = useCallback((params: Connection) => {
@@ -4328,6 +4516,17 @@ export default function PageEditor({ params }: PageProps) {
   // Node modifications inside graph editor
   const handleAddNode = (type: string, customPosition?: { x: number; y: number }) => {
     if (!page) return;
+
+    // Block duplicating mandatory nodes if they already exist in flow
+    const isStrict = type === 'start' || type === 'nome' || type === 'maioridade' || type === 'celular';
+    if (isStrict) {
+      const alreadyExists = (page.formFlow?.nodes || []).some((n: any) => n.type === type || n.id === type || (type === 'celular' && n.type === 'contato'));
+      if (alreadyExists) {
+        setError(`A etapa obrigatória '${type}' já está presente no fluxo e não pode ser duplicada.`);
+        return;
+      }
+    }
+
     const id = `${type}_${Math.random().toString(36).substring(2, 6)}`;
     
     let title = 'Escreva a pergunta da etapa...';
@@ -4340,9 +4539,12 @@ export default function PageEditor({ params }: PageProps) {
     } else if (type === 'nome') {
       title = 'Qual é o seu nome completo?';
       placeholder = 'Escreva seu nome completo aqui...';
-    } else if (type === 'celular' || type === 'contato') {
+    } else if (type === 'celular' || type === 'celular_custom' || type === 'contato') {
       title = 'Qual é o seu WhatsApp de contato?';
       placeholder = '(11) 99999-9999';
+    } else if (type === 'aviso' || type === 'mensagem') {
+      title = 'Aviso Importante';
+      placeholder = '';
     } else if (type === 'email') {
       title = 'Qual é o seu melhor e-mail?';
       placeholder = 'seu.email@exemplo.com';
@@ -4353,6 +4555,9 @@ export default function PageEditor({ params }: PageProps) {
       title = 'Você é maior de idade?';
       placeholder = '';
       options = [{ label: 'Sim', value: 'Sim' }, { label: 'Não', value: 'Não' }];
+    } else if (type === 'responsavel') {
+      title = 'Dados do Responsável Legal';
+      placeholder = '';
     } else if (type === 'emergencia') {
       title = 'Contato de Emergência';
       placeholder = '';
@@ -4371,14 +4576,48 @@ export default function PageEditor({ params }: PageProps) {
       placeholder = 'Digite aqui...';
     }
 
-    // Calculate position: custom drop position or next position to the right with 380px spacing
+    // Calculate position: custom drop position OR center of currently visible screen viewport when clicking sidebar
     const currentNodes = page.formFlow?.nodes || [];
     const maxX = currentNodes.reduce((max: number, n: any) => {
       const x = n.position?.x ?? 0;
       return Math.max(max, x);
     }, 0);
     const nextX = currentNodes.length === 0 ? 80 : Math.max(maxX + 380, currentNodes.length * 380 + 80);
-    const targetPosition = customPosition || { x: nextX, y: 150 };
+
+    let targetPosition = customPosition;
+
+    if (!targetPosition) {
+      if (reactFlowInstance) {
+        const flowContainer = document.querySelector('.react-flow');
+        if (flowContainer) {
+          const bounds = flowContainer.getBoundingClientRect();
+          const centerX = bounds.left + bounds.width / 2;
+          const centerY = bounds.top + bounds.height / 2;
+          if (typeof reactFlowInstance.screenToFlowPosition === 'function') {
+            const flowCenter = reactFlowInstance.screenToFlowPosition({ x: centerX, y: centerY });
+            targetPosition = {
+              x: Math.round(flowCenter.x - 160),
+              y: Math.round(flowCenter.y - 60),
+            };
+          } else if (typeof reactFlowInstance.getViewport === 'function') {
+            const viewport = reactFlowInstance.getViewport();
+            if (viewport && viewport.zoom) {
+              const flowX = (bounds.width / 2 - viewport.x) / viewport.zoom;
+              const flowY = (bounds.height / 2 - viewport.y) / viewport.zoom;
+              targetPosition = {
+                x: Math.round(flowX - 160),
+                y: Math.round(flowY - 60),
+              };
+            }
+          }
+        }
+      }
+      if (!targetPosition) {
+        targetPosition = { x: nextX, y: 150 };
+      }
+    }
+
+    const isNotice = type === 'aviso' || type === 'mensagem';
 
     const newNodeData = {
       id,
@@ -4386,11 +4625,14 @@ export default function PageEditor({ params }: PageProps) {
       position: targetPosition,
       data: {
         title,
-        isRequired: true,
+        subtitle: isNotice ? 'Leia atentamente as orientações antes de prosseguir.' : undefined,
+        buttonText: isNotice ? 'Entendi, continuar' : undefined,
+        isRequired: isNotice ? false : true,
         placeholder,
         options,
         isMultiple: type === 'escolha_multipla',
         contractText: type === 'contrato' ? 'Ao assinar este termo você concorda com o atendimento clínico.' : undefined,
+        variableKey: type === 'celular_custom' ? 'celular_secundario' : isNotice ? '' : undefined,
       }
     };
 
@@ -4773,8 +5015,8 @@ export default function PageEditor({ params }: PageProps) {
                 activeTab === 'flow' ? 'brand-accent shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <GitBranch className="h-3 w-3" />
-              Perguntas da Triagem
+              <Target className="h-3 w-3" />
+              Destino
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -5341,18 +5583,106 @@ export default function PageEditor({ params }: PageProps) {
             </div>
           )}
 
-          {/* TAB 2: TRIAGEM GRAPH FLOW EDITOR */}
+          {/* TAB 2: DESTINO & TRIAGEM GRAPH FLOW EDITOR */}
           {activeTab === 'flow' && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2.5">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Estrutura de Etapas</h3>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Arraste para o fluxo ou clique para adicionar</p>
+              {page && (
+                <div className="p-3.5 glass-sm border border-[var(--surface-border)] rounded-2xl space-y-3">
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-purple-500" />
+                    Destino do Botão (CTA)
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetFormId = page.formId || availableForms[0]?.id || null;
+                        if (targetFormId) {
+                          handleFormSelect(targetFormId);
+                        } else {
+                          setPage({ ...page, ctaType: 'form', formId: null });
+                          setHasUnsavedChanges(true);
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        (page?.ctaType || 'form') === 'form'
+                          ? 'bg-purple-500/10 border-purple-500 text-purple-900 dark:text-purple-200 font-bold shadow-sm'
+                          : 'border-[var(--surface-border)] glass-sm text-slate-700 dark:text-slate-300 hover:bg-[var(--surface-hover)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-purple-500 shrink-0" />
+                        <span className="text-xs">Formulário de Triagem</span>
+                      </div>
+                      {(page?.ctaType || 'form') === 'form' && <Check className="h-4 w-4 text-purple-500 shrink-0" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNodes([]);
+                        setEdges([]);
+                        setPage({ ...page, ctaType: 'whatsapp', formId: null });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        page?.ctaType === 'whatsapp'
+                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-900 dark:text-emerald-200 font-bold shadow-sm'
+                          : 'border-[var(--surface-border)] glass-sm text-slate-700 dark:text-slate-300 hover:bg-[var(--surface-hover)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span className="text-xs">WhatsApp Direto</span>
+                      </div>
+                      {page?.ctaType === 'whatsapp' && <Check className="h-4 w-4 text-emerald-500 shrink-0" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNodes([]);
+                        setEdges([]);
+                        setPage({ ...page, ctaType: 'external_url', formId: null });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        page?.ctaType === 'external_url'
+                          ? 'bg-blue-500/10 border-blue-500 text-blue-900 dark:text-blue-200 font-bold shadow-sm'
+                          : 'border-[var(--surface-border)] glass-sm text-slate-700 dark:text-slate-300 hover:bg-[var(--surface-hover)]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-blue-500 shrink-0" />
+                        <span className="text-xs">Link / URL Externa</span>
+                      </div>
+                      {page?.ctaType === 'external_url' && <Check className="h-4 w-4 text-blue-500 shrink-0" />}
+                    </button>
+                  </div>
                 </div>
-                <span className="text-[10px] glass-sm border border-[var(--surface-border)] text-purple-600 dark:text-purple-400 font-bold px-2.5 py-1 rounded-lg">
-                  {page.formFlow.nodes.length} blocos
-                </span>
-              </div>
+              )}
+
+              {(page?.ctaType || 'form') === 'form' ? (
+                <>
+                  <div className="glass-md border border-[var(--surface-border)] rounded-2xl p-3.5 space-y-1 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <GitBranch className="w-3.5 h-3.5 text-purple-500" />
+                      Editor de Fluxo
+                    </h4>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Arraste etapas da barra lateral para a posição desejada no fluxo e ligue os pontos.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-[var(--surface-border)] pb-2.5 pt-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Estrutura de Etapas do Formulário</h3>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">Arraste para o fluxo ou clique para adicionar</p>
+                    </div>
+                    <span className="text-[10px] glass-sm border border-[var(--surface-border)] text-purple-600 dark:text-purple-400 font-bold px-2.5 py-1 rounded-lg">
+                      {page?.formFlow?.nodes?.length || 0} blocos
+                    </span>
+                  </div>
 
               {/* Step Templates */}
               <div className="space-y-2">
@@ -5367,21 +5697,40 @@ export default function PageEditor({ params }: PageProps) {
                     { type: 'email', label: 'E-mail de Contato', desc: 'Validação de e-mail', icon: Mail, required: false, color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30' },
                     { type: 'cpf', label: 'CPF do Paciente', desc: 'Validação de documento', icon: Sliders, required: false, color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30' },
                     { type: 'contrato', label: 'Contrato / TCLE', desc: 'Termo de consentimento clínico', icon: FileText, required: false, color: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' },
+                    { type: 'responsavel', label: 'Contato do Responsável Legal', desc: 'Nome, parentesco e celular', icon: UserPlus, required: false, color: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30' },
                     { type: 'emergencia', label: 'Contato de Emergência', desc: 'Nome, parentesco e celular', icon: AlertCircle, required: false, color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30' },
                   ].map((tmpl) => {
                     const IconComp = tmpl.icon;
                     const isAdded = page.formFlow.nodes.some((n: any) => n.type === tmpl.type || (tmpl.type === 'celular' && n.type === 'contato'));
+                    const isLocked = tmpl.required && isAdded;
+
                     return (
                       <div
                         key={tmpl.type}
-                        draggable
-                        onDragStart={(e) => onDragStart(e, tmpl.type)}
-                        onClick={() => handleAddNode(tmpl.type)}
-                        className="p-2.5 rounded-xl text-left transition-all flex items-center justify-between glass-sm hover:bg-[var(--surface-hover)] border border-[var(--surface-border)] hover:border-purple-500/50 cursor-grab active:cursor-grabbing hover:scale-[1.01] active:scale-[0.99] select-none group w-full"
-                        title="Arraste para a posição desejada no fluxo ou clique para adicionar"
+                        draggable={!isLocked}
+                        onDragStart={(e) => {
+                          if (isLocked) {
+                            e.preventDefault();
+                            return;
+                          }
+                          onDragStart(e, tmpl.type);
+                        }}
+                        onClick={() => {
+                          if (isLocked) {
+                            setError(`A etapa obrigatória '${tmpl.label}' já está presente no fluxo e não pode ser duplicada.`);
+                            return;
+                          }
+                          handleAddNode(tmpl.type);
+                        }}
+                        className={`p-2.5 rounded-xl text-left transition-all flex items-center justify-between border select-none group w-full ${
+                          isLocked
+                            ? 'opacity-60 bg-slate-100/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 cursor-not-allowed'
+                            : 'glass-sm hover:bg-[var(--surface-hover)] border-[var(--surface-border)] hover:border-purple-500/50 cursor-grab active:cursor-grabbing hover:scale-[1.01] active:scale-[0.99]'
+                        }`}
+                        title={isLocked ? 'Esta etapa já está no fluxo e não pode ser duplicada' : 'Arraste para o fluxo ou clique para adicionar'}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <GripVertical className="h-3.5 w-3.5 text-slate-400 opacity-40 group-hover:opacity-100 group-hover:text-purple-500 shrink-0 transition-opacity" />
+                          <GripVertical className={`h-3.5 w-3.5 ${isLocked ? 'text-slate-300 dark:text-zinc-700' : 'text-slate-400 opacity-40 group-hover:opacity-100 group-hover:text-purple-500'} shrink-0 transition-opacity`} />
                           <div className={`p-1.5 rounded-lg shrink-0 border ${tmpl.color}`}>
                             <IconComp className="h-3.5 w-3.5" />
                           </div>
@@ -5401,10 +5750,10 @@ export default function PageEditor({ params }: PageProps) {
                                 ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' 
                                 : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40'
                             }`}>
-                              {isAdded ? 'Obrigatório' : 'Ausente (Obrigatório)'}
+                              {isAdded ? 'No Fluxo' : 'Ausente (Obrigatório)'}
                             </span>
                           )}
-                          <Plus className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-500" />
+                          {!isLocked && <Plus className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-500" />}
                         </div>
                       </div>
                     );
@@ -5423,6 +5772,10 @@ export default function PageEditor({ params }: PageProps) {
                     { type: 'escolha_multipla', label: 'Múltipla Escolha', desc: 'Seleção de várias opções', icon: CheckSquare, color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
                     { type: 'texto', label: 'Texto Curto', desc: 'Linha única de resposta livre', icon: MessageSquare, color: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30' },
                     { type: 'paragrafo', label: 'Parágrafo Longo', desc: 'Área de texto para queixa principal', icon: AlignLeft, color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30' },
+                    { type: 'cpf', label: 'CPF do Paciente', desc: 'Validação de documento', icon: Sliders, color: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30' },
+                    { type: 'email', label: 'E-mail de Contato', desc: 'Validação de e-mail', icon: Mail, color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30' },
+                    { type: 'celular_custom', label: 'Celular / WhatsApp', desc: 'Coleta de número com DDD e máscara', icon: Phone, color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
+                    { type: 'aviso', label: 'Aviso / Mensagem', desc: 'Texto informativo sem coleta de dados', icon: Info, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' },
                   ].map((inType) => {
                     const IconComp = inType.icon;
                     return (
@@ -5454,8 +5807,10 @@ export default function PageEditor({ params }: PageProps) {
                   })}
                 </div>
               </div>
-            </div>
-          )}
+            </>
+          ) : null}
+        </div>
+      )}
 
           {/* TAB 4: THEME, COLORS & TYPOGRAPHY */}
           {activeTab === 'theme' && (
@@ -5917,125 +6272,17 @@ export default function PageEditor({ params }: PageProps) {
 
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">🎯 Destino do Botão Principal (CTA)</h3>
                 
-                <div className="space-y-3">
-                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider block">
-                    O que acontece quando o paciente clica no CTA do site?
-                  </label>
-                  
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPage({ ...page, ctaType: 'form' });
-                        setHasUnsavedChanges(true);
-                      }}
-                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                        (page.ctaType || 'form') === 'form'
-                          ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 ring-1 ring-[var(--brand-gradient-start)]'
-                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 shrink-0">
-                        📋
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">Formulário de Triagem Interno</div>
-                        <div className="text-[10px] text-slate-500">Abre o modal de triagem e captação de dados clínica.</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPage({ ...page, ctaType: 'whatsapp' });
-                        setHasUnsavedChanges(true);
-                      }}
-                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                        page.ctaType === 'whatsapp'
-                          ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500'
-                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
-                        💬
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">Conversa Direta no WhatsApp</div>
-                        <div className="text-[10px] text-slate-500">Redireciona o paciente direto para o seu WhatsApp de atendimento.</div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPage({ ...page, ctaType: 'external_url' });
-                        setHasUnsavedChanges(true);
-                      }}
-                      className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                        page.ctaType === 'external_url'
-                          ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
-                          : 'border-[var(--surface-border)] glass-sm hover:border-slate-400 dark:hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 shrink-0">
-                        🌐
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900 dark:text-white">Link / URL Externa</div>
-                        <div className="text-[10px] text-slate-500">Redireciona para um sistema de agendamento (Calendly, Google Forms, etc.).</div>
-                      </div>
-                    </button>
+                <div className="p-4 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Destino Ativo: {page.ctaType === 'whatsapp' ? '💬 WhatsApp Direto' : page.ctaType === 'external_url' ? '🌐 Link Externo' : '📋 Formulário de Triagem'}
+                    </span>
+                    <span className="text-[10px] font-semibold text-violet-500 uppercase tracking-wider">
+                      Gerenciado no Editor
+                    </span>
                   </div>
-
-                  {page.ctaType === 'whatsapp' && (
-                    <div className="space-y-1 pt-2 animate-in fade-in duration-200">
-                      <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Mensagem Inicial do WhatsApp</label>
-                      <textarea
-                        rows={3}
-                        className="w-full p-2.5 rounded-xl border border-[var(--surface-border)] bg-slate-50/50 dark:bg-black/20 text-xs text-slate-900 dark:text-slate-100 outline-none focus:border-indigo-500 transition-colors resize-y min-h-[68px]"
-                        placeholder="Ex: Olá! Vim pelo seu site e gostaria de agendar uma consulta."
-                        value={page.ctaWhatsappMessage || ''}
-                        onChange={(e) => {
-                          setPage({ ...page, ctaWhatsappMessage: e.target.value });
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {page.ctaType === 'external_url' && (
-                    <div className="space-y-1 pt-2 animate-in fade-in duration-200">
-                      <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Link Externo de Destino</label>
-                      <Input
-                        type="text"
-                        className="brand-input font-mono"
-                        placeholder="https://calendly.com/sua-agenda"
-                        value={page.ctaExternalUrl || ''}
-                        onChange={(e) => {
-                          setPage({ ...page, ctaExternalUrl: e.target.value });
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider border-b border-[var(--surface-border)] pt-4 pb-2">Redirecionamento Pós-Triagem</h3>
-                
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase tracking-wider">Mensagem Padrão Whatsapp</label>
-                  <textarea
-                    rows={3}
-                    className="w-full text-xs p-3 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none focus:border-[var(--brand-gradient-start)]"
-                    placeholder="Olá, preenchi a triagem pelo site. Meu nome é {{nome}}."
-                    value={page.formFlow.settings?.whatsappMessageTemplate || ''}
-                    onChange={(e) => {
-                      const updatedSettings = { ...page.formFlow.settings, whatsappMessageTemplate: e.target.value };
-                      setPage({ ...page, formFlow: { ...page.formFlow, settings: updatedSettings } });
-                    }}
-                  />
-                  <p className="text-[9px] text-slate-500 pt-0.5 leading-relaxed">
-                    Você pode usar o marcador <code className="text-slate-600 dark:text-slate-350 font-bold">{"{{nome}}"}</code> para inserir dinamicamente a resposta digitada pelo paciente.
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    As configurações de ação do CTA (Formulário, WhatsApp ou Link Externo) e o redirecionamento pós-triagem agora são gerenciados na aba <strong>Destino</strong> do Formulário.
                   </p>
                 </div>
 
@@ -6213,35 +6460,151 @@ export default function PageEditor({ params }: PageProps) {
             </div>
           )}
 
-          {/* TAB 2: REACT FLOW WORKSPACE */}
+          {/* TAB 2: DESTINO (REACT FLOW OU CONFIGURAÇÕES DE URL/WHATSAPP) */}
           {activeTab === 'flow' && (
-            <div 
-              className="w-full h-full relative" 
-              style={{ height: '100%' }}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-            >
-              <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
-                <div className="glass-md border border-[var(--surface-border)] rounded-xl p-3 max-w-xs space-y-1 shadow-xl bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md">
-                  <h4 className="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <GitBranch className="w-3.5 h-3.5 text-purple-500" />
-                    Editor de Fluxo
-                  </h4>
-                  <p className="text-[9px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                    Arraste etapas da barra lateral para a posição desejada no fluxo e ligue os pontos.
-                  </p>
-                </div>
+            page?.ctaType === 'whatsapp' || page?.ctaType === 'external_url' ? (
+              <div className="w-full h-full flex items-center justify-center p-8 bg-[var(--brand-bg-color)] overflow-y-auto custom-scrollbar">
+                <div className="w-full max-w-xl glass-md p-8 rounded-3xl border border-[var(--surface-border)] shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-3 border-b border-[var(--surface-border)] pb-4">
+                    {page.ctaType === 'whatsapp' ? (
+                      <div className="h-12 w-12 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                        <MessageSquare className="h-6 w-6" />
+                      </div>
+                    ) : (
+                      <div className="h-12 w-12 rounded-2xl bg-blue-500/15 text-blue-500 flex items-center justify-center shrink-0 border border-blue-500/30">
+                        <Globe className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                        {page.ctaType === 'whatsapp' ? 'Configuração do WhatsApp Direto' : 'Configuração do Link / URL Externa'}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                        {page.ctaType === 'whatsapp'
+                          ? 'Quando o paciente clicar no CTA do seu site, ele será redirecionado diretamente para o seu WhatsApp de atendimento.'
+                          : 'Quando o paciente clicar no CTA do seu site, ele será redirecionado para a URL externa configurada.'}
+                      </p>
+                    </div>
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsFormPreviewOpen(true)}
-                  className="px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer border border-purple-400/30 hover:scale-[1.02] active:scale-[0.98]"
-                  title="Abrir simulação interativa do formulário popup"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
-                  <span>Testar Formulário Popup</span>
-                </button>
+                  {page.ctaType === 'whatsapp' ? (
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                          Mensagem Inicial Pré-Digitada
+                        </label>
+                        <textarea
+                          rows={4}
+                          className="w-full text-xs p-3.5 brand-input rounded-xl outline-none text-slate-900 dark:text-white transition-colors resize-none focus:ring-2 focus:ring-emerald-500/50"
+                          placeholder="Ex: Olá! Preenchi a triagem pelo seu site e gostaria de agendar minha consulta."
+                          value={page.ctaWhatsappMessage || ''}
+                          onChange={(e) => {
+                            setPage({ ...page, ctaWhatsappMessage: e.target.value });
+                            setHasUnsavedChanges(true);
+                          }}
+                        />
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                          💬 Esta mensagem é preenchida automaticamente no aplicativo do paciente quando ele clica no botão principal do site.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                          URL de Redirecionamento Externa
+                        </label>
+                        <Input
+                          type="url"
+                          className="brand-input text-xs"
+                          placeholder="https://calendly.com/seu-perfil ou https://..."
+                          value={page.ctaExternalUrl || ''}
+                          onChange={(e) => {
+                            setPage({ ...page, ctaExternalUrl: e.target.value });
+                            setHasUnsavedChanges(true);
+                          }}
+                        />
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                          🔗 Insira a URL completa de agendamento ou sistema externo incluindo <code className="font-mono">https://</code>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs flex items-start gap-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                    <p className="leading-relaxed">
+                      <strong>Aviso:</strong> Como o destino do CTA está configurado para <strong>{page.ctaType === 'whatsapp' ? 'WhatsApp Direto' : 'Link Externo'}</strong>, o formulário de triagem desta página foi desvinculado no banco de dados. Para reutilizar o formulário interno, selecione a opção <strong>Formulário de Triagem</strong> na barra lateral.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex justify-between items-center border-t border-[var(--surface-border)]">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const targetFormId = availableForms[0]?.id || null;
+                        setPage({
+                          ...page,
+                          ctaType: 'form',
+                          formId: targetFormId,
+                        });
+                        setHasUnsavedChanges(true);
+                      }}
+                      className="text-xs bg-purple-600/15 hover:bg-purple-600/25 text-purple-600 dark:text-purple-300 border border-purple-500/30 rounded-xl px-4 h-10 font-semibold cursor-pointer"
+                    >
+                      Vincular Formulário de Triagem
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={handlePublish}
+                      disabled={saving}
+                      className="brand-accent text-xs font-bold px-5 h-10 rounded-xl border-none cursor-pointer"
+                    >
+                      Salvar Alterações
+                    </Button>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <div 
+                className="w-full h-full relative" 
+                style={{ height: '100%' }}
+                onDragOver={onDragOver}
+                onDrop={onDrop}
+              >
+                <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
+                  <FormManagerSelect
+                    forms={availableForms}
+                    selectedFormId={page?.formId || availableForms[0]?.id || null}
+                    onSelectForm={handleFormSelect}
+                    onCreateForm={handleCreateForm}
+                    onRenameForm={handleRenameForm}
+                    onDeleteForm={handleDeleteForm}
+                    placeholder="Selecione um formulário..."
+                    className="w-64"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVariablesModalOpen(true)}
+                    className="px-3.5 py-2.5 rounded-xl bg-gray-800/80 hover:bg-gray-700/80 dark:bg-gray-800/90 dark:hover:bg-gray-700 text-gray-200 font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer border border-gray-700/50 hover:scale-[1.02] active:scale-[0.98]"
+                    title="Visualizar e gerenciar variáveis do formulário e CRM"
+                  >
+                    <Target className="w-4 h-4 text-purple-400" />
+                    <span>Variáveis</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFormPreviewOpen(true)}
+                    className="px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer border border-purple-400/30 hover:scale-[1.02] active:scale-[0.98]"
+                    title="Abrir simulação interativa do formulário popup"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
+                    <span>Testar Formulário Popup</span>
+                  </button>
+                </div>
 
               {/* Floating Alert Banner if required nodes are missing */}
               {missingRequiredNodes.length > 0 && (
@@ -6278,6 +6641,15 @@ export default function PageEditor({ params }: PageProps) {
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
+                onNodesDelete={(deletedNodes) => {
+                  const hasStrict = deletedNodes.some(n =>
+                    n.type === 'startNode' || n.type === 'start' ||
+                    n.id === 'start' || ((n.data as any)?.node?.type === 'start')
+                  );
+                  if (hasStrict) {
+                    setError("O nó de 'Início do Formulário' é obrigatório e não pode ser excluído.");
+                  }
+                }}
                 onEdgesChange={handleEdgesChange}
                 onConnect={onConnect}
                 onNodeDragStop={onNodeDragStop}
@@ -6287,13 +6659,14 @@ export default function PageEditor({ params }: PageProps) {
                 nodeTypes={nodeTypes}
                 onNodeClick={(_, node) => setSelectedNodeId(node.id)}
                 fitView
-                className="bg-[#0c0c0e]"
+                colorMode={theme === 'dark' ? 'dark' : 'light'}
+                className={theme === 'dark' ? 'bg-[#0c0c0e]' : 'bg-[#f8fafc]'}
               >
                 <Controls />
                 <Background color="#ffffff" gap={16} className="opacity-[0.03]" />
               </ReactFlow>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
@@ -6510,6 +6883,15 @@ export default function PageEditor({ params }: PageProps) {
           </div>
         </div>
       </BrandModal>
+
+      <FormVariablesModal
+        isOpen={isVariablesModalOpen}
+        onClose={() => setIsVariablesModalOpen(false)}
+        formFlow={page?.formFlow || { nodes: [], edges: [] }}
+        customFieldDefs={customFieldDefs}
+        workspaceId={tenant?.id}
+        onRefreshCustomFields={refreshCustomFields}
+      />
 
     </div>
   );

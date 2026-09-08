@@ -61,6 +61,7 @@ Before executing tasks, read **ONLY** the specific context file relevant to your
 | Staging, Drafts & Publishing | [.agents/architectures/site_staging_and_publishing.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/site_staging_and_publishing.md) | Draft state vs Published state, Cloudflare subdomains |
 | Captacao Funnel & Psychologist CRM | [.agents/architectures/captacao_ux.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/captacao_ux.md) | Lead capture flow, CRM board, Kanban columns |
 | Platform Settings & Feature Flags | [.agents/architectures/platform_settings.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/platform_settings.md) | Tenant configuration, feature flags, global settings |
+| Form Builder, Destino CTA & Page-Form Binding | [.agents/architectures/form_builder_and_page_destination.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/form_builder_and_page_destination.md) | CTA Destinations (Form, WhatsApp, External URL), Page-Form DB relationship (form_id), FormManagerSelect CRUD, React Flow canvas sync |
 | MVP Discrepancies & Post-MVP Backlog | [.agents/backlog/01_mvp_discrepancies_and_technical_debt.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/backlog/01_mvp_discrepancies_and_technical_debt.md) | Technical debt, deferred refactorings, MVP gaps & Post-MVP roadmap |
 
 ---

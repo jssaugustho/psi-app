@@ -97,6 +97,19 @@ const validateCPFHelper = (cpf: string): boolean => {
   return true;
 };
 
+export const KINSHIP_OPTIONS = [
+  'Mãe',
+  'Pai',
+  'Tutor(a) / Guardião(ã) Legal',
+  'Avô / Avó',
+  'Tio / Tia',
+  'Irmão / Irmã',
+  'Cônjuge / Companheiro(a)',
+  'Filho / Filha',
+  'Amigo(a) / Próximo(a)',
+  'Outro',
+];
+
 export function TypeformModal({
   open,
   onOpenChange,
@@ -118,11 +131,38 @@ export function TypeformModal({
   const headingFont = theme?.typography?.headingFont || 'var(--brand-heading-font, serif)';
   const bodyFont = theme?.typography?.bodyFont || 'var(--brand-body-font, sans-serif)';
 
-  const [currentNodeId, setCurrentNodeId] = useState<string>("start")
+  const nodes = formFlow.nodes
+  const edges = formFlow.edges
+  const settings = formFlow.settings
+
+  const getFirstStepNodeId = (nodesList: FormNode[], edgesList: FormEdge[]): string => {
+    const startNode = nodesList.find(n => n.type === 'start');
+    if (startNode) {
+      const firstEdge = edgesList.find(e => e.source === startNode.id);
+      if (firstEdge && firstEdge.target) {
+        const targetNode = nodesList.find(n => n.id === firstEdge.target && n.type !== 'start');
+        if (targetNode) return targetNode.id;
+      }
+    }
+    const firstNonStart = nodesList.find(n => n.type !== 'start');
+    return firstNonStart ? firstNonStart.id : (nodesList[0]?.id || '');
+  };
+
+  const [currentNodeId, setCurrentNodeId] = useState<string>("")
   const [history, setHistory] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
+
+  useEffect(() => {
+    if (open) {
+      const initialId = getFirstStepNodeId(nodes, edges);
+      setCurrentNodeId(initialId);
+      setHistory([]);
+      setIsSubmitted(false);
+      setErrorMsg("");
+    }
+  }, [open, nodes, edges]);
 
   // Form states matching all standard nodes
   const [nome, setNome] = useState("")
@@ -131,28 +171,30 @@ export function TypeformModal({
   const [rawPhone, setRawPhone] = useState("")
   const [cpf, setCpf] = useState("")
   const [maioridade, setMaioridade] = useState("")
+  const [responsavelNome, setResponsavelNome] = useState("")
+  const [responsavelRelacao, setResponsavelRelacao] = useState("")
+  const [responsavelTelefone, setResponsavelTelefone] = useState("")
+  const [responsavelCpf, setResponsavelCpf] = useState("")
   const [emergenciaNome, setEmergenciaNome] = useState("")
   const [emergenciaRelacao, setEmergenciaRelacao] = useState("")
   const [emergenciaTelefone, setEmergenciaTelefone] = useState("")
   const [contratoAceito, setContratoAceito] = useState(false)
-  const [responsavelNome, setResponsavelNome] = useState("")
-  const [responsavelCpf, setResponsavelCpf] = useState("")
-  const [responsavelTelefone, setResponsavelTelefone] = useState("")
 
   // Custom steps states: dictionary mapping node ID to answer
   const [customAnswers, setCustomAnswers] = useState<Record<string, any>>({})
 
-  const nodes = formFlow.nodes
-  const edges = formFlow.edges
-  const settings = formFlow.settings
-
-  const currentNode = nodes.find(n => n.id === currentNodeId) || nodes.find(n => n.type === 'start') || nodes[0]
+  const totalStepNodes = nodes.filter(n => n.type !== 'start');
+  let currentNode = nodes.find(n => n.id === currentNodeId && n.type !== 'start');
+  if (!currentNode) {
+    const firstId = getFirstStepNodeId(nodes, edges);
+    currentNode = nodes.find(n => n.id === firstId && n.type !== 'start') || totalStepNodes[0] || nodes[0];
+  }
 
   // Form progress percent
   const getProgressPercent = () => {
-    const totalSteps = nodes.length - 1; // skip start node
+    const totalSteps = totalStepNodes.length;
     if (totalSteps <= 0) return 100;
-    const currentStepIndex = history.length;
+    const currentStepIndex = history.length + 1;
     return Math.min(Math.round((currentStepIndex / totalSteps) * 100), 100);
   }
 
@@ -179,41 +221,54 @@ export function TypeformModal({
     return formatted
   }
 
-  // Next Node Resolution (Branching logic)
+  // Next Node Resolution (Branching logic with fallback)
   const resolveNextNodeId = () => {
     if (!currentNode) return null
 
-    // 1. If selector step (seletor), resolve based on edges with specific option handles (opt_idx or option-idx)
-    if (currentNode.type === "seletor" || currentNode.type === "escolha" || currentNode.type === "escolha_multipla") {
-      const selectedValue = customAnswers[currentNode.id];
-      const options = currentNode.data.options || [];
-      const optionIndex = options.findIndex((o: any) => o.value === selectedValue || o.label === selectedValue);
-      
-      if (optionIndex !== -1) {
-        const handle1 = `opt_${optionIndex}`;
-        const handle2 = `option-${optionIndex}`;
-        const matchingEdge = edges.find(e => e.source === currentNode.id && (e.sourceHandle === handle1 || e.sourceHandle === handle2));
-        if (matchingEdge) {
-          return matchingEdge.target;
-        }
-      }
-    }
-
-    // 2. If maioridade step, resolve based on handles: 'source-maior' vs 'source-menor'
+    // 1. If maioridade step, check for specific handle matching choice (source-maior vs source-menor)
     if (currentNode.type === "maioridade") {
       const isMaior = maioridade === "Sim" || maioridade === "sim" || maioridade === "true";
       const targetHandles = isMaior
         ? ["source-maior", "source-sim", "opt_0", "option-0"]
         : ["source-menor", "source-nao", "opt_1", "option-1"];
       const matchingEdge = edges.find(e => e.source === currentNode.id && targetHandles.includes(e.sourceHandle || ''));
-      if (matchingEdge) {
+      if (matchingEdge && nodes.some(n => n.id === matchingEdge.target)) {
         return matchingEdge.target;
       }
     }
 
-    // 3. Fallback to normal connected edge
+    // 2. If seletor step has legacy option handle edges, check if an edge matches
+    if (currentNode.type === "seletor" || currentNode.type === "escolha" || currentNode.type === "escolha_multipla") {
+      const selectedValue = customAnswers[currentNode.id];
+      const options = currentNode.data?.options || [];
+      const optionIndex = options.findIndex((o: any) => o.value === selectedValue || o.label === selectedValue);
+      if (optionIndex !== -1) {
+        const handle1 = `opt_${optionIndex}`;
+        const handle2 = `option-${optionIndex}`;
+        const matchingEdge = edges.find(e => e.source === currentNode.id && (e.sourceHandle === handle1 || e.sourceHandle === handle2));
+        if (matchingEdge && nodes.some(n => n.id === matchingEdge.target)) {
+          return matchingEdge.target;
+        }
+      }
+    }
+
+    // 3. Fallback to any outgoing edge originating from currentNode.id
     const outgoingEdge = edges.find(e => e.source === currentNode.id)
-    return outgoingEdge ? outgoingEdge.target : null
+    if (outgoingEdge && nodes.some(n => n.id === outgoingEdge.target)) {
+      return outgoingEdge.target;
+    }
+
+    // 4. Ultimate Fallback: next node in array order (skipping 'start' node)
+    const currentIndex = nodes.findIndex(n => n.id === currentNode.id);
+    if (currentIndex !== -1) {
+      for (let i = currentIndex + 1; i < nodes.length; i++) {
+        if (nodes[i].type !== 'start') {
+          return nodes[i].id;
+        }
+      }
+    }
+
+    return null
   }
 
   // Validate step input
@@ -255,19 +310,10 @@ export function TypeformModal({
         setErrorMsg("Por favor, selecione uma opção.")
         return false
       }
-      if (maioridade === "Não") {
-        if (!responsavelNome.trim()) {
-          setErrorMsg("Por favor, preencha o nome do responsável.")
-          return false
-        }
-        if (!validateCPFHelper(responsavelCpf)) {
-          setErrorMsg("Por favor, informe um CPF válido para o responsável.")
-          return false
-        }
-        if (responsavelTelefone.replace(/\D/g, '').length < 8) {
-          setErrorMsg("Por favor, informe um telefone válido para o responsável.")
-          return false
-        }
+    } else if (type === "responsavel" || type === "responsavel_legal") {
+      if (isRequired && (!responsavelNome.trim() || !responsavelRelacao.trim() || responsavelTelefone.replace(/\D/g, '').length < 8)) {
+        setErrorMsg("Por favor, informe o nome, grau de parentesco e telefone do responsável legal.")
+        return false
       }
     } else if (type === "contrato") {
       if (!contratoAceito) {
@@ -341,6 +387,7 @@ export function TypeformModal({
       cpf: cpf.replace(/\D/g, ""),
       maioridade,
       responsavelNome,
+      responsavelRelacao,
       responsavelCpf: responsavelCpf.replace(/\D/g, ""),
       responsavelTelefone: responsavelTelefone.replace(/\D/g, ""),
       contrato: contratoAceito,
@@ -425,7 +472,7 @@ export function TypeformModal({
   const handleClose = () => {
     onOpenChange(false)
     setTimeout(() => {
-      setCurrentNodeId("start")
+      setCurrentNodeId(getFirstStepNodeId(nodes, edges))
       setHistory([])
       setIsSubmitted(false)
       setNome("")
@@ -433,6 +480,10 @@ export function TypeformModal({
       setRawPhone("")
       setCpf("")
       setMaioridade("")
+      setResponsavelNome("")
+      setResponsavelRelacao("")
+      setResponsavelTelefone("")
+      setResponsavelCpf("")
       setEmergenciaNome("")
       setEmergenciaRelacao("")
       setEmergenciaTelefone("")
@@ -737,60 +788,64 @@ export function TypeformModal({
                         <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">B</span>
                       </button>
                     </div>
+                  </div>
+                )}
 
-                    {maioridade === "Não" && (
-                      <div className={`p-4 rounded-xl border space-y-3 animate-in slide-in-from-top-2 duration-200 ${
-                        isLight ? 'border-amber-200 bg-amber-50/50' : 'border-amber-500/30 bg-amber-500/5'
-                      }`}>
-                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
-                          Dados do Responsável Legal:
-                        </span>
-                        <div>
-                          <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                            Nome do Responsável:
-                          </label>
-                          <input
-                            type="text"
-                            value={responsavelNome}
-                            onChange={(e) => { setResponsavelNome(e.target.value); setErrorMsg(""); }}
-                            placeholder="Ex: Carlos Silva"
-                            className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
-                              isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
-                            }`}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                              CPF do Responsável:
-                            </label>
-                            <input
-                              type="text"
-                              value={responsavelCpf}
-                              onChange={(e) => { setResponsavelCpf(formatCPF(e.target.value)); setErrorMsg(""); }}
-                              placeholder="000.000.000-00"
-                              className={`w-full h-11 px-3 rounded-xl border text-sm outline-none font-mono ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
-                              Telefone do Responsável:
-                            </label>
-                            <input
-                              type="tel"
-                              value={responsavelTelefone}
-                              onChange={(e) => { setResponsavelTelefone(e.target.value); setErrorMsg(""); }}
-                              placeholder="(11) 99999-9999"
-                              className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
-                                isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                {/* RESPONSAVEL LEGAL */}
+                {(currentNode.type === "responsavel" || currentNode.type === "responsavel_legal") && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                        Nome do Responsável Legal:
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={responsavelNome}
+                        onChange={(e) => { setResponsavelNome(e.target.value); setErrorMsg(""); }}
+                        placeholder="Ex: Carlos Silva"
+                        className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none transition-all ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                        Grau de Parentesco / Relação:
+                      </label>
+                      <select
+                        value={responsavelRelacao}
+                        onChange={(e) => { setResponsavelRelacao(e.target.value); setErrorMsg(""); }}
+                        className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none transition-all cursor-pointer ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-200 text-slate-900 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-100 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                        }`}
+                      >
+                        <option value="">Selecione o grau de parentesco...</option>
+                        {KINSHIP_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isLight ? 'text-slate-600' : 'text-zinc-400'}`}>
+                        WhatsApp / Celular do Responsável:
+                      </label>
+                      <input
+                        type="tel"
+                        value={responsavelTelefone}
+                        onChange={(e) => { setResponsavelTelefone(e.target.value); setErrorMsg(""); }}
+                        placeholder="(11) 99999-9999"
+                        className={`w-full text-base sm:text-lg p-3.5 rounded-xl border outline-none transition-all ${
+                          isLight
+                            ? 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[var(--brand-gradient-start)] focus:bg-white'
+                            : 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500 focus:border-[var(--brand-gradient-start)] focus:bg-zinc-950'
+                        }`}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -840,15 +895,18 @@ export function TypeformModal({
                         <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>
                           Relação/Parentesco:
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={emergenciaRelacao}
                           onChange={(e) => { setEmergenciaRelacao(e.target.value); setErrorMsg(""); }}
-                          placeholder="Ex: Cônjuge, Mãe, Amigo"
-                          className={`w-full h-11 px-3 rounded-xl border text-sm outline-none ${
+                          className={`w-full h-11 px-3 rounded-xl border text-sm outline-none cursor-pointer ${
                             isLight ? 'bg-slate-50 border-slate-200 text-slate-900' : 'bg-zinc-900 border-zinc-700 text-zinc-100'
                           }`}
-                        />
+                        >
+                          <option value="">Selecione...</option>
+                          {KINSHIP_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-zinc-400'}`}>

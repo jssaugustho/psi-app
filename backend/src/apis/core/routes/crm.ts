@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { db } from '../../../shared/db';
-import { contacts, pipelineColumns, interactionHistory, workspaces } from '../../../shared/schema';
+import { contacts, pipelineColumns, interactionHistory, workspaces, customFieldDefinitions } from '../../../shared/schema';
 import { eq, and, or } from 'drizzle-orm';
 import { resolveTrafficSource } from '../../../shared/resolveTrafficSource';
 import { log } from '../../../shared/queue';
@@ -26,8 +26,151 @@ const WebhookBodySchema = z.object({
   custom_field_values: z.record(z.any()).optional().default({}),
 });
 
+export async function autoRegisterCustomFields(workspaceId: string, customFieldValues: Record<string, any>) {
+  if (!customFieldValues || typeof customFieldValues !== 'object') return;
+  const keys = Object.keys(customFieldValues);
+  if (keys.length === 0) return;
+
+  const existingDefs = await db.query.customFieldDefinitions.findMany({
+    where: eq(customFieldDefinitions.workspaceId, workspaceId),
+  });
+  const existingKeys = new Set(existingDefs.map((d) => d.key));
+
+  for (const key of keys) {
+    if (!key || existingKeys.has(key)) continue;
+    const name = key
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    try {
+      await db.insert(customFieldDefinitions).values({
+        workspaceId,
+        key,
+        name,
+        type: 'text',
+      }).onConflictDoNothing();
+      existingKeys.add(key);
+    } catch {
+      // Ignore conflict
+    }
+  }
+}
+
 export async function crmRoutes(fastifyApp: FastifyInstance) {
   const fastify = fastifyApp.withTypeProvider<ZodTypeProvider>();
+
+  // GET /v1/crm/custom-fields?workspace_id={{WORKSPACE_ID}}
+  fastify.get(
+    '/custom-fields',
+    {
+      schema: {
+        querystring: z.object({
+          workspace_id: z.string().uuid().optional(),
+          tenant_id: z.string().uuid().optional(),
+          workspaceId: z.string().uuid().optional(),
+          tenantId: z.string().uuid().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as any;
+      const workspaceId = q.workspace_id || q.tenant_id || q.workspaceId || q.tenantId;
+      if (!workspaceId) {
+        return reply.status(400).send({ error: 'workspace_id é obrigatório' });
+      }
+
+      const defs = await db.query.customFieldDefinitions.findMany({
+        where: eq(customFieldDefinitions.workspaceId, workspaceId),
+      });
+
+      return reply.send({ success: true, customFields: defs });
+    }
+  );
+
+  // POST /v1/crm/custom-fields
+  fastify.post(
+    '/custom-fields',
+    {
+      schema: {
+        body: z.object({
+          workspace_id: z.string().uuid().optional(),
+          tenant_id: z.string().uuid().optional(),
+          workspaceId: z.string().uuid().optional(),
+          tenantId: z.string().uuid().optional(),
+          key: z.string().min(1, 'Key é obrigatória'),
+          name: z.string().min(1, 'Nome é obrigatório'),
+          type: z.enum(['text', 'number', 'select', 'boolean', 'date']).optional().default('text'),
+          options: z.array(z.string()).optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const body = request.body as any;
+      const workspaceId = body.workspace_id || body.tenant_id || body.workspaceId || body.tenantId;
+      if (!workspaceId) {
+        return reply.status(400).send({ error: 'workspace_id é obrigatório' });
+      }
+
+      const cleanKey = body.key.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+      const existing = await db.query.customFieldDefinitions.findFirst({
+        where: and(
+          eq(customFieldDefinitions.workspaceId, workspaceId),
+          eq(customFieldDefinitions.key, cleanKey)
+        ),
+      });
+
+      if (existing) {
+        return reply.send({ success: true, customField: existing, created: false });
+      }
+
+      const [created] = await db.insert(customFieldDefinitions).values({
+        workspaceId,
+        key: cleanKey,
+        name: body.name.trim(),
+        type: body.type || 'text',
+        options: body.options || null,
+      }).returning();
+
+      return reply.status(201).send({ success: true, customField: created, created: true });
+    }
+  );
+
+  // DELETE /v1/crm/custom-fields/:id?workspace_id={{WORKSPACE_ID}}
+  fastify.delete(
+    '/custom-fields/:id',
+    {
+      schema: {
+        params: z.object({
+          id: z.string().uuid(),
+        }),
+        querystring: z.object({
+          workspace_id: z.string().uuid().optional(),
+          tenant_id: z.string().uuid().optional(),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as any;
+      const q = request.query as any;
+      const workspaceId = q.workspace_id || q.tenant_id;
+
+      if (!workspaceId) {
+        return reply.status(400).send({ error: 'workspace_id é obrigatório' });
+      }
+
+      await db.delete(customFieldDefinitions)
+        .where(
+          and(
+            eq(customFieldDefinitions.id, id),
+            eq(customFieldDefinitions.workspaceId, workspaceId)
+          )
+        );
+
+      return reply.send({ success: true });
+    }
+  );
 
   // POST /v1/crm/webhook?workspace_id={{WORKSPACE_ID}}
   fastify.post(
@@ -194,6 +337,8 @@ export async function crmRoutes(fastifyApp: FastifyInstance) {
             customFieldValues: custom_field_values || {},
           })
           .returning();
+
+        await autoRegisterCustomFields(targetWorkspaceId, custom_field_values || {});
 
         // 7. Inserir log inicial na timeline do contato
         const startLogNotes = `Contato criado automaticamente via Webhook.\n` +
