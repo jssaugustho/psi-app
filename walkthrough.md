@@ -60,4 +60,18 @@ Ajustamos o layout da Linha do Tempo (Timeline) para corrigir o problema em que 
   - Adicionada a classe `gap-2` (8px) na classe `base` do botão nos componentes [`select.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select.tsx) e [`select-with-helper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/ui/src/select-with-helper.tsx).
   - Isso garante que, mesmo quando a largura do componente estiver comprimida ou o texto das opções for muito longo, haja sempre um espaçamento mínimo confortável e legível entre o final do texto e o ícone do chevron, assim como já ocorre com o ícone de filtro.
 
+## 4. Visual Site Editor — Controles estilo Framer & Overrides Contextuais no Mobile
+
+- **Controle de Tamanho estilo Framer (`SizeControl.tsx`)**:
+  - Criado o componente reutilizável [`SizeControl.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/components/SizeControl.tsx) com suporte a modos de dimensionamento (`Fixo`, `Relativo %`, `Preencher Fill (100%)` e `Ajustar Conteúdo Fit`), min/max constraints recolhíveis, Proporção de Tela (Aspect Ratio) e Ajuste de Imagem (Object Fit).
+- **Painéis de Propriedades Reestruturados**:
+  - Atualizados os painéis [`SectionProperties.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/SectionProperties.tsx), [`DivProperties.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/DivProperties.tsx) e [`ComponentProperties.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/ComponentProperties.tsx).
+  - Removida a aba estática "📱 Mobile". Quando o viewport global está em modo `'mobile'`, as edições gravam automaticamente em `element.mobile` mantendo os valores originais de desktop intactos.
+  - Adicionados botões de direção Flexbox representados exclusivamente por ícones (`MoveHorizontal` e `MoveVertical`).
+  - Adicionado o botão de alternância única "Visibilidade / Ocultar" com ícones `Eye`/`EyeOff`.
+- **Canvas Wrappers & Overrides**:
+  - Atualizados os wrappers [`SectionWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/SectionWrapper.tsx), [`DivWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/DivWrapper.tsx) e [`AtomicComponentWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/AtomicComponentWrapper.tsx).
+  - Todos os wrappers mesclam as propriedades de `element.mobile` quando a visualização estiver em modo celular (`viewportMode === 'mobile'`), aplicando restrições de largura, altura, min/max dimensions, proporção de tela e ajuste de imagem em tempo real no canvas.
+
+
 

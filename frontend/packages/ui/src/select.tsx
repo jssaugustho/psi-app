@@ -5,6 +5,8 @@ import React, { useState, useRef, useEffect } from 'react';
 export interface SelectOption {
   value: string;
   label: string;
+  fontFamily?: string;
+  style?: React.CSSProperties;
 }
 
 export interface SelectProps {
@@ -127,7 +129,10 @@ export function Select({
         className={`${getTriggerClass()} ${className}`}
         style={getTriggerStyle()}
       >
-        <span className={selectedOption ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
+        <span 
+          className={selectedOption ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}
+          style={(selectedOption as any)?.fontFamily ? { fontFamily: `'${(selectedOption as any).fontFamily}', sans-serif` } : (selectedOption as any)?.style}
+        >
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg
@@ -146,11 +151,14 @@ export function Select({
         >
           {normalizedOptions.map((opt) => {
             const isSelected = opt.value === value;
+            const optFont = (opt as any).fontFamily;
+            const optStyle = (opt as any).style;
             return (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => handleSelect(opt.value)}
+                style={optFont ? { fontFamily: `'${optFont}', sans-serif` } : optStyle}
                 className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-sm transition-all border-none ${
                   isSelected 
                     ? 'bg-gradient-to-r from-[var(--brand-gradient-start)] to-[var(--brand-gradient-end)] text-white font-medium' 
@@ -159,7 +167,7 @@ export function Select({
               >
                 <span>{opt.label}</span>
                 {isSelected && (
-                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <svg className="w-4 h-4 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}

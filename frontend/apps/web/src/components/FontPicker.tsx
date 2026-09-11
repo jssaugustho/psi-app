@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { Type, Check, ChevronDown, Plus, Search } from 'lucide-react'
+import { loadGoogleFonts } from '@/app/dashboard/captacao/[pageId]/_editor/utils/googleFonts';
 
 interface FontOption {
   name: string;
@@ -68,18 +69,10 @@ export function FontPicker({
   // Lazy load fonts on popover open
   useEffect(() => {
     if (isOpen && !fontsLoaded) {
-      const fontFamilies = defaultFonts.map(f => f.name.replace(/\s+/g, '+')).join('&family=');
-      const href = `https://fonts.googleapis.com/css2?family=${fontFamilies}:wght@400;600;700&display=swap`;
-      
-      if (!document.querySelector(`link[href="${href}"]`)) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = href;
-        document.head.appendChild(link);
-      }
+      loadGoogleFonts(allFonts.map(f => f.name));
       setFontsLoaded(true);
     }
-  }, [isOpen, fontsLoaded, defaultFonts]);
+  }, [isOpen, fontsLoaded, allFonts]);
 
   // Click outside listener
   useEffect(() => {

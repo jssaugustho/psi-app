@@ -78,9 +78,9 @@ const DEFAULT_TEMPLATE_MODEL = {
       colors: {
         primaryStart: '#7C3AED',
         primaryEnd: '#A855F7',
-        contrast: '#FFFFFF',
-        bgDark: '#09090B',
-        textDark: '#F4F4F5',
+        contrast: '#18181B',
+        siteBg: '#FFFFFF',
+        cardBg: '#FFFFFF',
       }
     }
   },
@@ -618,9 +618,10 @@ export default function NovaPaginaCaptacaoPage() {
           currentStep: 1,
           theme: {
             colors: {
-              primaryStart: '#458270',
-              primaryEnd: '#A64E2B',
-              contrast: '#FFFFFF',
+              primaryStart: '#7C3AED',
+              primaryEnd: '#A855F7',
+              contrast: '#18181B',
+              siteBg: '#FFFFFF',
             },
           },
           sections: [

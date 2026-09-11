@@ -1072,41 +1072,77 @@ export const api = {
   // --- Captação: Capture Pages ---
   getCapturePages: async (tenantId: string): Promise<CapturePage[]> => {
     const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?workspace_id=eq.${tenantId}&order=created_at.desc`);
-    return list.map(item => ({
-      id: item.id,
-      tenantId: item.workspace_id,
-      title: item.title,
-      slug: item.slug,
-      isActive: item.is_active,
-      ctaType: item.cta_type || 'form',
-      ctaWhatsappMessage: item.cta_whatsapp_message || null,
-      ctaExternalUrl: item.cta_external_url || null,
-      formId: item.form_id || null,
-      customDomain: item.custom_domain,
-      seoConfig: item.seo_config,
-      siteConfig: item.site_config,
-      dictionary: item.dictionary,
-      formFlow: item.form_flow,
-      titleDraft: item.draft_data?.title ?? item.title_draft ?? null,
-      slugDraft: item.draft_data?.slug ?? item.slug_draft ?? null,
-      customDomainDraft: item.draft_data?.customDomain ?? item.custom_domain_draft ?? null,
-      seoConfigDraft: item.draft_data?.seoConfig ?? item.seo_config_draft ?? null,
-      siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
-      dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
-      formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
-      ctaTypeDraft: item.draft_data?.ctaType ?? null,
-      ctaWhatsappMessageDraft: item.draft_data?.ctaWhatsappMessage ?? null,
-      ctaExternalUrlDraft: item.draft_data?.ctaExternalUrl ?? null,
-      formIdDraft: item.draft_data?.formId ?? null,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    }));
+    return list.map(item => {
+      const draftData = item.draft_data || {};
+      return {
+        id: item.id,
+        tenantId: item.workspace_id,
+        title: item.title,
+        slug: item.slug,
+        isActive: item.is_active,
+        ctaType: item.cta_type || 'form',
+        ctaWhatsappMessage: item.cta_whatsapp_message || null,
+        ctaExternalUrl: item.cta_external_url || null,
+        formId: item.form_id || null,
+        customDomain: item.custom_domain,
+        seoConfig: item.seo_config,
+        siteConfig: item.site_config,
+        dictionary: item.dictionary,
+        formFlow: item.form_flow,
+        canvas_data: draftData.canvas_data || draftData.canvasData || item.site_config?.canvas_data || item.canvas_data || null,
+        titleDraft: draftData.title ?? item.title_draft ?? null,
+        slugDraft: draftData.slug ?? item.slug_draft ?? null,
+        customDomainDraft: draftData.customDomain ?? item.custom_domain_draft ?? null,
+        seoConfigDraft: draftData.seoConfig ?? item.seo_config_draft ?? null,
+        siteConfigDraft: draftData.siteConfig ?? item.site_config_draft ?? null,
+        dictionaryDraft: draftData.dictionary ?? item.dictionary_draft ?? null,
+        formFlowDraft: draftData.formFlow ?? item.form_flow_draft ?? null,
+        ctaTypeDraft: draftData.ctaType ?? null,
+        ctaWhatsappMessageDraft: draftData.ctaWhatsappMessage ?? null,
+        ctaExternalUrlDraft: draftData.ctaExternalUrl ?? null,
+        formIdDraft: draftData.formId ?? null,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      };
+    });
   },
 
   getCapturePage: async (id: string): Promise<CapturePage> => {
     const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
     if (list.length === 0) throw new Error('Página não encontrada');
     const item = list[0];
+    const draftData = item.draft_data || {};
+
+    // 🎨 Carrega a Identidade Visual padrão do Workspace
+    let visualIdentity: any = null;
+    if (item.workspace_id) {
+      try {
+        visualIdentity = await api.getVisualIdentity(item.workspace_id);
+      } catch (err) {
+        console.warn('⚠️ Não foi possível carregar a identidade visual do workspace:', err);
+      }
+    }
+
+    const theme = {
+      primaryStart: item.site_config?.theme?.primaryStart || visualIdentity?.primaryColor || '#4F46E5',
+      primaryEnd: item.site_config?.theme?.primaryEnd || visualIdentity?.secondaryColor || '#7C3AED',
+      contrast: item.site_config?.theme?.contrast || visualIdentity?.contrastColor || '#18181B',
+      siteBg: item.site_config?.theme?.siteBg || item.site_config?.theme?.bgColor || '#FFFFFF',
+      bgColor: item.site_config?.theme?.siteBg || item.site_config?.theme?.bgColor || '#FFFFFF',
+      logoUrl: item.site_config?.theme?.logoUrl || visualIdentity?.logoUrl || null,
+      faviconUrl: item.site_config?.theme?.faviconUrl || visualIdentity?.faviconUrl || null,
+      logoConfig: item.site_config?.logoConfig || visualIdentity?.logoConfig || null,
+      fontHeading: item.site_config?.theme?.fontHeading || visualIdentity?.fontHeading || 'Playfair Display',
+      fontBody: item.site_config?.theme?.fontBody || visualIdentity?.fontBody || 'Inter',
+      ...(item.site_config?.theme || {}),
+    };
+
+    const siteConfig = {
+      ...(item.site_config || {}),
+      theme,
+      logoConfig: theme.logoConfig,
+    };
+
     return {
       id: item.id,
       tenantId: item.workspace_id,
@@ -1118,21 +1154,30 @@ export const api = {
       ctaExternalUrl: item.cta_external_url || null,
       formId: item.form_id || null,
       customDomain: item.custom_domain,
+      primaryStart: theme.primaryStart,
+      primaryEnd: theme.primaryEnd,
+      contrast: theme.contrast,
+      logoUrl: theme.logoUrl,
+      faviconUrl: theme.faviconUrl,
+      logoConfig: theme.logoConfig,
+      fontHeading: theme.fontHeading,
+      fontBody: theme.fontBody,
       seoConfig: item.seo_config,
-      siteConfig: item.site_config,
+      siteConfig: siteConfig,
       dictionary: item.dictionary,
       formFlow: item.form_flow,
-      titleDraft: item.draft_data?.title ?? item.title_draft ?? null,
-      slugDraft: item.draft_data?.slug ?? item.slug_draft ?? null,
-      customDomainDraft: item.draft_data?.customDomain ?? item.custom_domain_draft ?? null,
-      seoConfigDraft: item.draft_data?.seoConfig ?? item.seo_config_draft ?? null,
-      siteConfigDraft: item.draft_data?.siteConfig ?? item.site_config_draft ?? null,
-      dictionaryDraft: item.draft_data?.dictionary ?? item.dictionary_draft ?? null,
-      formFlowDraft: item.draft_data?.formFlow ?? item.form_flow_draft ?? null,
-      ctaTypeDraft: item.draft_data?.ctaType ?? null,
-      ctaWhatsappMessageDraft: item.draft_data?.ctaWhatsappMessage ?? null,
-      ctaExternalUrlDraft: item.draft_data?.ctaExternalUrl ?? null,
-      formIdDraft: item.draft_data?.formId ?? null,
+      canvas_data: draftData.canvas_data || draftData.canvasData || item.site_config?.canvas_data || item.canvas_data || null,
+      titleDraft: draftData.title ?? item.title_draft ?? null,
+      slugDraft: draftData.slug ?? item.slug_draft ?? null,
+      customDomainDraft: draftData.customDomain ?? item.custom_domain_draft ?? null,
+      seoConfigDraft: draftData.seoConfig ?? item.seo_config_draft ?? null,
+      siteConfigDraft: draftData.siteConfig ?? item.site_config_draft ?? null,
+      dictionaryDraft: draftData.dictionary ?? item.dictionary_draft ?? null,
+      formFlowDraft: draftData.formFlow ?? item.form_flow_draft ?? null,
+      ctaTypeDraft: draftData.ctaType ?? null,
+      ctaWhatsappMessageDraft: draftData.ctaWhatsappMessage ?? null,
+      ctaExternalUrlDraft: draftData.ctaExternalUrl ?? null,
+      formIdDraft: draftData.formId ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -1203,7 +1248,7 @@ export const api = {
     };
   },
 
-  updateCapturePage: async (id: string, body: Partial<CapturePage>): Promise<CapturePage> => {
+  updateCapturePage: async (id: string, body: Partial<CapturePage> & Record<string, any>): Promise<CapturePage> => {
     // 1. Buscamos a página atual para carregar o draft_data existente
     const currentList = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
     if (currentList.length === 0) throw new Error('Página não encontrada');
@@ -1220,9 +1265,26 @@ export const api = {
     if (body.formId !== undefined) dbBody.form_id = body.formId;
     if (body.customDomain !== undefined) dbBody.custom_domain = body.customDomain;
     if (body.seoConfig !== undefined) dbBody.seo_config = body.seoConfig;
-    if (body.siteConfig !== undefined) dbBody.site_config = body.siteConfig;
+    if (body.siteConfig !== undefined) {
+      dbBody.site_config = {
+        ...(currentItem.site_config || {}),
+        ...body.siteConfig,
+        theme: {
+          ...(currentItem.site_config?.theme || {}),
+          ...(body.siteConfig?.theme || {}),
+        },
+      };
+    }
     if (body.dictionary !== undefined) dbBody.dictionary = body.dictionary;
     if (body.formFlow !== undefined) dbBody.form_flow = body.formFlow;
+
+    const canvasDataToSave = body.canvas_data ?? body.canvasData ?? body.canvasDataDraft ?? body.canvas_data_draft;
+    if (canvasDataToSave !== undefined) {
+      dbBody.site_config = {
+        ...(dbBody.site_config || currentItem.site_config || {}),
+        canvas_data: canvasDataToSave,
+      };
+    }
 
     // 2. Mesclamos os campos de draft recebidos no body para dentro de draft_data
     const updatedDraftData = { ...currentDraftData };
@@ -1237,6 +1299,10 @@ export const api = {
     if (body.ctaWhatsappMessageDraft !== undefined) updatedDraftData.ctaWhatsappMessage = body.ctaWhatsappMessageDraft;
     if (body.ctaExternalUrlDraft !== undefined) updatedDraftData.ctaExternalUrl = body.ctaExternalUrlDraft;
     if (body.formIdDraft !== undefined) updatedDraftData.formId = body.formIdDraft;
+    if (canvasDataToSave !== undefined) {
+      updatedDraftData.canvas_data = canvasDataToSave;
+      updatedDraftData.canvasData = canvasDataToSave;
+    }
 
     // Se houve qualquer atualização de rascunho, atualiza draft_data no DB
     if (
@@ -1250,7 +1316,8 @@ export const api = {
       body.ctaTypeDraft !== undefined ||
       body.ctaWhatsappMessageDraft !== undefined ||
       body.ctaExternalUrlDraft !== undefined ||
-      body.formIdDraft !== undefined
+      body.formIdDraft !== undefined ||
+      canvasDataToSave !== undefined
     ) {
       dbBody.draft_data = updatedDraftData;
     }
@@ -1849,6 +1916,9 @@ export interface CapturePage {
   contrast?: string;
   logoUrl?: string;
   faviconUrl?: string;
+  logoConfig?: any;
+  fontHeading?: string;
+  fontBody?: string;
   seoConfig: {
     metaTitle: string;
     metaDescription: string;
@@ -1860,6 +1930,8 @@ export interface CapturePage {
   siteConfig: any;
   dictionary: any;
   formFlow: any;
+  canvas_data?: any;
+  canvas_data_legacy?: any;
   titleDraft?: string | null;
   slugDraft?: string | null;
   customDomainDraft?: string | null;
