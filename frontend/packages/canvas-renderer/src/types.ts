@@ -353,7 +353,7 @@ export type AtomicComponentType =
   | 'faq_item' | 'card'
   | 'spacer' | 'navbar_links' | 'social_links';
 
-export type ComponentType = 'div' | 'carousel' | AtomicComponentType;
+export type ComponentType = 'div' | 'carousel' | 'global_instance' | AtomicComponentType;
 
 export type EffectType = 'shadow' | 'scale' | 'translate' | 'rotate' | 'opacity' | 'blur' | 'skew';
 
@@ -460,6 +460,26 @@ export interface ComponentMobileOverride {
   props?: Partial<Record<string, unknown>>;
 }
 
+export interface ExposedPropDeclaration {
+  path: string;
+  nodeId: string;
+  label: string;
+  propKey: string;
+  type: 'text' | 'color' | 'image' | 'link' | 'number' | 'boolean' | 'select';
+  defaultValue?: any;
+}
+
+export interface GlobalComponentMaster {
+  id: string;
+  workspaceId: string;
+  name: string;
+  category?: string;
+  iconName?: string;
+  masterNode: Component;
+  customizableProps: ExposedPropDeclaration[];
+  updatedAt: string;
+}
+
 export interface AtomicComponent extends ComponentBase {
   type: AtomicComponentType;
   props: Record<string, any>;
@@ -467,7 +487,15 @@ export interface AtomicComponent extends ComponentBase {
   mobile?: ComponentMobileOverride;
 }
 
-export type Component = DivComponent | CarouselComponent | AtomicComponent;
+export interface GlobalInstanceComponent extends ComponentBase {
+  type: 'global_instance';
+  globalComponentId: string;
+  overrides: Record<string, any>;
+  layout?: DivLayout;
+  mobile?: ComponentMobileOverride;
+}
+
+export type Component = DivComponent | CarouselComponent | AtomicComponent | GlobalInstanceComponent;
 
 export interface HeadingProps {
   text: string;
@@ -721,6 +749,7 @@ export interface CanvasGlobalStyles {
 export interface CanvasData {
   version: '2.0';
   globalStyles?: CanvasGlobalStyles;
+  globalComponentsMap?: Record<string, GlobalComponentMaster>;
   navbar?: NavbarConfig;
   sections: Section[];
 }
@@ -729,6 +758,6 @@ export type ViewportMode = 'desktop' | 'mobile';
 
 export interface SelectionState {
   id: string | null;
-  type: 'section' | 'div' | 'carousel' | 'navbar' | AtomicComponentType | null;
+  type: 'section' | 'div' | 'carousel' | 'navbar' | 'global_instance' | AtomicComponentType | null;
   path?: string[];
 }

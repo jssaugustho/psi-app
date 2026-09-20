@@ -414,5 +414,19 @@ export const auditLogs = pgTable('audit_logs', {
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
 
+// ── 16. Elementos Globais Reutilizáveis do Workspace ────────────────────────
+export const globalComponents = pgTable('global_components', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  category: text('category').default('custom').notNull(),
+  iconName: text('icon_name').default('Sparkles').notNull(),
+  description: text('description'),
+  masterNode: jsonb('master_node').notNull(),
+  customizableProps: jsonb('customizable_props').default([]).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
-
+export type GlobalComponent = typeof globalComponents.$inferSelect;
+export type NewGlobalComponent = typeof globalComponents.$inferInsert;

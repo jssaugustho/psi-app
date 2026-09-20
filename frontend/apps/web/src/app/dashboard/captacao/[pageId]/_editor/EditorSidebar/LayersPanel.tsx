@@ -283,7 +283,7 @@ export function LayersPanel({
     const isOpen = openIds.has(comp.id);
 
     const isTargetingThis = dropTarget?.id === comp.id;
-    const dropPosition = isTargetingThis ? dropTarget.position : null;
+    const dropPosition = isTargetingThis && dropTarget ? dropTarget.position : null;
 
     return (
       <div key={comp.id} className="space-y-1">

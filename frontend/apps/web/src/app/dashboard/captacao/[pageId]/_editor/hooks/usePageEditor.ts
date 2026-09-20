@@ -5,7 +5,9 @@ import {
   ViewportMode,
   Section,
   Component,
-  NavbarConfig
+  NavbarConfig,
+  GlobalComponentMaster,
+  GlobalInstanceComponent,
 } from '../types';
 import { migrateLegacyCanvas } from '../utils/migrateCanvas';
 import {
@@ -372,6 +374,36 @@ export function usePageEditor(pageId: string) {
     }
   }, [pageId, canvasData, autoSave]);
 
+  // 🌐 ADICIONAR ELEMENTO GLOBAL MASTER E TRANSFORMAR EM INSTÂNCIA
+  const addGlobalComponentMaster = useCallback((globalMaster: GlobalComponentMaster, newInstance: GlobalInstanceComponent) => {
+    if (!canvasData) return;
+    const currentMap = canvasData.globalComponentsMap || {};
+    const updatedMap = {
+      ...currentMap,
+      [globalMaster.id]: globalMaster,
+    };
+    const updatedCanvas = updateComponentHelper(canvasData, newInstance.id, () => newInstance as any);
+    updateCanvasState({
+      ...updatedCanvas,
+      globalComponentsMap: updatedMap,
+    }, `Criou Elemento Global "${globalMaster.name}"`);
+    selectElement(newInstance.id, 'global_instance');
+  }, [canvasData, updateCanvasState, selectElement]);
+
+  // 🌐 ATUALIZAR ELEMENTO GLOBAL MASTER (PROPAGAR A TODAS AS INSTÂNCIAS)
+  const updateGlobalComponentMaster = useCallback((updatedMaster: GlobalComponentMaster) => {
+    if (!canvasData) return;
+    const currentMap = canvasData.globalComponentsMap || {};
+    const updatedMap = {
+      ...currentMap,
+      [updatedMaster.id]: updatedMaster,
+    };
+    updateCanvasState({
+      ...canvasData,
+      globalComponentsMap: updatedMap,
+    }, `Atualizou Elemento Global Master "${updatedMaster.name}"`);
+  }, [canvasData, updateCanvasState]);
+
   return {
     page,
     loading,
@@ -404,6 +436,8 @@ export function usePageEditor(pageId: string) {
     copiedElement,
     updateSiteConfig,
     updatePage,
+    addGlobalComponentMaster,
+    updateGlobalComponentMaster,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
     historyEntries: history.entries,
@@ -420,4 +454,5 @@ export function usePageEditor(pageId: string) {
     isPublishing,
   };
 }
+
 

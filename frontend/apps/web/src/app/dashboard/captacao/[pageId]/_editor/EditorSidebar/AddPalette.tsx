@@ -25,27 +25,31 @@ import {
   ArrowUpDown,
   GripVertical,
   PanelBottom,
-  Share2
+  Share2,
+  Globe
 } from 'lucide-react';
 import { AccordionItem } from '../PropertiesPanel/components/AccordionSection';
-import { createSectionFromPreset, Section, AtomicComponentType } from '@psi/canvas-renderer';
+import { createSectionFromPreset, Section, AtomicComponentType, GlobalComponentMaster } from '@psi/canvas-renderer';
 
 interface AddPaletteProps {
   onAddSection: (label?: string) => void;
   onAddCustomSection?: (section: Section) => void;
-  onAddComponent: (type: 'div' | 'carousel' | AtomicComponentType, preset?: string) => void;
+  onAddComponent: (type: 'div' | 'carousel' | 'global_instance' | AtomicComponentType, preset?: string) => void;
+  globalComponentsMap?: Record<string, GlobalComponentMaster> | null;
+  onAddGlobalInstance?: (globalComponentId: string) => void;
 }
 
 interface PaletteItem {
-  type: 'section' | 'div' | 'carousel' | AtomicComponentType;
+  type: 'section' | 'div' | 'carousel' | 'global_instance' | AtomicComponentType;
   preset?: string;
+  globalComponentId?: string;
   label: string;
   icon: React.ComponentType<any>;
   desc: string;
 }
 
-export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent }: AddPaletteProps) {
-  // Categorias Simplificadas em 3 Acordeões Inteligentes
+export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, globalComponentsMap, onAddGlobalInstance }: AddPaletteProps) {
+  // Categorias Simplificadas em Acordeões Inteligentes
   const elementCategories: Array<{ title: string; icon: React.ComponentType<any>; items: PaletteItem[] }> = [
     {
       title: 'ESTRUTURA & LAYOUT',
@@ -93,8 +97,21 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent }:
     },
   ];
 
-  const handleDragStart = (e: React.DragEvent, item: { type: string; preset?: string }) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ itemType: item.type, preset: item.preset }));
+  const globalItems: PaletteItem[] = globalComponentsMap
+    ? Object.values(globalComponentsMap).map((gc) => ({
+        type: 'global_instance',
+        globalComponentId: gc.id,
+        label: gc.name,
+        icon: Sparkles,
+        desc: `${gc.customizableProps.length} prop(s) personalizável(is)`,
+      }))
+    : [];
+
+  const handleDragStart = (e: React.DragEvent, item: PaletteItem) => {
+    e.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({ itemType: item.type, preset: item.preset, globalComponentId: item.globalComponentId })
+    );
     e.dataTransfer.effectAllowed = 'copy';
   };
 
@@ -145,6 +162,55 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent }:
           </AccordionItem>
         );
       })}
+
+      {/* 4. Novo Acordeão: ELEMENTOS GLOBAIS */}
+      <AccordionItem id="acc-cat-global" title="ELEMENTOS GLOBAIS" icon={Globe} defaultOpen={true}>
+        {globalItems.length === 0 ? (
+          <div className="p-3 text-center rounded-xl border border-dashed border-purple-500/20 bg-purple-500/5 text-purple-600 dark:text-purple-400 space-y-1">
+            <Sparkles className="w-4 h-4 mx-auto animate-pulse" />
+            <p className="text-[11px] font-bold">Nenhum Elemento Global criado</p>
+            <p className="text-[9px] text-slate-500 dark:text-slate-400">
+              Clique com botão direito em qualquer elemento no canvas e escolha &quot;Salvar como Global&quot;.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {globalItems.map((item, itemIdx) => {
+              return (
+                <div
+                  key={`global-${item.globalComponentId}-${itemIdx}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
+                  onClick={() => {
+                    if (onAddGlobalInstance && item.globalComponentId) {
+                      onAddGlobalInstance(item.globalComponentId);
+                    } else {
+                      onAddComponent('global_instance', item.globalComponentId);
+                    }
+                  }}
+                  className="p-2 rounded-xl border border-purple-500/30 bg-purple-500/5 hover:border-purple-500 hover:bg-purple-500/10 transition-all text-left flex flex-col justify-between space-y-1 group/card cursor-grab active:cursor-grabbing select-none min-w-0 shadow-sm"
+                >
+                  <div className="flex items-center justify-between min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div className="p-1 rounded-lg bg-purple-600 text-white shrink-0">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate flex-1 min-w-0" title={item.label}>
+                        {item.label}
+                      </span>
+                    </div>
+                    <GripVertical className="w-3 h-3 text-purple-400 opacity-0 group-hover/card:opacity-100 transition-opacity shrink-0" />
+                  </div>
+                  <span className="text-[8.5px] text-purple-600 dark:text-purple-400 font-medium truncate block w-full" title={item.desc}>
+                    {item.desc}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </AccordionItem>
     </div>
   );
 }
+

@@ -7,6 +7,8 @@ import { SectionProperties } from './SectionProperties';
 import { DivProperties } from './DivProperties';
 import { CarouselProperties } from './CarouselProperties';
 import { ComponentProperties } from './ComponentProperties';
+import { GlobalInstanceProperties } from './GlobalInstanceProperties';
+import { GlobalInstanceComponent, resolveGlobalInstance } from '@psi/canvas-renderer';
 
 interface PropertiesPanelProps {
   canvasData: CanvasData | null;
@@ -22,6 +24,7 @@ interface PropertiesPanelProps {
   onSelectElement?: (id: string | null, type?: any) => void;
   onDeselect: () => void;
   onUpdateSiteConfig?: (patch: any) => void;
+  onEditMaster?: (globalComponentId: string) => void;
 }
 
 export function PropertiesPanel({
@@ -38,7 +41,9 @@ export function PropertiesPanel({
   onSelectElement,
   onDeselect,
   onUpdateSiteConfig,
+  onEditMaster,
 }: PropertiesPanelProps) {
+
   if (!selection.id || !canvasData) {
     return null;
   }
@@ -56,6 +61,41 @@ export function PropertiesPanel({
 
   return (
     <aside className="w-full h-full border-r border-[var(--surface-border)] glass-sm flex flex-col shrink-0">
+      {element.type === 'global_instance' && (
+        <GlobalInstanceProperties
+          instance={element as GlobalInstanceComponent}
+          globalMaster={canvasData.globalComponentsMap?.[(element as GlobalInstanceComponent).globalComponentId] || null}
+          onUpdateOverride={(path, value) => {
+            const currentOverrides = (element as GlobalInstanceComponent).overrides || {};
+            const nextOverrides = { ...currentOverrides };
+            if (value === undefined) {
+              delete nextOverrides[path];
+            } else {
+              nextOverrides[path] = value;
+            }
+            onUpdateComponent(element.id, { overrides: nextOverrides });
+          }}
+          onUnlinkInstance={() => {
+            const resolved = resolveGlobalInstance(
+              element as GlobalInstanceComponent,
+              canvasData.globalComponentsMap
+            );
+            delete (resolved as any).__isGlobalInstance;
+            delete (resolved as any).__globalMasterId;
+            delete (resolved as any).__globalMasterName;
+            delete (resolved as any).__customizableProps;
+            delete (resolved as any).__instanceOverrides;
+            onUpdateComponent(element.id, resolved);
+          }}
+          onEditMaster={() => {
+            if (onEditMaster) {
+              onEditMaster((element as GlobalInstanceComponent).globalComponentId);
+            }
+          }}
+        />
+      )}
+
+
       {element.type === 'section' && (
         <SectionProperties
           section={element as Section}
@@ -94,7 +134,7 @@ export function PropertiesPanel({
         />
       )}
 
-      {element.type !== 'section' && element.type !== 'div' && element.type !== 'carousel' && (
+      {element.type !== 'section' && element.type !== 'div' && element.type !== 'carousel' && element.type !== 'global_instance' && (
         <ComponentProperties
           component={element as AtomicComponent}
           canvasData={canvasData}
@@ -109,3 +149,4 @@ export function PropertiesPanel({
     </aside>
   );
 }
+

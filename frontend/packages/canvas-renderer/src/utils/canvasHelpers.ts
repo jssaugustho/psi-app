@@ -396,11 +396,14 @@ export function moveElementBeforeOrAfter(
 export function updateComponentInCanvas(
   canvas: CanvasData,
   componentId: string,
-  patch: Partial<Component>
+  patch: Partial<Component> | ((comp: Component) => Component)
 ): CanvasData {
   const updateInComponents = (components: Component[]): Component[] => {
     return components.map((comp) => {
       if (comp.id === componentId) {
+        if (typeof patch === 'function') {
+          return patch(comp);
+        }
         return { ...comp, ...patch } as Component;
       }
 

@@ -23,3 +23,4 @@ export * from './utils/sectionHelpers';
 export * from './utils/positionHelpers';
 export * from './hooks/useParallaxEffect';
 export * from './utils/propertyAdjustHelpers';
+export * from './utils/resolveGlobalInstance';

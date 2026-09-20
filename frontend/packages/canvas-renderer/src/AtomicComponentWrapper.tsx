@@ -149,6 +149,7 @@ function InlineEditableText({
     normalizedStyle.WebkitBackgroundClip = 'text';
     normalizedStyle.backgroundClip = 'text';
     normalizedStyle.color = 'transparent';
+    (normalizedStyle as any).WebkitTextFillColor = 'transparent';
   } else {
     normalizedStyle.backgroundImage = activeBgImage || 'none';
     if (activeBgColor) {
@@ -158,6 +159,7 @@ function InlineEditableText({
     }
     delete (normalizedStyle as any).WebkitBackgroundClip;
     delete (normalizedStyle as any).backgroundClip;
+    delete (normalizedStyle as any).WebkitTextFillColor;
   }
 
   if (isPublicView) {
@@ -498,6 +500,7 @@ export function AtomicComponentWrapper({
       background: isGradient ? rawColor : undefined,
       WebkitBackgroundClip: isGradient ? 'text' : undefined,
       backgroundClip: isGradient ? 'text' : undefined,
+      WebkitTextFillColor: isGradient ? 'transparent' : undefined,
       textAlign: explicitTextAlign || levelConfig.textAlign || (!prefix ? effectiveStyle.textAlign : undefined),
       marginBottom: !prefix ? effectiveStyle.marginBottom : undefined,
     };
@@ -1105,7 +1108,7 @@ export function AtomicComponentWrapper({
                 fontWeight: effectiveStyle.fontWeight || effectiveProps.fontWeight || typo.fontWeight || buttonDefaults.fontWeight || '700',
                 letterSpacing: effectiveStyle.letterSpacing || effectiveProps.letterSpacing || typo.letterSpacing || buttonDefaults.letterSpacing || '0.025em',
                 textTransform: (effectiveStyle.textTransform || effectiveProps.textTransform || typo.textTransform || buttonDefaults.textTransform || 'none') as any,
-                color: isBtnTextGradient ? 'transparent' : computedColor,
+                color: isBtnTextGradient ? undefined : computedColor,
                 fontFamily: effectiveStyle.fontFamily || effectiveProps.fontFamily || typo.fontFamily || buttonDefaults.fontFamily,
                 marginBottom: typo.marginBottom,
                 background: computedBg,
@@ -1121,7 +1124,7 @@ export function AtomicComponentWrapper({
                 transitionTimingFunction: timing,
               }}
             >
-              {ButtonIconLeft && <ButtonIconLeft className="w-4 h-4 pointer-events-none shrink-0" />}
+              {ButtonIconLeft && <ButtonIconLeft className="w-4 h-4 pointer-events-none shrink-0" style={{ color: isBtnTextGradient ? (computedColor.match(/#(?:[0-9a-fA-F]{3,8})|rgba?\([^)]+\)/)?.[0] || brandColor) : undefined }} />}
               <InlineEditableText
                 tagName="span"
                 html={effectiveProps.html}
@@ -1143,6 +1146,7 @@ export function AtomicComponentWrapper({
                         background: computedColor,
                         WebkitBackgroundClip: 'text',
                         backgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
                         color: 'transparent',
                         display: 'inline-block',
                       }
@@ -1150,7 +1154,7 @@ export function AtomicComponentWrapper({
                 }
                 className={`outline-none ${!isPublicView && isSelected ? 'cursor-text' : ''}`}
               />
-              {ButtonIconRight && <ButtonIconRight className="w-4 h-4 pointer-events-none shrink-0" />}
+              {ButtonIconRight && <ButtonIconRight className="w-4 h-4 pointer-events-none shrink-0" style={{ color: isBtnTextGradient ? (computedColor.match(/#(?:[0-9a-fA-F]{3,8})|rgba?\([^)]+\)/)?.[0] || brandColor) : undefined }} />}
             </button>
           );
         })()}

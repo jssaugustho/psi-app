@@ -34,6 +34,7 @@ export interface CanvasRendererProps {
   onCopyElement?: (id: string) => void;
   onPasteElement?: (id: string) => void;
   onPasteStyleElement?: (id: string) => void;
+  onSaveAsGlobal?: (id: string) => void;
   copiedElement?: any;
   canPaste?: boolean;
   onCtaClick?: () => void;
@@ -63,6 +64,7 @@ export function CanvasRenderer({
   onCopyElement,
   onPasteElement,
   onPasteStyleElement,
+  onSaveAsGlobal,
   copiedElement,
   canPaste = false,
   onCtaClick,
@@ -214,6 +216,7 @@ export function CanvasRenderer({
           onCopy={(id) => onCopyElement?.(id)}
           onPaste={(id) => onPasteElement?.(id)}
           onPasteStyle={(id) => onPasteStyleElement?.(id)}
+          onSaveAsGlobal={(id) => onSaveAsGlobal?.(id)}
           onDelete={(id, type) => {
             if (type === 'section') {
               onRemoveSection(id);

@@ -6,6 +6,7 @@ import {
   DivComponent,
   CarouselComponent,
   AtomicComponent,
+  GlobalInstanceComponent,
   ComponentType
 } from './types';
 
@@ -603,9 +604,21 @@ export function createDefaultComponent(type: ComponentType | string, preset?: st
     case 'div':
       return createDefaultDiv() as any;
 
+    case 'global_instance':
+      return createDefaultGlobalInstance(preset || '') as any;
+
     default:
       throw new Error(`Tipo de componente desconhecido: ${type}`);
   }
+}
+
+export function createDefaultGlobalInstance(globalComponentId: string): GlobalInstanceComponent {
+  return {
+    id: crypto.randomUUID(),
+    type: 'global_instance',
+    globalComponentId,
+    overrides: {},
+  };
 }
 
 export function createHeaderSectionTemplate(preset: 'classic' | 'floating' | 'minimal' = 'classic'): Section {

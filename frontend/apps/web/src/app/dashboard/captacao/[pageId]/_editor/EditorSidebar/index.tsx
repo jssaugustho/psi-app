@@ -16,7 +16,7 @@ interface EditorSidebarProps {
   page?: CapturePage | null;
   onAddSection: (label?: string) => void;
   onAddCustomSection?: (section: Section) => void;
-  onAddComponent: (type: 'div' | 'carousel' | AtomicComponentType, preset?: string) => void;
+  onAddComponent: (type: 'div' | 'carousel' | 'global_instance' | AtomicComponentType, preset?: string) => void;
   onSelectElement: (id: string | null, type?: any) => void;
   onRemoveSection: (id: string) => void;
   onRemoveComponent: (id: string) => void;
@@ -128,6 +128,7 @@ export function EditorSidebar({
             onAddSection={onAddSection}
             onAddCustomSection={onAddCustomSection}
             onAddComponent={onAddComponent}
+            globalComponentsMap={canvasData?.globalComponentsMap}
           />
         )}
 

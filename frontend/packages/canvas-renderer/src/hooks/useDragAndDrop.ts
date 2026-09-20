@@ -9,7 +9,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CanvasData, ComponentType } from '../types';
 import { validateCanvasOperation, moveSection, findElementInCanvas } from '../utils/canvasHelpers';
-import { createDefaultSection, createDefaultDiv, createDefaultComponent } from '../constants';
+import { createDefaultSection, createDefaultDiv, createDefaultComponent, createDefaultGlobalInstance } from '../constants';
 
 interface UseDragAndDropProps {
   canvasData: CanvasData | null;
@@ -80,18 +80,20 @@ export function useDragAndDrop({
         if (!parentFound) return;
 
         const parentType = parentFound.element.type === 'section' ? 'section' : 'div';
-        if (!validateCanvasOperation(itemType, parentType)) {
+        if (itemType !== 'global_instance' && !validateCanvasOperation(itemType, parentType)) {
           return; // Operação inválida (ex: div dentro de div)
         }
 
-        const preset = activeData?.preset;
+        const preset = activeData?.preset || activeData?.globalComponentId;
         const newComp = itemType === 'div'
           ? createDefaultDiv('Container (Div)')
+          : itemType === 'global_instance'
+          ? createDefaultGlobalInstance(activeData?.globalComponentId || preset || '')
           : createDefaultComponent(itemType as any, preset);
 
         const sections = canvasData.sections.map((sec) => {
           if (sec.id === targetParentId) {
-            return { ...sec, components: [...sec.components, newComp] };
+            return { ...sec, components: [...sec.components, newComp as any] };
           }
           if (sec.components.some((c) => c.id === targetParentId)) {
             const updatedComps = sec.components.map((c) => {
@@ -109,6 +111,7 @@ export function useDragAndDrop({
         onSelectElement?.(newComp.id, newComp.type);
         return;
       }
+
 
       // 2. REORDENAÇÃO DE SEÇÕES NO CANVAS
       if (activeData?.type === 'section' && overData?.type === 'section') {

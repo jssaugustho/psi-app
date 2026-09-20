@@ -10,7 +10,11 @@ import { EditorSidebar } from './EditorSidebar';
 import { EditorCanvas } from './EditorCanvas';
 import { PropertiesPanel } from './PropertiesPanel';
 import { HistoryModal } from './components/HistoryModal';
+import { CreateGlobalComponentModal } from './components/CreateGlobalComponentModal';
+import { GlobalMasterEditorModal } from './components/GlobalMasterEditorModal';
 import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from './constants';
+import { findElementInCanvas } from './utils/canvasHelpers';
+import { Component, GlobalInstanceComponent, GlobalComponentMaster } from '@psi/canvas-renderer';
 import { loadGoogleFonts } from './utils/googleFonts';
 import { useBrand } from '@/context/BrandContext';
 import {
@@ -78,6 +82,8 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
     copiedElement,
     updateSiteConfig,
     updatePage,
+    addGlobalComponentMaster,
+    updateGlobalComponentMaster,
     canUndo,
     canRedo,
     historyEntries,
@@ -98,6 +104,29 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [justPublished, setJustPublished] = React.useState(false);
   const [historyModalOpen, setHistoryModalOpen] = React.useState(false);
+  const [isGlobalModalOpen, setIsGlobalModalOpen] = React.useState(false);
+  const [globalModalTarget, setGlobalModalTarget] = React.useState<Component | null>(null);
+
+  const [isMasterEditorOpen, setIsMasterEditorOpen] = React.useState(false);
+  const [editingMaster, setEditingMaster] = React.useState<GlobalComponentMaster | null>(null);
+
+  const handleOpenMasterEditor = (globalComponentId: string) => {
+    const master = canvasData?.globalComponentsMap?.[globalComponentId];
+    if (master) {
+      setEditingMaster(master);
+      setIsMasterEditorOpen(true);
+    }
+  };
+
+  const handleOpenSaveAsGlobal = (id: string) => {
+    if (!canvasData) return;
+    const found = findElementInCanvas(canvasData, id);
+    if (found && found.element && found.element.type !== 'section') {
+      setGlobalModalTarget(found.element as Component);
+      setIsGlobalModalOpen(true);
+    }
+  };
+
 
   const handlePublish = async () => {
     if (isPublishing) return;
@@ -516,7 +545,9 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
                     onSelectElement={selectElement}
                     onDeselect={() => selectElement(null)}
                     onUpdateSiteConfig={updateSiteConfig}
+                    onEditMaster={handleOpenMasterEditor}
                   />
+
                 ) : (
                   <EditorSidebar
                     canvasData={canvasData}
@@ -612,6 +643,7 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
               onPasteStyleElement={pasteStyleElement}
               copiedElement={copiedElement}
               canPaste={!!copiedElement}
+              onSaveAsGlobal={handleOpenSaveAsGlobal}
               isPublicView={!controlsVisible}
             />
           </>
@@ -778,6 +810,36 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
         currentIndex={historyIndex}
         onJumpToIndex={jumpToHistoryIndex}
       />
+
+      {/* ✨ MODAL DE CRIAÇÃO DE ELEMENTO GLOBAL */}
+      <CreateGlobalComponentModal
+        isOpen={isGlobalModalOpen}
+        onClose={() => {
+          setIsGlobalModalOpen(false);
+          setGlobalModalTarget(null);
+        }}
+        targetComponent={globalModalTarget}
+        workspaceId={(page as any)?.workspace_id || (page as any)?.workspaceId}
+        onSave={async (globalMaster, newInstance) => {
+          addGlobalComponentMaster(globalMaster, newInstance);
+        }}
+      />
+
+      {/* 🎨 MODAL DE EDIÇÃO ISOLADA DO COMPONENTE MASTER (ESTILO FRAMER) */}
+      <GlobalMasterEditorModal
+        isOpen={isMasterEditorOpen}
+        onClose={() => {
+          setIsMasterEditorOpen(false);
+          setEditingMaster(null);
+        }}
+        master={editingMaster}
+        page={page}
+        onSaveMaster={async (updatedMaster) => {
+          updateGlobalComponentMaster(updatedMaster);
+        }}
+      />
     </div>
   );
 }
+
+

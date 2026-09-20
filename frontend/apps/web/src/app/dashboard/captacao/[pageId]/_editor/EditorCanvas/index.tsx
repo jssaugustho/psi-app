@@ -24,6 +24,7 @@ export interface EditorCanvasProps {
   onCopyElement?: (id: string) => void;
   onPasteElement?: (id: string) => void;
   onPasteStyleElement?: (id: string) => void;
+  onSaveAsGlobal?: (id: string) => void;
   copiedElement?: any;
   canPaste?: boolean;
   isPublicView?: boolean;

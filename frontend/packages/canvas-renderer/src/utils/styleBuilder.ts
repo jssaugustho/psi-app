@@ -305,7 +305,13 @@ export function buildComponentCssStyle({
 
   if (activeTextColor) {
     const isGradient = typeof activeTextColor === 'string' && (activeTextColor.includes('gradient') || activeTextColor.includes('var(--brand-gradient'));
-    if (!isGradient) {
+    if (isGradient) {
+      result.color = 'transparent';
+      result.background = activeTextColor;
+      result.WebkitBackgroundClip = 'text';
+      result.backgroundClip = 'text';
+      (result as any).WebkitTextFillColor = 'transparent';
+    } else {
       result.color = activeTextColor;
     }
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Edit, Copy, Clipboard, Layers, Trash2, Paintbrush } from 'lucide-react';
+import { Edit, Copy, Clipboard, Layers, Trash2, Paintbrush, Sparkles } from 'lucide-react';
 
 export interface ContextMenuState {
   isOpen: boolean;
@@ -19,6 +19,7 @@ interface ContextMenuProps {
   onCopy: (id: string) => void;
   onPaste: (id: string) => void;
   onPasteStyle?: (id: string) => void;
+  onSaveAsGlobal?: (id: string) => void;
   onDelete: (id: string, type: any) => void;
   canPaste: boolean;
   canPasteStyle?: boolean;
@@ -32,6 +33,7 @@ export function ContextMenu({
   onCopy,
   onPaste,
   onPasteStyle,
+  onSaveAsGlobal,
   onDelete,
   canPaste,
   canPasteStyle = false,
@@ -137,6 +139,21 @@ export function ContextMenu({
         <Paintbrush className="w-3.5 h-3.5 text-purple-500" />
         <span>Colar Estilo</span>
       </button>
+
+      {/* Opção 6: Salvar como Elemento Global */}
+      {onSaveAsGlobal && menuState.targetType !== 'section' && (
+        <button
+          type="button"
+          onClick={() => {
+            onSaveAsGlobal(menuState.targetId!);
+            onClose();
+          }}
+          className="w-full px-3 py-2 text-left text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 flex items-center gap-2 font-bold transition-colors cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+          <span>Salvar como Global</span>
+        </button>
+      )}
 
       <div className="my-1 border-t border-slate-100 dark:border-zinc-800" />
 
