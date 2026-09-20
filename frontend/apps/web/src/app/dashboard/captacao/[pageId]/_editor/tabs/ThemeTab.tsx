@@ -78,6 +78,9 @@ export function ThemeTab({ page, onUpdateSiteConfig, tenant }: ThemeTabProps) {
             value={page.logoUrl || ''}
             onChange={handleLogoChange}
             tenantId={page.tenantId}
+            targetWidth={300}
+            targetHeight={100}
+            aspectRatio={3}
             isLogo={true}
             logoConfig={page.siteConfig?.logoConfig}
             onLogoConfigChange={(cfg) => onUpdateSiteConfig({ logoConfig: cfg })}

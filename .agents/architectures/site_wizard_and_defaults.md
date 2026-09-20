@@ -1,6 +1,6 @@
-# 🧙‍♂️ Architecture Spec: Universal Workspace Inheritance & Site Overrides
+# 🧙‍♂️ Architecture Spec: Universal Workspace Inheritance & Site Creation Wizard
 
-> **Scope**: Multi-step workspace onboarding wizard, site creation wizard, RPC workspace bootstrapping, default CRM columns, visual identity initialization, and universal inheritance & override pattern (Branding, Social Links, Professional Profile).
+> **Scope**: Multi-step workspace onboarding wizard, 7-step site creation wizard, RPC workspace bootstrapping, default CRM columns, visual identity initialization, and universal inheritance & override pattern (Branding, Social Links, Professional Profile).
 
 ---
 
@@ -17,9 +17,10 @@ Read this document when working on:
 
 ## 2. Inviolable Directives (ALWAYS / NEVER)
 
+### Universal Workspace Inheritance
 1. **ALWAYS Use Universal Workspace Inheritance by Default**:
-   - Workspaces store baseline defaults for **Identidade Visual** (`visual_identities` table e `workspaces.gradient_color_start`, `gradient_color_end`, `contrast_color`, `bg_dark_color`), **Redes Sociais & Links** (`social_links`), e **Perfil Profissional** (`name`, `crp`, `bio`).
-   - The site creation wizard (`nova/page.tsx`), site editor and site renderer MUST fetch and render the exact colors saved in the active workspace database. Sites MUST dynamically inherit workspace defaults whenever the corresponding override flag (`hasBrandIdentityOverride`, `hasSocialLinksOverride`, `hasProfileOverride`) is `false`, `null`, or `undefined`.
+   - Workspaces store baseline defaults for **Identidade Visual** (`workspaces.gradient_color_start`, `gradient_color_end`, `contrast_color`, `bg_dark_color`), **Redes Sociais & Links** (`social_links`), and **Perfil Profissional** (`name`, `crp`, `bio`).
+   - The site creation wizard (`nova/page.tsx`), site editor, and site renderer MUST fetch and render the exact colors saved in the active workspace database. Sites MUST dynamically inherit workspace defaults whenever the corresponding override flag (`hasBrandIdentityOverride`, `hasSocialLinksOverride`, `hasProfileOverride`) is `false`, `null`, or `undefined`.
 2. **DOMAINS ARE ALWAYS WORKSPACE-GLOBAL (NO SITE OVERRIDES)**:
    - Subdomains (`workspaces.subdomain`) and custom domains (`workspaces.custom_domain`) belong exclusively to the workspace as a whole.
    - Sites NEVER override the base domain; they only specify their URL path/slug (e.g. `/`, `/ansiedade`).
@@ -30,30 +31,46 @@ Read this document when working on:
    - When creating a new site in a workspace:
      - **1st Priority (Workspace Inheritance)**: Inherit `dictionary`, `siteConfig` text structure, and `formFlow` from the **most recently updated site** of the same workspace.
      - **2nd Priority (Platform Global Fallback)**: If the workspace has NO previous sites (first site of workspace), inherit the **platform global default template model** (`DEFAULT_TEMPLATE_MODEL`).
-5. **NEVER Inject Hidden Text Fallbacks in Production Rendering**:
+
+### Wizard UI/UX & Navigation
+5. **ALWAYS Redirect to Creation Wizard when No Pages Exist**:
+   - When accessing `/dashboard/captacao`, if the user has 0 regular pages and 0 wizard drafts, automatically redirect immediately (`router.replace('/dashboard/captacao/nova?fresh=true')`) to start the creation wizard flow.
+6. **ALWAYS Display Interactive Inheritance vs Override Selection Cards in Wizard**:
+   - In Step 2 (Visual Identity) and Step 4 (Social Links), render prominent selectable cards:
+     - Card A (Recommended): "Usar marca do consultório" (Shows live workspace color pills & logo preview).
+     - Card B: "Personalizar para este site" (Opens color picker inputs & custom logo upload).
+7. **NEVER Inject Hidden Text Fallbacks in Production Rendering**:
    - `CapturePageRenderer.tsx` MUST NOT render hardcoded default strings to disguise missing DB text content in live public sites. If a text field in `dictionary` is missing or empty on a live site, render `null`/empty.
    - In editor/preview mode (`isPreview === true`), render explicit visual placeholders (`[Campo Vazio - ...]`) so the editor clearly identifies empty fields.
-6. **ALWAYS Enforce Publication Validation Lock on Empty Required Text Fields**:
-   - Page publishing (`publishCapturePage`) MUST be blocked if any active section (`hero`, `about`, `diagnostic`, `process`, `space`, `faq`) contains empty required text fields in `dictionary`.
-7. **ALWAYS Redirect to Creation Wizard when No Pages Exist**:
-   - When accessing `/dashboard/captacao`, if the user has 0 regular pages and 0 wizard drafts, automatically redirect immediately (`router.replace('/dashboard/captacao/nova?fresh=true')`) to start the creation wizard flow.
 
 ---
 
-## 3. Feature Architecture & Flowchart
+## 3. Feature Architecture & UI/UX Design System
 
 ```mermaid
 graph TD
     A[Workspace Settings / Onboarding] -->|Stores baseline defaults| B[(Workspaces Row)]
-    C[New Site Wizard] -->|User Selects Mode| D{Inheritance vs Override Cards}
-    
-    D -->|"Usar Marca/Redes do Consultório"| E[siteConfig.hasBrandIdentityOverride = false / hasSocialLinksOverride = false]
-    D -->|"Personalizar para Este Site"| F[siteConfig.hasBrandIdentityOverride = true + custom theme/links]
-    
-    G[CapturePageRenderer] --> H{Check Override Flags}
+    C[New Site Wizard: 7-Step Flow] -->|Step 2 & 4: User Selects Mode| D{Inheritance vs Override Cards}
+
+    D -->|"Usar Marca/Redes do Consultório (Rec)"| E[hasBrandIdentityOverride = false / hasSocialLinksOverride = false]
+    D -->|"Personalizar para Este Site"| F[hasBrandIdentityOverride = true + custom theme/links]
+
+    G[CapturePageRenderer / Site Editor] --> H{Check Override Flags}
     H -->|Flag = false / undefined| I[Dynamic Fallback to Workspace Baseline]
     H -->|Flag = true| J[Use Site-Specific Override Config]
 ```
+
+### 7-Step Site Creation Wizard Layout (`nova/page.tsx`)
+
+| Step # | Title & Purpose | Primary UI Component | Behavior / Action |
+|---|---|---|---|
+| **Etapa 1** | Nome da Profissional / Página | Input Text + Pre-fill | Set title and psychologist name |
+| **Etapa 2** | Identidade Visual | Dual Choice Cards (Inherit vs Custom) | `hasBrandIdentityOverride` flag |
+| **Etapa 3** | Endereço na Internet | Subdomain badge + Slug Input | Live preview: `subdomain.psi.app/slug` |
+| **Etapa 4** | Redes Sociais & Links | Dual Choice Cards + Link Fields | `hasSocialLinksOverride` flag |
+| **Etapa 5** | Destino do CTA Principal | Radio Cards (Form, WhatsApp, URL) | Select CTA destination type |
+| **Etapa 6** | SEO & Redes Sociais | Meta Title, Description, OG Cover | SEO social share optimization |
+| **Etapa 7** | Revisão & Instanciação | Summary Review Card + Submit | Trigger page instantiation |
 
 ---
 
@@ -64,22 +81,9 @@ graph TD
 | Property Category | Workspace Baseline Column | Site Config Override Flag | Renderer Fallback Logic |
 |---|---|---|---|
 | **Redes Sociais & Links** | `workspaces.social_links` | `hasSocialLinksOverride: boolean` | `cfg.hasSocialLinksOverride ? cfg.socialLinks : tenant.social_links` |
-| **Identidade Visual (Branding)** | `workspaces.default_site_*` | `hasBrandIdentityOverride: boolean` | `cfg.hasBrandIdentityOverride ? cfg.theme : tenant.defaultSite...` |
+| **Identidade Visual (Branding)** | `workspaces.gradient_color_start`, `end`, `contrast_color` | `hasBrandIdentityOverride: boolean` | `cfg.hasBrandIdentityOverride ? cfg.theme : tenant.defaultSite...` |
 | **Perfil Profissional & CRP** | `workspaces.name`, `crp` | `hasProfileOverride: boolean` | `cfg.hasProfileOverride ? cfg.professional : tenant.name` |
-| **Domínios & Subdomínios** | `workspaces.subdomain` | ❌ **Nenhum** (Global) | Base domain is always workspace-wide; site sets `slug` |
-
-### 7-Step Site Creation Wizard (`nova/page.tsx`)
-
-1. **Etapa 1: Nome da Psicóloga / Página**: Título da profissional e identificação principal.
-2. **Etapa 2: Identidade Visual**: Escolha entre herdar o tema visual do consultório ou personalizar paleta/logotipo para o site.
-3. **Etapa 3: Endereço na Internet**: Subdomínio e caminho relativo (`slug`).
-4. **Etapa 4: Redes Sociais & Links**: Definição dos links (WhatsApp, Instagram, LinkedIn, Doctoralia, X, YouTube, Facebook, Custom) com opção de herança ou override.
-5. **Etapa 5: Destino do CTA Principal**:
-   - `form` (Formulário Interno de Triagem): Opção entre instanciar novo formulário padrão ou vincular a um `form_id` existente na tabela `screening_forms`.
-   - `whatsapp` (WhatsApp Direto): Redireciona para `wa.me/55...` com `ctaWhatsappMessage` customizável.
-   - `external_url` (Link Externo): Redireciona para URL externa (`ctaExternalUrl` como Calendly/Google Forms).
-6. **Etapa 6: Otimização SEO & Redes Sociais**: Configuração de Meta Title, Meta Description, Palavras-chave e Capa de Compartilhamento Social (`og:image`).
-7. **Etapa 7: Revisão & Instanciação**: Card com o resumo completo da página antes da geração do site no editor.
+| **Domínios & Subdomínios** | `workspaces.subdomain` | ❌ **Nenhum** (Workspace Global) | Base domain is always workspace-wide; site sets `slug` |
 
 ### CTA Resolution Pattern in `CapturePageRenderer.tsx`
 
@@ -115,8 +119,22 @@ const handleCtaClick = () => {
 
 ## 5. Anti-Patterns & Prohibitions
 
-❌ **WRONG**: Hardcoding or copying workspace brand colors/logo into `siteConfig` when creating a new site with default options.
-> Why it fails: Breaks dynamic inheritance. If the psychologist updates their office primary color or logo later in Workspace Settings, existing sites with copied data will remain outdated.
+### ❌ ERRADO: Copiar as cores da marca do consultório para o `siteConfig` ao criar um site com opção padrão
+```typescript
+// NUNCA faça isso: se o psicólogo alterar a cor do consultório depois nas Configurações, o site ficará desatualizado
+const newSiteConfig = {
+  theme: {
+    primaryColor: tenant.gradient_color_start, // ❌ Quebra a herança dinâmica!
+  },
+  hasBrandIdentityOverride: false,
+};
+```
 
-✅ **CORRECT**: Setting `hasBrandIdentityOverride: false` and leaving `siteConfig.theme` undefined so the site renderer dynamically fetches the live workspace visual identity.
-
+### ✅ CORRETO: Manter `hasBrandIdentityOverride: false` e deixar `theme` como undefined
+```typescript
+// CORRETO: O site herda dinamicamente em tempo real qualquer alteração feita no consultório
+const newSiteConfig = {
+  theme: undefined,
+  hasBrandIdentityOverride: false,
+};
+```

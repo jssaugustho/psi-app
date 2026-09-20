@@ -106,12 +106,12 @@ export function ListItemsEditor({ items, showIconPicker = false, onChange }: Lis
                   onClick={() => setIconPickerOpenIdx(iconPickerOpenIdx === idx ? null : idx)}
                   className="text-[9px] font-bold px-2 py-1 rounded-lg border border-[var(--surface-border)] text-slate-500 hover:text-blue-600 hover:border-blue-400 transition-colors cursor-pointer"
                 >
-                  Icone: {item.iconName || 'Check'}
+                  Icone: {!item.iconName && item.iconName !== undefined ? 'Nenhum' : (item.iconName || 'Check')}
                 </button>
                 {iconPickerOpenIdx === idx && (
                   <div className="absolute z-50 top-full mt-1 left-0 right-0 p-2 bg-white dark:bg-zinc-900 border border-[var(--surface-border)] rounded-xl shadow-xl">
                     <IconPicker
-                      selectedName={item.iconName || 'Check'}
+                      selectedName={item.iconName !== undefined ? item.iconName : 'Check'}
                       onSelectIcon={(name) => handleIconChange(idx, name)}
                     />
                   </div>

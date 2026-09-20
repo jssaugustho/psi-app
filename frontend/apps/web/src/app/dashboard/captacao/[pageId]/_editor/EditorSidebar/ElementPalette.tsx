@@ -3,6 +3,7 @@ import {
   Square,
   Columns2,
   Columns3,
+  GalleryHorizontal,
   Heading,
   AlignLeft,
   Type,
@@ -20,16 +21,18 @@ import {
   HelpCircle,
   CreditCard,
   ArrowUpDown,
-  GripVertical
+  GripVertical,
+  Share2,
+  Compass,
 } from 'lucide-react';
 import { AtomicComponentType } from '../types';
 
 interface ElementPaletteProps {
-  onAddComponent: (type: 'div' | AtomicComponentType, preset?: string) => void;
+  onAddComponent: (type: 'div' | 'carousel' | AtomicComponentType, preset?: string) => void;
 }
 
 interface PaletteItem {
-  type: 'div' | AtomicComponentType;
+  type: 'div' | 'carousel' | AtomicComponentType;
   preset?: string;
   label: string;
   icon: React.ComponentType<any>;
@@ -41,9 +44,19 @@ export function ElementPalette({ onAddComponent }: ElementPaletteProps) {
     {
       title: 'CONTAINERS & SEÇÕES',
       items: [
-        { type: 'div' as const, preset: 'single', label: 'Container / Seção', icon: Square, desc: 'Nível 1 na raiz = Seção | Nível 2 = Div' },
+        { type: 'div' as const, preset: 'single', label: 'Container', icon: Square, desc: 'Container flexível de seção' },
         { type: 'div' as const, preset: '2col', label: '2 Colunas', icon: Columns2, desc: 'Grade de 2 colunas flex' },
         { type: 'div' as const, preset: '3col', label: '3 Colunas', icon: Columns3, desc: 'Grade de 3 colunas flex' },
+        { type: 'carousel' as const, label: 'Galeria / Carrossel', icon: GalleryHorizontal, desc: 'Carrossel coringa multi-itens' },
+      ],
+    },
+    {
+      title: 'NAVEGAÇÃO & BRANDING',
+      items: [
+        { type: 'logo' as const, label: 'Logotipo', icon: UserCheck, desc: 'Marca do profissional' },
+        { type: 'navbar_links' as const, label: 'Menu de Links', icon: Compass, desc: 'Links de navegação do site' },
+        { type: 'avatar' as const, label: 'Avatar', icon: User, desc: 'Foto de perfil circular' },
+        { type: 'social_links' as const, label: 'Redes Sociais', icon: Share2, desc: 'Ícones de redes sociais' },
       ],
     },
     {
@@ -51,16 +64,16 @@ export function ElementPalette({ onAddComponent }: ElementPaletteProps) {
       items: [
         { type: 'heading' as const, label: 'Título', icon: Heading, desc: 'H1 a H6 editável' },
         { type: 'paragraph' as const, label: 'Parágrafo', icon: AlignLeft, desc: 'Texto de apresentação' },
-        { type: 'label' as const, label: 'Subtítulo / Tag', icon: Type, desc: 'Texto curto de apoio' },
-        { type: 'list' as const, label: 'Lista de Itens', icon: List, desc: 'Tópicos com ícone check' },
+        { type: 'label' as const, label: 'Subtítulo', icon: Type, desc: 'Texto curto de apoio' },
+        { type: 'list' as const, label: 'Lista', icon: List, desc: 'Tópicos com ícone check' },
       ],
     },
     {
       title: 'MÍDIA & VISUAL',
       items: [
-        { type: 'image' as const, label: 'Imagem R2', icon: ImageIcon, desc: 'Upload de foto' },
-        { type: 'video' as const, label: 'Vídeo Embed', icon: Video, desc: 'YouTube ou Vimeo' },
-        { type: 'icon' as const, label: 'Ícone Lucide', icon: Sparkles, desc: 'Vetor customizável' },
+        { type: 'image' as const, label: 'Imagem', icon: ImageIcon, desc: 'Upload de foto R2' },
+        { type: 'video' as const, label: 'Vídeo', icon: Video, desc: 'YouTube ou Vimeo' },
+        { type: 'icon' as const, label: 'Ícone', icon: Sparkles, desc: 'Vetor Lucide customizável' },
         { type: 'divider' as const, label: 'Separador', icon: Minus, desc: 'Linha divisória' },
       ],
     },
@@ -68,18 +81,11 @@ export function ElementPalette({ onAddComponent }: ElementPaletteProps) {
       title: 'AÇÃO & CONVERSÃO',
       items: [
         { type: 'button' as const, label: 'Botão CTA', icon: MousePointerClick, desc: 'Ação principal' },
-        { type: 'logo' as const, label: 'Logotipo', icon: UserCheck, desc: 'Marca do profissional' },
-        { type: 'avatar' as const, label: 'Foto de Perfil', icon: User, desc: 'Avatar circular' },
-      ],
-    },
-    {
-      title: 'CARD & ESTRUTURA',
-      items: [
-        { type: 'badge' as const, label: 'Badge / Tag', icon: Award, desc: 'Chip de destaque' },
+        { type: 'badge' as const, label: 'Badge', icon: Award, desc: 'Chip de destaque' },
         { type: 'testimonial' as const, label: 'Depoimento', icon: MessageSquare, desc: 'Citação de paciente' },
         { type: 'stat_counter' as const, label: 'Contador', icon: BarChart3, desc: 'Métricas de impacto' },
-        { type: 'faq_item' as const, label: 'Pergunta FAQ', icon: HelpCircle, desc: 'Acordeão expansível' },
-        { type: 'card' as const, label: 'Card Informativo', icon: CreditCard, desc: 'Bloco em cartão' },
+        { type: 'faq_item' as const, label: 'FAQ', icon: HelpCircle, desc: 'Acordeão expansível' },
+        { type: 'card' as const, label: 'Card', icon: CreditCard, desc: 'Bloco em cartão' },
         { type: 'spacer' as const, label: 'Espaçador', icon: ArrowUpDown, desc: 'Espaço em branco' },
       ],
     },
@@ -106,20 +112,20 @@ export function ElementPalette({ onAddComponent }: ElementPaletteProps) {
                   draggable
                   onDragStart={(e) => handleDragStart(e, item)}
                   onClick={() => onAddComponent(item.type as any, item.preset)}
-                  className="p-2.5 rounded-xl border border-[var(--surface-border)] glass-sm hover:border-[var(--brand-gradient-start)] hover:glass-md transition-all text-left flex flex-col justify-between space-y-1.5 group cursor-grab active:cursor-grabbing select-none"
+                  className="p-2.5 rounded-xl border border-[var(--surface-border)] glass-sm hover:border-[var(--brand-gradient-start)] hover:glass-md transition-all text-left flex flex-col justify-between space-y-1.5 group/card cursor-grab active:cursor-grabbing select-none min-w-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] group-hover:brand-accent group-hover:text-white transition-colors">
+                  <div className="flex items-center justify-between min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div className="p-1.5 rounded-lg bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] group-hover/card:brand-accent group-hover/card:text-white transition-colors shrink-0">
                         <Icon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate flex-1 min-w-0" title={item.label}>
                         {item.label}
                       </span>
                     </div>
-                    <GripVertical className="w-3 h-3 text-slate-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <GripVertical className="w-3 h-3 text-slate-300 dark:text-zinc-600 opacity-0 group-hover/card:opacity-100 transition-opacity shrink-0 ml-1" />
                   </div>
-                  <span className="text-[8px] text-slate-500 truncate">{item.desc}</span>
+                  <span className="text-[9px] text-slate-500 truncate block w-full" title={item.desc}>{item.desc}</span>
                 </div>
               );
             })}

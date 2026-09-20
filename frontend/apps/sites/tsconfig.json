@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@psi/canvas-renderer": ["../../packages/canvas-renderer/src/index.ts"],
+      "@psi/canvas-renderer/*": ["../../packages/canvas-renderer/src/*"]
     }
   },
   "include": [

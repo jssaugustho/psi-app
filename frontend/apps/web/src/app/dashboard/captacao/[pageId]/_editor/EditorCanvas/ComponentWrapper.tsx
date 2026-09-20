@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Component, DivComponent, AtomicComponent, ViewportMode } from '../types';
+import { Component, DivComponent, CarouselComponent, AtomicComponent, ViewportMode } from '../types';
 import { DivWrapper } from './DivWrapper';
+import { CarouselWrapper } from './CarouselWrapper';
 import { AtomicComponentWrapper } from './AtomicComponentWrapper';
 
 interface ComponentWrapperProps {
@@ -18,6 +19,7 @@ interface ComponentWrapperProps {
   onMoveElementBeforeOrAfter?: (elementId: string, targetElementId: string, position: 'before' | 'after') => void;
   onAddComponentBeforeOrAfter?: (targetElementId: string, comp: any, position: 'before' | 'after') => void;
   onContextMenu?: (e: React.MouseEvent, id: string, type: string) => void;
+  isPublicView?: boolean;
 }
 
 export function ComponentWrapper({
@@ -33,7 +35,28 @@ export function ComponentWrapper({
   onMoveElementBeforeOrAfter,
   onAddComponentBeforeOrAfter,
   onContextMenu,
+  isPublicView = false,
 }: ComponentWrapperProps) {
+  if (component.type === 'carousel') {
+    return (
+      <CarouselWrapper
+        carouselComponent={component as CarouselComponent}
+        selectedId={selectedId}
+        viewportMode={viewportMode}
+        page={page}
+        onSelect={onSelect}
+        onRemove={onRemove}
+        onUpdateComponent={onUpdateComponent}
+        onAddComponent={onAddComponent}
+        onMoveElement={onMoveElement}
+        onMoveElementBeforeOrAfter={onMoveElementBeforeOrAfter}
+        onAddComponentBeforeOrAfter={onAddComponentBeforeOrAfter}
+        onContextMenu={onContextMenu}
+        isPublicView={isPublicView}
+      />
+    );
+  }
+
   if (component.type === 'div') {
     return (
       <DivWrapper
@@ -49,6 +72,7 @@ export function ComponentWrapper({
         onMoveElementBeforeOrAfter={onMoveElementBeforeOrAfter}
         onAddComponentBeforeOrAfter={onAddComponentBeforeOrAfter}
         onContextMenu={onContextMenu}
+        isPublicView={isPublicView}
       />
     );
   }
@@ -65,6 +89,7 @@ export function ComponentWrapper({
       onMoveElementBeforeOrAfter={onMoveElementBeforeOrAfter}
       onAddComponentBeforeOrAfter={onAddComponentBeforeOrAfter}
       onContextMenu={onContextMenu}
+      isPublicView={isPublicView}
     />
   );
 }

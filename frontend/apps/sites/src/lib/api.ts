@@ -92,13 +92,27 @@ export interface CapturePageData {
 function applyDraftData(item: any): any {
   if (!item) return item;
   const draft = item.draft_data || {};
+  const draftCanvas = draft.canvas_data || draft.canvasData || item.canvas_data || item.site_config?.canvas_data || item.site_config?.canvasData;
+
+  const mergedSiteConfig = {
+    ...(item.site_config || {}),
+    ...(draft.siteConfig || draft.site_config || {}),
+  };
+
+  if (draftCanvas) {
+    mergedSiteConfig.canvas_data = draftCanvas;
+    mergedSiteConfig.canvasData = draftCanvas;
+  }
+
   return {
     ...item,
     title: draft.title !== undefined && draft.title !== null ? draft.title : item.title,
     slug: draft.slug !== undefined && draft.slug !== null ? draft.slug : item.slug,
     custom_domain: draft.customDomain !== undefined && draft.customDomain !== null ? draft.customDomain : item.custom_domain,
     seo_config: draft.seoConfig !== undefined && draft.seoConfig !== null ? draft.seoConfig : item.seo_config,
-    site_config: draft.siteConfig !== undefined && draft.siteConfig !== null ? draft.siteConfig : item.site_config,
+    site_config: mergedSiteConfig,
+    canvas_data: draftCanvas,
+    canvasData: draftCanvas,
     dictionary: draft.dictionary !== undefined && draft.dictionary !== null ? draft.dictionary : item.dictionary,
     form_flow: draft.formFlow !== undefined && draft.formFlow !== null ? draft.formFlow : item.form_flow,
     cta_type: draft.ctaType !== undefined && draft.ctaType !== null ? draft.ctaType : item.cta_type,
@@ -106,6 +120,24 @@ function applyDraftData(item: any): any {
     cta_external_url: draft.ctaExternalUrl !== undefined ? draft.ctaExternalUrl : item.cta_external_url,
     form_id: draft.formId !== undefined ? draft.formId : item.form_id,
   };
+}
+
+function applyPublishedData(item: any): any {
+  if (!item) return item;
+  const pubCanvas = item.site_config?.canvas_data || item.site_config?.canvasData || item.canvas_data || item.canvasData;
+  return {
+    ...item,
+    canvas_data: pubCanvas,
+    canvasData: pubCanvas,
+  };
+}
+
+function checkIsPublished(item: any): boolean {
+  if (!item) return false;
+  if (item.is_published === true) return true;
+  if (item.site_config?.status === 'published') return true;
+  if (item.is_active === true && (item.site_config?.canvas_data || item.site_config?.canvasData || item.site_config?.sections)) return true;
+  return false;
 }
 
 async function verifyUserAccess(pageId: string, token: string): Promise<boolean> {
@@ -135,50 +167,100 @@ export const getCapturePageBySlugs = cache(async (
 ): Promise<CapturePageData | null> => {
   if (isNetworkErrorCoolingDown()) return null;
 
+  const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  const isPageSlugUuid = uuidRegex.test(pageSlug);
+  const isTenantSlugUuid = uuidRegex.test(tenantSlug);
+
+  // 1. Busca por ID direto no PostgREST se pageSlug ou tenantSlug for UUID
+  if (isPageSlugUuid || isTenantSlugUuid) {
+    const targetId = isPageSlugUuid ? pageSlug : tenantSlug;
+    const directUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&id=eq.${targetId}&limit=1`;
+    try {
+      const res = await fetch(directUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        apiConnection.notifyOnline();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0];
+          if (item.tenants && item.tenants.workspace_domains) {
+            if (Array.isArray(item.tenants.workspace_domains) && item.tenants.workspace_domains.length > 0) {
+              item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
+            } else if (typeof item.tenants.workspace_domains === 'object') {
+              item.tenants.slug = (item.tenants.workspace_domains as any).subdomain;
+            }
+          }
+          return applyDraftData(item) as CapturePageData;
+        }
+      }
+    } catch (err) {
+      handleFetchError(err);
+    }
+  }
+
+  // 2. Busca padrão por Slug e Subdomínio
   const targetSlug = (pageSlug === '_root_' || pageSlug === 'root') ? '' : (pageSlug || '');
   const url = (isPreview || token)
     ? `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains!inner(*))&slug=eq.${targetSlug}&tenants.workspace_domains.subdomain=eq.${tenantSlug}`
     : `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains!inner(*))&slug=eq.${targetSlug}&is_active=eq.true&tenants.workspace_domains.subdomain=eq.${tenantSlug}`;
+
   try {
     const fetchOptions: RequestInit = (isPreview || token) ? { cache: 'no-store' } : { next: { revalidate: 60, tags: ['sites', `site-${tenantSlug}`] } };
     const res = await fetch(url, fetchOptions);
-    if (!res.ok) {
-      return null;
-    }
-    const data = await res.json();
-    apiConnection.notifyOnline();
+    if (res.ok) {
+      const data = await res.json();
+      apiConnection.notifyOnline();
 
-    if (Array.isArray(data) && data.length > 0) {
-      const item = data[0];
-      if (item.tenants && item.tenants.workspace_domains && item.tenants.workspace_domains.length > 0) {
-        item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
-      } else if (item.tenants && item.tenants.workspace_domains && typeof item.tenants.workspace_domains === 'object') {
-        item.tenants.slug = item.tenants.workspace_domains.subdomain;
-      }
-      
-      const status = item.site_config?.status;
-      const isPublished = status === 'published';
-      
-      if (isPreview || token) {
-        if (token && token !== 'active' && token.length > 50) {
-          const authorized = await verifyUserAccess(item.id, token);
-          if (authorized) {
-            return applyDraftData(item) as CapturePageData;
+      if (Array.isArray(data) && data.length > 0) {
+        const item = data[0];
+        if (item.tenants && item.tenants.workspace_domains) {
+          if (Array.isArray(item.tenants.workspace_domains) && item.tenants.workspace_domains.length > 0) {
+            item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
+          } else if (typeof item.tenants.workspace_domains === 'object') {
+            item.tenants.slug = item.tenants.workspace_domains.subdomain;
           }
         }
-        return applyDraftData(item) as CapturePageData;
+        
+        const isPublished = checkIsPublished(item);
+        
+        if (isPreview || token) {
+          if (token && token !== 'active' && token.length > 50) {
+            const authorized = await verifyUserAccess(item.id, token);
+            if (authorized) {
+              return applyDraftData(item) as CapturePageData;
+            }
+          }
+          return applyDraftData(item) as CapturePageData;
+        }
+        
+        if (!isPublished) {
+          return null;
+        }
+        return applyPublishedData(item) as CapturePageData;
       }
-      
-      if (!isPublished) {
-        return null;
-      }
-      return item as CapturePageData;
     }
-    return null;
   } catch (err) {
     handleFetchError(err);
-    return null;
   }
+
+  // 3. Fallback adicional para Modo Preview se slug do subdomínio ainda não estiver indexado
+  if (isPreview || token) {
+    const fallbackUrl = `${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&or=(slug.eq.${targetSlug},slug.eq.${pageSlug})&limit=1`;
+    try {
+      const res = await fetch(fallbackUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        apiConnection.notifyOnline();
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0];
+          return applyDraftData(item) as CapturePageData;
+        }
+      }
+    } catch (err) {
+      handleFetchError(err);
+    }
+  }
+
+  return null;
 });
 
 export const getCapturePageByDomain = cache(async (
@@ -267,7 +349,7 @@ export const getCapturePageByDomain = cache(async (
             }
           }
           
-          const isPublished = item.site_config?.status === 'published';
+          const isPublished = checkIsPublished(item);
           
           if (isPreview || token) {
             if (token && token !== 'active' && token.length > 50) {
@@ -280,7 +362,7 @@ export const getCapturePageByDomain = cache(async (
           }
           
           if (!isPublished) return null;
-          return item as CapturePageData;
+          return applyPublishedData(item) as CapturePageData;
         }
       }
     } catch (err) {
@@ -304,7 +386,7 @@ export const getCapturePageByDomain = cache(async (
           item.tenants.slug = item.tenants.workspace_domains[0].subdomain;
         }
         
-        const isPublished = item.site_config?.status === 'published';
+        const isPublished = checkIsPublished(item);
         
         if (isPreview || token) {
           if (token) {
@@ -313,14 +395,11 @@ export const getCapturePageByDomain = cache(async (
               return applyDraftData(item) as CapturePageData;
             }
           }
-          if (isPublished) {
-            return item as CapturePageData;
-          }
-          return null;
+          return applyDraftData(item) as CapturePageData;
         }
         
         if (!isPublished) return null;
-        return item as CapturePageData;
+        return applyPublishedData(item) as CapturePageData;
       }
     }
   } catch (err) {

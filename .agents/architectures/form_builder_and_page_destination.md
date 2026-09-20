@@ -4,27 +4,38 @@
 
 ---
 
-## ⚡ 1. Inviolable Directives (Regras de Ouro da Funcionalidade)
+## 1. Scope & Triggers
 
-1. **ALWAYS sync `form_id` according to `cta_type`**:
-   - Quando `cta_type === 'form'`, a coluna `form_id` (e `draft_data.formId` no rascunho) **DEVE** conter a chave primária `UUID` do formulário ativo em `public.screening_forms`.
-   - Quando `cta_type` for alterado para `'whatsapp'` ou `'external_url'`, a aplicação **DEVE** zerar `form_id = null` e `draft_data.formId = null`, desfazendo explicitamente o relacionamento no PostgreSQL.
-2. **ALWAYS isolate workspace forms by `workspace_id`**:
-   - Formulários em `public.screening_forms` pertencem estritamente a um `workspace_id`.
-   - Consultas de formulários devem sempre filtrar por `workspace_id=eq.<tenantId>` sob politicas de RLS.
-3. **NEVER mix React Flow Canvas with URL/WhatsApp destination view**:
-   - Se `cta_type` for `'whatsapp'` ou `'external_url'`, o canvas do React Flow **NÃO** deve ser exibido. No lugar do canvas, a tela principal exibe a **Tela de Configurações de Destino da URL/WhatsApp**.
-   - Se `cta_type` for `'form'`, o canvas do React Flow exibe o fluxograma interativo do formulário vinculado.
-4. **ALWAYS perform reactive canvas reload on form selection**:
-   - Ao trocar de formulário no `<FormManagerSelect />`, a aplicação **DEVE** resetar os nós e arestas (`setNodes([])`, `setEdges([])`) e carregar reativamente a estrutura `formFlowDraft` ou `formFlow` do novo formulário.
-5. **ALWAYS support inline Form CRUD inside `<FormManagerSelect />`**:
-   - O seletor `<FormManagerSelect />` permite **Criar** (`api.createForm`), **Renomear** (`api.updateForm`) e **Excluir** (`api.deleteForm`) formulários diretamente no menu suspenso sem sair da tela do construtor.
+Read this document when:
+- Working on screening forms builder (`frontend/apps/web/src/app/dashboard/triagem/`)
+- Modifying CTA destination settings (Form, WhatsApp, External URL) in site editor or wizard
+- Updating `<FormManagerSelect />` dropdown or form selection state
+- Altering the DB schema for `screening_forms` or `capture_pages.form_id`
 
 ---
 
-## 🏗️ 2. Feature Architecture & Flowchart
+## 2. Inviolable Directives (ALWAYS / NEVER)
 
-### Data Flow Diagram (Página ↔ Formulário ↔ Destino CTA)
+### Database Relationship & State Sync
+1. **ALWAYS sync `form_id` according to `cta_type`**:
+   - When `cta_type === 'form'`, `public.capture_pages.form_id` (and `draft_data.formId` in draft) **MUST** contain the primary key `UUID` of an active screening form in `public.screening_forms`.
+   - When `cta_type` is changed to `'whatsapp'` or `'external_url'`, the application **MUST** set `form_id = null` and `draft_data.formId = null`, explicitly severing the database relationship.
+2. **ALWAYS isolate workspace forms by `workspace_id`**:
+   - Screening forms in `public.screening_forms` belong strictly to a single `workspace_id`.
+   - Form queries MUST filter by `workspace_id=eq.<tenantId>` under active RLS policies.
+
+### Form Builder UI/UX
+3. **NEVER mix React Flow Canvas with URL/WhatsApp destination view**:
+   - When `cta_type` is `'whatsapp'` or `'external_url'`, the React Flow canvas **MUST NOT** be rendered. In its place, the main screen displays the **Destination Settings Card** (WhatsApp message text or External URL input).
+   - When `cta_type` is `'form'`, the React Flow canvas displays the interactive flowchart nodes and edges for the linked screening form.
+4. **ALWAYS perform reactive canvas reload on form selection**:
+   - Swapping forms in `<FormManagerSelect />` **MUST** reset nodes and edges (`setNodes([])`, `setEdges([])`) and reload the `formFlowDraft` or `formFlow` structure of the newly selected form cleanly.
+5. **ALWAYS support inline Form CRUD inside `<FormManagerSelect />`**:
+   - The dropdown `<FormManagerSelect />` allows users to **Create** (`api.createForm`), **Rename** (`api.updateForm`), and **Delete** (`api.deleteForm`) forms directly from the select menu without leaving the editor page.
+
+---
+
+## 3. Feature Architecture & UI/UX Design System
 
 ```mermaid
 flowchart TD
@@ -66,7 +77,7 @@ flowchart TD
 
 ---
 
-## 💻 3. Concrete Code Recipes & Schemas
+## 4. Concrete Code Recipes & Schemas
 
 ### Database Schema Definition (`public.capture_pages` & `public.screening_forms`)
 
@@ -93,8 +104,6 @@ CREATE TABLE IF NOT EXISTS public.screening_forms (
 );
 ```
 
----
-
 ### Component Contract: `<FormManagerSelect />`
 
 ```tsx
@@ -112,9 +121,7 @@ import { FormManagerSelect } from '@/components/FormManagerSelect';
 />
 ```
 
----
-
-### Receita: Troca Reativa de Formulário no Canvas (`handleFormSelect`)
+### Reactive Form Swap Handler (`handleFormSelect`)
 
 ```typescript
 const handleFormSelect = useCallback((selectedId: string) => {
@@ -122,11 +129,11 @@ const handleFormSelect = useCallback((selectedId: string) => {
   const selectedForm = availableForms.find((f: any) => f.id === selectedId);
   const newFormFlow = selectedForm?.formFlowDraft || selectedForm?.formFlow || { nodes: [], edges: [] };
 
-  // 1. Limpa canvas do React Flow para forçar rebuild limpo
+  // 1. Reset React Flow nodes and edges for clean canvas rebuild
   setNodes([]);
   setEdges([]);
 
-  // 2. Atualiza estado da página com novo formId e formFlow
+  // 2. Update page state with new formId and formFlow
   setPage(prev => {
     if (!prev) return prev;
     return {
@@ -141,19 +148,34 @@ const handleFormSelect = useCallback((selectedId: string) => {
 
 ---
 
-## 🚫 4. Anti-Patterns & Prohibitions
+## 5. Anti-Patterns & Prohibitions
 
-### ❌ Incorreto: Alterar o `formId` sem atualizar o `formFlow` e zerar o canvas
+### ❌ ERRADO: Manter o `form_id` preenchido quando `cta_type` for trocado para WhatsApp ou Link Externo
 ```typescript
-// ERRADO: Apenas muda a string formId mas deixa o canvas mostrando os nós do formulário antigo
+// NUNCA faça isso: gera inconsistência no banco com 2 tipos de destinos ativos ao mesmo tempo
+setPage({ ...page, ctaType: 'whatsapp' }); // ❌ form_id continua apontando para um formulário antigo!
+```
+
+### ✅ CORRETO: Desvincular explicitamente `form_id = null`
+```typescript
+// CORRETO: Zerar form_id desvincula o formulário no banco de dados
+setPage({ ...page, ctaType: 'whatsapp', formId: null });
+setHasUnsavedChanges(true);
+```
+
+---
+
+### ❌ ERRADO: Alterar o `formId` sem zerar os nós do React Flow
+```typescript
+// NUNCA faça isso: a UI mostrará visualmente os nós do formulário anterior
 const handleFormSelectBad = (selectedId: string) => {
-  setPage({ ...page, formId: selectedId }); // ❌ O canvas não atualiza!
+  setPage({ ...page, formId: selectedId }); // ❌ O canvas não atualiza limpo!
 };
 ```
 
-### ✅ Correto: Resetar nós/arestas e carregar o `formFlow` correspondente
+### ✅ CORRETO: Resetar os nós/arestas e recarregar a estrutura `formFlow` do novo formulário
 ```typescript
-// CORRETO: Reseta o canvas e copia a estrutura formFlow do novo formulário
+// CORRETO: Zera o canvas e carrega a estrutura formFlow do novo formulário
 const handleFormSelectGood = (selectedId: string) => {
   const targetForm = availableForms.find(f => f.id === selectedId);
   setNodes([]);
@@ -161,23 +183,8 @@ const handleFormSelectGood = (selectedId: string) => {
   setPage({
     ...page,
     formId: selectedId,
-    formFlow: targetForm?.formFlowDraft || targetForm?.formFlow || { nodes: [], edges: [] }
+    formFlow: targetForm?.formFlowDraft || targetForm?.formFlow || { nodes: [], edges: [] },
   });
   setHasUnsavedChanges(true);
 };
-```
-
----
-
-### ❌ Incorreto: Manter o `form_id` preenchido quando `cta_type` for WhatsApp ou Link Externo
-```typescript
-// ERRADO: Mudar para WhatsApp mas deixar o form_id antigo no banco
-setPage({ ...page, ctaType: 'whatsapp' }); // ❌ Múltiplas fontes de verdade!
-```
-
-### ✅ Correto: Desvincular explicitamente o `form_id = null` ao mudar para WhatsApp ou URL Externa
-```typescript
-// CORRETO: Zerar form_id para desvincular o formulário no banco de dados
-setPage({ ...page, ctaType: 'whatsapp', formId: null });
-setHasUnsavedChanges(true);
 ```

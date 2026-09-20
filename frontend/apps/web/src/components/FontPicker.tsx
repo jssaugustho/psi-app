@@ -54,6 +54,7 @@ export function FontPicker({
   onOpenCustomFontModal,
 }: FontPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [placement, setPlacement] = useState<'bottom' | 'top'>('bottom')
   const [searchQuery, setSearchQuery] = useState('')
   const [fontsLoaded, setFontsLoaded] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -65,6 +66,18 @@ export function FontPicker({
     ...(customFontName ? [{ name: customFontName, category: 'custom' as const, isCustom: true }] : []),
     ...defaultFonts,
   ];
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      if (rect.bottom + 280 > viewportHeight && rect.top > 280) {
+        setPlacement('top');
+      } else {
+        setPlacement('bottom');
+      }
+    }
+  }, [isOpen]);
 
   // Lazy load fonts on popover open
   useEffect(() => {
@@ -124,7 +137,9 @@ export function FontPicker({
 
       {/* Dropdown Overlay Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 brand-popup rounded-xl shadow-2xl z-50 p-2 space-y-2 animate-in fade-in duration-150">
+        <div className={`absolute left-0 right-0 ${
+          placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+        } brand-popup rounded-xl shadow-2xl z-50 p-2 space-y-2 animate-in fade-in duration-150`}>
           {/* Search bar */}
           <div className="relative flex items-center">
             <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5" />

@@ -45,10 +45,7 @@ export function InlineTypographyControl({
         <SliderNumberInput
           value={sizeValue || '0.875rem'}
           onChange={onChangeSize}
-          min={8}
-          max={72}
           defaultUnit="rem"
-          step={0.125}
         />
       </div>
 

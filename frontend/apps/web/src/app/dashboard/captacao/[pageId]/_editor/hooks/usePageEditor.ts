@@ -17,11 +17,14 @@ import {
   removeComponentFromCanvas as removeComponentHelper,
   updateComponentInCanvas as updateComponentHelper,
   duplicateElementInCanvas,
+  findAdjacentElementAfterRemoval,
   cloneElementWithNewIds,
   findElementInCanvas,
   moveElementInCanvas,
   addComponentBeforeOrAfter as addComponentBeforeOrAfterHelper,
-  moveElementBeforeOrAfter as moveElementBeforeOrAfterHelper
+  moveElementBeforeOrAfter as moveElementBeforeOrAfterHelper,
+  pasteStyleToElementInCanvas,
+  normalizeCanvasData
 } from '../utils/canvasHelpers';
 import { useEditorHistory } from './useEditorHistory';
 import { useAutoSave } from './useAutoSave';
@@ -29,7 +32,7 @@ import { api, CapturePage } from '@/lib/api';
 
 import { getThemeColors, sanitizeCanvasColors } from '../utils/colorHelpers';
 
-export type TabType = 'layout' | 'flow' | 'theme' | 'settings';
+export type TabType = 'layout' | 'flow' | 'settings';
 
 export function usePageEditor(pageId: string) {
   const [page, setPage] = useState<CapturePage | null>(null);
@@ -64,9 +67,10 @@ export function usePageEditor(pageId: string) {
         const themeColors = getThemeColors(fetchedPage);
         const canvas = migrateLegacyCanvas(fetchedPage);
         const cleanCanvas = sanitizeCanvasColors(canvas, themeColors.siteBg);
+        const normalizedCanvas = normalizeCanvasData(cleanCanvas);
 
-        setCanvasData(cleanCanvas);
-        history.resetHistory(cleanCanvas);
+        setCanvasData(normalizedCanvas);
+        history.resetHistory(normalizedCanvas);
       } catch (err: any) {
         console.error('❌ Erro ao carregar página no editor:', err);
         setError(err.message || 'Erro ao carregar dados da página.');
@@ -83,13 +87,15 @@ export function usePageEditor(pageId: string) {
   const autoSave = useAutoSave({
     pageId,
     canvasData,
+    publishedCanvas: (page as any)?.publishedCanvas || page?.siteConfig?.canvas_data || page?.siteConfig?.canvasData,
     enabled: !loading && canvasData !== null,
   });
 
   // Atualiza estado do Canvas e registra no histórico
-  const updateCanvasState = useCallback((newCanvas: CanvasData) => {
-    setCanvasData(newCanvas);
-    history.pushState(newCanvas);
+  const updateCanvasState = useCallback((newCanvas: CanvasData, label?: string) => {
+    const normalized = normalizeCanvasData(newCanvas);
+    setCanvasData(normalized);
+    history.pushState(normalized, label);
   }, [history]);
 
   // Seleção de Elementos
@@ -136,67 +142,93 @@ export function usePageEditor(pageId: string) {
     updateCanvasState({
       ...canvasData,
       navbar: updatedNavbar,
-    });
+    }, 'Atualizou Cabeçalho / Navbar');
   }, [canvasData, updateCanvasState]);
 
   // Actions de Seção
   const addSection = useCallback((label?: string, index?: number) => {
     if (!canvasData) return;
     const updated = addSectionHelper(canvasData, label, index);
-    updateCanvasState(updated);
+    updateCanvasState(updated, `Adicionou Seção "${label || 'Nova Seção'}"`);
   }, [canvasData, updateCanvasState]);
+
+  const addCustomSection = useCallback((customSection: Section, index?: number) => {
+    if (!canvasData) return;
+    const sections = [...canvasData.sections];
+    const isFooter = customSection.anchorId === 'sec-footer' || (customSection.label && customSection.label.toLowerCase().includes('rodapé'));
+
+    if (index !== undefined && index >= 0 && index <= sections.length) {
+      sections.splice(index, 0, customSection);
+    } else if (isFooter) {
+      sections.push(customSection);
+    } else {
+      sections.unshift(customSection);
+    }
+    const updated: CanvasData = {
+      ...canvasData,
+      sections,
+    };
+    updateCanvasState(updated, `Adicionou Seção "${customSection.label || 'Customizada'}"`);
+    selectElement(customSection.id, 'section');
+  }, [canvasData, updateCanvasState, selectElement]);
 
   const removeSection = useCallback((sectionId: string) => {
     if (!canvasData) return;
+    const adjacent = findAdjacentElementAfterRemoval(canvasData, sectionId);
     const updated = removeSectionHelper(canvasData, sectionId);
-    updateCanvasState(updated);
-    if (selection.id === sectionId) {
+    updateCanvasState(updated, 'Removeu Seção');
+    if (adjacent) {
+      selectElement(adjacent.id, adjacent.type);
+    } else {
       selectElement(null);
     }
-  }, [canvasData, updateCanvasState, selection.id, selectElement]);
+  }, [canvasData, updateCanvasState, selectElement]);
 
   const moveSection = useCallback((fromIndex: number, toIndex: number) => {
     if (!canvasData) return;
     const updated = moveSectionHelper(canvasData, fromIndex, toIndex);
-    updateCanvasState(updated);
+    updateCanvasState(updated, 'Reordenou Seções');
   }, [canvasData, updateCanvasState]);
 
   const updateSection = useCallback((sectionId: string, patch: Partial<Section>) => {
     if (!canvasData) return;
     const updated = updateSectionHelper(canvasData, sectionId, patch);
-    updateCanvasState(updated);
+    updateCanvasState(updated, 'Editou Seção');
   }, [canvasData, updateCanvasState]);
 
   // Actions de Componente
   const addComponent = useCallback((parentId: string, component: Component, index?: number) => {
     if (!canvasData) return;
     const updated = addComponentHelper(canvasData, parentId, component, index);
-    updateCanvasState(updated);
+    updateCanvasState(updated, `Adicionou "${component.label || component.type}"`);
     selectElement(component.id, component.type as SelectionState['type']);
   }, [canvasData, updateCanvasState, selectElement]);
 
   const removeComponent = useCallback((componentId: string) => {
     if (!canvasData) return;
+    const adjacent = findAdjacentElementAfterRemoval(canvasData, componentId);
     const updated = removeComponentHelper(canvasData, componentId);
-    updateCanvasState(updated);
-    if (selection.id === componentId) {
+    updateCanvasState(updated, 'Removeu Componente');
+    if (adjacent) {
+      selectElement(adjacent.id, adjacent.type);
+    } else {
       selectElement(null);
     }
-  }, [canvasData, updateCanvasState, selection.id, selectElement]);
+  }, [canvasData, updateCanvasState, selectElement]);
 
   const updateComponent = useCallback((componentId: string, patch: Partial<Component>) => {
     if (!canvasData) return;
     const updated = updateComponentHelper(canvasData, componentId, patch);
-    updateCanvasState(updated);
+    updateCanvasState(updated, 'Editou Componente');
   }, [canvasData, updateCanvasState]);
 
-  // 👯 DUPLICAR ELEMENTO
+  // 👯 DUPLICAR ELEMENTO (SEMPRE SELECIONA O NOVO ELEMENTO)
   const duplicateElement = useCallback((id: string) => {
     if (!canvasData) return;
-    const { canvas: updated, newId } = duplicateElementInCanvas(canvasData, id);
-    updateCanvasState(updated);
-    if (newId) {
-      selectElement(newId);
+    const { canvas: updated, newId, newType } = duplicateElementInCanvas(canvasData, id);
+    updateCanvasState(updated, 'Duplicou Elemento');
+    if (newId && newType) {
+      selectElement(newId, newType);
     }
   }, [canvasData, updateCanvasState, selectElement]);
 
@@ -217,20 +249,28 @@ export function usePageEditor(pageId: string) {
 
     if (cloned.type === 'section') {
       const sections = [...canvasData.sections, cloned as Section];
-      updateCanvasState({ ...canvasData, sections });
+      updateCanvasState({ ...canvasData, sections }, 'Colou Seção');
       selectElement(cloned.id, 'section');
     } else {
       const updated = addComponentHelper(canvasData, targetParentId, cloned as Component);
-      updateCanvasState(updated);
+      updateCanvasState(updated, 'Colou Elemento');
       selectElement(cloned.id, cloned.type);
     }
+  }, [canvasData, copiedElement, updateCanvasState, selectElement]);
+
+  // 🎨 COLAR APENAS ESTILO ENTRE ELEMENTOS DO MESMO TIPO
+  const pasteStyleElement = useCallback((targetId: string) => {
+    if (!canvasData || !copiedElement) return;
+    const updated = pasteStyleToElementInCanvas(canvasData, targetId, copiedElement);
+    updateCanvasState(updated, 'Colou Estilo do Elemento');
+    selectElement(targetId);
   }, [canvasData, copiedElement, updateCanvasState, selectElement]);
 
   // 🚚 MOVER ELEMENTO DE CONTAINER / SEÇÃO
   const moveElement = useCallback((elementId: string, targetParentId: string) => {
     if (!canvasData) return;
     const updated = moveElementInCanvas(canvasData, elementId, targetParentId);
-    updateCanvasState(updated);
+    updateCanvasState(updated, 'Moveu Elemento');
     selectElement(elementId);
   }, [canvasData, updateCanvasState, selectElement]);
 
@@ -238,7 +278,7 @@ export function usePageEditor(pageId: string) {
   const moveElementBeforeOrAfter = useCallback((elementId: string, targetElementId: string, position: 'before' | 'after') => {
     if (!canvasData) return;
     const updated = moveElementBeforeOrAfterHelper(canvasData, elementId, targetElementId, position);
-    updateCanvasState(updated);
+    updateCanvasState(updated, 'Reordenou Elemento');
     selectElement(elementId);
   }, [canvasData, updateCanvasState, selectElement]);
 
@@ -246,7 +286,7 @@ export function usePageEditor(pageId: string) {
   const addComponentBeforeOrAfter = useCallback((targetElementId: string, component: Component, position: 'before' | 'after') => {
     if (!canvasData) return;
     const updated = addComponentBeforeOrAfterHelper(canvasData, targetElementId, component, position);
-    updateCanvasState(updated);
+    updateCanvasState(updated, `Adicionou "${component.label || component.type}"`);
     selectElement(component.id, component.type as any);
   }, [canvasData, updateCanvasState, selectElement]);
 
@@ -259,6 +299,11 @@ export function usePageEditor(pageId: string) {
   const handleRedo = useCallback(() => {
     const next = history.redo();
     if (next) setCanvasData(next);
+  }, [history]);
+
+  const jumpToHistoryIndex = useCallback((index: number) => {
+    const targetData = history.jumpToIndex(index);
+    if (targetData) setCanvasData(targetData);
   }, [history]);
 
   // 🎨 ATUALIZAÇÃO DO SITE CONFIG (CORES, TIPOGRAFIA, LOGO, ETC)
@@ -277,15 +322,15 @@ export function usePageEditor(pageId: string) {
       const newPage = {
         ...prevPage,
         siteConfig: updatedSiteConfig,
-        ...(patch.logoUrl ? { logoUrl: patch.logoUrl } : {}),
+        ...(patch.logoUrl !== undefined ? { logoUrl: patch.logoUrl } : {}),
       };
 
-      // Dispara atualização assíncrona no backend PostgREST
+      // Dispara atualização assíncrona no backend PostgREST para o rascunho em staging
       api.updateCapturePage(pageId, {
-        siteConfig: updatedSiteConfig,
-        ...(patch.logoUrl ? { logoUrl: patch.logoUrl } : {}),
+        siteConfigDraft: updatedSiteConfig,
+        ...(patch.logoUrl !== undefined ? { logoUrl: patch.logoUrl } : {}),
       }).catch((err) => {
-        console.error('❌ Erro ao salvar siteConfig:', err);
+        console.error('❌ Erro ao salvar siteConfigDraft:', err);
       });
 
       return newPage;
@@ -306,6 +351,27 @@ export function usePageEditor(pageId: string) {
     });
   }, [pageId]);
 
+  // 🚀 PUBLICAÇÃO DA PÁGINA (PROMOTE DRAFT -> CANVAS_DATA ATÔMICO VIA RPC)
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const publishPage = useCallback(async () => {
+    if (!pageId || !canvasData) return;
+    setIsPublishing(true);
+    try {
+      // 1. Força a gravação SÍNCRONA do rascunho no banco antes de disparar a RPC
+      await autoSave.forceSave();
+      // 2. Dispara a chamada RPC para copiar draft_data -> canvas_data
+      const updatedPage = await api.publishCapturePage(pageId);
+      setPage(updatedPage);
+      autoSave.markAsPublished(canvasData);
+    } catch (err: any) {
+      console.error('❌ Erro ao publicar página:', err);
+      throw err;
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [pageId, canvasData, autoSave]);
+
   return {
     page,
     loading,
@@ -315,10 +381,13 @@ export function usePageEditor(pageId: string) {
     viewportMode,
     setViewportMode,
     selection,
+    selectedId: selection.id,
+    selectedType: selection.type,
     selectElement,
     canvasData,
     updateNavbar,
     addSection,
+    addCustomSection,
     removeSection,
     moveSection,
     updateSection,
@@ -331,16 +400,24 @@ export function usePageEditor(pageId: string) {
     duplicateElement,
     copyElement,
     pasteElement,
+    pasteStyleElement,
     copiedElement,
     updateSiteConfig,
     updatePage,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
+    historyEntries: history.entries,
+    historyIndex: history.currentIndex,
+    jumpToHistoryIndex,
     undo: handleUndo,
     redo: handleRedo,
     saving: autoSave.saving,
     hasUnsavedChanges: autoSave.hasUnsavedChanges,
+    hasUnpublishedChanges: autoSave.hasUnpublishedChanges,
     lastSavedTime: autoSave.lastSavedTime,
     forceSave: autoSave.forceSave,
+    publishPage,
+    isPublishing,
   };
 }
+

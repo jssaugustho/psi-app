@@ -38,8 +38,8 @@ interface SizeControlProps {
 function parseSizingMode(value?: string, defaultMode: SizingMode = 'fill'): SizingMode {
   if (!value || value === '100%') return 'fill';
   if (value === 'auto' || value === 'fit-content') return 'fit';
-  if (value.endsWith('%')) return 'relative';
-  if (value.endsWith('px') || value.endsWith('rem') || !isNaN(Number(value))) return 'fixed';
+  if (value.endsWith('%') || value.endsWith('vw') || value.endsWith('vh')) return 'relative';
+  if (value.endsWith('px') || value.endsWith('rem') || value.endsWith('em') || !isNaN(Number(value))) return 'fixed';
   return defaultMode;
 }
 
@@ -97,8 +97,8 @@ export function SizeControl({
           {[
             { mode: 'fill', label: 'Preencher (100%)', icon: Maximize },
             { mode: 'fit', label: 'Ajustar Conteúdo', icon: Minimize },
-            { mode: 'fixed', label: 'Fixo (px)', icon: Lock },
-            { mode: 'relative', label: 'Relativo (%)', icon: Percent },
+            { mode: 'fixed', label: 'Fixo (px/rem)', icon: Lock },
+            { mode: 'relative', label: 'Relativo (%/vw/vh)', icon: Percent },
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = widthMode === item.mode;
@@ -127,6 +127,7 @@ export function SizeControl({
             min={0}
             max={widthMode === 'relative' ? 100 : 1200}
             defaultUnit={widthMode === 'relative' ? '%' : 'px'}
+            unitOptions={['px', 'rem', 'em', 'vw', 'vh', '%']}
             className="mt-1.5"
           />
         )}
@@ -142,8 +143,8 @@ export function SizeControl({
           {[
             { mode: 'fit', label: 'Ajustar Conteúdo', icon: Minimize },
             { mode: 'fill', label: 'Preencher (100%)', icon: Maximize },
-            { mode: 'fixed', label: 'Fixo (px)', icon: Lock },
-            { mode: 'relative', label: 'Relativo (%)', icon: Percent },
+            { mode: 'fixed', label: 'Fixo (px/rem)', icon: Lock },
+            { mode: 'relative', label: 'Relativo (%/vh/vw)', icon: Percent },
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = heightMode === item.mode;
@@ -171,7 +172,8 @@ export function SizeControl({
             onChange={onChangeHeight}
             min={0}
             max={heightMode === 'relative' ? 100 : 1000}
-            defaultUnit={heightMode === 'relative' ? '%' : 'px'}
+            defaultUnit={heightMode === 'relative' ? 'vh' : 'px'}
+            unitOptions={['vh', 'px', 'rem', 'em', 'vw', '%']}
             className="mt-1.5"
           />
         )}

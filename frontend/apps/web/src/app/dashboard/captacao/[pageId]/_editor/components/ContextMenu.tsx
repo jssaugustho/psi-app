@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Edit, Copy, Clipboard, Layers, Trash2 } from 'lucide-react';
+import { Edit, Copy, Clipboard, Layers, Trash2, Paintbrush } from 'lucide-react';
 
 export interface ContextMenuState {
   isOpen: boolean;
@@ -18,8 +18,10 @@ interface ContextMenuProps {
   onDuplicate: (id: string) => void;
   onCopy: (id: string) => void;
   onPaste: (id: string) => void;
+  onPasteStyle?: (id: string) => void;
   onDelete: (id: string, type: any) => void;
   canPaste: boolean;
+  canPasteStyle?: boolean;
 }
 
 export function ContextMenu({
@@ -29,8 +31,10 @@ export function ContextMenu({
   onDuplicate,
   onCopy,
   onPaste,
+  onPasteStyle,
   onDelete,
   canPaste,
+  canPasteStyle = false,
 }: ContextMenuProps) {
   useEffect(() => {
     const handleClickOutside = () => onClose();
@@ -111,6 +115,27 @@ export function ContextMenu({
       >
         <Clipboard className="w-3.5 h-3.5" />
         <span>Colar</span>
+      </button>
+
+      {/* Opção 5: Colar Estilo */}
+      <button
+        type="button"
+        disabled={!canPasteStyle}
+        onClick={() => {
+          if (canPasteStyle) {
+            onPasteStyle?.(menuState.targetId!);
+            onClose();
+          }
+        }}
+        className="w-full px-3 py-2 text-left text-slate-700 dark:text-slate-200 hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-2 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        title={
+          !canPasteStyle
+            ? 'O estilo só pode ser colado em um componente do mesmo tipo'
+            : 'Colar apenas estilos CSS e tipografia'
+        }
+      >
+        <Paintbrush className="w-3.5 h-3.5 text-purple-500" />
+        <span>Colar Estilo</span>
       </button>
 
       <div className="my-1 border-t border-slate-100 dark:border-zinc-800" />

@@ -3,6 +3,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: psi-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?A variável POSTGRES_PASSWORD é obrigatória no .env}
@@ -24,6 +25,7 @@ services:
   gotrue:
     image: supabase/gotrue:v2.189.0
     container_name: psi-gotrue
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +50,7 @@ services:
   postgrest:
     image: postgrest/postgrest:v12.0.2
     container_name: psi-postgrest
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +67,7 @@ services:
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: psi-rabbitmq
+    restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
@@ -84,6 +88,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: psi-nginx
+    restart: unless-stopped
     depends_on:
       gotrue:
         condition: service_started
@@ -104,6 +109,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: psi-api
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,6 +143,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: psi-workers
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy

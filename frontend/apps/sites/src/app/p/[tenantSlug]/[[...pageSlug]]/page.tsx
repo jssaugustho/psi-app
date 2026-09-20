@@ -7,7 +7,7 @@ export const revalidate = 60;
 interface PageProps {
   params: Promise<{
     tenantSlug: string;
-    pageSlug: string;
+    pageSlug?: string[] | string;
   }>;
   searchParams: Promise<{
     preview?: string;
@@ -16,13 +16,20 @@ interface PageProps {
   }>;
 }
 
+function resolveSlug(pageSlug?: string[] | string): string {
+  if (!pageSlug) return '';
+  if (Array.isArray(pageSlug)) return pageSlug.filter(Boolean).join('/');
+  return (pageSlug === '_root_' || pageSlug === 'root') ? '' : pageSlug;
+}
+
 export async function generateMetadata({ params, searchParams }: PageProps) {
   const { tenantSlug, pageSlug } = await params;
+  const targetPageSlug = resolveSlug(pageSlug);
   const { preview, staging, token } = await searchParams;
   const isPreview = preview === 'true' || staging === 'true';
 
   try {
-    const pageData = await getCapturePageBySlugs(tenantSlug, pageSlug, isPreview, token);
+    const pageData = await getCapturePageBySlugs(tenantSlug, targetPageSlug, isPreview, token);
     if (!pageData) {
       const tenant = await getTenantBySlug(tenantSlug);
       const primaryTenant = tenant ? null : await getPrimaryTenant();
@@ -68,6 +75,7 @@ export async function generateMetadata({ params, searchParams }: PageProps) {
 
 export default async function PreviewCapturePage({ params, searchParams }: PageProps) {
   const { tenantSlug, pageSlug } = await params;
+  const targetPageSlug = resolveSlug(pageSlug);
   const { preview, staging, token } = await searchParams;
   const isPreview = preview === 'true' || staging === 'true';
 
@@ -90,7 +98,7 @@ export default async function PreviewCapturePage({ params, searchParams }: PageP
   let pageData = null;
   let fetchError = null;
   try {
-    pageData = await getCapturePageBySlugs(tenantSlug, pageSlug, isPreview, token);
+    pageData = await getCapturePageBySlugs(tenantSlug, targetPageSlug, isPreview, token);
   } catch (err: any) {
     fetchError = err.message || String(err);
   }
@@ -114,7 +122,7 @@ export default async function PreviewCapturePage({ params, searchParams }: PageP
             </div>
             <div className="space-y-2 text-xs text-slate-400 border-t border-slate-800 pt-4">
               <div><strong>Tenant Slug:</strong> {tenantSlug}</div>
-              <div><strong>Page Slug:</strong> {pageSlug}</div>
+              <div><strong>Page Slug:</strong> {targetPageSlug || '(raiz)'}</div>
               <div><strong>Modo Preview:</strong> {isPreview ? "Sim" : "Não"}</div>
               <div><strong>Token recebido:</strong> {token ? `${token.substring(0, 30)}... (Tamanho: ${token.length})` : "Nenhum"}</div>
               <div><strong>PGRST_BASE_URL:</strong> {PGRST_BASE_URL}</div>
@@ -142,6 +150,8 @@ export default async function PreviewCapturePage({ params, searchParams }: PageP
         ctaWhatsappMessage: pageData.cta_whatsapp_message,
         ctaExternalUrl: pageData.cta_external_url,
         formId: pageData.form_id,
+        canvasData: (pageData as any).canvasData || (pageData as any).canvas_data || pageData.site_config?.canvas_data || pageData.site_config?.canvasData,
+        canvas_data: (pageData as any).canvas_data || (pageData as any).canvasData || pageData.site_config?.canvas_data || pageData.site_config?.canvasData,
       }}
       tenant={{
         id: pageData.tenants.id,

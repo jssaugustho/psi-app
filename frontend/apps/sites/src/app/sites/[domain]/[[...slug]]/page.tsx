@@ -115,6 +115,8 @@ export default async function CustomDomainCapturePage({ params, searchParams }: 
         ctaWhatsappMessage: pageData.cta_whatsapp_message,
         ctaExternalUrl: pageData.cta_external_url,
         formId: pageData.form_id,
+        canvasData: (pageData as any).canvasData || (pageData as any).canvas_data || pageData.site_config?.canvas_data || pageData.site_config?.canvasData,
+        canvas_data: (pageData as any).canvas_data || (pageData as any).canvasData || pageData.site_config?.canvas_data || pageData.site_config?.canvasData,
       }}
       tenant={{
         id: pageData.tenants.id,

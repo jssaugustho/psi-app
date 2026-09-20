@@ -1101,17 +1101,43 @@ export const api = {
         ctaWhatsappMessageDraft: draftData.ctaWhatsappMessage ?? null,
         ctaExternalUrlDraft: draftData.ctaExternalUrl ?? null,
         formIdDraft: draftData.formId ?? null,
+        isPublished: item.is_published ?? false,
+        publishedAt: item.published_at ?? null,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       };
     });
   },
 
-  getCapturePage: async (id: string): Promise<CapturePage> => {
-    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
-    if (list.length === 0) throw new Error('Página não encontrada');
+  getCapturePage: async (idOrSlug: string): Promise<CapturePage> => {
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(idOrSlug);
+    const query = isUuid ? `id=eq.${idOrSlug}` : `slug=eq.${encodeURIComponent(idOrSlug)}`;
+    const list = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?select=*,tenants:workspaces!inner(*,workspace_domains(*))&${query}`);
+    if (!list || list.length === 0) throw new Error('Página não encontrada');
     const item = list[0];
     const draftData = item.draft_data || {};
+
+    let tenantSlug: string | null = null;
+    if (item.tenants?.workspace_domains) {
+      if (Array.isArray(item.tenants.workspace_domains) && item.tenants.workspace_domains.length > 0) {
+        tenantSlug = item.tenants.workspace_domains[0].subdomain;
+      } else if (typeof item.tenants.workspace_domains === 'object' && (item.tenants.workspace_domains as any)?.subdomain) {
+        tenantSlug = (item.tenants.workspace_domains as any).subdomain;
+      }
+    }
+    if (!tenantSlug && item.workspace_id) {
+      try {
+        const domList = await fetchApi<any[]>(`${PGRST_BASE_URL}/workspace_domains?workspace_id=eq.${item.workspace_id}&limit=1`);
+        if (domList && domList.length > 0 && domList[0].subdomain) {
+          tenantSlug = domList[0].subdomain;
+        }
+      } catch (err) {
+        console.warn('⚠️ Não foi possível carregar subdomain de workspace_domains:', err);
+      }
+    }
+    if (!tenantSlug) {
+      tenantSlug = item.tenants?.slug || item.tenants?.subdomain || null;
+    }
 
     // 🎨 Carrega a Identidade Visual padrão do Workspace
     let visualIdentity: any = null;
@@ -1123,22 +1149,32 @@ export const api = {
       }
     }
 
-    const theme = {
-      primaryStart: item.site_config?.theme?.primaryStart || visualIdentity?.primaryColor || '#4F46E5',
-      primaryEnd: item.site_config?.theme?.primaryEnd || visualIdentity?.secondaryColor || '#7C3AED',
-      contrast: item.site_config?.theme?.contrast || visualIdentity?.contrastColor || '#18181B',
-      siteBg: item.site_config?.theme?.siteBg || item.site_config?.theme?.bgColor || '#FFFFFF',
-      bgColor: item.site_config?.theme?.siteBg || item.site_config?.theme?.bgColor || '#FFFFFF',
-      logoUrl: item.site_config?.theme?.logoUrl || visualIdentity?.logoUrl || null,
-      faviconUrl: item.site_config?.theme?.faviconUrl || visualIdentity?.faviconUrl || null,
-      logoConfig: item.site_config?.logoConfig || visualIdentity?.logoConfig || null,
-      fontHeading: item.site_config?.theme?.fontHeading || visualIdentity?.fontHeading || 'Playfair Display',
-      fontBody: item.site_config?.theme?.fontBody || visualIdentity?.fontBody || 'Inter',
+    const effectiveRawSiteConfig = {
+      ...(item.site_config || {}),
+      ...(draftData.siteConfig || draftData.site_config || {}),
+    };
+
+    const effectiveRawTheme = {
       ...(item.site_config?.theme || {}),
+      ...(draftData.siteConfig?.theme || draftData.site_config?.theme || {}),
+    };
+
+    const theme = {
+      primaryStart: effectiveRawTheme?.primaryStart || visualIdentity?.primaryColor || '#4F46E5',
+      primaryEnd: effectiveRawTheme?.primaryEnd || visualIdentity?.secondaryColor || '#7C3AED',
+      contrast: effectiveRawTheme?.contrast || visualIdentity?.contrastColor || '#18181B',
+      siteBg: effectiveRawTheme?.siteBg || effectiveRawTheme?.bgColor || '#FFFFFF',
+      bgColor: effectiveRawTheme?.siteBg || effectiveRawTheme?.bgColor || '#FFFFFF',
+      logoUrl: effectiveRawTheme?.logoUrl || visualIdentity?.logoUrl || null,
+      faviconUrl: effectiveRawTheme?.faviconUrl || visualIdentity?.faviconUrl || null,
+      logoConfig: effectiveRawSiteConfig?.logoConfig || visualIdentity?.logoConfig || null,
+      fontHeading: effectiveRawTheme?.fontHeading || visualIdentity?.fontHeading || 'Playfair Display',
+      fontBody: effectiveRawTheme?.fontBody || visualIdentity?.fontBody || 'Inter',
+      ...effectiveRawTheme,
     };
 
     const siteConfig = {
-      ...(item.site_config || {}),
+      ...effectiveRawSiteConfig,
       theme,
       logoConfig: theme.logoConfig,
     };
@@ -1146,6 +1182,7 @@ export const api = {
     return {
       id: item.id,
       tenantId: item.workspace_id,
+      tenantSlug: tenantSlug,
       title: item.title,
       slug: item.slug,
       isActive: item.is_active,
@@ -1167,6 +1204,7 @@ export const api = {
       dictionary: item.dictionary,
       formFlow: item.form_flow,
       canvas_data: draftData.canvas_data || draftData.canvasData || item.site_config?.canvas_data || item.canvas_data || null,
+      publishedCanvas: item.site_config?.canvas_data || item.site_config?.canvasData || item.canvas_data || null,
       titleDraft: draftData.title ?? item.title_draft ?? null,
       slugDraft: draftData.slug ?? item.slug_draft ?? null,
       customDomainDraft: draftData.customDomain ?? item.custom_domain_draft ?? null,
@@ -1178,6 +1216,8 @@ export const api = {
       ctaWhatsappMessageDraft: draftData.ctaWhatsappMessage ?? null,
       ctaExternalUrlDraft: draftData.ctaExternalUrl ?? null,
       formIdDraft: draftData.formId ?? null,
+      isPublished: item.is_published ?? false,
+      publishedAt: item.published_at ?? null,
       createdAt: item.created_at,
       updatedAt: item.updated_at,
     };
@@ -1279,14 +1319,8 @@ export const api = {
     if (body.formFlow !== undefined) dbBody.form_flow = body.formFlow;
 
     const canvasDataToSave = body.canvas_data ?? body.canvasData ?? body.canvasDataDraft ?? body.canvas_data_draft;
-    if (canvasDataToSave !== undefined) {
-      dbBody.site_config = {
-        ...(dbBody.site_config || currentItem.site_config || {}),
-        canvas_data: canvasDataToSave,
-      };
-    }
 
-    // 2. Mesclamos os campos de draft recebidos no body para dentro de draft_data
+    // 2. Mesclamos os campos de draft recebidos no body para dentro de draft_data (isolamento do staging)
     const updatedDraftData = { ...currentDraftData };
     if (body.titleDraft !== undefined) updatedDraftData.title = body.titleDraft;
     if (body.slugDraft !== undefined) updatedDraftData.slug = body.slugDraft;
@@ -1363,57 +1397,14 @@ export const api = {
   },
 
   publishCapturePage: async (id: string): Promise<CapturePage> => {
-    const currentList = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`);
-    if (currentList.length === 0) throw new Error('Página não encontrada');
-    const currentItem = currentList[0];
-    const draft = currentItem.draft_data || {};
-
-    const dbBody: Record<string, any> = {
-      title: draft.title !== undefined && draft.title !== null ? draft.title : currentItem.title,
-      slug: draft.slug !== undefined && draft.slug !== null ? draft.slug : currentItem.slug,
-      custom_domain: draft.customDomain !== undefined ? draft.customDomain : currentItem.custom_domain,
-      seo_config: draft.seoConfig !== undefined && draft.seoConfig !== null ? draft.seoConfig : currentItem.seo_config,
-      site_config: {
-        ...(draft.siteConfig || currentItem.site_config || {}),
-        status: 'published',
-        isWizardDraft: false,
-      },
-      dictionary: draft.dictionary !== undefined && draft.dictionary !== null ? draft.dictionary : currentItem.dictionary,
-      form_flow: draft.formFlow !== undefined && draft.formFlow !== null ? draft.formFlow : currentItem.form_flow,
-      draft_data: null,
-    };
-
-    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/capture_pages?id=eq.${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(dbBody),
-      headers: { 'Prefer': 'return=representation' }
+    // 1. Invocação atômica da Stored Function RPC PL/pgSQL
+    await fetchApi<any>(`${PGRST_BASE_URL}/rpc/publish_capture_page`, {
+      method: 'POST',
+      body: JSON.stringify({ p_page_id: id }),
     });
-    const item = res[0];
-    return {
-      id: item.id,
-      tenantId: item.workspace_id,
-      title: item.title,
-      slug: item.slug,
-      isActive: item.is_active,
-      customDomain: item.custom_domain,
-      seoConfig: item.seo_config,
-      siteConfig: {
-        ...(item.site_config || {}),
-        status: 'published',
-        isWizardDraft: false,
-      },
-      dictionary: item.dictionary,
-      formFlow: item.form_flow,
-      titleDraft: null,
-      slugDraft: null,
-      customDomainDraft: null,
-      seoConfigDraft: null,
-      siteConfigDraft: null,
-      dictionaryDraft: null,
-      formFlowDraft: null,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    };
+
+    // 2. Carrega a página atualizada pós-publicação
+    return await api.getCapturePage(id);
   },
 
   deleteCapturePage: async (id: string): Promise<void> => {
@@ -1897,6 +1888,7 @@ export const api = {
 export interface CapturePage {
   id: string;
   tenantId: string;
+  tenantSlug?: string | null;
   title: string;
   slug: string;
   isActive: boolean;
@@ -1931,6 +1923,7 @@ export interface CapturePage {
   dictionary: any;
   formFlow: any;
   canvas_data?: any;
+  publishedCanvas?: any;
   canvas_data_legacy?: any;
   titleDraft?: string | null;
   slugDraft?: string | null;
@@ -1946,6 +1939,8 @@ export interface CapturePage {
   siteConfigDraft?: any;
   dictionaryDraft?: any;
   formFlowDraft?: any;
+  isPublished?: boolean;
+  publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -76,11 +76,11 @@ const DEFAULT_TEMPLATE_MODEL = {
     theme: {
       fontFamily: 'Playfair Display',
       colors: {
-        primaryStart: '#7C3AED',
-        primaryEnd: '#A855F7',
-        contrast: '#18181B',
-        siteBg: '#FFFFFF',
-        cardBg: '#FFFFFF',
+        primaryStart: 'var(--brand-gradient-start)',
+        primaryEnd: 'var(--brand-gradient-end)',
+        contrast: 'var(--brand-contrast-color)',
+        siteBg: 'var(--site-bg)',
+        cardBg: 'color-mix(in srgb, var(--brand-gradient-start) 4%, var(--site-bg))',
       }
     }
   },
@@ -1281,8 +1281,7 @@ export default function NovaPaginaCaptacaoPage() {
         status: 'draft',
         isWizardDraft: false,
         hasSocialLinksOverride: socialLinksMode === 'custom',
-        socialLinks: socialLinksToSave,
-        theme: {
+        theme: hasBrandOverride ? {
           colors: {
             primaryStart: activePrimaryStart,
             primaryEnd: activePrimaryEnd,
@@ -1293,7 +1292,7 @@ export default function NovaPaginaCaptacaoPage() {
           fontBody,
           logoUrl: newLogoUrl || undefined,
           faviconUrl: newFaviconUrl || undefined,
-        },
+        } : undefined,
         ...draftData
       };
 

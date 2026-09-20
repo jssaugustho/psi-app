@@ -73,5 +73,31 @@ Ajustamos o layout da Linha do Tempo (Timeline) para corrigir o problema em que 
   - Atualizados os wrappers [`SectionWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/SectionWrapper.tsx), [`DivWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/DivWrapper.tsx) e [`AtomicComponentWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/EditorCanvas/AtomicComponentWrapper.tsx).
   - Todos os wrappers mesclam as propriedades de `element.mobile` quando a visualização estiver em modo celular (`viewportMode === 'mobile'`), aplicando restrições de largura, altura, min/max dimensions, proporção de tela e ajuste de imagem em tempo real no canvas.
 
+## 5. Opção de Remover / Limpar Ícones em Todos os Componentes ("Sem Ícone")
+
+- **Componente `IconPicker.tsx`**:
+  - Adicionada a opção de primeiro item no grid de ícones: botão **"Sem Ícone"** (`<Ban className="w-4 h-4" />`), permitindo remover o ícone de qualquer componente.
+  - Atualizada a função `getLucideIcon(iconName)` para retornar `null` quando o nome do ícone for vazio `""` ou `"none"`.
+- **Renderização e Painéis de Propriedades**:
+  - Atualizados os componentes de renderização (`AtomicComponentWrapper.tsx` no `@psi/canvas-renderer` e na `apps/web`), garantindo que se um ícone for removido, o container do ícone não deixe espaços ou margens residuais.
+  - Atualizado o [`ContentPropsPanel.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/ContentPropsPanel.tsx) para suportar remoção de ícones em badges, botões (esquerdo e direito), cards de conteúdo, estatísticas e listas.
+  ## 6. Unificação do Estado Hover & Controle de Efeitos / Transformações
+
+- **Remoção do Accordion Antigo de Hover**:
+  - Removido o antigo accordion estático *"Efeito de Hover & Interação"* (com presets fixos). O sistema de hover foi 100% unificado na estrutura de abas `[ Estado Normal ]` e `[ ✨ Estado Hover ]`.
+- **Abas Unificadas (`[ Estado Normal ]` / `[ ✨ Estado Hover ]`)**:
+  - Tanto na aba Normal quanto na aba Hover, os **mesmos accordions** de propriedades visuais são exibidos (Dimensões, Espaçamento, Cores, Bordas, Efeitos & Transformações).
+  - Quando a aba `[ ✨ Estado Hover ]` está selecionada, qualquer edição de propriedade visual grava automaticamente na propriedade de override do hover (`hoverBackgroundColor`, `hoverColor`, `hoverBorderColor`, `hoverScale`, `hoverTranslateY`, etc.).
+- **Novo Accordion `Efeitos & Transformações` ([`TransformControl.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/apps/web/src/app/dashboard/captacao/%5BpageId%5D/_editor/PropertiesPanel/components/TransformControl.tsx))**:
+  - Criado o componente reutilizável `TransformControl.tsx` para controle de **Escala (Scale 0.5x–2.0x)**, **Deslocamento Vertical (Translate Y -50px..+50px)**, **Deslocamento Horizontal (Translate X -50px..+50px)**, **Rotação (Rotate -180°..+180°)**, **Opacidade (0%–100%)** e **Sombras / Glow Neon (Box Shadow)**.
+## 7. Correção de Conflito de Estilo React (Shorthand vs Longhand Background)
+
+- **Causa do Erro de Console React**:
+  - Em elementos do canvas (`SectionWrapper`, `DivWrapper`, `AtomicComponentWrapper`), as propriedades de estilo `backgroundColor` (longhand) e `background` (shorthand) estavam sendo definidas simultaneamente no mesmo objeto `style={{ ... }}` ou alternadas durante a transição do mouse no hover. O React DOM dispara o aviso *"Updating/Removing a style property during rerender (backgroundColor) when a conflicting property is set (background) can lead to styling bugs"*.
+- **Solução Aplicada**:
+  - Removidas as declarações concorrentes de `backgroundColor` nos objetos de estilo dos wrappers ([`AtomicComponentWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/canvas-renderer/src/AtomicComponentWrapper.tsx), [`DivWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/canvas-renderer/src/DivWrapper.tsx), [`SectionWrapper.tsx`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/canvas-renderer/src/SectionWrapper.tsx)).
+  - Padronizada a propriedade `background` na função `getComponentTransitionAndHoverStyle` em [`colorHelpers.ts`](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/frontend/packages/canvas-renderer/src/utils/colorHelpers.ts).
+  - Eliminado por completo o aviso no console e evitados bugs de renderização visual ao alternar o cursor sobre os elementos.
+
 
 

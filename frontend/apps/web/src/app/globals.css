@@ -13,9 +13,9 @@
   --brand-bg-color: #09090B;
   --brand-card-bg-color: #18181B;
   --brand-text-color: #F4F4F5;
+  --surface-base: #09090B;
 
   /* ── Base de Mistura (color-mix) — muda por tema ── */
-  /* Garante que superfícies sempre carregam o matiz da marca, sem virar cinza */
   --mix-base: #000000; /* dark: mistura com preto */
 
   /* ── Superfícies derivadas com opacidade neutra ── */
@@ -23,20 +23,40 @@
   --surface-hover: rgba(255, 255, 255, 0.05);
   --surface-active: rgba(255, 255, 255, 0.10);
   --surface-input: rgba(0, 0, 0, 0.30);
-  --surface-muted: rgba(255, 255, 255, 0.60); /* opacidade do texto secundário */
+  --surface-muted: rgba(255, 255, 255, 0.60);
   --surface-header-bg: color-mix(in srgb, var(--brand-gradient-start) 8%, #09090B);
 }
 
-/* ── Quando o tema claro está ativo, ajusta as superfícies derivadas ── */
-html.light {
-  --mix-base: #FFFFFF; /* light: mistura com branco */
+/* ── Quando o tema claro está ativo (html.light ou sem classe .dark) ── */
+html.light,
+html:not(.dark) {
+  --brand-bg-color: #F8FAFC;
+  --brand-card-bg-color: #FFFFFF;
+  --brand-text-color: #09090B;
+  --surface-base: #F1F5F9;
+  --mix-base: #FFFFFF;
   --surface-border: rgba(0, 0, 0, 0.10);
   --surface-hover: rgba(0, 0, 0, 0.04);
   --surface-active: rgba(0, 0, 0, 0.08);
-  --surface-input: rgba(255, 255, 255, 0.80);
+  --surface-input: rgba(255, 255, 255, 0.90);
   --surface-muted: rgba(0, 0, 0, 0.55);
   --surface-header-bg: color-mix(in srgb, var(--brand-gradient-start) 3%, #F8FAFC);
   --status-info-text: rgba(0, 0, 0, 0.70);
+}
+
+/* ── Quando o tema escuro está ativo (.dark) ── */
+html.dark {
+  --brand-bg-color: #09090B;
+  --brand-card-bg-color: #18181B;
+  --brand-text-color: #F4F4F5;
+  --surface-base: #09090B;
+  --mix-base: #000000;
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.05);
+  --surface-active: rgba(255, 255, 255, 0.10);
+  --surface-input: rgba(0, 0, 0, 0.30);
+  --surface-muted: rgba(255, 255, 255, 0.60);
+  --surface-header-bg: color-mix(in srgb, var(--brand-gradient-start) 8%, #09090B);
 }
 
 body {

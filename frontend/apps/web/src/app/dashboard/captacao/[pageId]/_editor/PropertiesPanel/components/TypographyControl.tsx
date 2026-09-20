@@ -14,7 +14,7 @@ import { SliderNumberInput } from './SliderNumberInput';
 
 import { loadGoogleFonts } from '../../utils/googleFonts';
 import { GlobalColorPicker } from './GlobalColorPicker';
-import { getThemeColors } from '../../utils/colorHelpers';
+import { getThemeColors, getThemeTypography } from '../../utils/colorHelpers';
 
 interface TypographyControlProps {
   style: ComponentStyle;
@@ -34,6 +34,13 @@ export function TypographyControl({
   const themeHeadingFont = page?.siteConfig?.theme?.fontHeading || 'Playfair Display';
   const themeBodyFont = page?.siteConfig?.theme?.fontBody || 'Inter';
   const inheritedFontName = defaultFontCategory === 'heading' ? themeHeadingFont : themeBodyFont;
+
+  const themeTypo = getThemeTypography(page);
+  const inheritedLevel = defaultFontCategory === 'heading' ? themeTypo.levels.h2 : themeTypo.levels.paragraph;
+
+  const displayFontSize = style.fontSize || inheritedLevel.fontSize || (defaultFontCategory === 'heading' ? '28px' : '16px');
+  const displayLineHeight = style.lineHeight || inheritedLevel.lineHeight || '1.4';
+  const displayLetterSpacing = style.letterSpacing || inheritedLevel.letterSpacing || '0px';
 
   React.useEffect(() => {
     loadGoogleFonts();
@@ -80,10 +87,8 @@ export function TypographyControl({
       <div className="space-y-1">
         <label className="text-[9px] font-bold text-slate-500 uppercase">Tamanho da Fonte (fontSize)</label>
         <SliderNumberInput
-          value={style.fontSize || (defaultFontCategory === 'heading' ? '28px' : '16px')}
+          value={displayFontSize}
           onChange={(val) => onChangeStyle('fontSize', val)}
-          min={8}
-          max={120}
           defaultUnit="px"
         />
       </div>
@@ -95,7 +100,7 @@ export function TypographyControl({
           value={style.fontWeight || ''}
           onChange={(e) => onChangeStyle('fontWeight', e.target.value)}
           options={[
-            { value: '', label: 'Herdar Padrão' },
+            { value: '', label: `Herdar Padrão (${inheritedLevel.fontWeight || '400'})` },
             { value: '300', label: 'Leve (300)' },
             { value: '400', label: 'Normal (400)' },
             { value: '500', label: 'Médio (500)' },
@@ -112,12 +117,10 @@ export function TypographyControl({
       <div className="space-y-1">
         <label className="text-[9px] font-bold text-slate-500 uppercase">Altura da Linha (lineHeight)</label>
         <SliderNumberInput
-          value={style.lineHeight || '1.4'}
+          value={displayLineHeight}
           onChange={(val) => onChangeStyle('lineHeight', val)}
-          min={0.8}
-          max={3}
-          step={0.1}
           defaultUnit=""
+          unitOptions={['', 'px', 'rem', 'em']}
         />
       </div>
 
@@ -125,11 +128,8 @@ export function TypographyControl({
       <div className="space-y-1">
         <label className="text-[9px] font-bold text-slate-500 uppercase">Espaço entre Letras (letterSpacing)</label>
         <SliderNumberInput
-          value={style.letterSpacing || '0px'}
+          value={displayLetterSpacing}
           onChange={(val) => onChangeStyle('letterSpacing', val)}
-          min={-2}
-          max={10}
-          step={0.5}
           defaultUnit="px"
         />
       </div>
@@ -201,19 +201,6 @@ export function TypographyControl({
           defaultUnit="px"
         />
       </div>
-
-      {/* COR DO TEXTO */}
-      {(() => {
-        const themeColors = getThemeColors(page);
-        return (
-          <GlobalColorPicker
-            label="Cor do Texto"
-            value={style.color || themeColors.contrast}
-            onChange={(val) => onChangeStyle('color', val)}
-            page={page}
-          />
-        );
-      })()}
     </div>
   );
 }

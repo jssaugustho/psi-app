@@ -236,8 +236,10 @@ export const capturePages = pgTable('capture_pages', {
   workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }).notNull(),
   visualIdentityId: uuid('visual_identity_id').references(() => visualIdentities.id, { onDelete: 'set null' }),
   title: text('title').notNull(),
-  slug: text('slug').notNull(),
+  slug: text('slug').default('').notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  isPublished: boolean('is_published').default(false).notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
 
   // Destino das Ações (CTAs) & Formulário Vinculado
   ctaType: text('cta_type').$type<'whatsapp' | 'external_url' | 'form'>().default('form').notNull(),

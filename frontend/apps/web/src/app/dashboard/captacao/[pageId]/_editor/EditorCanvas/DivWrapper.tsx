@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { DivComponent, ViewportMode } from '../types';
+import { DivComponent, ViewportMode, getPositionStyles, useScrollThreshold, useParallaxEffect } from '@psi/canvas-renderer';
 import { ComponentWrapper } from './ComponentWrapper';
 import { Trash2, Square, Plus, GripVertical } from 'lucide-react';
-import { createDefaultDiv, createDefaultComponent } from '../constants';
+import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from '../constants';
+import { getComponentHoverClasses, getComponentTransitionAndHoverStyle } from '../utils/colorHelpers';
 
 interface DivWrapperProps {
   divComponent: DivComponent;
@@ -17,6 +18,7 @@ interface DivWrapperProps {
   onMoveElementBeforeOrAfter?: (elementId: string, targetElementId: string, position: 'before' | 'after') => void;
   onAddComponentBeforeOrAfter?: (targetElementId: string, comp: any, position: 'before' | 'after') => void;
   onContextMenu?: (e: React.MouseEvent, id: string, type: string) => void;
+  isPublicView?: boolean;
 }
 
 export function DivWrapper({
@@ -32,9 +34,11 @@ export function DivWrapper({
   onMoveElementBeforeOrAfter,
   onAddComponentBeforeOrAfter,
   onContextMenu,
+  isPublicView = false,
 }: DivWrapperProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSelfHovered, setIsSelfHovered] = useState(false);
+  const isStylingHovered = isSelfHovered || !!(divComponent.style as any)?.__isPreviewingHover;
   const isSelected = selectedId === divComponent.id;
   const isMobile = viewportMode === 'mobile';
 
@@ -94,7 +98,9 @@ export function DivWrapper({
           const col1 = createDefaultDiv('Coluna 1');
           const col2 = createDefaultDiv('Coluna 2');
           col1.layout.flexBasis = '50%';
+          col1.layout.width = '50%';
           col2.layout.flexBasis = '50%';
+          col2.layout.width = '50%';
           newDiv.components = [col1, col2];
           newDiv.layout.flexDirection = 'row';
         } else if (preset === '3col') {
@@ -102,12 +108,18 @@ export function DivWrapper({
           const col2 = createDefaultDiv('Coluna 2');
           const col3 = createDefaultDiv('Coluna 3');
           col1.layout.flexBasis = '33.33%';
+          col1.layout.width = '33.33%';
           col2.layout.flexBasis = '33.33%';
+          col2.layout.width = '33.33%';
           col3.layout.flexBasis = '33.33%';
+          col3.layout.width = '33.33%';
           newDiv.components = [col1, col2, col3];
           newDiv.layout.flexDirection = 'row';
         }
         if (onAddComponent) onAddComponent(divComponent.id, newDiv);
+      } else if (itemType === 'carousel') {
+        const newCarousel = createDefaultCarousel('Galeria / Carrossel');
+        if (onAddComponent) onAddComponent(divComponent.id, newCarousel);
       } else if (itemType) {
         const newComp = createDefaultComponent(itemType);
         if (onAddComponent) onAddComponent(divComponent.id, newComp);
@@ -117,54 +129,72 @@ export function DivWrapper({
     }
   };
 
+  const hasFlexBasisPreset = !!layout.flexBasis && layout.flexBasis !== 'auto' && layout.flexBasis !== '100%';
+  const effectiveWidth = hasFlexBasisPreset ? layout.flexBasis : (layout.width || 'auto');
+  const effectiveFlexBasis = layout.flexBasis || effectiveWidth;
+  const effectiveMaxWidth = layout.maxWidth || (hasFlexBasisPreset ? layout.flexBasis : '100%');
+
+  const isRow = layout.flexDirection === 'row';
+  const effectiveAlignItems = (layout.alignItems === 'center' || layout.alignItems === 'flex-end' || layout.alignItems === 'baseline')
+    ? layout.alignItems
+    : (isRow ? 'stretch' : (layout.alignItems || 'flex-start'));
+
+  const isPastThreshold = useScrollThreshold(!!layout?.appearOnScroll, layout?.scrollThreshold || 300);
+  const positionStyles = getPositionStyles(layout, divComponent.mobile, isMobile, isPastThreshold, !isPublicView);
+  const parallax = useParallaxEffect({
+    speed: layout?.parallaxSpeed || 0,
+    disableMobile: !!layout?.disableParallaxMobile,
+    isMobile,
+    isEditorMode: !isPublicView,
+  });
+
   return (
     <div
       onClick={(e) => {
-        e.stopPropagation();
-        onSelect(divComponent.id, 'div');
+        if (!isPublicView) {
+          e.stopPropagation();
+          onSelect(divComponent.id, 'div');
+        }
       }}
-      onContextMenu={handleContextMenu}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onContextMenu={!isPublicView ? handleContextMenu : undefined}
+      onDragOver={!isPublicView ? handleDragOver : undefined}
+      onDragLeave={!isPublicView ? handleDragLeave : undefined}
+      onDrop={!isPublicView ? handleDrop : undefined}
       onMouseEnter={(e) => {
-        e.stopPropagation();
-        setIsSelfHovered(true);
+        if (!isPublicView) {
+          e.stopPropagation();
+          setIsSelfHovered(true);
+        }
       }}
       onMouseLeave={(e) => {
-        e.stopPropagation();
-        setIsSelfHovered(false);
+        if (!isPublicView) {
+          e.stopPropagation();
+          setIsSelfHovered(false);
+        }
       }}
-      className={`relative min-h-[40px] p-2 transition-all duration-200 cursor-pointer ${
+      className={`relative flex flex-col transition-all duration-200 cursor-pointer ${
         isHidden ? 'opacity-40 outline-dashed outline-1 outline-amber-400' : ''
-      } ${
-        isDragOver
-          ? 'outline outline-2 outline-purple-500 bg-purple-500/10 shadow-lg ring-2 ring-purple-400/50'
-          : isSelected
-          ? 'outline outline-2 outline-purple-500 -outline-offset-2'
-          : isSelfHovered
-          ? 'outline outline-1 outline-purple-400/60 -outline-offset-1'
-          : ''
-      }`}
+      } ${getComponentHoverClasses(divComponent.style?.hoverEffect || (divComponent.props as any)?.hoverEffect)}`}
       style={{
-        width: layout.width || layout.flexBasis || 'auto',
-        flexBasis: layout.flexBasis || layout.width || 'auto',
-        flexGrow: layout.flexGrow !== undefined ? layout.flexGrow : (layout.width === '100%' || layout.flexBasis === '100%' ? 1 : 0),
+        ...parallax.style,
+        ...positionStyles,
+        width: effectiveWidth,
+        flexBasis: effectiveFlexBasis,
+        flexGrow: layout.flexGrow !== undefined ? layout.flexGrow : (effectiveWidth === '100%' || layout.flexBasis === '100%' ? 1 : 0),
         flexShrink: layout.flexShrink !== undefined ? layout.flexShrink : 1,
-        alignSelf: layout.alignSelf || 'auto',
+        alignSelf: layout.alignSelf || (layout.height === '100%' || layout.height === 'stretch' ? 'stretch' : 'auto'),
         gap: layout.gap || '16px',
         flexDirection: layout.flexDirection || 'column',
         textAlign: layout.textAlign || 'inherit',
         minWidth: layout.minWidth || 'none',
-        maxWidth: layout.maxWidth || '100%',
-        height: layout.height || 'auto',
+        maxWidth: effectiveMaxWidth,
+        height: layout.height === '100%' || layout.height === 'stretch' ? '100%' : (layout.height || 'auto'),
         minHeight: layout.minHeight || 'auto',
         maxHeight: layout.maxHeight,
         paddingTop: layout.paddingTop,
         paddingRight: layout.paddingRight,
         paddingBottom: layout.paddingBottom,
         paddingLeft: layout.paddingLeft,
-        backgroundColor: divComponent.background?.color || 'transparent',
         background: divComponent.background?.gradientString || divComponent.background?.color || 'transparent',
         backgroundImage: divComponent.background?.type === 'image' && divComponent.background?.imageUrl
           ? `linear-gradient(${divComponent.background.imageOverlayColor || 'transparent'}, ${divComponent.background.imageOverlayColor || 'transparent'}), url(${divComponent.background.imageUrl})`
@@ -182,49 +212,62 @@ export function DivWrapper({
         borderWidth: border.borderWidth || divComponent.border?.width || '1px',
         borderColor: border.borderColor || divComponent.border?.color || 'transparent',
         borderRadius: border.borderRadius || divComponent.border?.radiusTopLeft || '0px',
+        ...getComponentTransitionAndHoverStyle(divComponent.style, isStylingHovered),
       }}
     >
+      {/* Borda Flutuante de Seleção / Hover no topo dos filhos (z-20) */}
+      {!isPublicView && isSelected && (
+        <div className="absolute inset-0 border-2 border-purple-500 pointer-events-none z-20 rounded-[inherit]" />
+      )}
+      {!isPublicView && isSelfHovered && !isSelected && (
+        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-[inherit]" />
+      )}
+      {!isPublicView && isDragOver && (
+        <div className="absolute inset-0 border-2 border-purple-500 bg-purple-500/10 ring-2 ring-purple-400/50 pointer-events-none z-20 rounded-[inherit]" />
+      )}
       {/* Indicator Badge em Drag Over */}
-      {isDragOver && (
-        <div className="absolute -top-3 right-3 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-bold shadow-md z-30 flex items-center gap-1">
+      {!isPublicView && isDragOver && (
+        <div className="absolute top-1.5 right-3 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[9px] font-bold shadow-md z-30 flex items-center gap-1">
           <Plus className="w-3 h-3" />
           <span>Soltar elemento aqui</span>
         </div>
       )}
 
       {/* Botão de Arrastar / Mover Container no Hover */}
-      <div
-        draggable
-        onDragStart={(e) => {
-          e.stopPropagation();
-          onSelect(divComponent.id, 'div');
-          e.dataTransfer.setData(
-            'application/json',
-            JSON.stringify({
-              isExistingElement: true,
-              elementId: divComponent.id,
-              elementType: 'div',
-            })
-          );
-          e.dataTransfer.effectAllowed = 'move';
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(divComponent.id, 'div');
-        }}
-        className={`absolute -top-2.5 right-2 transition-opacity bg-purple-600 text-white p-1 rounded-md shadow-md z-30 cursor-grab active:cursor-grabbing flex items-center justify-center ${
-          isSelfHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        title="Arrastar container para mover de lugar"
-      >
-        <GripVertical className="w-3 h-3" />
-      </div>
+      {!isPublicView && (
+        <div
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            onSelect(divComponent.id, 'div');
+            e.dataTransfer.setData(
+              'application/json',
+              JSON.stringify({
+                isExistingElement: true,
+                elementId: divComponent.id,
+                elementType: 'div',
+              })
+            );
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(divComponent.id, 'div');
+          }}
+          className={`absolute top-1.5 right-2 transition-opacity bg-purple-600 text-white p-1 rounded-md shadow-md z-30 cursor-grab active:cursor-grabbing flex items-center justify-center ${
+            isSelfHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          title="Arrastar container para mover de lugar"
+        >
+          <GripVertical className="w-3 h-3" />
+        </div>
+      )}
 
       {/* Label de Identificação Flutuante ao Selecionar */}
-      {isSelected && !isDragOver && (
-        <div className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm select-none z-20">
+      {!isPublicView && isSelected && !isDragOver && (
+        <div className="absolute top-1.5 left-3 px-2 py-0.5 rounded-full bg-purple-600 text-white text-[8px] font-extrabold uppercase tracking-wider flex items-center gap-1 shadow-sm select-none z-30">
           <Square className="w-2.5 h-2.5" />
-          {divComponent.label || 'Div Container'}
+          Container Div
           <button
             type="button"
             onClick={(e) => {
@@ -242,11 +285,11 @@ export function DivWrapper({
       {/* Render dos Filhos */}
       {divComponent.components.length > 0 ? (
         <div
-          className="flex w-full min-h-[45px]"
+          className="flex w-full h-full flex-1"
           style={{
             flexDirection: layout.flexDirection || 'column',
             gap: layout.gap || '16px',
-            alignItems: layout.alignItems || 'flex-start',
+            alignItems: effectiveAlignItems,
             justifyContent: layout.justifyContent || 'flex-start',
             textAlign: layout.textAlign || 'inherit',
           }}
@@ -266,17 +309,23 @@ export function DivWrapper({
               onMoveElementBeforeOrAfter={onMoveElementBeforeOrAfter}
               onAddComponentBeforeOrAfter={onAddComponentBeforeOrAfter}
               onContextMenu={onContextMenu}
+              isPublicView={isPublicView}
             />
           ))}
         </div>
-      ) : (
-        <div className="w-full h-full min-h-[50px] flex flex-col items-center justify-center text-[10px] text-purple-500 dark:text-purple-400 font-bold border border-dashed border-purple-300 dark:border-purple-800/60 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors p-3 select-none">
-          <span className="flex items-center gap-1">
+      ) : !isPublicView ? (
+        <div
+          className="w-full flex-1 min-h-[50px] flex flex-col items-center justify-center text-[10px] text-[var(--brand-gradient-start)] font-bold border border-dashed border-[var(--brand-gradient-start)]/40 bg-[var(--brand-gradient-start)]/5 hover:bg-[var(--brand-gradient-start)]/10 transition-colors p-4 select-none"
+          style={{
+            borderRadius: border.borderRadius ? `calc(${border.borderRadius} - 2px)` : 'inherit',
+          }}
+        >
+          <span className="flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" />
             + Solte elementos neste container
           </span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

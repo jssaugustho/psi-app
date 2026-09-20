@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import * as LucideIcons from 'lucide-react';
 import {
+  Ban,
   Brain,
   Heart,
   HeartHandshake,
@@ -76,7 +78,7 @@ export const POPULAR_ICONS: Array<{ name: string; icon: LucideIcon; category: st
   { name: 'Lock', icon: Lock, category: 'Confiança' },
   { name: 'ThumbsUp', icon: ThumbsUp, category: 'Confiança' },
 
-  // Ação & CTA
+  // Ação & Geral
   { name: 'Zap', icon: Zap, category: 'Ação & Geral' },
   { name: 'Target', icon: Target, category: 'Ação & Geral' },
   { name: 'BookOpen', icon: BookOpen, category: 'Ação & Geral' },
@@ -89,10 +91,12 @@ export const POPULAR_ICONS: Array<{ name: string; icon: LucideIcon; category: st
   { name: 'Layers', icon: Layers, category: 'Ação & Geral' },
 ];
 
-export function getLucideIcon(iconName?: string): LucideIcon {
-  if (!iconName) return Sparkles;
+export function getLucideIcon(iconName?: string): LucideIcon | null {
+  if (!iconName || iconName.toLowerCase() === 'none' || iconName.trim() === '') return null;
   const found = POPULAR_ICONS.find((item) => item.name.toLowerCase() === iconName.toLowerCase());
-  return found ? found.icon : Sparkles;
+  if (found) return found.icon;
+  const lucideIcon = (LucideIcons as any)[iconName];
+  return (lucideIcon as LucideIcon) || null;
 }
 
 interface IconPickerProps {
@@ -100,7 +104,7 @@ interface IconPickerProps {
   onSelectIcon: (iconName: string) => void;
 }
 
-export function IconPicker({ selectedName = 'Sparkles', onSelectIcon }: IconPickerProps) {
+export function IconPicker({ selectedName = '', onSelectIcon }: IconPickerProps) {
   const [search, setSearch] = useState('');
 
   const filteredIcons = POPULAR_ICONS.filter(
@@ -108,6 +112,8 @@ export function IconPicker({ selectedName = 'Sparkles', onSelectIcon }: IconPick
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  const isNoneSelected = !selectedName || selectedName.toLowerCase() === 'none' || selectedName.trim() === '';
 
   return (
     <div className="space-y-3">
@@ -123,9 +129,23 @@ export function IconPicker({ selectedName = 'Sparkles', onSelectIcon }: IconPick
       </div>
 
       <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1 border border-[var(--surface-border)] rounded-xl glass-sm custom-scrollbar">
+        {/* Opção: Sem Ícone */}
+        <button
+          type="button"
+          onClick={() => onSelectIcon('')}
+          className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-all cursor-pointer ${
+            isNoneSelected
+              ? 'border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold shadow-sm'
+              : 'border-dashed border-[var(--surface-border)] text-slate-400 hover:bg-[var(--surface-hover)] hover:text-slate-600 dark:hover:text-slate-200'
+          }`}
+          title="Sem Ícone (Remover ícone)"
+        >
+          <Ban className="w-4 h-4" />
+        </button>
+
         {filteredIcons.map((item) => {
           const IconComp = item.icon;
-          const isSelected = item.name.toLowerCase() === selectedName.toLowerCase();
+          const isSelected = !isNoneSelected && item.name.toLowerCase() === selectedName.toLowerCase();
           return (
             <button
               key={item.name}
@@ -146,3 +166,4 @@ export function IconPicker({ selectedName = 'Sparkles', onSelectIcon }: IconPick
     </div>
   );
 }
+
