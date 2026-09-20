@@ -10,7 +10,7 @@ import { ContextMenu, ContextMenuState } from './components/ContextMenu';
 import { InlineSelectionHelper } from './components/InlineSelectionHelper';
 import { loadGoogleFonts } from './utils/googleFonts';
 import { getThemeColors, getThemeTypography } from './utils/colorHelpers';
-import { normalizeCanvasData } from './utils/canvasHelpers';
+import { normalizeCanvasData, denormalizeCanvasData } from './utils/canvasHelpers';
 import { createSectionFromPreset } from './constants';
 
 export interface CanvasRendererProps {
@@ -112,9 +112,9 @@ export function CanvasRenderer({
     setContextMenu((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
-  // Normaliza o canvasData garantindo auto-promoção de containers sticky para seções de nível 1
-  const normalizedCanvasData = useMemo(() => {
-    return canvasData ? normalizeCanvasData(canvasData) : null;
+  // Denormaliza o canvasData garantindo compatibilidade com renderizador de seções de nível 1
+  const denormalizedCanvasData = useMemo(() => {
+    return canvasData ? denormalizeCanvasData(canvasData) : null;
   }, [canvasData]);
 
   const content = (
@@ -158,18 +158,20 @@ export function CanvasRenderer({
     >
       {/* Frame de Simulação de Viewport com Injeção Dinâmica da Identidade Visual */}
       <div
-        className={`w-full transition-all duration-300 ${
-          viewportMode === 'mobile' && !isPublicView
-            ? 'max-w-[390px] border-[8px] border-slate-700 dark:border-slate-800 rounded-[40px] shadow-2xl overflow-y-auto max-h-[840px] custom-scrollbar p-2 my-6'
-            : 'w-full min-h-full'
+        className={`w-full min-h-full transition-all duration-300 relative flex flex-col flex-1 ${
+          isPublicView
+            ? 'w-full shadow-none border-none rounded-none'
+            : viewportMode === 'mobile'
+            ? 'max-w-[390px] border border-[var(--surface-border)] rounded-3xl shadow-2xl overflow-hidden min-h-[750px] my-4'
+            : 'w-full shadow-none border-none rounded-none'
         }`}
         style={{
           backgroundColor: siteBg,
         }}
       >
         {/* Seções do Canvas */}
-        {normalizedCanvasData && normalizedCanvasData.sections && normalizedCanvasData.sections.length > 0 ? (
-          normalizedCanvasData.sections.map((sec, idx) => (
+        {denormalizedCanvasData && denormalizedCanvasData.sections && denormalizedCanvasData.sections.length > 0 ? (
+          denormalizedCanvasData.sections.map((sec: Section, idx: number) => (
             <SectionWrapper
               key={sec.id}
               section={sec}

@@ -172,6 +172,34 @@ export interface CanvasData {
   sections: Section[];
   globalStyles?: CanvasGlobalStyles;
 }
+
+/**
+ * 🚀 Estado Normalizado (State by ID - Flat Hash Table)
+ * Utilizado internamente no usePageEditor para acesso O(1) e histório delta leve com Immer.
+ */
+export interface CanvasNode {
+  id: string;
+  type: 'root' | 'section' | 'div' | 'carousel' | 'global_instance' | AtomicComponentType;
+  parentId: string | null;
+  childrenIds: string[];
+  name?: string;
+  label?: string;
+  props?: Record<string, any>;
+  style?: Record<string, any>;
+  layout?: Record<string, any>;
+  border?: Record<string, any>;
+  background?: Record<string, any>;
+  mobile?: Record<string, any>;
+}
+
+export interface NormalizedCanvasData {
+  version: '2.0';
+  rootNodeId: 'root';
+  nodes: Record<string, CanvasNode>;
+  globalStyles?: CanvasGlobalStyles;
+  globalComponentsMap?: Record<string, GlobalComponentMaster>;
+  navbar?: NavbarConfig;
+}
 ```
 
 ---
@@ -189,39 +217,47 @@ export interface CanvasData {
 
 ---
 
-## 5. Concrete Code Recipes (Mutação Imutável de Estado)
+## 5. Concrete Code Recipes (Mutação em Estado Normalizado $O(1)$)
 
-### Atualização Inteligente de Propriedade de Componente
+### Atualização Direta de Componente por ID com Immer Patches
 
 ```typescript
-// usePageEditor.ts ou canvasHelpers.ts
-export function updateComponentInCanvas(
-  canvasData: CanvasData,
-  componentId: string,
-  updater: (comp: any) => any
-): CanvasData {
-  return {
-    ...canvasData,
-    sections: canvasData.sections.map((section) => ({
-      ...section,
-      components: section.components.map((item) => {
-        // Se o item for o próprio componente (atômico no nível da seção)
-        if (item.id === componentId) {
-          return updater(item);
-        }
-        // Se o item for um Div contêiner com filhos
-        if (item.type === 'div' && Array.isArray((item as DivComponent).components)) {
-          return {
-            ...item,
-            components: (item as DivComponent).components.map((child) =>
-              child.id === componentId ? updater(child) : child
-            ),
-          };
-        }
-        return item;
-      }),
-    })),
+// usePageEditor.ts
+const updateComponent = useCallback((componentId: string, patch: Partial<Component>) => {
+  updateCanvasState((draft) => {
+    if (draft.nodes[componentId]) {
+      Object.assign(draft.nodes[componentId], patch);
+    }
+  }, 'Editou Componente');
+}, [updateCanvasState]);
+```
+
+### Remoção de Container com Exclusão em Cascata em $O(1)$
+
+```typescript
+// canvasHelpers.ts
+export function removeNodeCascadeInFlatCanvas(nodes: Record<string, CanvasNode>, nodeId: string) {
+  const node = nodes[nodeId];
+  if (!node) return;
+
+  if (node.parentId && nodes[node.parentId]) {
+    const parentNode = nodes[node.parentId];
+    parentNode.childrenIds = (parentNode.childrenIds || []).filter((id: string) => id !== nodeId);
+  }
+
+  const idsToDelete: string[] = [];
+  const collectDescendants = (id: string) => {
+    idsToDelete.push(id);
+    const n = nodes[id];
+    if (n && Array.isArray(n.childrenIds)) {
+      n.childrenIds.forEach((childId: string) => collectDescendants(childId));
+    }
   };
+
+  collectDescendants(nodeId);
+  idsToDelete.forEach((id: string) => {
+    delete nodes[id];
+  });
 }
 ```
 
@@ -229,19 +265,24 @@ export function updateComponentInCanvas(
 
 ## 6. Anti-Patterns & Proibições
 
-### ❌ Errado (Mutação Direta do Objeto)
+### ❌ Errado (Percorrer a árvore recursivamente para alterar um nó)
 ```typescript
-// NUNCA altere propriedades diretamente na referência do estado!
-const comp = canvasData.sections[0].components[0];
-comp.props.text = "Novo Título"; // QUEBRA a reatividade do React e do histórico Undo/Redo
+// NUNCA faça busca em profundidade (DFS/map) na árvore inteira para atualizar uma simples propriedade!
+setCanvasData((prev) => updateComponentInCanvasTree(prev, id, patch));
 ```
 
-### ✅ Correto (Atualização Imutável via Helper)
+### ❌ Errado (Salvar snapshots completos da árvore a cada evento do slider)
 ```typescript
-setCanvasData((prev) =>
-  updateComponentInCanvas(prev, selectedId, (comp) => ({
-    ...comp,
-    props: { ...comp.props, text: "Novo Título" },
-  }))
-);
+// NUNCA armazene a cópia inteira do CanvasData a cada evento onChange do slider de padding/tamanho!
+history.push(fullCanvasSnapshot); // Consome centenas de MB de RAM e polui a pilha com 100 passos de undo
+```
+
+### ✅ Correto (Acesso O(1) na Hash Table Flat + Immer Patch Deltas)
+```typescript
+// Acesso O(1) direto por ID com patches delta e batching no PointerUp
+updateCanvasState((draft) => {
+  if (draft.nodes[selectedId]) {
+    draft.nodes[selectedId].props.text = "Novo Título";
+  }
+}, 'Editou Título');
 ```

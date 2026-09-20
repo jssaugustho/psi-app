@@ -29,8 +29,13 @@
    - Bind visual identity colors directly to CSS variables (`var(--brand-gradient-start)`, `var(--brand-gradient-end)`, `var(--brand-contrast-color)`).
 9. **ALWAYS manage CTA Destinations declaratively (`form`, `whatsapp`, `external_url`)**:
    - Button and Form CTAs support explicit destination types. Clicking a `form` CTA scrolls to or triggers the bound `form_id` modal; `whatsapp` opens `https://wa.me/55...`; `external_url` navigates to target URLs.
-10. **ALWAYS keep `page.tsx` concise (< 50 lines)**:
-    - Delegate execution to `EditorLayout` and custom hooks (`usePageEditor`, `useEditorHistory`, `useAutoSave`).
+11. **ALWAYS use Normalized Flat State (`NormalizedCanvasData` / State by ID) in `usePageEditor`**:
+    - The editor state uses a flat hash map `nodes: Record<string, CanvasNode>` for O(1) property updates and element reordering.
+    - Automatic bidirectional conversion (`normalizeCanvasData` / `denormalizeCanvasData`) guarantees 100% backward/forward compatibility with PostgreSQL JSON storage (`draft_data` / `canvas_data`) and public sites (`apps/sites`).
+12. **ALWAYS store Undo/Redo history as Immer Patch Deltas (`produceWithPatches` & `applyPatches`)**:
+    - Instead of full tree object snapshots, `useEditorHistory.ts` records `patches` and `inversePatches` with a max ceiling of `MAX_HISTORY = 50`.
+13. **ALWAYS batch continuous slider/drag transactions until `onPointerUp`**:
+    - During continuous property adjustments (`isAdjusting === true` via `useIsAdjustingProperty`), visual mutations render in real time while consolidating **exactly 1 single patch delta** into the history stack when the gesture completes.
 
 ---
 
@@ -38,7 +43,7 @@
 
 | Domínio de Leitura | Arquivo Contextual | Tópicos Cobertos |
 |---|---|---|
-| **Schema de Dados & Props** | [.agents/site_editor/01_schema_and_props_storage.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/01_schema_and_props_storage.md) | CanvasData v2.0, objetos `style`, `layout`, `border`, `background`, `props`, `mobile` e imutabilidade. |
+| **Schema de Dados & Props** | [.agents/site_editor/01_schema_and_props_storage.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/01_schema_and_props_storage.md) | CanvasData v2.0, NormalizedCanvasData (State by ID), Immer Patches, objetos `style`, `layout`, `border`, `background`, `props`, `mobile` e imutabilidade. |
 | **Canvas Renderer & Modos** | [.agents/site_editor/02_canvas_rendering_and_modes.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/02_canvas_rendering_and_modes.md) | `@psi/canvas-renderer`, `isPublicView` flag, `styleBuilder.ts`, gradientes de texto e outlines de seleção. |
 | **Staging, Publicação & Domínios** | [.agents/site_editor/03_staging_publishing_and_domains.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/03_staging_publishing_and_domains.md) | `draft_data` vs `canvas_data`, RPC `publish_capture_page`, subdomínios Cloudflare e Nginx wildcard. |
 | **Herança do Wizard & Identidade** | [.agents/site_editor/04_wizard_inheritance_and_bootstrapping.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/04_wizard_inheritance_and_bootstrapping.md) | RPC `bootstrap_workspace`, variáveis `{{psychologist_name}}`, `{{crp}}` e variáveis CSS do tema. |

@@ -754,6 +754,38 @@ export interface CanvasData {
   sections: Section[];
 }
 
+export interface CanvasNode {
+  id: string;
+  type: 'root' | 'section' | 'div' | 'carousel' | 'global_instance' | AtomicComponentType;
+  parentId: string | null;
+  childrenIds: string[];
+  name?: string;
+  label?: string;
+  anchorId?: string;
+  stickyScope?: string;
+  locked?: boolean;
+  hidden?: boolean;
+  props?: Record<string, any>;
+  style?: Record<string, any>;
+  layout?: Record<string, any>;
+  border?: Record<string, any>;
+  background?: Record<string, any>;
+  effects?: Record<string, any>;
+  mobile?: Record<string, any>;
+  masterId?: string;
+  overrides?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface NormalizedCanvasData {
+  version: '2.0';
+  rootNodeId: 'root';
+  nodes: Record<string, CanvasNode>;
+  globalStyles?: CanvasGlobalStyles;
+  globalComponentsMap?: Record<string, GlobalComponentMaster>;
+  navbar?: NavbarConfig;
+}
+
 export type ViewportMode = 'desktop' | 'mobile';
 
 export interface SelectionState {

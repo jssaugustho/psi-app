@@ -1,4 +1,4 @@
-import { CanvasData, Section, Component, DivComponent, CarouselComponent, AtomicComponent, ComponentType, SelectionState } from '../types';
+import { CanvasData, Section, Component, DivComponent, CarouselComponent, AtomicComponent, ComponentType, SelectionState, CanvasNode, NormalizedCanvasData } from '../types';
 import { createDefaultSection, createDefaultDiv, createDefaultCarousel, createDefaultComponent } from '../constants';
 
 /**
@@ -594,10 +594,202 @@ export function getComponentTypeLabel(type: string): string {
 }
 
 /**
- * Normaliza a árvore do Canvas (Blueprint v2.0).
+ * Normaliza a árvore aninhada do Canvas (CanvasData v2.0) em uma tabela hash flat (State by ID).
  */
-export function normalizeCanvasData(canvas: CanvasData): CanvasData {
-  if (!canvas || !Array.isArray(canvas.sections)) return canvas;
-  return canvas;
+export function normalizeCanvasData(canvas: CanvasData | NormalizedCanvasData): NormalizedCanvasData {
+  if (!canvas) {
+    return {
+      version: '2.0',
+      rootNodeId: 'root',
+      nodes: {
+        root: { id: 'root', type: 'root', parentId: null, childrenIds: [] }
+      }
+    };
+  }
+
+  if ('nodes' in canvas && canvas.rootNodeId === 'root' && canvas.nodes) {
+    return canvas as NormalizedCanvasData;
+  }
+
+  const treeCanvas = canvas as CanvasData;
+  const nodes: Record<string, CanvasNode> = {};
+  const sectionIds: string[] = [];
+
+  const rootNode: CanvasNode = {
+    id: 'root',
+    type: 'root',
+    parentId: null,
+    childrenIds: sectionIds,
+  };
+  nodes['root'] = rootNode;
+
+  if (Array.isArray(treeCanvas.sections)) {
+    treeCanvas.sections.forEach((sec) => {
+      sectionIds.push(sec.id);
+      const childIds: string[] = [];
+
+      const secNode: CanvasNode = {
+        ...sec,
+        id: sec.id,
+        type: 'section',
+        parentId: 'root',
+        childrenIds: childIds,
+      };
+      delete (secNode as any).components;
+      nodes[sec.id] = secNode;
+
+      if (Array.isArray(sec.components)) {
+        sec.components.forEach((comp) => {
+          processComponentToFlat(comp, sec.id, childIds, nodes);
+        });
+      }
+    });
+  }
+
+  return {
+    version: '2.0',
+    rootNodeId: 'root',
+    nodes,
+    globalStyles: treeCanvas.globalStyles,
+    globalComponentsMap: treeCanvas.globalComponentsMap,
+    navbar: treeCanvas.navbar,
+  };
 }
+
+function processComponentToFlat(
+  comp: Component,
+  parentId: string,
+  parentChildIds: string[],
+  nodes: Record<string, CanvasNode>
+) {
+  parentChildIds.push(comp.id);
+  const childIds: string[] = [];
+
+  const compNode: CanvasNode = {
+    ...comp,
+    id: comp.id,
+    type: comp.type as any,
+    parentId,
+    childrenIds: childIds,
+  };
+  delete (compNode as any).components;
+  nodes[comp.id] = compNode;
+
+  if ((comp.type === 'div' || comp.type === 'carousel') && Array.isArray((comp as DivComponent | CarouselComponent).components)) {
+    (comp as DivComponent | CarouselComponent).components.forEach((subComp) => {
+      processComponentToFlat(subComp as Component, comp.id, childIds, nodes);
+    });
+  }
+}
+
+/**
+ * Denormaliza a tabela hash flat (NormalizedCanvasData) de volta para a árvore aninhada (CanvasData v2.0).
+ */
+export function denormalizeCanvasData(flat: NormalizedCanvasData | CanvasData): CanvasData {
+  if (!flat) {
+    return { version: '2.0', sections: [] };
+  }
+
+  if ('sections' in flat && Array.isArray(flat.sections)) {
+    return flat as CanvasData;
+  }
+
+  const flatCanvas = flat as NormalizedCanvasData;
+  const nodes = flatCanvas.nodes || {};
+  const rootNode = nodes['root'];
+
+  const sectionIds = rootNode ? rootNode.childrenIds || [] : [];
+  const sections: Section[] = [];
+
+  sectionIds.forEach((secId: string) => {
+    const secNode = nodes[secId];
+    if (!secNode) return;
+
+    const secComponents: Component[] = [];
+    (secNode.childrenIds || []).forEach((childId: string) => {
+      const comp = denormalizeComponentFromFlat(childId, nodes);
+      if (comp) secComponents.push(comp);
+    });
+
+    const { parentId, childrenIds, ...secClean } = secNode;
+    const section: Section = {
+      ...secClean,
+      id: secId,
+      type: 'section',
+      layout: secClean.layout || {},
+      background: secClean.background || {},
+      components: secComponents,
+    } as Section;
+
+    sections.push(section);
+  });
+
+  return {
+    version: '2.0',
+    globalStyles: flatCanvas.globalStyles,
+    globalComponentsMap: flatCanvas.globalComponentsMap,
+    navbar: flatCanvas.navbar,
+    sections,
+  };
+}
+
+function denormalizeComponentFromFlat(compId: string, nodes: Record<string, CanvasNode>): Component | null {
+  const node = nodes[compId];
+  if (!node) return null;
+
+  const { parentId, childrenIds, ...cleanNode } = node;
+
+  if (node.type === 'div' || node.type === 'carousel') {
+    const childComponents: Component[] = [];
+    (childrenIds || []).forEach((cId: string) => {
+      const child = denormalizeComponentFromFlat(cId, nodes);
+      if (child) childComponents.push(child);
+    });
+
+    return {
+      ...cleanNode,
+      id: compId,
+      type: node.type,
+      components: childComponents,
+    } as DivComponent | CarouselComponent;
+  }
+
+  return {
+    ...cleanNode,
+    id: compId,
+    type: node.type,
+  } as AtomicComponent;
+}
+
+/**
+ * Coleta recursivamente todos os IDs descendentes de um nó e remove em cascata.
+ */
+export function removeNodeCascadeInFlatCanvas(nodes: Record<string, CanvasNode>, nodeId: string) {
+  const node = nodes[nodeId];
+  if (!node) return;
+
+  // 1. Remove referência do pai
+  if (node.parentId && nodes[node.parentId]) {
+    const parentNode = nodes[node.parentId];
+    parentNode.childrenIds = (parentNode.childrenIds || []).filter((id: string) => id !== nodeId);
+  }
+
+  // 2. Coleta recursiva de todos os filhos
+  const idsToDelete: string[] = [];
+  const collectDescendants = (id: string) => {
+    idsToDelete.push(id);
+    const n = nodes[id];
+    if (n && Array.isArray(n.childrenIds)) {
+      n.childrenIds.forEach((childId: string) => collectDescendants(childId));
+    }
+  };
+
+  collectDescendants(nodeId);
+
+  // 3. Deleta todos do dicionário hash
+  idsToDelete.forEach((id: string) => {
+    delete nodes[id];
+  });
+}
+
 
