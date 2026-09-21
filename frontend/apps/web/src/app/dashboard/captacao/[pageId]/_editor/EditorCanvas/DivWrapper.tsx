@@ -129,10 +129,12 @@ export function DivWrapper({
     }
   };
 
-  const hasFlexBasisPreset = !!layout.flexBasis && layout.flexBasis !== 'auto' && layout.flexBasis !== '100%';
-  const effectiveWidth = hasFlexBasisPreset ? layout.flexBasis : (layout.width || 'auto');
-  const effectiveFlexBasis = layout.flexBasis || effectiveWidth;
-  const effectiveMaxWidth = layout.maxWidth || (hasFlexBasisPreset ? layout.flexBasis : '100%');
+  const isAutoWidth = layout.width === 'auto' || layout.width === 'fit-content';
+  const hasValidFlexBasis = !!layout.flexBasis && layout.flexBasis !== 'auto' && layout.flexBasis !== '100%' && layout.flexBasis !== '0px' && layout.flexBasis !== '0';
+  const effectiveWidth = isAutoWidth ? 'fit-content' : (hasValidFlexBasis ? layout.flexBasis : (layout.width || '100%'));
+  const effectiveFlexBasis = isAutoWidth ? 'auto' : (hasValidFlexBasis ? layout.flexBasis : (layout.width === '100%' || layout.flexBasis === '100%' ? '100%' : 'auto'));
+  const effectiveMaxWidth = layout.maxWidth || (hasValidFlexBasis ? layout.flexBasis : '100%');
+  const effectiveFlexGrow = layout.flexGrow !== undefined ? layout.flexGrow : (isAutoWidth ? 0 : (effectiveWidth === '100%' || layout.flexBasis === '100%' ? 1 : 0));
 
   const isRow = layout.flexDirection === 'row';
   const effectiveAlignItems = (layout.alignItems === 'center' || layout.alignItems === 'flex-end' || layout.alignItems === 'baseline')
@@ -187,9 +189,9 @@ export function DivWrapper({
         }),
         width: effectiveWidth,
         flexBasis: effectiveFlexBasis,
-        flexGrow: layout.flexGrow !== undefined ? layout.flexGrow : (effectiveWidth === '100%' || layout.flexBasis === '100%' ? 1 : 0),
+        flexGrow: effectiveFlexGrow,
         flexShrink: layout.flexShrink !== undefined ? layout.flexShrink : 1,
-        alignSelf: layout.alignSelf || (layout.height === '100%' || layout.height === 'stretch' ? 'stretch' : 'auto'),
+        alignSelf: (layout.height === '100%' || layout.height === 'stretch' ? 'stretch' : undefined),
         maxWidth: effectiveMaxWidth,
       }}
     >
@@ -263,7 +265,7 @@ export function DivWrapper({
       {/* Render dos Filhos */}
       {divComponent.components.length > 0 ? (
         <div
-          className="flex w-full h-full flex-1"
+          className={`flex h-full flex-1 ${isAutoWidth ? 'w-auto max-w-full' : 'w-full'}`}
           style={{
             flexDirection: layout.flexDirection || 'column',
             gap: layout.gap || '16px',

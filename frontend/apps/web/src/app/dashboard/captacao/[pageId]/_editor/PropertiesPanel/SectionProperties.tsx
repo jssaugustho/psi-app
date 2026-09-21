@@ -42,6 +42,8 @@ import { TransformControl } from './components/TransformControl';
 import { TransitionControl } from './components/TransitionControl';
 import { PositioningControl } from './components/PositioningControl';
 import { ParallaxControl } from './components/ParallaxControl';
+import { FlexLayoutControl } from './components/FlexLayoutControl';
+import { SpacingControl } from './components/SpacingControl';
 
 interface SectionPropertiesProps {
   section: Section;
@@ -433,243 +435,134 @@ export function SectionProperties({
           })()}
         </div>
 
-        {/* 📐 ACCORDION: DISPOSIÇÃO & ALINHAMENTO */}
+        {/* 1º 📐 ACCORDION: DIMENSIONAMENTO (LARGURA & ALTURA) */}
         <AccordionItem
-          id="sec-layout"
-          title="Disposição & Alinhamento"
-          icon={LayoutGrid}
-          defaultOpen={false}
-        >
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Organização dos Elementos</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleLayoutChange('flexDirection', 'row')}
-                className={`p-2 rounded-xl border flex items-center justify-center gap-2 font-bold cursor-pointer transition-all ${
-                  isHorizontal
-                    ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]'
-                    : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <MoveHorizontal className="w-3.5 h-3.5" />
-                <span>Lado a Lado</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLayoutChange('flexDirection', 'column')}
-                className={`p-2 rounded-xl border flex items-center justify-center gap-2 font-bold cursor-pointer transition-all ${
-                  !isHorizontal
-                    ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)]'
-                    : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <MoveVertical className="w-3.5 h-3.5" />
-                <span>Empilhado</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">
-              {isHorizontal ? 'Alinhamento Horizontal' : 'Alinhamento Vertical'}
-            </label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'flex-start', label: isHorizontal ? 'Esquerda' : 'Topo' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: isHorizontal ? 'Direita' : 'Base' },
-                { value: 'space-between', label: 'Espaçado' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleLayoutChange('justifyContent', item.value)}
-                  className={`py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
-                    (effectiveLayout.justifyContent || 'flex-start') === item.value
-                      ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] font-extrabold'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">
-              {isHorizontal ? 'Alinhamento Vertical dos Elementos' : 'Alinhamento Horizontal dos Elementos'}
-            </label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'flex-start', label: isHorizontal ? 'Topo' : 'Esquerda' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: isHorizontal ? 'Base' : 'Direita' },
-                { value: 'stretch', label: 'Esticar' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleLayoutChange('alignItems', item.value)}
-                  className={`py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
-                    (effectiveLayout.alignItems || 'flex-start') === item.value
-                      ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] font-extrabold'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Alinhamento do Texto na Seção</label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'left', icon: AlignLeft, label: 'Esquerda' },
-                { value: 'center', icon: AlignCenter, label: 'Centro' },
-                { value: 'right', icon: AlignRight, label: 'Direita' },
-                { value: 'justify', icon: AlignJustify, label: 'Justificado' },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => handleLayoutChange('textAlign', item.value)}
-                    className={`p-2 rounded-lg border flex items-center justify-center cursor-pointer transition-all ${
-                      effectiveLayout.textAlign === item.value
-                        ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] font-extrabold'
-                        : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                    }`}
-                    title={item.label}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Espaço entre Elementos (Gap)</label>
-            <SliderNumberInput
-              value={effectiveLayout.gap || '24px'}
-              onChange={(val) => handleLayoutChange('gap', val)}
-              min={0}
-              max={96}
-              defaultUnit="px"
-            />
-          </div>
-        </AccordionItem>
-
-        {/* 📏 ACCORDION: DIMENSÕES & MEDIDAS DA SEÇÃO */}
-        <AccordionItem
-          id="sec-dimensions"
-          title="Dimensões & Medidas da Seção"
+          id="sec-size"
+          title="Dimensionamento (Largura & Altura)"
           icon={Ruler}
-          defaultOpen={false}
+          defaultOpen={true}
         >
-          {(() => {
-            const hasFullWidth = effectiveLayout.fullWidth !== false;
-            return (
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1.5 p-2.5 rounded-xl border border-[var(--surface-border)] glass-sm">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                      Largura Total da Tela (Full Width)
-                    </label>
-                    <input
-                      type="checkbox"
-                      checked={hasFullWidth}
-                      onChange={(e) => handleLayoutChange('fullWidth', e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 accent-[var(--brand-gradient-start)] cursor-pointer"
-                    />
+          <div className="space-y-3 text-xs">
+            {(() => {
+              const hasFullWidth = effectiveLayout.fullWidth !== false;
+              return (
+                <>
+                  <div className="space-y-1.5 p-2.5 rounded-xl border border-[var(--surface-border)] glass-sm">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                        Largura Total da Tela (Full Width)
+                      </label>
+                      <input
+                        type="checkbox"
+                        checked={hasFullWidth}
+                        onChange={(e) => handleLayoutChange('fullWidth', e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 accent-[var(--brand-gradient-start)] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[9px] text-slate-400 leading-tight">
+                      Quando ativado, o fundo da seção se estende por 100% da largura do navegador.
+                    </p>
                   </div>
-                  <p className="text-[9px] text-slate-400 leading-tight">
-                    Quando ativado, o fundo da seção se estende por 100% da largura do navegador.
-                  </p>
-                </div>
 
-                {!hasFullWidth && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Largura Máxima do Conteúdo</label>
-                    <SliderNumberInput
-                      value={effectiveLayout.maxContentWidth || '1200px'}
-                      onChange={(val) => handleLayoutChange('maxContentWidth', val)}
-                      min={600}
-                      max={1920}
-                      step={20}
-                      defaultUnit="px"
-                      unitOptions={['px', '%', 'vw']}
-                    />
-                  </div>
-                )}
+                  {!hasFullWidth && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Largura Máxima do Conteúdo</label>
+                      <SliderNumberInput
+                        value={effectiveLayout.maxContentWidth || '1200px'}
+                        onChange={(val) => handleLayoutChange('maxContentWidth', val)}
+                        min={600}
+                        max={1920}
+                        step={20}
+                        defaultUnit="px"
+                        unitOptions={['px', '%', 'vw']}
+                      />
+                    </div>
+                  )}
 
-                <SizeControl
-                  width={effectiveLayout.width || '100%'}
-                  height={effectiveLayout.height || 'auto'}
-                  minWidth={effectiveLayout.minWidth}
-                  maxWidth={effectiveLayout.maxWidth}
-                  minHeight={effectiveLayout.minHeight || 'auto'}
-                  maxHeight={effectiveLayout.maxHeight}
-                  onChangeWidth={(w) => handleLayoutChange('width', w)}
-                  onChangeHeight={(h) => handleLayoutChange('height', h)}
-                  onChangeMinMax={(minMax) => handleMultiLayoutChange(minMax)}
-                  isMobileOverride={isMobile}
-                />
-              </div>
-            );
-          })()}
+                  <SizeControl
+                    width={effectiveLayout.width || '100%'}
+                    height={effectiveLayout.height || 'auto'}
+                    minWidth={effectiveLayout.minWidth}
+                    maxWidth={effectiveLayout.maxWidth}
+                    minHeight={effectiveLayout.minHeight || 'auto'}
+                    maxHeight={effectiveLayout.maxHeight}
+                    onChangeWidth={(w) => handleLayoutChange('width', w)}
+                    onChangeHeight={(h) => handleLayoutChange('height', h)}
+                    onChangeMinMax={(minMax) => handleMultiLayoutChange(minMax)}
+                    isMobileOverride={isMobile}
+                  />
+                </>
+              );
+            })()}
+          </div>
         </AccordionItem>
 
-        {/* 📦 ACCORDION: ESPAÇAMENTO (PADDING) */}
+        {/* 2º 🧩 ACCORDION: ORGANIZAÇÃO INTERNA */}
         <AccordionItem
-          id="sec-padding"
-          title="Espaçamento (Padding)"
-          icon={Maximize}
+          id="sec-layout-flex"
+          title="Organização Interna"
+          icon={LayoutGrid}
+          defaultOpen={true}
+        >
+          <FlexLayoutControl
+            flexDirection={effectiveLayout.flexDirection || 'column'}
+            flexWrap={effectiveLayout.flexWrap || 'nowrap'}
+            justifyContent={effectiveLayout.justifyContent || 'flex-start'}
+            alignItems={effectiveLayout.alignItems || 'flex-start'}
+            gap={effectiveLayout.gap || '32px'}
+            htmlTag={(section as any).htmlTag || 'section'}
+            onChangeFlexDirection={(dir) => handleLayoutChange('flexDirection', dir)}
+            onChangeFlexWrap={(wrap) => handleLayoutChange('flexWrap', wrap)}
+            onChangeJustifyContent={(j) => handleLayoutChange('justifyContent', j)}
+            onChangeAlignItems={(a) => handleLayoutChange('alignItems', a)}
+            onChangeGap={(g) => handleLayoutChange('gap', g)}
+            onChangeHtmlTag={(tag) => onUpdateSection(section.id, { htmlTag: tag } as any)}
+          />
+        </AccordionItem>
+
+        {/* 3º ↔️ ACCORDION: ESPAÇAMENTOS (PADDING & MARGEM) */}
+        <AccordionItem
+          id="sec-spacing"
+          title="Espaçamentos (Padding & Margem)"
+          icon={MoveHorizontal}
           defaultOpen={false}
         >
-          <PaddingControl
+          <SpacingControl
             paddingTop={effectiveLayout.paddingTop !== undefined ? effectiveLayout.paddingTop : '0px'}
             paddingRight={effectiveLayout.paddingRight !== undefined ? effectiveLayout.paddingRight : '0px'}
             paddingBottom={effectiveLayout.paddingBottom !== undefined ? effectiveLayout.paddingBottom : '0px'}
             paddingLeft={effectiveLayout.paddingLeft !== undefined ? effectiveLayout.paddingLeft : '0px'}
-            onChangePadding={(patch) => handleMultiLayoutChange(patch)}
-            isMobileOverride={isMobile}
+            marginTop={effectiveLayout.marginTop}
+            marginRight={effectiveLayout.marginRight}
+            marginBottom={effectiveLayout.marginBottom}
+            marginLeft={effectiveLayout.marginLeft}
+            onChangePadding={(p) => handleMultiLayoutChange(p)}
+            onChangeMargin={(m) => handleMultiLayoutChange(m)}
           />
         </AccordionItem>
 
-        {/* 📌 ACCORDION: POSICIONAMENTO (STICKY / FIXED) */}
+        {/* 4º 📌 ACCORDION: POSICIONAMENTO & PARALLAX */}
         <AccordionItem
-          id="sec-position"
-          title="Posicionamento & Fixação Avançada"
+          id="sec-positioning"
+          title="Posicionamento & Parallax"
           icon={Pin}
           defaultOpen={false}
         >
-          <PositioningControl
-            layout={effectiveLayout}
-            mobileOverride={section.mobile}
-            onChange={(patch) => handleMultiLayoutChange(patch)}
-            isMobile={isMobile}
-          />
-        </AccordionItem>
+          <div className="space-y-4">
+            <PositioningControl
+              layout={effectiveLayout}
+              mobileOverride={section.mobile}
+              onChange={(patch) => handleMultiLayoutChange(patch)}
+              isMobile={isMobile}
+            />
 
-        {/* 🏔️ ACCORDION: EFEITO PARALLAX */}
-        <AccordionItem
-          id="sec-parallax"
-          title="Efeito Parallax & Velocidade de Scroll"
-          icon={Layers}
-          defaultOpen={false}
-        >
-          <ParallaxControl
-            parallaxSpeed={effectiveLayout.parallaxSpeed}
-            disableParallaxMobile={effectiveLayout.disableParallaxMobile}
-            onChangeSpeed={(speed) => handleLayoutChange('parallaxSpeed', speed)}
-            onChangeDisableMobile={(disable) => handleLayoutChange('disableParallaxMobile', disable)}
-          />
+            <ParallaxControl
+              parallaxSpeed={effectiveLayout.parallaxSpeed}
+              disableParallaxMobile={effectiveLayout.disableParallaxMobile}
+              onChangeSpeed={(speed) => handleLayoutChange('parallaxSpeed', speed)}
+              onChangeDisableMobile={(disable) => handleLayoutChange('disableParallaxMobile', disable)}
+            />
+          </div>
         </AccordionItem>
 
         {/* 🎨 SEÇÃO DE APARÊNCIA & HOVER OVERRIDES */}

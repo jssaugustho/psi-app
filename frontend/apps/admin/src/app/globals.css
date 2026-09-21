@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @source "../../../../packages/ui";
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 :root {
   /* ── Gradiente & Contraste da Marca ── */
   --brand-gradient-start: #4F46E5;

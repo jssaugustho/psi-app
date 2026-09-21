@@ -21,6 +21,9 @@ export function parseValueWithUnit(val?: string | number, fallbackUnit = 'px') {
     return { numericValue: 0, unit: fallbackUnit };
   }
   const str = String(val).trim();
+  if (str === 'auto') {
+    return { numericValue: 0, unit: 'auto' };
+  }
   const match = str.match(/^(-?\d+(?:\.\d+)?)\s*([a-z%]*)$/i);
   if (match) {
     const num = parseFloat(match[1]);
@@ -110,8 +113,9 @@ export function SliderNumberInput({
   className = '',
 }: SliderNumberInputProps) {
   const { numericValue, unit } = parseValueWithUnit(value, defaultUnit);
+  const activeUnit = unit === 'auto' ? (defaultUnit !== 'auto' ? defaultUnit : 'px') : unit;
   const { min: effectiveMin, max: effectiveMax, step: effectiveStep } = getUnitDefaults(
-    unit,
+    activeUnit,
     customMin,
     customMax,
     customStep,
@@ -128,7 +132,7 @@ export function SliderNumberInput({
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newNum = parseFloat(e.target.value);
     const rounded = Number(newNum.toFixed(2));
-    onChange(`${rounded}${unit}`);
+    onChange(`${rounded}${activeUnit}`);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,13 +141,17 @@ export function SliderNumberInput({
       onChange('');
     } else {
       const newNum = parseFloat(val);
-      onChange(`${isNaN(newNum) ? 0 : newNum}${unit}`);
+      onChange(`${isNaN(newNum) ? 0 : newNum}${activeUnit}`);
     }
   };
 
   const handleUnitSelect = (newUnit: string) => {
-    const converted = convertValueUnit(numericValue, unit, newUnit);
-    onChange(`${converted}${newUnit}`);
+    if (newUnit === 'auto') {
+      onChange('auto');
+    } else {
+      const converted = convertValueUnit(numericValue, activeUnit, newUnit);
+      onChange(`${converted}${newUnit}`);
+    }
     setIsUnitOpen(false);
   };
 
@@ -172,14 +180,14 @@ export function SliderNumberInput({
       const mult = e.shiftKey ? 5 : 1;
       const change = e.deltaY < 0 ? effectiveStep * mult : -effectiveStep * mult;
       const newNum = Math.max(effectiveMin, Number((numericValue + change).toFixed(2)));
-      onChange(`${newNum}${unit}`);
+      onChange(`${newNum}${activeUnit}`);
     };
 
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
       el.removeEventListener('wheel', handleWheel);
     };
-  }, [numericValue, unit, effectiveStep, effectiveMin, onChange]);
+  }, [numericValue, activeUnit, effectiveStep, effectiveMin, onChange]);
 
   return (
     <div className={`flex items-center gap-2.5 w-full ${className}`}>

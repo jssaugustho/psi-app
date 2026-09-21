@@ -2,6 +2,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @source "../../../../packages/ui";
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 :root {
   /* ── Gradiente & Contraste da Marca (Fallback Neutro - Cores reais sobem via API do Tenant) ── */
   --brand-gradient-start: #27272A;

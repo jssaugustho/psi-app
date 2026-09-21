@@ -33,6 +33,14 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
     const syncIframeStyles = (doc: Document) => {
       if (!doc || !doc.head) return;
 
+      // Injeta reset universal box-sizing: border-box no iframe
+      if (!doc.head.querySelector('[data-box-sizing-reset]')) {
+        const resetStyle = doc.createElement('style');
+        resetStyle.setAttribute('data-box-sizing-reset', 'true');
+        resetStyle.textContent = '*, *::before, *::after { box-sizing: border-box !important; }';
+        doc.head.appendChild(resetStyle);
+      }
+
       // Injeta estilos das tags <style> e <link rel="stylesheet"> do pai
       const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
       styles.forEach((styleNode, idx) => {
@@ -586,6 +594,42 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
               attributes: true,
             });
           }
+
+          // 9. Encaminhamento de Atalhos de Teclado (Iframe -> Janela Pai)
+          const handleIframeKeyDown = (ke: KeyboardEvent) => {
+            const target = ke.target as HTMLElement | null;
+            const isEditingText =
+              target &&
+              (target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable ||
+                target.getAttribute('contenteditable') === 'true' ||
+                (typeof target.closest === 'function' && target.closest('[contenteditable="true"]') !== null));
+
+            if (isEditingText) return;
+
+            const syntheticEvt = new KeyboardEvent('keydown', {
+              key: ke.key,
+              code: ke.code,
+              location: ke.location,
+              ctrlKey: ke.ctrlKey,
+              shiftKey: ke.shiftKey,
+              altKey: ke.altKey,
+              metaKey: ke.metaKey,
+              repeat: ke.repeat,
+              isComposing: ke.isComposing,
+              bubbles: true,
+              cancelable: true,
+            });
+
+            const defaultPrevented = !win.parent.dispatchEvent(syntheticEvt);
+            if (defaultPrevented) {
+              ke.preventDefault();
+            }
+          };
+
+          doc.removeEventListener('keydown', handleIframeKeyDown);
+          doc.addEventListener('keydown', handleIframeKeyDown);
         } catch (err) {
           console.error('❌ Erro ao inicializar Iframe Portal:', err);
         }

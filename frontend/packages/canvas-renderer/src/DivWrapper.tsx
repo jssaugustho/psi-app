@@ -144,11 +144,14 @@ export function DivWrapper({
     }
   };
 
-  const effectiveWidth = layout.width || '100%';
+  const isAutoWidth = layout.width === 'auto' || layout.width === 'fit-content';
   const effectiveHeight = layout.height || 'auto';
-  const hasCustomWidth = !!layout.width && layout.width !== '100%' && layout.width !== 'auto';
-  const effectiveFlexBasis = hasCustomWidth ? 'auto' : (layout.flexBasis || 'auto');
+  const hasCustomWidth = !!layout.width && layout.width !== '100%' && !isAutoWidth;
+  const effectiveWidth = isAutoWidth ? 'fit-content' : (layout.width || '100%');
+  const hasValidFlexBasis = !!layout.flexBasis && layout.flexBasis !== 'auto' && layout.flexBasis !== '0px' && layout.flexBasis !== '0';
+  const effectiveFlexBasis = isAutoWidth ? 'auto' : (hasValidFlexBasis ? layout.flexBasis : (hasCustomWidth ? 'auto' : (layout.width === '100%' || layout.flexBasis === '100%' ? '100%' : 'auto')));
   const effectiveMaxWidth = layout.maxWidth || '100%';
+  const effectiveFlexGrow = layout.flexGrow !== undefined ? layout.flexGrow : (isAutoWidth ? 0 : (effectiveWidth === '100%' || layout.flexBasis === '100%' ? 1 : 0));
 
   const isRow = layout.flexDirection === 'row';
   const effectiveAlignItems = layout.alignItems || (isRow ? 'stretch' : 'flex-start');
@@ -194,6 +197,7 @@ export function DivWrapper({
         }),
         width: effectiveWidth,
         height: effectiveHeight,
+        flexGrow: effectiveFlexGrow,
         flexBasis: effectiveFlexBasis,
         maxWidth: effectiveMaxWidth,
       }}
@@ -296,7 +300,7 @@ export function DivWrapper({
       {/* Render dos Filhos */}
       {divComponent.components.length > 0 ? (
         <div
-          className="flex w-full h-full flex-1"
+          className={`flex h-full flex-1 ${isAutoWidth ? 'w-auto max-w-full' : 'w-full'}`}
           style={{
             flexDirection: layout.flexDirection || 'column',
             gap: layout.gap || '16px',

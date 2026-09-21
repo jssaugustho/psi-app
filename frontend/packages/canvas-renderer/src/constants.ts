@@ -39,7 +39,6 @@ export const DEFAULT_DIV_LAYOUT: DivLayout = {
   flexGrow: 1,
   flexShrink: 1,
   flexBasis: 'auto',
-  alignSelf: 'auto',
   flexDirection: 'column',
   flexWrap: 'nowrap',
   alignItems: 'flex-start',
@@ -365,7 +364,6 @@ export function createDefaultComponent(type: ComponentType | string, preset?: st
         ...DEFAULT_DIV_LAYOUT,
         flexDirection: 'column',
         gap: '2px',
-        alignSelf: 'center',
       };
 
       const avatarName = createDefaultComponent('heading');
@@ -389,7 +387,6 @@ export function createDefaultComponent(type: ComponentType | string, preset?: st
         alignItems: 'center',
         gap: '8px',
         width: 'auto',
-        alignSelf: 'flex-start',
         paddingTop: '4px',
         paddingRight: '12px',
         paddingBottom: '4px',
@@ -461,7 +458,6 @@ export function createDefaultComponent(type: ComponentType | string, preset?: st
         alignItems: 'center',
         gap: '4px',
         width: '100%',
-        alignSelf: 'center',
       };
 
       const statIcon = createDefaultComponent('icon');

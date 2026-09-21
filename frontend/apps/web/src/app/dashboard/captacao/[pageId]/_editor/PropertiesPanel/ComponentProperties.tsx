@@ -16,7 +16,9 @@ import {
   Sparkles,
   Sun,
   Zap,
-  Sliders
+  Sliders,
+  LayoutGrid,
+  MoveHorizontal,
 } from 'lucide-react';
 import { SizeControl } from './components/SizeControl';
 import { PaddingControl } from './components/PaddingControl';
@@ -26,6 +28,9 @@ import { ContentPropsPanel, hasContentProps } from './ContentPropsPanel';
 import { AccordionItem } from './components/AccordionSection';
 import { TransformControl } from './components/TransformControl';
 import { TransitionControl } from './components/TransitionControl';
+import { FlexChildControl } from './components/FlexChildControl';
+import { SpacingControl } from './components/SpacingControl';
+import { PropertyResetBadge } from './components/PropertyResetBadge';
 
 interface ComponentPropertiesProps {
   component: AtomicComponent;
@@ -457,38 +462,13 @@ export function ComponentProperties({
           />
         )}
 
-        {/* 📏 ACCORDION: DIMENSÕES & MEDIDAS */}
+        {/* 1º 📐 ACCORDION: DIMENSIONAMENTO (LARGURA & ALTURA) */}
         <AccordionItem
-          id="cmp-dimensions"
-          title="Dimensões & Medidas"
+          id="cmp-size"
+          title="Dimensionamento (Largura & Altura)"
           icon={Ruler}
-          defaultOpen={false}
+          defaultOpen={true}
         >
-          <div className="space-y-1 mb-3 pb-3 border-b border-[var(--surface-border)]">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Alinhamento no Container (Align Self)</label>
-            <div className="grid grid-cols-5 gap-1">
-              {[
-                { value: 'auto', label: 'Auto' },
-                { value: 'flex-start', label: 'Início' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: 'Fim' },
-                { value: 'stretch', label: 'Esticar' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleSmartStyleChange('alignSelf', item.value as any)}
-                  className={`py-1 rounded-lg border text-[9px] font-bold cursor-pointer transition-all ${
-                    activeStyle.alignSelf === item.value
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-600'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
           <SizeControl
             width={activeStyle.width || 'auto'}
             height={activeStyle.height || 'auto'}
@@ -509,20 +489,41 @@ export function ComponentProperties({
           />
         </AccordionItem>
 
-        {/* 📦 ACCORDION: ESPAÇAMENTO (PADDING) */}
+        {/* 2º 📦 ACCORDION: COMPORTAMENTO DE ENCAIXE */}
         <AccordionItem
-          id="cmp-padding"
-          title="Espaçamento (Padding)"
+          id="cmp-flex-child"
+          title="Comportamento de Encaixe"
           icon={Maximize}
           defaultOpen={false}
         >
-          <PaddingControl
+          <FlexChildControl
+            flexGrow={activeStyle.flexGrow ?? 0}
+            flexShrink={activeStyle.flexShrink ?? 1}
+            flexBasis={activeStyle.flexBasis || 'auto'}
+            onChangeFlexGrow={(g) => handleSmartStyleChange('flexGrow', g)}
+            onChangeFlexShrink={(s) => handleSmartStyleChange('flexShrink', s)}
+            onChangeFlexBasis={(b) => handleSmartStyleChange('flexBasis', b)}
+          />
+        </AccordionItem>
+
+        {/* 3º ↔️ ACCORDION: ESPAÇAMENTOS (PADDING & MARGEM) */}
+        <AccordionItem
+          id="cmp-spacing"
+          title="Espaçamentos (Padding & Margem)"
+          icon={MoveHorizontal}
+          defaultOpen={false}
+        >
+          <SpacingControl
             paddingTop={activeStyle.paddingTop || '0px'}
             paddingRight={activeStyle.paddingRight || '0px'}
             paddingBottom={activeStyle.paddingBottom || '0px'}
             paddingLeft={activeStyle.paddingLeft || '0px'}
-            onChangePadding={(patch) => handleSmartMultiStyleChange(patch)}
-            isMobileOverride={isMobile}
+            marginTop={activeStyle.marginTop || '0px'}
+            marginRight={activeStyle.marginRight || '0px'}
+            marginBottom={activeStyle.marginBottom || '0px'}
+            marginLeft={activeStyle.marginLeft || '0px'}
+            onChangePadding={(p) => handleSmartMultiStyleChange(p)}
+            onChangeMargin={(m) => handleSmartMultiStyleChange(m)}
           />
         </AccordionItem>
 

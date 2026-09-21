@@ -85,11 +85,9 @@ export function buildComponentCssStyle({
   if (style.display || layout.display) result.display = (style.display || layout.display) as any;
   if (layout.flexDirection) result.flexDirection = layout.flexDirection as any;
   if (layout.flexWrap) result.flexWrap = layout.flexWrap as any;
-  if (layout.flexGrow !== undefined) result.flexGrow = layout.flexGrow;
-  if (layout.flexShrink !== undefined) result.flexShrink = layout.flexShrink;
-  if (layout.flexBasis) result.flexBasis = layout.flexBasis;
-  if (style.alignSelf || layout.alignSelf) result.alignSelf = (style.alignSelf || layout.alignSelf) as any;
-  if (layout.alignItems) result.alignItems = layout.alignItems as any;
+  if ((style.alignSelf && style.alignSelf !== 'auto') || (layout.alignSelf && layout.alignSelf !== 'auto')) {
+    result.alignSelf = (style.alignSelf || layout.alignSelf) as any;
+  }
   if (layout.justifyContent) result.justifyContent = layout.justifyContent as any;
   if (style.gap || layout.gap) result.gap = style.gap || layout.gap;
 
@@ -180,8 +178,30 @@ export function buildComponentCssStyle({
       result.borderColor = finalBorderColor;
     }
   }
-  if (borderRadius) {
+  const rTopLeft = border.radiusTopLeft || style.borderTopLeftRadius || style.radiusTopLeft;
+  const rTopRight = border.radiusTopRight || style.borderTopRightRadius || style.radiusTopRight;
+  const rBottomRight = border.radiusBottomRight || style.borderBottomRightRadius || style.radiusBottomRight;
+  const rBottomLeft = border.radiusBottomLeft || style.borderBottomLeftRadius || style.radiusBottomLeft;
+
+  if (rTopLeft || rTopRight || rBottomRight || rBottomLeft) {
+    if (rTopLeft) result.borderTopLeftRadius = typeof rTopLeft === 'number' ? `${rTopLeft}px` : rTopLeft;
+    if (rTopRight) result.borderTopRightRadius = typeof rTopRight === 'number' ? `${rTopRight}px` : rTopRight;
+    if (rBottomRight) result.borderBottomRightRadius = typeof rBottomRight === 'number' ? `${rBottomRight}px` : rBottomRight;
+    if (rBottomLeft) result.borderBottomLeftRadius = typeof rBottomLeft === 'number' ? `${rBottomLeft}px` : rBottomLeft;
+  } else if (borderRadius) {
     result.borderRadius = typeof borderRadius === 'number' ? `${borderRadius}px` : borderRadius;
+  }
+
+  // Image / Aspect Ratio & Object Fit
+  if (style.aspectRatio || props.aspectRatio) result.aspectRatio = style.aspectRatio || props.aspectRatio;
+  if (style.objectFit || props.objectFit) result.objectFit = (style.objectFit || props.objectFit) as any;
+  if (style.objectPosition || props.objectPosition) result.objectPosition = style.objectPosition || props.objectPosition;
+
+  // Defaults
+  result.boxSizing = 'border-box';
+  if (componentCategory === 'heading' || componentCategory === 'paragraph' || componentCategory === 'label' || componentCategory === 'button') {
+    result.wordBreak = 'break-word';
+    result.overflowWrap = 'anywhere';
   }
 
   // 5. SHADOW & OPACITY & DYNAMIC EFFECTS STACK (ComponentEffect[])

@@ -154,6 +154,7 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
     onRemoveComponent: removeComponent,
     onUndo: undo,
     onRedo: redo,
+    onSave: forceSave,
   });
 
   // Estados de Visibilidade dos Controles (Sidebar e Header / Modo Foco)

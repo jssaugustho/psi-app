@@ -37,6 +37,10 @@ import { TransitionControl } from './components/TransitionControl';
 import { PositioningControl } from './components/PositioningControl';
 import { ParallaxControl } from './components/ParallaxControl';
 import { GlobalColorPicker } from './components/GlobalColorPicker';
+import { FlexLayoutControl } from './components/FlexLayoutControl';
+import { FlexChildControl } from './components/FlexChildControl';
+import { SpacingControl } from './components/SpacingControl';
+import { PropertyResetBadge } from './components/PropertyResetBadge';
 
 interface DivPropertiesProps {
   divComponent: DivComponent;
@@ -416,170 +420,13 @@ export function DivProperties({
           </button>
         </div>
 
-        {/* 📐 ACCORDION: DISPOSIÇÃO & ALINHAMENTO */}
+        {/* 1º 📐 ACCORDION: DIMENSIONAMENTO (LARGURA & ALTURA) */}
         <AccordionItem
-          id="div-layout"
-          title="Disposição & Alinhamento"
-          icon={LayoutGrid}
-          defaultOpen={false}
-        >
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Organização dos Elementos</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleLayoutChange('flexDirection', 'row')}
-                className={`p-2 rounded-xl border flex items-center justify-center gap-2 font-bold cursor-pointer transition-all ${
-                  isHorizontal
-                    ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                    : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <MoveHorizontal className="w-3.5 h-3.5" />
-                <span>Lado a Lado</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleLayoutChange('flexDirection', 'column')}
-                className={`p-2 rounded-xl border flex items-center justify-center gap-2 font-bold cursor-pointer transition-all ${
-                  !isHorizontal
-                    ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                    : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <MoveVertical className="w-3.5 h-3.5" />
-                <span>Empilhado</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">
-              {isHorizontal ? 'Alinhamento Horizontal' : 'Alinhamento Vertical'}
-            </label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'flex-start', label: isHorizontal ? 'Esquerda' : 'Topo' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: isHorizontal ? 'Direita' : 'Base' },
-                { value: 'space-between', label: 'Espaçado' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleLayoutChange('justifyContent', item.value)}
-                  className={`py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
-                    (effectiveLayout.justifyContent || 'flex-start') === item.value
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">
-              {isHorizontal ? 'Alinhamento Vertical dos Elementos' : 'Alinhamento Horizontal dos Elementos'}
-            </label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'flex-start', label: isHorizontal ? 'Topo' : 'Esquerda' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: isHorizontal ? 'Base' : 'Direita' },
-                { value: 'stretch', label: 'Esticar' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleLayoutChange('alignItems', item.value)}
-                  className={`py-1.5 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
-                    (effectiveLayout.alignItems || 'flex-start') === item.value
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Alinhamento do Texto na Div</label>
-            <div className="grid grid-cols-4 gap-1">
-              {[
-                { value: 'left', icon: AlignLeft, label: 'Esquerda' },
-                { value: 'center', icon: AlignCenter, label: 'Centro' },
-                { value: 'right', icon: AlignRight, label: 'Direita' },
-                { value: 'justify', icon: AlignJustify, label: 'Justificado' },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => handleLayoutChange('textAlign', item.value)}
-                    className={`p-2 rounded-lg border flex items-center justify-center cursor-pointer transition-all ${
-                      effectiveLayout.textAlign === item.value
-                        ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                        : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                    }`}
-                    title={item.label}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Espaço entre Elementos (Gap)</label>
-            <SliderNumberInput
-              value={effectiveLayout.gap || '16px'}
-              onChange={(val) => handleLayoutChange('gap', val)}
-              min={0}
-              max={96}
-              defaultUnit="px"
-            />
-          </div>
-        </AccordionItem>
-
-        {/* 📏 ACCORDION: DIMENSÕES & MEDIDAS */}
-        <AccordionItem
-          id="div-dimensions"
-          title="Dimensões & Medidas"
+          id="div-size"
+          title="Dimensionamento (Largura & Altura)"
           icon={Ruler}
-          defaultOpen={false}
+          defaultOpen={true}
         >
-          <div className="space-y-1 mb-3 pb-3 border-b border-[var(--surface-border)]">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Alinhamento no Container (Align Self)</label>
-            <div className="grid grid-cols-5 gap-1">
-              {[
-                { value: 'auto', label: 'Auto' },
-                { value: 'flex-start', label: 'Início' },
-                { value: 'center', label: 'Centro' },
-                { value: 'flex-end', label: 'Fim' },
-                { value: 'stretch', label: 'Esticar' },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => handleSmartStyleChange('alignSelf', item.value as any)}
-                  className={`py-1 rounded-lg border text-[9px] font-bold cursor-pointer transition-all ${
-                    activeStyle.alignSelf === item.value
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                      : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
           <SizeControl
             width={effectiveLayout.width || 'auto'}
             height={effectiveLayout.height || 'auto'}
@@ -592,118 +439,91 @@ export function DivProperties({
             onChangeMinMax={(minMax) => handleMultiLayoutChange(minMax)}
             isMobileOverride={isMobile}
           />
-
-          {/* CONTROLES FLEXBOX AVANÇADOS (FLEX GROW / SHRINK / BASIS) */}
-          <div className="space-y-2 pt-3 border-t border-[var(--surface-border)] mt-3">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Comportamento Flexbox do Container</label>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <span className="text-[9px] text-slate-400 block font-semibold">Crescimento (flexGrow)</span>
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { label: 'Não (0)', val: 0 },
-                    { label: 'Sim (1)', val: 1 },
-                  ].map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => handleLayoutChange('flexGrow', opt.val)}
-                      className={`py-1 rounded-lg border text-[9px] font-bold cursor-pointer transition-all ${
-                        (effectiveLayout.flexGrow ?? 1) === opt.val
-                          ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <span className="text-[9px] text-slate-400 block font-semibold">Encolhimento (flexShrink)</span>
-                <div className="grid grid-cols-2 gap-1">
-                  {[
-                    { label: 'Não (0)', val: 0 },
-                    { label: 'Sim (1)', val: 1 },
-                  ].map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => handleLayoutChange('flexShrink', opt.val)}
-                      className={`py-1 rounded-lg border text-[9px] font-bold cursor-pointer transition-all ${
-                        (effectiveLayout.flexShrink ?? 1) === opt.val
-                          ? 'border-purple-500 bg-purple-500/10 text-purple-600 font-extrabold'
-                          : 'border-[var(--surface-border)] text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1 mt-2">
-              <span className="text-[9px] text-slate-400 block font-semibold">Tamanho Base Flex (flexBasis)</span>
-              <SliderNumberInput
-                value={effectiveLayout.flexBasis || 'auto'}
-                onChange={(val) => handleLayoutChange('flexBasis', val)}
-                min={0}
-                max={1200}
-                defaultUnit="px"
-                unitOptions={['auto', 'px', 'rem', 'em', 'vw', 'vh', '%']}
-                placeholder="Ex: auto ou 50%"
-              />
-            </div>
-          </div>
         </AccordionItem>
 
-        {/* 📦 ACCORDION: ESPAÇAMENTO (PADDING) */}
+        {/* 2º 🧩 ACCORDION: ORGANIZAÇÃO INTERNA */}
         <AccordionItem
-          id="div-padding"
-          title="Espaçamento (Padding)"
+          id="div-layout-flex"
+          title="Organização Interna"
+          icon={LayoutGrid}
+          defaultOpen={true}
+        >
+          <FlexLayoutControl
+            flexDirection={effectiveLayout.flexDirection || 'column'}
+            flexWrap={effectiveLayout.flexWrap || 'nowrap'}
+            justifyContent={effectiveLayout.justifyContent || 'flex-start'}
+            alignItems={effectiveLayout.alignItems || 'flex-start'}
+            gap={effectiveLayout.gap || '16px'}
+            htmlTag={(divComponent.props as any)?.htmlTag || 'div'}
+            onChangeFlexDirection={(dir) => handleLayoutChange('flexDirection', dir)}
+            onChangeFlexWrap={(wrap) => handleLayoutChange('flexWrap', wrap)}
+            onChangeJustifyContent={(j) => handleLayoutChange('justifyContent', j)}
+            onChangeAlignItems={(a) => handleLayoutChange('alignItems', a)}
+            onChangeGap={(g) => handleLayoutChange('gap', g)}
+            onChangeHtmlTag={(tag) => onUpdateComponent(divComponent.id, { props: { ...(divComponent.props || {}), htmlTag: tag } as any })}
+          />
+        </AccordionItem>
+
+        {/* 3º 📦 ACCORDION: COMPORTAMENTO DE ENCAIXE */}
+        <AccordionItem
+          id="div-flex-child"
+          title="Comportamento de Encaixe"
           icon={Maximize}
           defaultOpen={false}
         >
-          <PaddingControl
+          <FlexChildControl
+            flexGrow={effectiveLayout.flexGrow ?? 0}
+            flexShrink={effectiveLayout.flexShrink ?? 1}
+            flexBasis={effectiveLayout.flexBasis || 'auto'}
+            onChangeFlexGrow={(g) => handleLayoutChange('flexGrow', g)}
+            onChangeFlexShrink={(s) => handleLayoutChange('flexShrink', s)}
+            onChangeFlexBasis={(b) => handleLayoutChange('flexBasis', b)}
+          />
+        </AccordionItem>
+
+        {/* 4º ↔️ ACCORDION: ESPAÇAMENTOS (PADDING & MARGEM) */}
+        <AccordionItem
+          id="div-spacing"
+          title="Espaçamentos (Padding & Margem)"
+          icon={MoveHorizontal}
+          defaultOpen={false}
+        >
+          <SpacingControl
             paddingTop={effectiveLayout.paddingTop}
             paddingRight={effectiveLayout.paddingRight}
             paddingBottom={effectiveLayout.paddingBottom}
             paddingLeft={effectiveLayout.paddingLeft}
-            onChangePadding={(patch) => handleMultiLayoutChange(patch)}
-            isMobileOverride={isMobile}
+            marginTop={effectiveLayout.marginTop}
+            marginRight={effectiveLayout.marginRight}
+            marginBottom={effectiveLayout.marginBottom}
+            marginLeft={effectiveLayout.marginLeft}
+            onChangePadding={(p) => handleMultiLayoutChange(p)}
+            onChangeMargin={(m) => handleMultiLayoutChange(m)}
           />
         </AccordionItem>
 
-        {/* 📌 ACCORDION: POSICIONAMENTO (STICKY / FIXED) */}
+        {/* 5º 📌 ACCORDION: POSICIONAMENTO & PARALLAX */}
         <AccordionItem
-          id="div-position"
-          title="Posicionamento & Fixação Avançada"
+          id="div-positioning"
+          title="Posicionamento & Parallax"
           icon={Pin}
           defaultOpen={false}
         >
-          <PositioningControl
-            layout={effectiveLayout}
-            mobileOverride={divComponent.mobile}
-            onChange={(patch) => handleMultiLayoutChange(patch)}
-            isMobile={isMobile}
-          />
-        </AccordionItem>
+          <div className="space-y-4">
+            <PositioningControl
+              layout={effectiveLayout}
+              mobileOverride={divComponent.mobile}
+              onChange={(patch) => handleMultiLayoutChange(patch)}
+              isMobile={isMobile}
+            />
 
-        {/* 🏔️ ACCORDION: EFEITO PARALLAX */}
-        <AccordionItem
-          id="div-parallax"
-          title="Efeito Parallax & Velocidade de Scroll"
-          icon={Layers}
-          defaultOpen={false}
-        >
-          <ParallaxControl
-            parallaxSpeed={effectiveLayout.parallaxSpeed}
-            disableParallaxMobile={effectiveLayout.disableParallaxMobile}
-            onChangeSpeed={(speed) => handleLayoutChange('parallaxSpeed', speed)}
-            onChangeDisableMobile={(disable) => handleLayoutChange('disableParallaxMobile', disable)}
-          />
+            <ParallaxControl
+              parallaxSpeed={effectiveLayout.parallaxSpeed}
+              disableParallaxMobile={effectiveLayout.disableParallaxMobile}
+              onChangeSpeed={(speed) => handleLayoutChange('parallaxSpeed', speed)}
+              onChangeDisableMobile={(disable) => handleLayoutChange('disableParallaxMobile', disable)}
+            />
+          </div>
         </AccordionItem>
 
         {/* 🎨 SEÇÃO DE APARÊNCIA & HOVER OVERRIDES */}

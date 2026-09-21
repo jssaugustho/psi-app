@@ -547,7 +547,6 @@ export function AtomicComponentWrapper({
       } ${getComponentHoverClasses(effectiveStyle.hoverEffect || (effectiveProps as any)?.hoverEffect, component.type === 'button')}`}
       style={{
         ...parallax.style,
-        alignSelf: effectiveStyle.alignSelf || 'auto',
         textAlign: effectiveStyle.textAlign || 'inherit',
         marginTop: effectiveStyle.marginTop || '0px',
         marginBottom: effectiveStyle.marginBottom || '0px',
@@ -555,7 +554,14 @@ export function AtomicComponentWrapper({
         paddingRight: effectiveStyle.paddingRight || '0px',
         paddingBottom: effectiveStyle.paddingBottom || '0px',
         paddingLeft: effectiveStyle.paddingLeft || '0px',
-        width: effectiveStyle.width || (['faq_item', 'card', 'testimonial', 'divider', 'paragraph'].includes(component.type) ? '100%' : 'auto'),
+        display: (effectiveStyle.display as any) || (
+          (effectiveStyle.width && effectiveStyle.width !== 'auto')
+            ? 'block'
+            : (['faq_item', 'card', 'testimonial', 'divider', 'video'].includes(component.type) ? 'block' : 'inline-block')
+        ),
+        width: (effectiveStyle.width && effectiveStyle.width !== 'auto')
+          ? effectiveStyle.width
+          : (['faq_item', 'card', 'testimonial', 'divider', 'video'].includes(component.type) ? '100%' : 'fit-content'),
         height: effectiveStyle.height || 'auto',
         minWidth: effectiveStyle.minWidth,
         maxWidth: effectiveStyle.maxWidth || '100%',

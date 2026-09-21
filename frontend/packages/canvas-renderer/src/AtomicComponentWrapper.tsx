@@ -691,11 +691,12 @@ export function AtomicComponentWrapper({
         display: (effectiveStyle.display as any) || (
           (effectiveStyle.width && effectiveStyle.width !== 'auto')
             ? 'block'
-            : (['faq_item', 'card', 'testimonial', 'divider', 'paragraph', 'heading', 'label', 'list', 'stat_counter', 'video'].includes(component.type) ? 'block' : 'inline-block')
+            : (['faq_item', 'card', 'testimonial', 'divider', 'video'].includes(component.type) ? 'block' : 'inline-block')
         ),
         width: (effectiveStyle.width && effectiveStyle.width !== 'auto')
           ? effectiveStyle.width
-          : (['faq_item', 'card', 'testimonial', 'divider', 'paragraph', 'heading', 'label', 'list', 'stat_counter', 'video'].includes(component.type) ? '100%' : 'auto'),
+          : (['faq_item', 'card', 'testimonial', 'divider', 'video'].includes(component.type) ? '100%' : 'fit-content'),
+        maxWidth: effectiveStyle.maxWidth || '100%',
         ...buildComponentCssStyle({
           component,
           viewportMode,
@@ -802,8 +803,11 @@ export function AtomicComponentWrapper({
 
       {/* Render Visual Real com Suporte a Edição Inline de Texto quando no Editor */}
       <div
-        className={`w-full ${effectiveStyle.height && effectiveStyle.height !== 'auto' ? 'h-full flex items-center justify-center' : ''}`}
-        style={{ textAlign: effectiveStyle.textAlign || 'inherit' }}
+        className={`w-full flex flex-col ${effectiveStyle.height && effectiveStyle.height !== 'auto' ? 'h-full justify-center' : ''}`}
+        style={{
+          alignItems: effectiveStyle.textAlign === 'center' ? 'center' : (effectiveStyle.textAlign === 'right' ? 'flex-end' : (effectiveStyle.textAlign === 'justify' ? 'stretch' : 'inherit')),
+          textAlign: effectiveStyle.textAlign || 'inherit',
+        }}
       >
         {/* HEADING */}
         {component.type === 'heading' && (() => {

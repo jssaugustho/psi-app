@@ -107,7 +107,9 @@ export interface SectionLayout {
   paddingBottom: string;
   paddingLeft: string;
   marginTop: string;
+  marginRight?: string;
   marginBottom?: string;
+  marginLeft?: string;
   position?: PositionMode;
   verticalAnchor?: 'top' | 'bottom';
   verticalOffset?: string;
@@ -223,6 +225,10 @@ export interface DivLayout {
   paddingRight?: string;
   paddingBottom?: string;
   paddingLeft?: string;
+  marginTop?: string;
+  marginRight?: string;
+  marginBottom?: string;
+  marginLeft?: string;
   position?: PositionMode;
   verticalAnchor?: 'top' | 'bottom';
   verticalOffset?: string;
