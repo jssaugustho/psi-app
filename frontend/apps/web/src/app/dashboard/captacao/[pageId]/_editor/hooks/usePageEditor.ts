@@ -32,6 +32,8 @@ import {
   normalizeCanvasData,
   denormalizeCanvasData,
   removeNodeCascadeInFlatCanvas,
+  isDescendantOf,
+  getContainingSectionId,
 } from '../utils/canvasHelpers';
 import { useEditorHistory } from './useEditorHistory';
 import { useAutoSave } from './useAutoSave';
@@ -82,10 +84,8 @@ export function usePageEditor(pageId: string) {
         const fetchedPage = await api.getCapturePage(pageId);
         setPage(fetchedPage);
 
-        const themeColors = getThemeColors(fetchedPage);
         const canvas = migrateLegacyCanvas(fetchedPage);
-        const cleanCanvas = sanitizeCanvasColors(canvas, themeColors.siteBg);
-        const normalized = normalizeCanvasData(cleanCanvas);
+        const normalized = normalizeCanvasData(canvas);
 
         setNormalizedCanvas(normalized);
         history.resetHistory(normalized);
@@ -284,22 +284,11 @@ export function usePageEditor(pageId: string) {
 
   const moveSection = useCallback(
     (fromIndex: number, toIndex: number) => {
-      if (!normalizedCanvas) return;
-      updateCanvasState((draft) => {
-        const root = draft.nodes['root'];
-        if (!root || !Array.isArray(root.childrenIds)) return;
-        if (
-          fromIndex < 0 ||
-          fromIndex >= root.childrenIds.length ||
-          toIndex < 0 ||
-          toIndex >= root.childrenIds.length
-        )
-          return;
-        const [removed] = root.childrenIds.splice(fromIndex, 1);
-        root.childrenIds.splice(toIndex, 0, removed);
-      }, 'Reordenou Seções');
+      if (!canvasData) return;
+      const updated = moveSectionHelper(canvasData, fromIndex, toIndex);
+      updateCanvasState(updated, 'Reordenou Seções');
     },
-    [normalizedCanvas, updateCanvasState]
+    [canvasData, updateCanvasState]
   );
 
   const updateSection = useCallback(
@@ -414,24 +403,12 @@ export function usePageEditor(pageId: string) {
   // 🚚 MOVER ELEMENTO DE CONTAINER / SEÇÃO
   const moveElement = useCallback(
     (elementId: string, targetParentId: string) => {
-      if (!normalizedCanvas) return;
-      updateCanvasState((draft) => {
-        const node = draft.nodes[elementId];
-        if (!node) return;
-        const oldParent = draft.nodes[node.parentId || ''];
-        const newParent = draft.nodes[targetParentId];
-        if (oldParent && Array.isArray(oldParent.childrenIds)) {
-          oldParent.childrenIds = oldParent.childrenIds.filter((id) => id !== elementId);
-        }
-        if (newParent) {
-          if (!Array.isArray(newParent.childrenIds)) newParent.childrenIds = [];
-          newParent.childrenIds.push(elementId);
-          node.parentId = targetParentId;
-        }
-      }, 'Moveu Elemento');
+      if (!canvasData) return;
+      const updated = moveElementInCanvas(canvasData, elementId, targetParentId);
+      updateCanvasState(updated, 'Moveu Elemento');
       selectElement(elementId);
     },
-    [normalizedCanvas, updateCanvasState, selectElement]
+    [canvasData, updateCanvasState, selectElement]
   );
 
   // ↕️ REORDENAR / MOVER ELEMENTO ANTES OU DEPOIS DE OUTRO

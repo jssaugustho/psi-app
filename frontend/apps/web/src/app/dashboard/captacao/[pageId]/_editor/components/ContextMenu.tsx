@@ -39,26 +39,39 @@ export function ContextMenu({
   canPasteStyle = false,
 }: ContextMenuProps) {
   useEffect(() => {
-    const handleClickOutside = () => onClose();
+    if (!menuState.isOpen) return;
+
+    const handleOutsideClick = () => {
+      onClose();
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
 
-    window.addEventListener('click', handleClickOutside);
+    // Pequeno atraso para impedir que o próprio clique do botão direito feche o menu no mesmo tick
+    const timer = setTimeout(() => {
+      window.addEventListener('pointerdown', handleOutsideClick);
+      window.addEventListener('click', handleOutsideClick);
+    }, 20);
+
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('click', handleClickOutside);
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', handleOutsideClick);
+      window.removeEventListener('click', handleOutsideClick);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [menuState.isOpen, onClose]);
 
   if (!menuState.isOpen || !menuState.targetId) return null;
 
   return (
     <div
-      className="fixed z-50 w-48 py-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-2xl backdrop-blur-md text-xs font-sans select-none animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 pointer-events-auto w-48 py-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-2xl backdrop-blur-md text-xs font-sans select-none animate-in fade-in zoom-in-95 duration-100"
       style={{
+        pointerEvents: 'auto',
         left: `${menuState.x}px`,
         top: `${menuState.y}px`,
       }}

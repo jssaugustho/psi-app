@@ -36,15 +36,17 @@ Leia este arquivo quando trabalhar em:
 
 ---
 
-## 3. Matriz de Comparação dos Modos (`isPublicView`)
+## 3. Matriz de Comparação dos Modos e Arquitetura Iframe + CanvasOverlay
 
-| Recurso / Comportamento | `isPublicView={false}` (Modo Edição) | `isPublicView={true}` (Modo Produção) |
+O editor utiliza uma **arquitetura desacoplada**: a renderização do site ocorre 100% isolada dentro de um `<iframe id="canvas-iframe">` via `React.createPortal` (`CanvasIframePortal`), enquanto todas as molduras de seleção, barras de ferramentas flutuantes, badges de hover e menus de contexto são renderizados em uma camada transparente `CanvasOverlay` no documento pai.
+
+| Recurso / Comportamento | `isPublicView={false}` (Modo Edição via Iframe + Overlay) | `isPublicView={true}` (Modo Produção Publicado) |
 |---|---|---|
-| **Molduras de Hover / Seleção** | Exibe `outline` azul no hover e roxo na seleção com badges flutuantes. | ❌ Oculto. Renderização limpa sem artefatos visuais. |
-| **Alça de Arraste (Drag Handle)** | Exibe o ícone `GripVertical` no canto superior esquerdo para arrastar a seção/elemento. | ❌ Oculto. |
-| **Edição Inline de Texto** | Ativa `contentEditable` ao clicar no texto (`InlineEditableText`). | ❌ Desativado. Renderiza HTML estático ou texto simples. |
-| **Indicadores de Soltura (Drop)** | Exibe linhas azuis pulsantes no topo/base durante a operação de Drag & Drop. | ❌ Oculto. |
-| **Ações de Botões e CTAs** | Bloqueia navegação real durante edição (previne sair do editor). | Executa a ação final (envio de formulário, scroll de seção, WhatsApp `wa.me`, URL externa). |
+| **Renderização do DOM** | Isolado em `<iframe>` via `CanvasIframePortal` (`isPublicView={true}` dentro do iframe). | Renderização limpa direta na página publica em `apps/sites`. |
+| **Molduras de Hover / Seleção** | Desenhadas na camada `CanvasOverlay` no pai (`translate3d` sincronizado por scroll). | ❌ Oculto. Renderização limpa sem artefatos visuais. |
+| **Toolbar Flutuante de Ações** | Exibe botões no topo do elemento selecionado (Duplicar, Copiar, Colar Estilo, Salvar Global, Excluir). | ❌ Oculto. |
+| **Navegação & Interação** | Passa eventos através de `pointer-events: none` no overlay raiz e telemetria via `postMessage`. Previne navegação em links. | Executa a ação final (envio de formulário, scroll de seção, WhatsApp `wa.me`, URL externa). |
+| **Indicadores de Soltura (Drop)** | Exibe linha azul pulsante/borda no overlay pai ao arrastar elementos da sidebar sobre o iframe. | ❌ Oculto. |
 | **Elementos Ocultos no Mobile** | Exibe com opacidade reduzida (50%) e aviso visual para o editor. | Oculta completamente o elemento via `display: none`. |
 
 ---

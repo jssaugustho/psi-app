@@ -168,6 +168,8 @@ export function SectionWrapper({
     <section
       ref={sectionRef}
       id={section.anchorId || section.id}
+      data-node-id={section.id}
+      data-is-container="true"
       onClick={(e) => {
         if (!isPublicView && onSelect) {
           e.stopPropagation();

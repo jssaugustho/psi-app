@@ -79,26 +79,37 @@ export function BackgroundControl({
         </label>
       )}
 
-      {/* 1. SELEÇÃO DO TIPO DE FUNDO (BOTOES INLINE) */}
+      {/* 1. SELEÇÃO DO TIPO DE FUNDO (BOTÕES INLINE) */}
       <div className="space-y-1.5">
         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
           Tipo de Fundo
         </label>
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-3 gap-1.5">
           {[
             { id: 'none', label: 'Transparente', icon: X },
-            { id: 'color', label: 'Cor / Alfa', icon: Droplet },
-            { id: 'gradient', label: 'Gradiente', icon: Sparkles },
+            { id: 'color', label: 'Cor / Gradiente', icon: Droplet },
             { id: 'image', label: 'Imagem', icon: ImageIcon },
           ].map((item) => {
             const Icon = item.icon;
-            const isSelected = bgType === item.id;
+            const isSelected = item.id === 'color'
+              ? (bgType === 'color' || bgType === 'gradient')
+              : bgType === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onChange({ ...background, type: item.id as any })}
-                className={`py-1.5 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                onClick={() => {
+                  if (item.id === 'none') {
+                    onChange({ ...background, type: 'none' });
+                  } else if (item.id === 'color') {
+                    const activeVal = background.gradientString || background.color;
+                    const isGrad = typeof activeVal === 'string' && activeVal.includes('gradient');
+                    onChange({ ...background, type: isGrad ? 'gradient' : 'color' });
+                  } else {
+                    onChange({ ...background, type: 'image' });
+                  }
+                }}
+                className={`py-1.5 px-1.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                   isSelected
                     ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 text-[var(--brand-gradient-start)] font-bold shadow-sm'
                     : 'border-[var(--surface-border)] text-slate-400 hover:text-slate-200'
@@ -113,24 +124,20 @@ export function BackgroundControl({
       </div>
 
       {/* 2. CONTROLES ESPECÍFICOS DO TIPO DE FUNDO */}
-      {bgType === 'color' && (
+      {(bgType === 'color' || bgType === 'gradient') && (
         <div className="pt-1">
           <GlobalColorPicker
-            label="Cor do Fundo"
-            value={color || '#FFFFFF'}
-            onChange={(val) => onChange({ ...background, color: val })}
-            page={page}
-            canvasData={canvasData}
-          />
-        </div>
-      )}
-
-      {bgType === 'gradient' && (
-        <div className="pt-1">
-          <GlobalColorPicker
-            label="Gradiente de Fundo"
-            value={background.gradientString || color || 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)'}
-            onChange={(val) => onChange({ ...background, gradientString: val, color: val })}
+            label="Cor ou Gradiente de Fundo"
+            value={background.gradientString || background.color || 'transparent'}
+            onChange={(val) => {
+              const isGrad = typeof val === 'string' && val.includes('gradient');
+              onChange({
+                ...background,
+                type: isGrad ? 'gradient' : 'color',
+                color: val,
+                gradientString: isGrad ? val : undefined,
+              });
+            }}
             page={page}
             canvasData={canvasData}
           />

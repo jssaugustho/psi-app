@@ -658,6 +658,7 @@ export function AtomicComponentWrapper({
   return (
     <div
       ref={parallax.ref as any}
+      data-node-id={component.id}
       onClick={(e) => {
         if (!isPublicView && onSelect) {
           const sel = typeof window !== 'undefined' ? window.getSelection() : null;

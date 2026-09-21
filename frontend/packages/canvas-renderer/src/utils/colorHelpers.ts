@@ -189,50 +189,7 @@ export function extractCanvasGradients(canvasData: CanvasData | null): string[] 
   return Array.from(gradientSet).slice(0, 12);
 }
 
-export function sanitizeCanvasColors(canvasData: CanvasData, siteBg: string): CanvasData {
-  if (!canvasData || !Array.isArray(canvasData.sections)) return canvasData;
-
-  const isLightSite = getLuminance(siteBg) > 160;
-
-  const legacyHardcodedBgs = new Set([
-    '#09090B', '#09090b',
-    '#070A13', '#070a13',
-    '#080B13', '#080b13',
-    '#000000', '#000',
-    '#18181B', '#18181b',
-    '#0F172A', '#0f172a',
-    '#1E293B', '#1e293b',
-    '#111827', '#1f2937',
-    '#FFFFFF', '#ffffff', '#FFF', '#fff',
-    '#FAF5FF', '#faf5ff',
-    '#F8FAFC', '#f8fafc',
-    '#F3F4F6', '#f3f4f6',
-    '#FAFAFA', '#fafafa',
-  ]);
-
-  const sanitizeComponent = (comp: Component) => {
-    if (comp.type === 'div') {
-      const div = comp as DivComponent;
-      if (isLightSite && div.background?.color && legacyHardcodedBgs.has(div.background.color.trim())) {
-        div.background.color = 'transparent';
-        if (div.background.gradientString && legacyHardcodedBgs.has(div.background.gradientString.trim())) {
-          div.background.gradientString = undefined;
-        }
-      }
-      if (div.components) div.components.forEach(sanitizeComponent);
-    }
-  };
-
-  canvasData.sections.forEach((sec: Section) => {
-    if (isLightSite && sec.background?.color && legacyHardcodedBgs.has(sec.background.color.trim())) {
-      sec.background.color = 'transparent';
-      if (sec.background.gradientString && legacyHardcodedBgs.has(sec.background.gradientString.trim())) {
-        sec.background.gradientString = undefined;
-      }
-    }
-    if (sec.components) sec.components.forEach(sanitizeComponent);
-  });
-
+export function sanitizeCanvasColors(canvasData: CanvasData, _siteBg: string): CanvasData {
   return canvasData;
 }
 

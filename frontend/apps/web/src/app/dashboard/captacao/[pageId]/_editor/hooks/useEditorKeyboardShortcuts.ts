@@ -82,15 +82,7 @@ export function useEditorKeyboardShortcuts({
         if (!copiedElement) return;
 
         if (selectedId) {
-          if (selectedType === 'section' || selectedType === 'div') {
-            onPasteElement(selectedId);
-          } else {
-            // Se o elemento selecionado for atômico, cola no container/seção pai
-            const found = canvasData ? findElementInCanvas(canvasData, selectedId) : null;
-            if (found && found.parent) {
-              onPasteElement(found.parent.id);
-            }
-          }
+          onPasteElement(selectedId);
         } else if (canvasData && canvasData.sections.length > 0) {
           onPasteElement(canvasData.sections[0].id);
         }

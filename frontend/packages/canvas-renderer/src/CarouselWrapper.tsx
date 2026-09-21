@@ -139,6 +139,8 @@ export function CarouselWrapper({
 
   return (
     <div
+      data-node-id={carouselComponent.id}
+      data-is-container="true"
       onClick={(e) => {
         if (!isPublicView && onSelect) {
           e.stopPropagation();
@@ -177,7 +179,7 @@ export function CarouselWrapper({
     >
       {/* 🟣 BORDA DE HOVER DO CARROSSEL */}
       {!isPublicView && isSelfHovered && !isSelected && (
-        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-2xl" />
+        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-none" />
       )}
 
       {/* 🟣 BORDA DE SELEÇÃO E BARRA FLUTUANTE DE AÇÕES DO CARROSSEL */}

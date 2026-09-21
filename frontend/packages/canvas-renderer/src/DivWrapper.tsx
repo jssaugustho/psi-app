@@ -156,6 +156,8 @@ export function DivWrapper({
   return (
     <div
       ref={divRef}
+      data-node-id={divComponent.id}
+      data-is-container="true"
       onClick={(e) => {
         if (!isPublicView && onSelect) {
           e.stopPropagation();
@@ -201,7 +203,7 @@ export function DivWrapper({
         <div className="absolute inset-0 border-2 border-purple-500 pointer-events-none z-20 rounded-[inherit]" />
       )}
       {!isPublicView && isSelfHovered && !isSelected && (
-        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-[inherit]" />
+        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-none" />
       )}
 
       {/* Indicator Badge em Drag Over */}

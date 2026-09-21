@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DivComponent, ViewportMode, getPositionStyles, useScrollThreshold, useParallaxEffect } from '@psi/canvas-renderer';
+import { DivComponent, ViewportMode, getPositionStyles, useScrollThreshold, useParallaxEffect, buildComponentCssStyle } from '@psi/canvas-renderer';
 import { ComponentWrapper } from './ComponentWrapper';
 import { Trash2, Square, Plus, GripVertical } from 'lucide-react';
 import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from '../constants';
@@ -178,41 +178,19 @@ export function DivWrapper({
       style={{
         ...parallax.style,
         ...positionStyles,
+        ...buildComponentCssStyle({
+          component: divComponent,
+          viewportMode,
+          isHovered: isStylingHovered,
+          page,
+          componentCategory: 'div',
+        }),
         width: effectiveWidth,
         flexBasis: effectiveFlexBasis,
         flexGrow: layout.flexGrow !== undefined ? layout.flexGrow : (effectiveWidth === '100%' || layout.flexBasis === '100%' ? 1 : 0),
         flexShrink: layout.flexShrink !== undefined ? layout.flexShrink : 1,
         alignSelf: layout.alignSelf || (layout.height === '100%' || layout.height === 'stretch' ? 'stretch' : 'auto'),
-        gap: layout.gap || '16px',
-        flexDirection: layout.flexDirection || 'column',
-        textAlign: layout.textAlign || 'inherit',
-        minWidth: layout.minWidth || 'none',
         maxWidth: effectiveMaxWidth,
-        height: layout.height === '100%' || layout.height === 'stretch' ? '100%' : (layout.height || 'auto'),
-        minHeight: layout.minHeight || 'auto',
-        maxHeight: layout.maxHeight,
-        paddingTop: layout.paddingTop,
-        paddingRight: layout.paddingRight,
-        paddingBottom: layout.paddingBottom,
-        paddingLeft: layout.paddingLeft,
-        background: divComponent.background?.gradientString || divComponent.background?.color || 'transparent',
-        backgroundImage: divComponent.background?.type === 'image' && divComponent.background?.imageUrl
-          ? `linear-gradient(${divComponent.background.imageOverlayColor || 'transparent'}, ${divComponent.background.imageOverlayColor || 'transparent'}), url(${divComponent.background.imageUrl})`
-          : divComponent.background?.gradientString
-          ? divComponent.background.gradientString
-          : undefined,
-        backgroundSize: divComponent.background?.imageSize || 'cover',
-        backdropFilter: divComponent.background?.backdropBlur && divComponent.background.backdropBlur !== '0px'
-          ? `blur(${divComponent.background.backdropBlur})`
-          : undefined,
-        WebkitBackdropFilter: divComponent.background?.backdropBlur && divComponent.background.backdropBlur !== '0px'
-          ? `blur(${divComponent.background.backdropBlur})`
-          : undefined,
-        borderStyle: border.borderStyle || (divComponent.border?.style as any) || 'none',
-        borderWidth: border.borderWidth || divComponent.border?.width || '1px',
-        borderColor: border.borderColor || divComponent.border?.color || 'transparent',
-        borderRadius: border.borderRadius || divComponent.border?.radiusTopLeft || '0px',
-        ...getComponentTransitionAndHoverStyle(divComponent.style, isStylingHovered),
       }}
     >
       {/* Borda Flutuante de Seleção / Hover no topo dos filhos (z-20) */}
@@ -220,7 +198,7 @@ export function DivWrapper({
         <div className="absolute inset-0 border-2 border-purple-500 pointer-events-none z-20 rounded-[inherit]" />
       )}
       {!isPublicView && isSelfHovered && !isSelected && (
-        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-[inherit]" />
+        <div className="absolute inset-0 border border-purple-400/60 pointer-events-none z-20 rounded-none" />
       )}
       {!isPublicView && isDragOver && (
         <div className="absolute inset-0 border-2 border-purple-500 bg-purple-500/10 ring-2 ring-purple-400/50 pointer-events-none z-20 rounded-[inherit]" />

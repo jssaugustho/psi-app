@@ -18,7 +18,12 @@ export function validateCanvasOperation(
     return parentType === 'canvas';
   }
 
-  // 2. Divs e Componentes Atômicos/Carrossel podem existir em Seções, Divs ou Carrossel
+  // 2. Containers (Divs e Carrosséis) podem existir em Seções ou Divs
+  if (elementType === 'div' || elementType === 'carousel') {
+    return parentType === 'section' || parentType === 'div';
+  }
+
+  // 3. Componentes atômicos podem existir em Seções, Divs ou Carrossel
   return parentType === 'section' || parentType === 'div' || parentType === 'carousel';
 }
 
@@ -221,12 +226,88 @@ export function duplicateElementInCanvas(canvas: CanvasData, elementId: string):
 // MANIPULAÇÃO DE COMPONENTES (SEÇÃO, DIV E CARROSSEL RECURSIVO)
 // ============================================================================
 
+export interface ContainerTargetResolution {
+  containerId: string;
+  index?: number;
+}
+
+/**
+ * Resolve o contêiner de destino válido e o índice de inserção para qualquer ID de elemento no canvas.
+ * Se o targetId for um elemento atômico, resolve para o container pai e calcula o índice logo após o elemento.
+ * Se o targetId for um Carrossel, resolve para o slide ativo (Div) do carrossel.
+ * Se o componente for um container (Div ou Carrossel), resolve estritamente para a Seção ancestral.
+ */
+export function getValidContainerForComponent(
+  canvas: CanvasData,
+  targetId: string,
+  componentType: ComponentType | 'section'
+): ContainerTargetResolution | null {
+  const found = findElementInCanvas(canvas, targetId);
+  if (!found) {
+    if (canvas.sections.length > 0) {
+      return { containerId: canvas.sections[0].id };
+    }
+    return null;
+  }
+
+  const { element, parent } = found;
+
+  // 1. Seções não são componentes de container interno
+  if ((componentType as string) === 'section') {
+    return null;
+  }
+
+  // 2. Caso targetId seja uma Seção
+  if (element.type === 'section') {
+    return { containerId: element.id };
+  }
+
+  // 3. Caso targetId seja uma Div
+  if (element.type === 'div') {
+    return { containerId: element.id };
+  }
+
+  // 4. Caso targetId seja um Carousel
+  if (element.type === 'carousel') {
+    const car = element as CarouselComponent;
+    if (car.components && car.components.length > 0) {
+      return { containerId: car.components[0].id };
+    }
+    const sectionId = getContainingSectionId(canvas, targetId);
+    return { containerId: sectionId || targetId };
+  }
+
+  // 5. Caso targetId seja um elemento atômico (ex: botão, título, parágrafo, card, etc.)
+  if (parent) {
+    const parentComps = (parent as Section | DivComponent | CarouselComponent).components || [];
+    const targetIdx = parentComps.findIndex((c) => c.id === targetId);
+    const insertIndex = targetIdx !== -1 ? targetIdx + 1 : undefined;
+
+    return {
+      containerId: parent.id,
+      index: insertIndex,
+    };
+  }
+
+  if (canvas.sections.length > 0) {
+    return { containerId: canvas.sections[0].id };
+  }
+
+  return null;
+}
+
 export function addComponentToParent(
   canvas: CanvasData,
   parentId: string,
   component: Component,
   targetIndex?: number
 ): CanvasData {
+  const resolution = getValidContainerForComponent(canvas, parentId, component.type);
+  if (!resolution) return canvas;
+
+  const resolvedParentId = resolution.containerId;
+  const resolvedIndex = typeof targetIndex === 'number' ? targetIndex : resolution.index;
+
   const addToComponents = (
     components: Component[],
     currentParentId: string
@@ -238,8 +319,8 @@ export function addComponentToParent(
         const containerComp = comp as DivComponent | CarouselComponent;
         const subComponents = [...containerComp.components];
 
-        if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= subComponents.length) {
-          subComponents.splice(targetIndex, 0, component as any);
+        if (typeof resolvedIndex === 'number' && resolvedIndex >= 0 && resolvedIndex <= subComponents.length) {
+          subComponents.splice(resolvedIndex, 0, component as any);
         } else {
           subComponents.push(component as any);
         }
@@ -265,12 +346,12 @@ export function addComponentToParent(
 
   const sections = canvas.sections.map((sec) => {
     // Caso 1: O pai é a própria Seção
-    if (sec.id === parentId) {
+    if (sec.id === resolvedParentId) {
       if (!validateCanvasOperation(component.type, 'section')) return sec;
 
       const components = [...sec.components];
-      if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= components.length) {
-        components.splice(targetIndex, 0, component);
+      if (typeof resolvedIndex === 'number' && resolvedIndex >= 0 && resolvedIndex <= components.length) {
+        components.splice(resolvedIndex, 0, component);
       } else {
         components.push(component);
       }
@@ -278,7 +359,7 @@ export function addComponentToParent(
     }
 
     // Caso 2: O pai é um Container/Carrossel dentro da Seção
-    const subResult = addToComponents(sec.components, parentId);
+    const subResult = addToComponents(sec.components, resolvedParentId);
     if (subResult.added) {
       return { ...sec, components: subResult.updatedComponents };
     }
@@ -321,6 +402,11 @@ export function moveElementInCanvas(
     return canvas;
   }
 
+  // Previne mover um elemento para dentro de si mesmo ou de um de seus descendentes
+  if (isDescendantOf(canvas, targetParentId, elementId)) {
+    return canvas;
+  }
+
   // Remove o componente de onde ele está atualmente
   const canvasWithoutElement = removeComponentFromCanvas(canvas, elementId);
 
@@ -337,11 +423,21 @@ export function addComponentBeforeOrAfter(
   const target = findElementInCanvas(canvas, targetElementId);
   if (!target || !target.parent) return canvas;
 
-  const targetIndex = target.parent.components.findIndex((c) => c.id === targetElementId);
+  let targetParentId = target.parent.id;
+
+  const parentFound = findElementInCanvas(canvas, targetParentId);
+  if (!parentFound) return canvas;
+
+  const componentsInTargetParent = (parentFound.element as Section | DivComponent | CarouselComponent).components || [];
+  let targetIndex = componentsInTargetParent.findIndex((c) => c.id === targetElementId);
+  if (targetIndex === -1) {
+    targetIndex = componentsInTargetParent.findIndex((c) => isDescendantOf(canvas, targetElementId, c.id));
+  }
+
   if (targetIndex === -1) return canvas;
 
   const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
-  return addComponentToParent(canvas, target.parent.id, component, insertIndex);
+  return addComponentToParent(canvas, targetParentId, component, insertIndex);
 }
 
 export function moveElementBeforeOrAfter(
@@ -351,6 +447,9 @@ export function moveElementBeforeOrAfter(
   position: 'before' | 'after'
 ): CanvasData {
   if (elementId === targetElementId) return canvas;
+
+  // Previne mover um elemento para antes/depois de um de seus descendentes se isso for violar hierarquia
+  if (isDescendantOf(canvas, targetElementId, elementId)) return canvas;
 
   const source = findElementInCanvas(canvas, elementId);
   const target = findElementInCanvas(canvas, targetElementId);
@@ -371,9 +470,16 @@ export function moveElementBeforeOrAfter(
 
   if (!target.parent) return canvas;
 
-  const targetParentId = target.parent.id;
-  const componentsInTargetParent = target.parent.components;
-  const targetIndex = componentsInTargetParent.findIndex((c) => c.id === targetElementId);
+  let targetParentId = target.parent.id;
+
+  const parentFound = findElementInCanvas(canvas, targetParentId);
+  if (!parentFound) return canvas;
+
+  const componentsInTargetParent = (parentFound.element as Section | DivComponent | CarouselComponent).components || [];
+  let targetIndex = componentsInTargetParent.findIndex((c) => c.id === targetElementId);
+  if (targetIndex === -1) {
+    targetIndex = componentsInTargetParent.findIndex((c) => isDescendantOf(canvas, targetElementId, c.id));
+  }
 
   if (targetIndex === -1) return canvas;
 
@@ -464,6 +570,70 @@ export function findElementInCanvas(canvas: CanvasData, elementId: string): Foun
 
   return null;
 }
+
+/**
+ * Verifica recursivamente se candidateChildId é o próprio ancestorId ou um descendente dele no canvas.
+ */
+export function isDescendantOf(
+  canvas: CanvasData,
+  candidateChildId: string,
+  ancestorId: string
+): boolean {
+  if (candidateChildId === ancestorId) return true;
+
+  const ancestorFound = findElementInCanvas(canvas, ancestorId);
+  if (!ancestorFound) return false;
+
+  const ancestorElement = ancestorFound.element;
+
+  const checkComponents = (comps: Component[]): boolean => {
+    for (const comp of comps) {
+      if (comp.id === candidateChildId) return true;
+      if (comp.type === 'div' || comp.type === 'carousel') {
+        const sub = (comp as DivComponent | CarouselComponent).components || [];
+        if (checkComponents(sub)) return true;
+      }
+    }
+    return false;
+  };
+
+  if (ancestorElement.type === 'section') {
+    return checkComponents((ancestorElement as Section).components || []);
+  }
+
+  if (ancestorElement.type === 'div' || ancestorElement.type === 'carousel') {
+    return checkComponents((ancestorElement as DivComponent | CarouselComponent).components || []);
+  }
+
+  return false;
+}
+
+/**
+ * Retorna o ID da Seção ancestral que contém o elemento com dado elementId.
+ */
+export function getContainingSectionId(canvas: CanvasData, elementId: string): string | null {
+  const found = findElementInCanvas(canvas, elementId);
+  if (!found) return null;
+  if (found.element.type === 'section') return found.element.id;
+  if (found.parentType === 'section' && found.parent) return found.parent.id;
+
+  let current = found;
+  while (current && current.parent && current.parentType !== 'section') {
+    const parentFound = findElementInCanvas(canvas, current.parent.id);
+    if (!parentFound) break;
+    current = parentFound;
+  }
+
+  if (current && current.parentType === 'section' && current.parent) {
+    return current.parent.id;
+  }
+  if (current && current.element.type === 'section') {
+    return current.element.id;
+  }
+
+  return null;
+}
+
 
 // ============================================================================
 // COLAGEM EXCLUSIVA DE ESTILOS CSS ENTRE ELEMENTOS DO MESMO TIPO

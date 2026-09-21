@@ -110,40 +110,24 @@ export function buildComponentCssStyle({
   if (padBottom !== undefined) result.paddingBottom = padBottom;
   if (padLeft !== undefined) result.paddingLeft = padLeft;
 
-  // 3. BACKGROUND & MEDIA (COM SUPORTE A VARIÁVEIS CSS DE GRADIENTE NO HOVER)
-  const normalBgStr = (bg.type === 'image' && bg.imageUrl)
-    ? `linear-gradient(${bg.imageOverlayColor || 'transparent'}, ${bg.imageOverlayColor || 'transparent'}), url(${bg.imageUrl})`
-    : (bg.gradientString || style.gradientString || bg.color || style.backgroundColor || style.background || '');
-
-  const hoverBgStr = style.hoverBackgroundColor || '';
-
-  const normalGrad = extractGradientStops(normalBgStr);
-  const hoverGrad = extractGradientStops(hoverBgStr);
-
-  if (normalGrad && hoverGrad && normalGrad.stops.length >= 2 && hoverGrad.stops.length >= 2) {
-    const activeGrad = isHovered ? hoverGrad : normalGrad;
-    const c1 = isHovered ? (hoverGrad.stops[0] || '#4F46E5') : (normalGrad.stops[0] || '#4F46E5');
-    const c2 = isHovered ? (hoverGrad.stops[1] || '#7C3AED') : (normalGrad.stops[1] || '#7C3AED');
-    const angle = activeGrad.angle;
-
-    (result as any)['--grad-c1'] = c1;
-    (result as any)['--grad-c2'] = c2;
-
-    if (activeGrad.type === 'radial') {
-      result.background = `radial-gradient(circle, var(--grad-c1) 0%, var(--grad-c2) 100%)`;
-    } else {
-      result.background = `linear-gradient(${angle}deg, var(--grad-c1) 0%, var(--grad-c2) 100%)`;
+  // 3. BACKGROUND & MEDIA
+  if (isHovered && style.hoverBackgroundColor) {
+    result.background = style.hoverBackgroundColor;
+  } else if (bg.type === 'none') {
+    result.background = 'transparent';
+    result.backgroundImage = 'none';
+  } else if (bg.type === 'image' && bg.imageUrl) {
+    result.backgroundImage = `linear-gradient(${bg.imageOverlayColor || 'transparent'}, ${bg.imageOverlayColor || 'transparent'}), url(${bg.imageUrl})`;
+    result.backgroundSize = bg.imageSize || 'cover';
+    if (bg.imagePosition) {
+      result.backgroundPosition = bg.imagePosition;
     }
   } else {
-    if (isHovered && style.hoverBackgroundColor) {
-      result.background = style.hoverBackgroundColor;
-    } else if (bg.type === 'image' && bg.imageUrl) {
-      result.backgroundImage = `linear-gradient(${bg.imageOverlayColor || 'transparent'}, ${bg.imageOverlayColor || 'transparent'}), url(${bg.imageUrl})`;
-      result.backgroundSize = bg.imageSize || 'cover';
-    } else if (bg.gradientString || style.gradientString) {
-      result.background = bg.gradientString || style.gradientString;
-    } else if (bg.color || style.backgroundColor || style.background) {
-      result.background = bg.color || style.backgroundColor || style.background;
+    const rawVal = bg.gradientString || bg.color || style.backgroundColor || style.background;
+    if (rawVal) {
+      result.background = rawVal;
+    } else if (bg.type === 'color' || bg.type === 'gradient') {
+      result.background = 'transparent';
     }
   }
 
@@ -155,6 +139,9 @@ export function buildComponentCssStyle({
   if (backdropBlur && backdropBlur !== '0px') {
     result.backdropFilter = `blur(${backdropBlur})`;
     result.WebkitBackdropFilter = `blur(${backdropBlur})`;
+  } else if (backdropBlur === '0px') {
+    result.backdropFilter = 'none';
+    result.WebkitBackdropFilter = 'none';
   }
 
   // 4. BORDERS & RADIUS
