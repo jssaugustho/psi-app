@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main  # ou 'master', dependendo do nome da sua branch principal
-
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: self-hosted
