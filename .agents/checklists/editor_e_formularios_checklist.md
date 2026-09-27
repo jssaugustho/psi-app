@@ -54,8 +54,19 @@
 - [ ] **Cards Arrastáveis de Seções e Estruturas (`AddPalette.tsx`)**:
   - [ ] Renderizar todas as estruturas de seções (1 Coluna, 2 Colunas, 3 Colunas, Navbar Clássico, Navbar Flutuante, Rodapé) como cards arrastáveis (`draggable`, `onDragStart`, `GripVertical`), integrados na categoria `SEÇÕES & ESTRUTURA`.
   - [ ] Permitir arrastar a seção diretamente para o canvas/qualquer seção existente para inserção instantânea via `createSectionFromPreset(item.preset)`.
-- [ ] **Auto-Save Debocado**:
-  - [ ] Auto-save em 1.500ms salvando estritamente em `capture_pages.draft_data`.
+- [x] **Auto-Save Debocado**:
+  - [x] Auto-save em 1.500ms salvando estritamente em `capture_pages.draft_data`.
+- [x] **Motor Pure CSS Flexbox & Controle no Pai**:
+  - [x] O container pai (`Div`, `Section`) rege 100% o alinhamento de seus elementos filhos via `alignItems`. Eliminada qualquer sobrescrita por `alignSelf` nos filhos.
+  - [x] Containers auto-width (`width: 'auto' | 'fit-content'`) utilizam `width: fit-content`, `flexGrow: 0` e `w-auto max-w-full` para centralização perfeita via pai.
+- [x] **Reset Universal `box-sizing: border-box`**:
+  - [x] `*, *::before, *::after { box-sizing: border-box; }` aplicado no `globals.css` dos apps `web`, `sites`, `admin` e injetado no `<head>` do `CanvasIframePortal.tsx`.
+- [x] **Ponte de Eventos de Teclado & Atalhos Universais**:
+  - [x] `CanvasIframePortal.tsx` dispara `KeyboardEvent` sintético no `window.parent` ao pressionar teclas no iframe, ativando atalhos (`Escape`, `Ctrl+S`, `Ctrl+Z`, `Ctrl+Y`, `Ctrl+C`, `Ctrl+V`, `Ctrl+Shift+V`, `Ctrl+X`, `Ctrl+D`, `Delete`/`Backspace`).
+- [x] **Painel de Propriedades Reorganizado & Espaçamento Sem Sliders**:
+  - [x] Organização em 5 acordeões ordenados (Dimensionamento, Organização Interna, Encaixe, Espaçamentos, Posicionamento & Parallax).
+  - [x] `SpacingControl.tsx` compacto em 4 colunas sem sliders de faixa, com digitação numérica, rolagem de scroll, seletor de unidade e sincronização.
+  - [x] Ícones de ajuda `?` (`HelpTooltip`) interativos em cada propriedade.
 
 ---
 

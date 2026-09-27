@@ -4,17 +4,16 @@ import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePageEditor } from './hooks/usePageEditor';
 import { useEditorKeyboardShortcuts } from './hooks/useEditorKeyboardShortcuts';
+import { EditorStateMemoryProvider } from './context/EditorStateMemoryContext';
 import { SettingsTab } from './tabs/SettingsTab';
 import { DestinationTab } from './tabs/DestinationTab';
 import { EditorSidebar } from './EditorSidebar';
 import { EditorCanvas } from './EditorCanvas';
 import { PropertiesPanel } from './PropertiesPanel';
 import { HistoryModal } from './components/HistoryModal';
-import { CreateGlobalComponentModal } from './components/CreateGlobalComponentModal';
-import { GlobalMasterEditorModal } from './components/GlobalMasterEditorModal';
-import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from './constants';
+import { createDefaultDiv, createDefaultCarousel, createDefaultComponent, createDefaultGlobalInstance } from './constants';
 import { findElementInCanvas } from './utils/canvasHelpers';
-import { Component, GlobalInstanceComponent, GlobalComponentMaster } from '@psi/canvas-renderer';
+import { Component, GlobalInstanceComponent, GlobalComponentMaster, CanvasData, Section } from '@psi/canvas-renderer';
 import { loadGoogleFonts } from './utils/googleFonts';
 import { useBrand } from '@/context/BrandContext';
 import {
@@ -42,7 +41,8 @@ import {
   Maximize2,
   Minimize2,
   Rocket,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-react';
 
 interface EditorLayoutProps {
@@ -63,6 +63,13 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
     selectedType,
     selectElement,
     canvasData,
+    editingMasterId,
+    editingMaster,
+    enterMasterEditing,
+    exitMasterEditing,
+    toggleExposedProp,
+    deleteGlobalMaster,
+    unlinkInstance,
     updateNavbar,
     addSection,
     addCustomSection,
@@ -82,6 +89,7 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
     copiedElement,
     updateSiteConfig,
     updatePage,
+    createGlobalFromElement,
     addGlobalComponentMaster,
     updateGlobalComponentMaster,
     canUndo,
@@ -104,27 +112,41 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [justPublished, setJustPublished] = React.useState(false);
   const [historyModalOpen, setHistoryModalOpen] = React.useState(false);
-  const [isGlobalModalOpen, setIsGlobalModalOpen] = React.useState(false);
-  const [globalModalTarget, setGlobalModalTarget] = React.useState<Component | null>(null);
 
-  const [isMasterEditorOpen, setIsMasterEditorOpen] = React.useState(false);
-  const [editingMaster, setEditingMaster] = React.useState<GlobalComponentMaster | null>(null);
+  // Sintetiza o canvasData ativo quando no Modo de Edição Master
+  const activeCanvasData: CanvasData | null = React.useMemo(() => {
+    if (editingMasterId && editingMaster && editingMaster.masterNode) {
+      const sec: any = {
+        id: 'sec-master-isolated',
+        name: `Mestre: ${editingMaster.name}`,
+        type: 'custom',
+        layout: {
+          paddingTop: '60px',
+          paddingBottom: '60px',
+          paddingLeft: '24px',
+          paddingRight: '24px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+        },
+        background: { color: 'transparent' },
+        components: [editingMaster.masterNode],
+      };
+      return {
+        version: '2.0' as const,
+        sections: [sec],
+        globalComponentsMap: canvasData?.globalComponentsMap,
+      };
+    }
+    return canvasData;
+  }, [editingMasterId, editingMaster, canvasData]);
 
   const handleOpenMasterEditor = (globalComponentId: string) => {
-    const master = canvasData?.globalComponentsMap?.[globalComponentId];
-    if (master) {
-      setEditingMaster(master);
-      setIsMasterEditorOpen(true);
-    }
+    enterMasterEditing(globalComponentId);
   };
 
   const handleOpenSaveAsGlobal = (id: string) => {
-    if (!canvasData) return;
-    const found = findElementInCanvas(canvasData, id);
-    if (found && found.element && found.element.type !== 'section') {
-      setGlobalModalTarget(found.element as Component);
-      setIsGlobalModalOpen(true);
-    }
+    createGlobalFromElement(id);
   };
 
 
@@ -252,7 +274,8 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface-base)] text-slate-900 dark:text-white flex flex-col font-sans select-none overflow-hidden h-screen">
+    <EditorStateMemoryProvider pageId={pageId}>
+      <div className="min-h-screen bg-[var(--surface-base)] text-slate-900 dark:text-white flex flex-col font-sans select-none overflow-hidden h-screen">
       {/* ──────────────────────────────────────────────────────────────────────────── */}
       {/* TOP BAR FIXO DO EDITOR */}
       {/* ──────────────────────────────────────────────────────────────────────────── */}
@@ -531,85 +554,115 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
             {/* Sidebar Esquerda Redimensionável (Paleta ou PropertiesPanel) */}
             {controlsVisible && sidebarVisible && (
               <div style={{ width: `${sidebarWidth}px` }} className="relative flex shrink-0 h-full group/sidebar">
-                {selection.id !== null ? (
-                  <PropertiesPanel
-                    canvasData={canvasData}
-                    selection={selection}
-                    viewportMode={viewportMode}
-                    page={page}
-                    onUpdateSection={updateSection}
-                    onRemoveSection={removeSection}
-                    onMoveSection={moveSection}
-                    onUpdateComponent={updateComponent}
-                    onRemoveComponent={removeComponent}
-                    onAddComponent={addComponent}
-                    onSelectElement={selectElement}
-                    onDeselect={() => selectElement(null)}
-                    onUpdateSiteConfig={updateSiteConfig}
-                    onEditMaster={handleOpenMasterEditor}
-                  />
-
-                ) : (
-                  <EditorSidebar
-                    canvasData={canvasData}
-                    selectedId={selection.id}
-                    selectedType={selection.type}
-                    viewportMode={viewportMode}
-                    page={page}
-                    onAddSection={addSection}
-                    onAddCustomSection={addCustomSection}
-                    onAddComponent={(type, preset) => {
-                      if (!canvasData || canvasData.sections.length === 0) {
-                        addSection('Nova Seção');
-                        return;
+                <EditorSidebar
+                  canvasData={activeCanvasData}
+                  selectedId={selection.id}
+                  selectedType={selection.type}
+                  viewportMode={viewportMode}
+                  page={page}
+                  editingMaster={editingMaster}
+                  onAddSection={addSection}
+                  onAddCustomSection={addCustomSection}
+                  onAddComponent={(type, preset) => {
+                    if (!activeCanvasData || activeCanvasData.sections.length === 0) {
+                      addSection('Nova Seção');
+                      return;
+                    }
+                    const targetSectionId = activeCanvasData.sections[0].id;
+                    if (type === 'carousel') {
+                      const newCarousel = createDefaultCarousel('Galeria / Carrossel');
+                      addComponent(targetSectionId, newCarousel as any);
+                    } else if (type === 'div') {
+                      const newDiv = createDefaultDiv('Container (Div)');
+                      if (preset === '2col') {
+                        const col1 = createDefaultDiv('Coluna 1');
+                        const col2 = createDefaultDiv('Coluna 2');
+                        col1.layout.flexBasis = '50%';
+                        col1.layout.width = '50%';
+                        col2.layout.flexBasis = '50%';
+                        col2.layout.width = '50%';
+                        newDiv.components = [col1, col2];
+                        newDiv.layout.flexDirection = 'row';
+                      } else if (preset === '3col') {
+                        const col1 = createDefaultDiv('Coluna 1');
+                        const col2 = createDefaultDiv('Coluna 2');
+                        const col3 = createDefaultDiv('Coluna 3');
+                        col1.layout.flexBasis = '33.33%';
+                        col1.layout.width = '33.33%';
+                        col2.layout.flexBasis = '33.33%';
+                        col2.layout.width = '33.33%';
+                        col3.layout.flexBasis = '33.33%';
+                        col3.layout.width = '33.33%';
+                        newDiv.components = [col1, col2, col3];
+                        newDiv.layout.flexDirection = 'row';
                       }
-                      const targetSectionId = canvasData.sections[0].id;
-                      if (type === 'carousel') {
-                        const newCarousel = createDefaultCarousel('Galeria / Carrossel');
-                        addComponent(targetSectionId, newCarousel as any);
-                      } else if (type === 'div') {
-                        const newDiv = createDefaultDiv('Container (Div)');
-                        if (preset === '2col') {
-                          const col1 = createDefaultDiv('Coluna 1');
-                          const col2 = createDefaultDiv('Coluna 2');
-                          col1.layout.flexBasis = '50%';
-                          col1.layout.width = '50%';
-                          col2.layout.flexBasis = '50%';
-                          col2.layout.width = '50%';
-                          newDiv.components = [col1, col2];
-                          newDiv.layout.flexDirection = 'row';
-                        } else if (preset === '3col') {
-                          const col1 = createDefaultDiv('Coluna 1');
-                          const col2 = createDefaultDiv('Coluna 2');
-                          const col3 = createDefaultDiv('Coluna 3');
-                          col1.layout.flexBasis = '33.33%';
-                          col1.layout.width = '33.33%';
-                          col2.layout.flexBasis = '33.33%';
-                          col2.layout.width = '33.33%';
-                          col3.layout.flexBasis = '33.33%';
-                          col3.layout.width = '33.33%';
-                          newDiv.components = [col1, col2, col3];
-                          newDiv.layout.flexDirection = 'row';
+                      addComponent(targetSectionId, newDiv as any);
+                    } else if (type === 'global_instance') {
+                      const masterId = preset || '';
+                      const masterName = masterId ? activeCanvasData?.globalComponentsMap?.[masterId]?.name : undefined;
+                      const newGlobalInst = createDefaultGlobalInstance(masterId, masterName);
+                      addComponent(targetSectionId, newGlobalInst as any);
+                    } else {
+                      const compType = typeof type === 'object' ? (type as any).type : type;
+                      const compPreset = typeof type === 'object' ? (type as any).preset : preset;
+                      const newComp = createDefaultComponent(compType as any, compPreset);
+                      addComponent(targetSectionId, newComp as any);
+                    }
+                  }}
+                  onAddComponentToParent={addComponent}
+                  onSelectElement={selectElement}
+                  onRemoveSection={removeSection}
+                  onRemoveComponent={removeComponent}
+                  onUpdateSection={updateSection}
+                  onUpdateComponent={(id, patch) => {
+                    if (editingMasterId && editingMaster) {
+                      const updateNodeInSubtree = (node: Component): Component => {
+                        if (node.id === id) {
+                          return { ...node, ...patch } as Component;
                         }
-                        addComponent(targetSectionId, newDiv as any);
-                        const compType = typeof type === 'object' ? (type as any).type : type;
-                        const compPreset = typeof type === 'object' ? (type as any).preset : preset;
-                        const newComp = createDefaultComponent(compType as any, compPreset);
-                        addComponent(targetSectionId, newComp as any);
-                      }
-                    }}
-                    onSelectElement={selectElement}
-                    onRemoveSection={removeSection}
-                    onRemoveComponent={removeComponent}
-                    onUpdateSection={updateSection}
-                    onUpdateComponent={updateComponent}
-                    onMoveSection={moveSection}
-                    onMoveElement={moveElement}
-                    onMoveElementBeforeOrAfter={moveElementBeforeOrAfter}
-                    onUpdateSiteConfig={updateSiteConfig}
-                    onUpdatePage={updatePage}
-                  />
-                )}
+                        if ('components' in node && Array.isArray((node as any).components)) {
+                          return {
+                            ...node,
+                            components: (node as any).components.map(updateNodeInSubtree),
+                          } as Component;
+                        }
+                        return node;
+                      };
+                      const updatedMasterNode = updateNodeInSubtree(editingMaster.masterNode);
+                      updateGlobalComponentMaster({
+                        ...editingMaster,
+                        masterNode: updatedMasterNode,
+                        updatedAt: new Date().toISOString(),
+                      });
+                    } else {
+                      updateComponent(id, patch);
+                    }
+                  }}
+                  onMoveSection={moveSection}
+                  onMoveElement={moveElement}
+                  onMoveElementBeforeOrAfter={moveElementBeforeOrAfter}
+                  onUpdateSiteConfig={updateSiteConfig}
+                  onUpdatePage={updatePage}
+                  onEditMaster={enterMasterEditing}
+                  onUpdateMaster={(patch) => {
+                    if (editingMaster) {
+                      updateGlobalComponentMaster({ ...editingMaster, ...patch });
+                    }
+                  }}
+                  onToggleExposedProp={(declaration) => {
+                    if (editingMasterId) {
+                      toggleExposedProp(editingMasterId, declaration);
+                    }
+                  }}
+                  onDeleteMaster={(masterId?: string) => {
+                    const targetId = masterId || editingMasterId;
+                    if (targetId) {
+                      deleteGlobalMaster(targetId);
+                    }
+                  }}
+                  onExitMasterEditing={exitMasterEditing}
+                  onUnlinkInstance={unlinkInstance}
+                />
 
                 {/* Handle Interativo de Redimensionamento */}
                 <div
@@ -622,7 +675,7 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
 
             {/* Canvas Central Interativo (Ocupa 100% da largura restante!) */}
             <EditorCanvas
-              canvasData={canvasData}
+              canvasData={activeCanvasData}
               viewportMode={viewportMode}
               selectedId={selection.id}
               page={page}
@@ -631,7 +684,30 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
               onRemoveSection={removeSection}
               onRemoveComponent={removeComponent}
               onUpdateSection={updateSection}
-              onUpdateComponent={updateComponent}
+              onUpdateComponent={(id, patch) => {
+                if (editingMasterId && editingMaster) {
+                  const updateNodeInSubtree = (node: Component): Component => {
+                    if (node.id === id) {
+                      return { ...node, ...patch };
+                    }
+                    if ('components' in node && Array.isArray((node as any).components)) {
+                      return {
+                        ...node,
+                        components: (node as any).components.map(updateNodeInSubtree),
+                      } as Component;
+                    }
+                    return node;
+                  };
+                  const updatedMasterNode = updateNodeInSubtree(editingMaster.masterNode);
+                  updateGlobalComponentMaster({
+                    ...editingMaster,
+                    masterNode: updatedMasterNode,
+                    updatedAt: new Date().toISOString(),
+                  });
+                } else {
+                  updateComponent(id, patch);
+                }
+              }}
               onAddComponent={addComponent}
               onAddCustomSection={addCustomSection}
               onMoveSection={moveSection}
@@ -811,36 +887,9 @@ export function EditorLayout({ pageId }: EditorLayoutProps) {
         currentIndex={historyIndex}
         onJumpToIndex={jumpToHistoryIndex}
       />
-
-      {/* ✨ MODAL DE CRIAÇÃO DE ELEMENTO GLOBAL */}
-      <CreateGlobalComponentModal
-        isOpen={isGlobalModalOpen}
-        onClose={() => {
-          setIsGlobalModalOpen(false);
-          setGlobalModalTarget(null);
-        }}
-        targetComponent={globalModalTarget}
-        workspaceId={(page as any)?.workspace_id || (page as any)?.workspaceId}
-        onSave={async (globalMaster, newInstance) => {
-          addGlobalComponentMaster(globalMaster, newInstance);
-        }}
-      />
-
-      {/* 🎨 MODAL DE EDIÇÃO ISOLADA DO COMPONENTE MASTER (ESTILO FRAMER) */}
-      <GlobalMasterEditorModal
-        isOpen={isMasterEditorOpen}
-        onClose={() => {
-          setIsMasterEditorOpen(false);
-          setEditingMaster(null);
-        }}
-        master={editingMaster}
-        page={page}
-        onSaveMaster={async (updatedMaster) => {
-          updateGlobalComponentMaster(updatedMaster);
-        }}
-      />
     </div>
-  );
+  </EditorStateMemoryProvider>
+);
 }
 
 

@@ -150,9 +150,20 @@ export function LayersPanel({
 }: LayersPanelProps) {
   // Estado local como fallback se não for passado via prop
   const [localOpenIds, setLocalOpenIds] = useState<Set<string>>(new Set());
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
   const openIds = propOpenIds ?? localOpenIds;
   const setOpenIds = propSetOpenIds ?? setLocalOpenIds;
+
+  // Auto-scroll para o elemento selecionado no painel de camadas
+  React.useEffect(() => {
+    if (selectedId && panelRef.current) {
+      const activeEl = panelRef.current.querySelector('[data-selected="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedId]);
 
   // Estado de Arrastar e Soltar (Drag and Drop)
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
@@ -290,6 +301,7 @@ export function LayersPanel({
         {/* Item do Componente */}
         <div
           draggable
+          data-selected={isSelected ? 'true' : undefined}
           onDragStart={(e) => handleDragStart(e, comp.id, 'component')}
           onDragOver={(e) => handleDragOver(e, comp.id, isContainer)}
           onDragLeave={(e) => handleDragLeave(e, comp.id)}
@@ -297,7 +309,7 @@ export function LayersPanel({
           onClick={() => onSelectElement(comp.id, comp.type)}
           className={`relative p-1.5 rounded-lg border flex items-center justify-between text-xs transition-all cursor-pointer ${
             isSelected
-              ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10 font-semibold'
+              ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/15 font-bold ring-1 ring-[var(--brand-gradient-start)]/40 shadow-sm'
               : 'border-[var(--surface-border)] glass-sm hover:border-slate-400'
           } ${draggedItem?.id === comp.id ? 'opacity-40 border-dashed' : ''} ${
             dropPosition === 'inside' ? 'ring-2 ring-purple-500 bg-purple-500/10' : ''
@@ -331,9 +343,15 @@ export function LayersPanel({
 
             {getComponentIcon(comp.type)}
 
-            <span className="truncate text-slate-800 dark:text-slate-200 font-medium text-[11px]">
+            <span className={`truncate text-[11px] ${isSelected ? 'font-bold text-[var(--brand-gradient-start)]' : 'font-medium text-slate-800 dark:text-slate-200'}`}>
               {comp.label || getComponentTypeLabel(comp.type)}
             </span>
+
+            {isSelected && (
+              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-[var(--brand-gradient-start)] text-white shrink-0 shadow-xs">
+                Ativo
+              </span>
+            )}
           </div>
 
           {/* Ações do Componente */}
@@ -383,7 +401,7 @@ export function LayersPanel({
   const isAllOpen = allContainerIds.length > 0 && allContainerIds.every((id) => openIds.has(id));
 
   return (
-    <div className="p-3 space-y-2">
+    <div ref={panelRef} className="p-3 space-y-2">
       <div className="flex items-center justify-between px-2 pb-1">
         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
           Estrutura de Camadas (Layers)
@@ -422,6 +440,7 @@ export function LayersPanel({
               {/* Item da Seção (Nível 1) */}
               <div
                 draggable
+                data-selected={isSecSelected ? 'true' : undefined}
                 onDragStart={(e) => handleDragStart(e, sec.id, 'section', secIdx)}
                 onDragOver={(e) => handleDragOver(e, sec.id, true)}
                 onDragLeave={(e) => handleDragLeave(e, sec.id)}
@@ -429,7 +448,7 @@ export function LayersPanel({
                 onClick={() => onSelectElement(sec.id, 'section')}
                 className={`relative p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-xs ${
                   isSecSelected
-                    ? 'border-[var(--brand-gradient-start)] ring-1 ring-[var(--brand-gradient-start)]/30 glass-md font-bold'
+                    ? 'border-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/15 font-bold ring-2 ring-[var(--brand-gradient-start)]/40 shadow-sm'
                     : 'border-[var(--surface-border)] glass-sm hover:border-slate-400'
                 } ${draggedItem?.id === sec.id ? 'opacity-40 border-dashed' : ''} ${
                   dropPositionSec === 'inside' ? 'ring-2 ring-[var(--brand-gradient-start)] bg-[var(--brand-gradient-start)]/10' : ''
@@ -458,9 +477,14 @@ export function LayersPanel({
                   </button>
 
                   <Layout className="w-3.5 h-3.5 text-[var(--brand-gradient-start)] shrink-0" />
-                  <span className="truncate text-slate-800 dark:text-slate-200 font-semibold">
+                  <span className={`truncate ${isSecSelected ? 'font-bold text-[var(--brand-gradient-start)]' : 'font-semibold text-slate-800 dark:text-slate-200'}`}>
                     {sec.label || `Seção ${secIdx + 1}`}
                   </span>
+                  {isSecSelected && (
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-[var(--brand-gradient-start)] text-white shrink-0 shadow-xs">
+                      Ativo
+                    </span>
+                  )}
                 </div>
 
                 {/* Ações da Seção */}

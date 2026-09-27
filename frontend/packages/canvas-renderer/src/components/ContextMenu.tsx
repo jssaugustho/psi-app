@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Edit, Copy, Clipboard, Layers, Trash2, Paintbrush, Sparkles } from 'lucide-react';
 
 export interface ContextMenuState {
@@ -38,11 +38,15 @@ export function ContextMenu({
   canPaste,
   canPasteStyle = false,
 }: ContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!menuState.isOpen) return;
 
-    const handleOutsideClick = () => {
-      onClose();
+    const handleOutsideClick = (e: MouseEvent | PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,12 +81,14 @@ export function ContextMenu({
 
   return (
     <div
+      ref={menuRef}
       className="fixed z-[9999] pointer-events-auto w-48 py-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-2xl backdrop-blur-md text-xs font-sans select-none animate-in fade-in zoom-in-95 duration-100"
       style={{
         pointerEvents: 'auto',
         left: `${adjustedX}px`,
         top: `${adjustedY}px`,
       }}
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Opção 1: Editar */}

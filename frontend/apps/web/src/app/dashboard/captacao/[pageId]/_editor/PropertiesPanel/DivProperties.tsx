@@ -31,7 +31,8 @@ import { PaddingControl } from './components/PaddingControl';
 import { BorderControl } from './components/BorderControl';
 import { SliderNumberInput } from './components/SliderNumberInput';
 import { BackgroundControl } from './components/BackgroundControl';
-import { AccordionItem } from './components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from './components/AccordionSection';
+import { useSidebarScrollMemory } from '../context/EditorStateMemoryContext';
 import { TransformControl } from './components/TransformControl';
 import { TransitionControl } from './components/TransitionControl';
 import { PositioningControl } from './components/PositioningControl';
@@ -376,8 +377,11 @@ export function DivProperties({
     effectiveStyle.hoverTranslateY !== undefined ||
     effectiveStyle.hoverRotate !== undefined;
 
+  const { containerRef: divScrollRef, handleScroll: handleDivScroll } = useSidebarScrollMemory(`properties:element:${divComponent.id}`);
+
   return (
-    <div className="flex flex-col h-full text-xs select-none">
+    <AccordionScopeProvider scopeId={`element:${divComponent.id}`} typeFallback="type:div">
+      <div className="flex flex-col h-full text-xs select-none">
       {/* Header */}
       <div className="p-3 border-b border-[var(--surface-border)] flex items-center justify-between glass-sm shrink-0">
         <button
@@ -402,7 +406,7 @@ export function DivProperties({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
+      <div ref={divScrollRef} onScroll={handleDivScroll} className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
         {/* Top Metadata */}
         <div className="p-3 rounded-xl border border-[var(--surface-border)] glass-sm flex items-center justify-between">
           <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">Visibilidade</span>
@@ -688,5 +692,6 @@ export function DivProperties({
         </div>
       </div>
     </div>
+    </AccordionScopeProvider>
   );
 }

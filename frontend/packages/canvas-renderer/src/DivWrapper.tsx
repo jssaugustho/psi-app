@@ -5,7 +5,7 @@ import { DivComponent, ViewportMode, CanvasData } from './types';
 import { ComponentWrapper } from './ComponentWrapper';
 import { Trash2, Square, Plus, GripVertical } from 'lucide-react';
 import { getComponentHoverClasses, buildComponentCssStyle } from './utils/colorHelpers';
-import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from './constants';
+import { createDefaultDiv, createDefaultCarousel, createDefaultComponent, createDefaultGlobalInstance } from './constants';
 import { useScrollThreshold, getPositionStyles } from './utils/positionHelpers';
 import { useParallaxEffect } from './hooks/useParallaxEffect';
 import { useIsAdjustingProperty } from './utils/propertyAdjustHelpers';
@@ -127,6 +127,10 @@ export function DivWrapper({
           newComp = createDefaultDiv('Container (Div)');
         } else if (data.itemType === 'carousel') {
           newComp = createDefaultCarousel();
+        } else if (data.itemType === 'global_instance') {
+          const masterId = data.globalComponentId || data.preset;
+          const masterName = canvasData?.globalComponentsMap?.[masterId]?.name;
+          newComp = createDefaultGlobalInstance(masterId, masterName);
         } else {
           newComp = createDefaultComponent(data.itemType, data.preset);
         }

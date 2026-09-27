@@ -33,7 +33,8 @@
 9. **ALWAYS propagate `requestId`, `userId` and `sessionId` for End-to-End Tracing**:
    - Fastify injects a syntactic UUID `X-Request-ID` into every HTTP response (`request.raw.requestId`).
    - Repasse `requestId`, `userId` e `sessionId` em todas as mensagens publicadas no RabbitMQ para observabilidade total no worker.
-10. **NEVER bypass the database migration CLI (`db:migrate` & `db:version`)**:
+10. **NEVER bypass the database migration CLI (`db:migrate` & `db:version`) and NEVER edit executed migration files**:
+    - **IMUTABILIDADE ABSOLUTA DE MIGRAÇÕES EXECUTADAS**: NUNCA edite ou modifique um arquivo `.sql` de migração que já foi executado/aplicado no banco (registrado em `public.schema_migrations`). Qualquer nova alteração de schema, tabela, RPC ou trigger DEVE ser escrita em um NOVO arquivo de migração `.sql` (ex: `0025_...sql`). Modificar arquivos já executados corrompe a verificação de checksum SHA-256 e interrompe o pipeline de deploy/migração.
     - **VINCULAÇÃO À VERSÃO ATIVA**: Qualquer nova migração pertence à **versão ativa atual** (ex: `v1.0.1`) e é gravada com essa versão na tabela `public.schema_migrations`.
     - **RAIZ DE ./DRIZZLE**: Migrações em desenvolvimento ficam na raiz da pasta `./drizzle/`.
     - **ARQUIVAMENTO NO RELEASE**: Arquivos `.sql` só são movidos para subpastas de histórico (`./drizzle/migrations/vX.X.X/`) via `npm run db:version`.
@@ -69,6 +70,7 @@ Before executing tasks, read **ONLY** the specific context file relevant to your
 | MVP Discrepancies & Post-MVP Backlog | [.agents/backlog/01_mvp_discrepancies_and_technical_debt.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/backlog/01_mvp_discrepancies_and_technical_debt.md) | Technical debt, deferred refactorings, MVP gaps & Post-MVP roadmap |
 | Checklist Mestre do Editor & Formulários | [.agents/checklists/editor_e_formularios_checklist.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/checklists/editor_e_formularios_checklist.md) | Checklist mestre de auditoria e verificação de correções do criador/editor de páginas e formulários |
 | Guia de Criação de Elementos & Framework do Editor | [.agents/core/06_element_framework_and_creation_guide.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/core/06_element_framework_and_creation_guide.md) | Registro declarativo `ElementRegistry`, catálogo de propriedades, edição inline e adição de componentes |
+| Editor State Memory System (Accordions, Layers & Scroll) | [.agents/architectures/editor_state_memory.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/editor_state_memory.md) | Centralized state memory, scoped accordions (`scopeId`/`typeFallback`), `openLayerIds`, `useSidebarScrollMemory`, `sessionStorage` sync |
 
 ---
 

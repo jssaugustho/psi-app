@@ -733,6 +733,8 @@ export interface ButtonPresetStyle {
 }
 
 export interface CanvasGlobalStyles {
+  contentMaxWidth?: string;
+  containerMaxWidth?: string;
   typography?: {
     h1?: TypographyPresetStyle;
     h2?: TypographyPresetStyle;

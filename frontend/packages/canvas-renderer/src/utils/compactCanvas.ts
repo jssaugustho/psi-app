@@ -97,6 +97,21 @@ function compactComponent(comp: Component): Component {
     };
   }
 
+  if (comp.type === 'global_instance') {
+    const instance = comp as any;
+    return {
+      id: instance.id,
+      type: 'global_instance',
+      globalComponentId: instance.globalComponentId,
+      ...(instance.overrides && Object.keys(instance.overrides).length > 0 ? { overrides: instance.overrides } : {}),
+      ...(instance.layout ? { layout: instance.layout } : {}),
+      ...(instance.label ? { label: instance.label } : {}),
+      ...(instance.locked ? { locked: instance.locked } : {}),
+      ...(instance.hidden ? { hidden: instance.hidden } : {}),
+      ...(instance.mobile ? { mobile: instance.mobile } : {}),
+    } as Component;
+  }
+
   // Componente atômico
   const atomic = comp as AtomicComponent;
   const cleanedStyle = compactStyle(atomic.style) || {};
@@ -163,6 +178,7 @@ export function compactCanvasData(canvas: CanvasData): CanvasData {
     version: '2.0',
     ...(Object.keys(cleanedGlobalStyles).length > 0 ? { globalStyles: cleanedGlobalStyles } : {}),
     ...(canvas.navbar ? { navbar: canvas.navbar } : {}),
+    ...(canvas.globalComponentsMap && Object.keys(canvas.globalComponentsMap).length > 0 ? { globalComponentsMap: canvas.globalComponentsMap } : {}),
     sections,
   };
 }

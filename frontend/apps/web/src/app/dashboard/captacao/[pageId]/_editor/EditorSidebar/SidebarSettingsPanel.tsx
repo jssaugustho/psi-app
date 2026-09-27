@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { Palette, Type, Maximize2, Image as ImageIcon, Globe, Sliders, Plus } from 'lucide-react';
-import { AccordionItem } from '../PropertiesPanel/components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from '../PropertiesPanel/components/AccordionSection';
 import { GlobalColorPicker } from '../PropertiesPanel/components/GlobalColorPicker';
 import { GlobalTypographyPicker } from '../PropertiesPanel/components/GlobalTypographyPicker';
 import { SliderNumberInput } from '../PropertiesPanel/components/SliderNumberInput';
@@ -112,7 +112,8 @@ export function SidebarSettingsPanel({
   ];
 
   return (
-    <div className="p-3 space-y-3 custom-scrollbar overflow-y-auto">
+    <AccordionScopeProvider scopeId="panel:settings">
+      <div className="p-3 space-y-3 custom-scrollbar overflow-y-auto">
       {/* Indicator de Modo de Edição (Desktop vs Mobile) */}
       {isMobile && (
         <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1.5">
@@ -373,5 +374,6 @@ export function SidebarSettingsPanel({
         </div>
       </AccordionItem>
     </div>
-  );
+  </AccordionScopeProvider>
+);
 }

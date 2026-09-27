@@ -17,7 +17,7 @@ import {
   MousePointerClick,
   RotateCcw,
 } from 'lucide-react';
-import { AccordionItem } from '../PropertiesPanel/components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from '../PropertiesPanel/components/AccordionSection';
 import { GlobalColorPicker } from '../PropertiesPanel/components/GlobalColorPicker';
 import { GlobalTypographyPicker, TypographyPatch } from '../PropertiesPanel/components/GlobalTypographyPicker';
 import { ImageUploader } from '../components/ImageUploader';
@@ -208,7 +208,8 @@ export function NavbarPanel({ canvasData, page, onUpdateNavbar, onUpdateSiteConf
   };
 
   return (
-    <div className="p-4 space-y-4 text-xs select-none">
+    <AccordionScopeProvider scopeId="panel:navbar">
+      <div className="p-4 space-y-4 text-xs select-none">
       {/* Header do Painel de Configurações */}
       <div className="flex items-center gap-2.5 border-b border-[var(--surface-border)] pb-3">
         <div className="p-2 rounded-xl brand-accent text-white shadow-sm">
@@ -1425,5 +1426,6 @@ export function NavbarPanel({ canvasData, page, onUpdateNavbar, onUpdateSiteConf
         </div>
       </AccordionItem>
     </div>
-  );
+  </AccordionScopeProvider>
+);
 }

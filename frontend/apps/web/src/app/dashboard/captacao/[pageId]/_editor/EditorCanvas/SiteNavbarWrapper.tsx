@@ -270,7 +270,7 @@ export function SiteNavbarWrapper({
       <div
         className="flex items-center justify-between w-full mx-auto"
         style={{
-          maxWidth: page?.siteConfig?.theme?.contentMaxWidth || page?.siteConfig?.theme?.containerMaxWidth || '1200px',
+          maxWidth: page?.siteConfig?.containerMaxWidth || page?.siteConfig?.layoutWidth || page?.siteConfig?.theme?.contentMaxWidth || page?.siteConfig?.theme?.containerMaxWidth || '1200px',
         }}
       >
         {/* Logotipo da Navbar com altura customizada */}

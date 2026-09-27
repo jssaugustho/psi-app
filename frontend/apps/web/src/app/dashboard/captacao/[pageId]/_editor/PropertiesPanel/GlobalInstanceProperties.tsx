@@ -3,7 +3,7 @@
 import React from 'react';
 import { Sparkles, Unlink, Type, Image as ImageIcon, Link as LinkIcon, Palette, Edit } from 'lucide-react';
 import { GlobalInstanceComponent, GlobalComponentMaster, getDeepPropertyByPath } from '@psi/canvas-renderer';
-import { AccordionItem } from './components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from './components/AccordionSection';
 import { GlobalColorPicker } from './components/GlobalColorPicker';
 
 interface GlobalInstancePropertiesProps {
@@ -33,7 +33,8 @@ export function GlobalInstanceProperties({
   const customizableProps = globalMaster.customizableProps || [];
 
   return (
-    <div className="space-y-4 text-xs font-sans">
+    <AccordionScopeProvider scopeId={`element:${instance.id}`} typeFallback="type:global_instance">
+      <div className="space-y-4 text-xs font-sans">
       {/* Header Info Card */}
       <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-600/10 via-purple-500/5 to-indigo-600/10 border border-purple-500/30 space-y-3">
         <div className="flex items-center gap-2">
@@ -163,5 +164,6 @@ export function GlobalInstanceProperties({
         )}
       </AccordionItem>
     </div>
-  );
+  </AccordionScopeProvider>
+);
 }

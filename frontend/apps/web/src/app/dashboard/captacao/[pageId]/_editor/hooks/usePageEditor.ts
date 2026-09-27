@@ -29,6 +29,7 @@ import {
   addComponentBeforeOrAfter as addComponentBeforeOrAfterHelper,
   moveElementBeforeOrAfter as moveElementBeforeOrAfterHelper,
   pasteStyleToElementInCanvas,
+  unlinkGlobalInstanceInCanvas,
   normalizeCanvasData,
   denormalizeCanvasData,
   removeNodeCascadeInFlatCanvas,
@@ -47,6 +48,9 @@ export function usePageEditor(pageId: string) {
   const [page, setPage] = useState<CapturePage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modo de Edição de Elemento Global Master (In-Place UI)
+  const [editingMasterId, setEditingMasterId] = useState<string | null>(null);
 
   // Estados Visuais e de Navegação
   const [activeTab, setActiveTab] = useState<TabType>('layout');
@@ -74,7 +78,7 @@ export function usePageEditor(pageId: string) {
     return denormalizeCanvasData(normalizedCanvas);
   }, [normalizedCanvas]);
 
-  // Carrega página e migra schema para estado normalizado
+  // Carrega página e migra schema para estado normalizado (com busca de global_components do workspace)
   useEffect(() => {
     async function loadPage() {
       if (!pageId) return;
@@ -84,7 +88,18 @@ export function usePageEditor(pageId: string) {
         const fetchedPage = await api.getCapturePage(pageId);
         setPage(fetchedPage);
 
+        const workspaceId = fetchedPage.tenantId || (fetchedPage as any).workspaceId || (fetchedPage as any).workspace_id;
+        let dbGlobalMap: Record<string, GlobalComponentMaster> = {};
+        if (workspaceId) {
+          dbGlobalMap = await api.getGlobalComponents(workspaceId);
+        }
+
         const canvas = migrateLegacyCanvas(fetchedPage);
+        canvas.globalComponentsMap = {
+          ...(canvas.globalComponentsMap || {}),
+          ...dbGlobalMap,
+        };
+
         const normalized = normalizeCanvasData(canvas);
 
         setNormalizedCanvas(normalized);
@@ -532,9 +547,100 @@ export function usePageEditor(pageId: string) {
     }
   }, [pageId, canvasData, autoSave]);
 
+  // 🌐 MODO DE EDIÇÃO DE ELEMENTO GLOBAL MASTER (IN-PLACE UI)
+  const enterMasterEditing = useCallback(
+    (masterId: string) => {
+      setEditingMasterId(masterId);
+      const master = canvasData?.globalComponentsMap?.[masterId];
+      if (master && master.masterNode) {
+        setSelection({ id: master.masterNode.id, type: master.masterNode.type as any });
+      } else {
+        setSelection({ id: null, type: null });
+      }
+    },
+    [canvasData]
+  );
+
+  const exitMasterEditing = useCallback(() => {
+    setEditingMasterId(null);
+    setSelection({ id: null, type: null });
+  }, []);
+
+  // 🌐 CONVERTER NÓ DO CANVAS EM ELEMENTO GLOBAL MASTER (SEM MODAL POPUP)
+  const createGlobalFromElement = useCallback(
+    async (elementId: string) => {
+      if (!canvasData || !page) return;
+
+      const found = findElementInCanvas(canvasData, elementId);
+      if (!found || !found.element || found.element.type === 'section') return;
+
+      const targetComponent = found.element as Component;
+      const workspaceId = page.tenantId || (page as any).workspaceId || (page as any).workspace_id || '';
+
+      const masterId = crypto.randomUUID();
+      const rawName = targetComponent.label || (targetComponent as any).props?.text || (targetComponent as any).props?.title || targetComponent.type;
+      const cleanName = typeof rawName === 'string' ? rawName.slice(0, 30) : targetComponent.type;
+      const name = cleanName.toLowerCase().startsWith('global:') ? cleanName : `Global: ${cleanName}`;
+
+      const globalMaster: GlobalComponentMaster = {
+        id: masterId,
+        workspaceId,
+        name,
+        category: 'custom',
+        iconName: 'Sparkles',
+        masterNode: JSON.parse(JSON.stringify(targetComponent)),
+        customizableProps: [], // Por padrão nada é personalizável
+        updatedAt: new Date().toISOString(),
+      };
+
+      const newInstance: GlobalInstanceComponent = {
+        id: targetComponent.id,
+        type: 'global_instance',
+        globalComponentId: masterId,
+        overrides: {},
+        layout: (targetComponent as any).layout,
+      };
+
+      const currentMap = canvasData.globalComponentsMap || {};
+      const updatedMap = {
+        ...currentMap,
+        [globalMaster.id]: globalMaster,
+      };
+
+      const updatedCanvas = updateComponentHelper(canvasData, targetComponent.id, () => newInstance as any);
+
+      updateCanvasState(
+        {
+          ...updatedCanvas,
+          globalComponentsMap: updatedMap,
+        },
+        `Criou Elemento Global "${name}"`
+      );
+
+      selectElement(targetComponent.id, 'global_instance');
+
+      if (workspaceId) {
+        try {
+          await api.createGlobalComponent({
+            id: globalMaster.id,
+            workspaceId,
+            name: globalMaster.name,
+            category: globalMaster.category,
+            iconName: globalMaster.iconName,
+            masterNode: globalMaster.masterNode,
+            customizableProps: globalMaster.customizableProps,
+          });
+        } catch (err) {
+          console.error('❌ Erro ao persistir elemento global no banco:', err);
+        }
+      }
+    },
+    [canvasData, page, updateCanvasState, selectElement]
+  );
+
   // 🌐 ADICIONAR ELEMENTO GLOBAL MASTER E TRANSFORMAR EM INSTÂNCIA
   const addGlobalComponentMaster = useCallback(
-    (globalMaster: GlobalComponentMaster, newInstance: GlobalInstanceComponent) => {
+    async (globalMaster: GlobalComponentMaster, newInstance: GlobalInstanceComponent) => {
       if (!canvasData) return;
       const currentMap = canvasData.globalComponentsMap || {};
       const updatedMap = {
@@ -550,13 +656,27 @@ export function usePageEditor(pageId: string) {
         `Criou Elemento Global "${globalMaster.name}"`
       );
       selectElement(newInstance.id, 'global_instance');
+
+      try {
+        await api.createGlobalComponent({
+          id: globalMaster.id,
+          workspaceId: globalMaster.workspaceId,
+          name: globalMaster.name,
+          category: globalMaster.category,
+          iconName: globalMaster.iconName,
+          masterNode: globalMaster.masterNode,
+          customizableProps: globalMaster.customizableProps,
+        });
+      } catch (err) {
+        console.error('Erro ao persistir elemento global no banco:', err);
+      }
     },
     [canvasData, updateCanvasState, selectElement]
   );
 
   // 🌐 ATUALIZAR ELEMENTO GLOBAL MASTER
   const updateGlobalComponentMaster = useCallback(
-    (updatedMaster: GlobalComponentMaster) => {
+    async (updatedMaster: GlobalComponentMaster) => {
       if (!canvasData) return;
       const currentMap = canvasData.globalComponentsMap || {};
       const updatedMap = {
@@ -570,8 +690,99 @@ export function usePageEditor(pageId: string) {
         },
         `Atualizou Elemento Global Master "${updatedMaster.name}"`
       );
+
+      try {
+        await api.updateGlobalComponent(updatedMaster.id, {
+          name: updatedMaster.name,
+          category: updatedMaster.category,
+          masterNode: updatedMaster.masterNode,
+          customizableProps: updatedMaster.customizableProps,
+        });
+      } catch (err) {
+        console.error('Erro ao atualizar elemento global no banco:', err);
+      }
     },
     [canvasData, updateCanvasState]
+  );
+
+  // 🌐 LIBERAR OU REMOVER VARIÁVEL PERSONALIZÁVEL (+) NO MASTER
+  const toggleExposedProp = useCallback(
+    async (masterId: string, declaration: { path: string; nodeId: string; label: string; propKey: string; type: any; defaultValue?: any }) => {
+      if (!canvasData) return;
+      const master = canvasData.globalComponentsMap?.[masterId];
+      if (!master) return;
+
+      const currentProps = master.customizableProps || [];
+      const exists = currentProps.some((p) => p.path === declaration.path);
+      const updatedProps = exists
+        ? currentProps.filter((p) => p.path !== declaration.path)
+        : [...currentProps, declaration];
+
+      const updatedMaster: GlobalComponentMaster = {
+        ...master,
+        customizableProps: updatedProps,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updatedMap = {
+        ...(canvasData.globalComponentsMap || {}),
+        [masterId]: updatedMaster,
+      };
+
+      updateCanvasState(
+        {
+          ...canvasData,
+          globalComponentsMap: updatedMap,
+        },
+        exists ? `Removeu personalização da propriedade "${declaration.label}"` : `Liberou personalização para "${declaration.label}"`
+      );
+
+      try {
+        await api.updateGlobalComponent(masterId, { customizableProps: updatedProps });
+      } catch (err) {
+        console.error('Erro ao atualizar propriedade exposta no banco:', err);
+      }
+    },
+    [canvasData, updateCanvasState]
+  );
+
+  // 🌐 DELETAR ELEMENTO GLOBAL DO WORKSPACE
+  const deleteGlobalMaster = useCallback(
+    async (masterId: string) => {
+      if (!canvasData) return;
+      const currentMap = { ...(canvasData.globalComponentsMap || {}) };
+      delete currentMap[masterId];
+
+      updateCanvasState(
+        {
+          ...canvasData,
+          globalComponentsMap: currentMap,
+        },
+        'Excluiu Elemento Global'
+      );
+
+      if (editingMasterId === masterId) {
+        setEditingMasterId(null);
+      }
+
+      try {
+        await api.deleteGlobalComponent(masterId);
+      } catch (err) {
+        console.error('Erro ao excluir elemento global do banco:', err);
+      }
+    },
+    [canvasData, updateCanvasState, editingMasterId]
+  );
+
+  // 🌐 DESVINCULAR INSTÂNCIA GLOBAL (DETACH)
+  const unlinkInstance = useCallback(
+    (instanceId: string) => {
+      if (!canvasData) return;
+      const updatedCanvas = unlinkGlobalInstanceInCanvas(canvasData, instanceId, canvasData.globalComponentsMap);
+      updateCanvasState(updatedCanvas, 'Desvinculou Elemento Global (Detach)');
+      selectElement(null);
+    },
+    [canvasData, updateCanvasState, selectElement]
   );
 
   return {
@@ -588,6 +799,13 @@ export function usePageEditor(pageId: string) {
     selectElement,
     canvasData,
     normalizedCanvas,
+    editingMasterId,
+    editingMaster: editingMasterId ? canvasData?.globalComponentsMap?.[editingMasterId] || null : null,
+    enterMasterEditing,
+    exitMasterEditing,
+    toggleExposedProp,
+    deleteGlobalMaster,
+    unlinkInstance,
     updateNavbar,
     addSection,
     addCustomSection,
@@ -607,6 +825,7 @@ export function usePageEditor(pageId: string) {
     copiedElement,
     updateSiteConfig,
     updatePage,
+    createGlobalFromElement,
     addGlobalComponentMaster,
     updateGlobalComponentMaster,
     canUndo: history.canUndo,
@@ -625,3 +844,4 @@ export function usePageEditor(pageId: string) {
     isPublishing,
   };
 }
+

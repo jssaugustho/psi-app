@@ -402,7 +402,6 @@ function convertNavbarConfigToSection(nav: NavbarConfig): Section {
   headerSec.layout.paddingBottom = '16px';
   headerSec.layout.paddingLeft = '24px';
   headerSec.layout.paddingRight = '24px';
-  headerSec.layout.maxContentWidth = '1200px';
   headerSec.layout.position = 'sticky';
   headerSec.layout.verticalAnchor = 'top';
   headerSec.layout.verticalOffset = '0px';

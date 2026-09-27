@@ -1883,6 +1883,98 @@ export const api = {
       updatedAt: item.updated_at
     };
   },
+
+  getGlobalComponents: async (workspaceId: string): Promise<Record<string, any>> => {
+    try {
+      const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/global_components?workspace_id=eq.${workspaceId}&select=*`);
+      const map: Record<string, any> = {};
+      if (Array.isArray(res)) {
+        res.forEach((item) => {
+          map[item.id] = {
+            id: item.id,
+            workspaceId: item.workspace_id,
+            name: item.name,
+            category: item.category,
+            iconName: item.icon_name,
+            masterNode: item.master_node,
+            customizableProps: item.customizable_props || [],
+            createdAt: item.created_at,
+            updatedAt: item.updated_at,
+          };
+        });
+      }
+      return map;
+    } catch (err) {
+      console.warn('⚠️ Não foi possível carregar elementos globais do banco:', err);
+      return {};
+    }
+  },
+
+  createGlobalComponent: async (data: {
+    id?: string;
+    workspaceId: string;
+    name: string;
+    category?: string;
+    iconName?: string;
+    masterNode: any;
+    customizableProps?: any[];
+  }): Promise<any> => {
+    const dbBody = {
+      id: data.id,
+      workspace_id: data.workspaceId,
+      name: data.name,
+      category: data.category || 'custom',
+      icon_name: data.iconName || 'Sparkles',
+      master_node: data.masterNode,
+      customizable_props: data.customizableProps || [],
+    };
+    const res = await fetchApi<any[]>(`${PGRST_BASE_URL}/global_components`, {
+      method: 'POST',
+      body: JSON.stringify(dbBody),
+      headers: {
+        'Prefer': 'return=representation',
+      },
+    });
+    const item = Array.isArray(res) ? res[0] : res;
+    return {
+      id: item.id,
+      workspaceId: item.workspace_id,
+      name: item.name,
+      category: item.category,
+      iconName: item.icon_name,
+      masterNode: item.master_node,
+      customizableProps: item.customizable_props || [],
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  },
+
+  updateGlobalComponent: async (
+    id: string,
+    patch: {
+      name?: string;
+      category?: string;
+      masterNode?: any;
+      customizableProps?: any[];
+    }
+  ): Promise<void> => {
+    const dbBody: any = { updated_at: new Date().toISOString() };
+    if (patch.name !== undefined) dbBody.name = patch.name;
+    if (patch.category !== undefined) dbBody.category = patch.category;
+    if (patch.masterNode !== undefined) dbBody.master_node = patch.masterNode;
+    if (patch.customizableProps !== undefined) dbBody.customizable_props = patch.customizableProps;
+
+    await fetchApi(`${PGRST_BASE_URL}/global_components?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+    });
+  },
+
+  deleteGlobalComponent: async (id: string): Promise<void> => {
+    await fetchApi(`${PGRST_BASE_URL}/global_components?id=eq.${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export interface CapturePage {

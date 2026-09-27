@@ -47,7 +47,7 @@ export function useEditorKeyboardShortcuts({
         (target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
           target.isContentEditable ||
-          target.getAttribute('contenteditable') === 'true' ||
+          (typeof target.getAttribute === 'function' && target.getAttribute('contenteditable') === 'true') ||
           (typeof target.closest === 'function' && target.closest('[contenteditable="true"]') !== null));
 
       if (isEditingText) return;

@@ -1,0 +1,17 @@
+name: Deploy Automático no Servidor
+
+on:
+  push:
+    branches:
+      - main  # ou 'master', dependendo do nome da sua branch principal
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Atualizar arquivos e subir Docker Compose
+        run: |
+          cd /home/hector/Documents/Projects/psi-app
+          git pull origin main
+          docker compose up -d --build --remove-orphans

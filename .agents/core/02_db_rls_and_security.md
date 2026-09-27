@@ -7,6 +7,7 @@
 ## ⚡ 1. Directives & Constraints (ALWAYS / NEVER)
 
 - **ALWAYS use the CLI scripts `db:migrate` and `db:version`**: NUNCA crie arquivos `.sql` manualmente fora do CLI e NUNCA execute `drizzle-kit generate` avulso.
+- **NEVER edit or modify an executed `.sql` migration file**: Arquivos já registrados em `public.schema_migrations` possuem hash SHA-256 e são estritamente imutáveis. Toda alteração incremental (novas colunas, RPCs, RLS) DEVE ser feita em um NOVO arquivo de migração `.sql`.
 - **ALWAYS enable RLS on every public table**: Toda tabela criada em `public` deve conter `ALTER TABLE public.<table_name> ENABLE ROW LEVEL SECURITY;`.
 - **ALWAYS isolate tenant data by `workspace_id`**: As tabelas devem ter a coluna `workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE`.
 - **NEVER expose Service Keys to the Frontend**: Operações administrativas exigem backend Fastify ou Stored Functions com `SECURITY DEFINER`.
@@ -120,3 +121,17 @@ CREATE TABLE public.contacts (
 );
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 ```
+
+### ❌ ERRADO: Editar arquivo .sql já executado no banco
+```sql
+-- ❌ PROIBIDO: Modificar 0001_initial.sql ou 0024_add_table.sql que já rodou no banco
+-- Isso corrompe o checksum SHA-256 gravado na tabela public.schema_migrations e quebra o npm run db:migrate!
+ALTER TABLE public.users ADD COLUMN new_col text; -- adicionado dentro de arquivo antigo
+```
+
+### ✅ CORRETO: Criar um NOVO arquivo de migração .sql para novas alterações
+```sql
+-- ✅ SEGURO: Criar 0025_add_new_col.sql (ou via CLI db:migrate)
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS new_col text;
+```
+

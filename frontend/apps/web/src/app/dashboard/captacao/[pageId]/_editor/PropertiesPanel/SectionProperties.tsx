@@ -3,7 +3,7 @@
 import React from 'react';
 import { CanvasData, ComponentStyle, Section, ViewportMode } from '../types';
 import { Button, Input } from '@psi/ui';
-import { sanitizeUriSlug, getSectionDisplayName } from '@psi/canvas-renderer';
+import { sanitizeUriSlug, getSectionDisplayName, getGlobalContentMaxWidth } from '@psi/canvas-renderer';
 import {
   Trash2,
   ArrowLeft,
@@ -37,7 +37,8 @@ import { PaddingControl } from './components/PaddingControl';
 import { BorderControl } from './components/BorderControl';
 import { SliderNumberInput } from './components/SliderNumberInput';
 import { BackgroundControl } from './components/BackgroundControl';
-import { AccordionItem } from './components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from './components/AccordionSection';
+import { useSidebarScrollMemory } from '../context/EditorStateMemoryContext';
 import { TransformControl } from './components/TransformControl';
 import { TransitionControl } from './components/TransitionControl';
 import { PositioningControl } from './components/PositioningControl';
@@ -299,8 +300,11 @@ export function SectionProperties({
     effectiveStyle.hoverTranslateY !== undefined ||
     effectiveStyle.hoverRotate !== undefined;
 
+  const { containerRef: sectionScrollRef, handleScroll: handleSectionScroll } = useSidebarScrollMemory(`properties:element:${section.id}`);
+
   return (
-    <div className="flex flex-col h-full text-xs select-none">
+    <AccordionScopeProvider scopeId={`element:${section.id}`} typeFallback="type:section">
+      <div className="flex flex-col h-full text-xs select-none">
       {/* Top Header */}
       <div className="p-3 border-b border-[var(--surface-border)] flex items-center justify-between glass-sm shrink-0">
         <button
@@ -325,7 +329,7 @@ export function SectionProperties({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
+      <div ref={sectionScrollRef} onScroll={handleSectionScroll} className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
         {/* Identificação da Seção (Nome & Âncora de URI) */}
         <div className="p-3 rounded-xl border border-[var(--surface-border)] glass-sm space-y-3">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200 text-xs">
@@ -444,40 +448,23 @@ export function SectionProperties({
         >
           <div className="space-y-3 text-xs">
             {(() => {
-              const hasFullWidth = effectiveLayout.fullWidth !== false;
+              const globalMaxWidth = getGlobalContentMaxWidth(page, canvasData);
+
               return (
                 <>
-                  <div className="space-y-1.5 p-2.5 rounded-xl border border-[var(--surface-border)] glass-sm">
+                  <div className="space-y-1.5 p-3 rounded-xl border border-[var(--surface-border)] glass-sm">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                        Largura Total da Tela (Full Width)
+                        Largura do Conteúdo Interno
                       </label>
-                      <input
-                        type="checkbox"
-                        checked={hasFullWidth}
-                        onChange={(e) => handleLayoutChange('fullWidth', e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 accent-[var(--brand-gradient-start)] cursor-pointer"
-                      />
+                      <span className="text-[9px] font-mono font-bold text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20">
+                        Global ({globalMaxWidth})
+                      </span>
                     </div>
-                    <p className="text-[9px] text-slate-400 leading-tight">
-                      Quando ativado, o fundo da seção se estende por 100% da largura do navegador.
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Esta seção herda automaticamente a largura máxima do conteúdo definida nas Configurações Globais do Site.
                     </p>
                   </div>
-
-                  {!hasFullWidth && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Largura Máxima do Conteúdo</label>
-                      <SliderNumberInput
-                        value={effectiveLayout.maxContentWidth || '1200px'}
-                        onChange={(val) => handleLayoutChange('maxContentWidth', val)}
-                        min={600}
-                        max={1920}
-                        step={20}
-                        defaultUnit="px"
-                        unitOptions={['px', '%', 'vw']}
-                      />
-                    </div>
-                  )}
 
                   <SizeControl
                     width={effectiveLayout.width || '100%'}
@@ -719,7 +706,8 @@ export function SectionProperties({
             Excluir Seção e todos os filhos
           </Button>
         </div>
+        </div>
       </div>
-    </div>
+    </AccordionScopeProvider>
   );
 }

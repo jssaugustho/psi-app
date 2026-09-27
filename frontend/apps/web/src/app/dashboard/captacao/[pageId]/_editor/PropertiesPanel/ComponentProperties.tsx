@@ -25,7 +25,8 @@ import { PaddingControl } from './components/PaddingControl';
 import { BorderControl } from './components/BorderControl';
 import { GlobalColorPicker } from './components/GlobalColorPicker';
 import { ContentPropsPanel, hasContentProps } from './ContentPropsPanel';
-import { AccordionItem } from './components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from './components/AccordionSection';
+import { useSidebarScrollMemory } from '../context/EditorStateMemoryContext';
 import { TransformControl } from './components/TransformControl';
 import { TransitionControl } from './components/TransitionControl';
 import { FlexChildControl } from './components/FlexChildControl';
@@ -186,48 +187,66 @@ export function ComponentProperties({
 
   const handleStyleChange = (key: keyof ComponentStyle, value: any) => {
     if (isMobile) {
+      const updatedStyle = { ...(component.mobile?.style || {}) };
+      if (value === undefined) {
+        delete (updatedStyle as any)[key];
+      } else {
+        (updatedStyle as any)[key] = value;
+      }
       onUpdateComponent(component.id, {
         mobile: {
           ...(component.mobile || {}),
-          style: {
-            ...(component.mobile?.style || {}),
-            [key]: value,
-          },
+          style: updatedStyle,
         },
       });
     } else {
+      const updatedStyle = { ...style };
+      if (value === undefined) {
+        delete (updatedStyle as any)[key];
+      } else {
+        (updatedStyle as any)[key] = value;
+      }
       onUpdateComponent(component.id, {
-        style: {
-          ...style,
-          [key]: value,
-        },
+        style: updatedStyle,
       });
     }
   };
 
   const handleMultiStyleChange = (patch: Record<string, any>) => {
     if (isMobile) {
+      const updatedStyle = { ...(component.mobile?.style || style || {}) };
+      Object.entries(patch).forEach(([k, v]) => {
+        if (v === undefined) {
+          delete (updatedStyle as any)[k];
+        } else {
+          (updatedStyle as any)[k] = v;
+        }
+      });
       onUpdateComponent(component.id, {
         mobile: {
           ...(component.mobile || {}),
-          style: {
-            ...(component.mobile?.style || style || {}),
-            ...patch,
-          },
+          style: updatedStyle,
         },
       });
     } else {
+      const updatedStyle = { ...style };
+      Object.entries(patch).forEach(([k, v]) => {
+        if (v === undefined) {
+          delete (updatedStyle as any)[k];
+        } else {
+          (updatedStyle as any)[k] = v;
+        }
+      });
       onUpdateComponent(component.id, {
-        style: {
-          ...style,
-          ...patch,
-        },
+        style: updatedStyle,
       });
     }
   };
 
   const hoverStyleKeyMap: Record<string, string> = {
     backgroundColor: 'hoverBackgroundColor',
+    background: 'hoverBackground',
+    gradientString: 'hoverGradientString',
     color: 'hoverColor',
     textColor: 'hoverTextColor',
     titleColor: 'hoverTitleColor',
@@ -390,8 +409,11 @@ export function ComponentProperties({
     effectiveStyle.hoverTranslateY !== undefined ||
     effectiveStyle.hoverRotate !== undefined;
 
+  const { containerRef: compScrollRef, handleScroll: handleCompScroll } = useSidebarScrollMemory(`properties:element:${component.id}`);
+
   return (
-    <div className="flex flex-col h-full text-xs select-none">
+    <AccordionScopeProvider scopeId={`element:${component.id}`} typeFallback={`type:${component.type}`}>
+      <div className="flex flex-col h-full text-xs select-none">
       {/* Header */}
       <div className="p-3 border-b border-[var(--surface-border)] flex items-center justify-between glass-sm shrink-0">
         <button
@@ -429,7 +451,7 @@ export function ComponentProperties({
       </div>
 
       {/* Content scroll container */}
-      <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
+      <div ref={compScrollRef} onScroll={handleCompScroll} className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
         {/* Top Metadata */}
         <div className="p-3 rounded-xl border border-[var(--surface-border)] glass-sm flex items-center justify-between">
           <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">Visibilidade</span>
@@ -743,8 +765,15 @@ export function ComponentProperties({
               {/* Cor de Fundo / Preenchimento */}
               <GlobalColorPicker
                 label="Cor de Fundo / Preenchimento"
-                value={activeStyle.backgroundColor || ''}
-                onChange={(val) => handleSmartStyleChange('backgroundColor', val)}
+                value={activeStyle.backgroundColor || (activeStyle as any).background || (activeStyle as any).gradientString || ''}
+                onChange={(val) => {
+                  const isGradient = typeof val === 'string' && val.includes('gradient');
+                  handleSmartMultiStyleChange({
+                    backgroundColor: isGradient ? undefined : (val || undefined),
+                    background: isGradient ? val : (val || undefined),
+                    gradientString: isGradient ? val : undefined,
+                  });
+                }}
                 page={page}
               />
             </div>
@@ -836,5 +865,6 @@ export function ComponentProperties({
         </div>
       </div>
     </div>
+    </AccordionScopeProvider>
   );
 }

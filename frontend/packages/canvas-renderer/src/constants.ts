@@ -21,7 +21,6 @@ export const DEFAULT_SECTION_LAYOUT: SectionLayout = {
   justifyContent: 'flex-start',
   gap: '32px',
   minHeight: 'auto',
-  maxContentWidth: '1200px',
   fullWidth: false,
   paddingTop: '80px',
   paddingRight: '24px',
@@ -157,6 +156,16 @@ export function createDefaultCarousel(label: string = 'Galeria / Carrossel'): Ca
       width: '100%',
     },
     components: [slide1, slide2, slide3],
+  };
+}
+
+export function createDefaultGlobalInstance(globalComponentId: string, label?: string): GlobalInstanceComponent {
+  return {
+    id: crypto.randomUUID(),
+    type: 'global_instance',
+    globalComponentId,
+    overrides: {},
+    label: label || 'Instância Global',
   };
 }
 
@@ -606,15 +615,6 @@ export function createDefaultComponent(type: ComponentType | string, preset?: st
     default:
       throw new Error(`Tipo de componente desconhecido: ${type}`);
   }
-}
-
-export function createDefaultGlobalInstance(globalComponentId: string): GlobalInstanceComponent {
-  return {
-    id: crypto.randomUUID(),
-    type: 'global_instance',
-    globalComponentId,
-    overrides: {},
-  };
 }
 
 export function createHeaderSectionTemplate(preset: 'classic' | 'floating' | 'minimal' = 'classic'): Section {

@@ -29,7 +29,7 @@ import { useParallaxEffect } from './hooks/useParallaxEffect';
 import { useIsAdjustingProperty } from './utils/propertyAdjustHelpers';
 import { NavbarLinksWrapper } from './NavbarLinksWrapper';
 import { SocialLinksWrapper } from './SocialLinksWrapper';
-import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from './constants';
+import { createDefaultDiv, createDefaultCarousel, createDefaultComponent, createDefaultGlobalInstance } from './constants';
 
 function getLucideIcon(iconName?: string): React.ComponentType<any> | null {
   if (!iconName || iconName.toLowerCase() === 'none' || iconName.trim() === '') return null;
@@ -638,6 +638,9 @@ export function AtomicComponentWrapper({
           newComp = createDefaultDiv('Container (Div)');
         } else if (data.itemType === 'carousel') {
           newComp = createDefaultCarousel();
+        } else if (data.itemType === 'global_instance') {
+          const masterId = data.globalComponentId || data.preset;
+          newComp = createDefaultGlobalInstance(masterId);
         } else {
           newComp = createDefaultComponent(data.itemType, data.preset);
         }
@@ -981,9 +984,9 @@ export function AtomicComponentWrapper({
             !!effectiveProps.color;
 
           let computedBg =
+            effectiveStyle.backgroundColor ||
             (effectiveStyle as any).background ||
             (effectiveStyle as any).gradientString ||
-            effectiveStyle.backgroundColor ||
             buttonDefaults.gradientString ||
             buttonDefaults.backgroundColor ||
             defaultBg;

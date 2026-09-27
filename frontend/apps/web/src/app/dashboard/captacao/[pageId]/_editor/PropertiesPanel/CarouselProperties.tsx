@@ -28,7 +28,8 @@ import { BorderControl } from './components/BorderControl';
 import { SliderNumberInput } from './components/SliderNumberInput';
 import { GlobalColorPicker } from './components/GlobalColorPicker';
 import { BackgroundControl } from './components/BackgroundControl';
-import { AccordionItem } from './components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from './components/AccordionSection';
+import { useSidebarScrollMemory } from '../context/EditorStateMemoryContext';
 import { createDefaultDiv } from '../constants';
 
 interface CarouselPropertiesProps {
@@ -250,8 +251,11 @@ export function CarouselProperties({
     onRemoveComponent(carouselComponent.id);
   };
 
+  const { containerRef: carouselScrollRef, handleScroll: handleCarouselScroll } = useSidebarScrollMemory(`properties:element:${carouselComponent.id}`);
+
   return (
-    <div className="flex flex-col h-full text-xs select-none">
+    <AccordionScopeProvider scopeId={`element:${carouselComponent.id}`} typeFallback="type:carousel">
+      <div className="flex flex-col h-full text-xs select-none">
       {/* Header do Painel */}
       <div className="p-3 border-b border-[var(--surface-border)] flex items-center justify-between glass-sm shrink-0">
         <button
@@ -277,7 +281,7 @@ export function CarouselProperties({
       </div>
 
       {/* Conteúdo Scrollável com Accordions */}
-      <div className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
+      <div ref={carouselScrollRef} onScroll={handleCarouselScroll} className="flex-1 p-3 space-y-3 overflow-y-auto custom-scrollbar">
         {/* Top Metadata & Adicionar Slide rápido */}
         <div className="p-3 rounded-xl border border-[var(--surface-border)] glass-sm space-y-3">
           <div className="flex items-center justify-between">
@@ -695,5 +699,6 @@ export function CarouselProperties({
         </div>
       </div>
     </div>
+    </AccordionScopeProvider>
   );
 }

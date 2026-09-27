@@ -33,6 +33,19 @@ Leia este arquivo quando trabalhar em:
    - Para botões (`button`) com texto em gradiente, o fundo preenchido do botão é mantido na tag `<button>`, enquanto o gradiente é aplicado exclusivamente na `span` interna do texto (`InlineEditableText`), mantendo os ícones e o fundo do botão visíveis.
 4. **ALWAYS resolve flat border colors via `resolveBorderColor`**:
    - Propriedades de borda (`borderColor`) aceitam apenas cores sólidas, variáveis CSS ou `transparent`. Se uma string de gradiente for atribuída à borda, a função `resolveBorderColor` extrai a primeira parada de cor (`stops[0]`), prevenindo bordas transparentes ou sintaxe CSS inválida.
+5. **ALWAYS enforce 100% parent container flex alignment control**:
+   - Todo alinhamento dos elementos filhos (textos, botões, selos, imagens) é ditado 100% pela propriedade `alignItems` do container pai.
+   - **NEVER** utilizar `alignSelf` nos elementos filhos para sobrescrever o container pai. A propriedade `alignSelf` foi eliminada dos wrappers e purgada do banco via script de migração.
+6. **ALWAYS compute auto-width containers (`width: 'auto' | 'fit-content'`) to shrink-wrap content**:
+   - Containers Div configurados com `width: 'auto'` ou `'fit-content'` (ex: Selo/Badge) utilizam `width: fit-content`, `flexGrow: 0` e `w-auto max-w-full`. Isso permite que o container pai com `alignItems: 'center'` centralize selos e badges perfeitamente sem forçar a expansão para 100% da largura.
+7. **ALWAYS enforce `box-sizing: border-box !important` across all canvas elements**:
+   - Todos os elementos dentro do iframe do editor (`CanvasIframePortal.tsx`) e nos sites publicados usam `box-sizing: border-box`, garantindo previsibilidade absoluta de layouts sem estourar margens.
+8. **ALWAYS forward iframe keyboard events via synthetic `keydown` event bridge**:
+   - `CanvasIframePortal.tsx` registra um listener `keydown` no documento do iframe e repassa eventos de teclado para `win.parent` quando o usuário não está editando texto inline, garantindo que os atalhos do editor (`Escape`, `Ctrl+S`, `Ctrl+Z`, `Ctrl+Y`, `Ctrl+C`, `Ctrl+V`, `Ctrl+Shift+V`, `Ctrl+X`, `Ctrl+D`, `Delete`/`Backspace`) funcionem perfeitamente.
+9. **ALWAYS re-evaluate hovered elements dynamically during canvas scroll**:
+   - `CanvasIframePortal.tsx` armazena as últimas coordenadas do cursor (`lastClientX`, `lastClientY`) em eventos `mousemove` e, durante a rolagem do canvas (`handleScroll`), recalcula o elemento sob o ponteiro utilizando `doc.elementFromPoint(lastClientX, lastClientY)` em `requestAnimationFrame`, mantendo os destaques de hover e badges sincronizados em tempo real sem exigir movimento físico do mouse.
+10. **ALWAYS inherit section content maximum width from global site configuration (`getGlobalContentMaxWidth`)**:
+    - Todas as seções do site herdam 100% a largura máxima do conteúdo a partir das Configurações Globais do Site (`containerMaxWidth` / `layoutWidth`). Não existem seletores ou substituições de largura máxima no nível individual das seções.
 
 ---
 

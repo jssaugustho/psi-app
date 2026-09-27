@@ -7,6 +7,7 @@ import { CanvasRenderer as SharedCanvasRenderer, CanvasData, ViewportMode } from
 export interface CanvasIframePortalProps {
   canvasData: CanvasData | null;
   viewportMode: ViewportMode;
+  selectedId?: string | null;
   page?: any;
   isPublicView?: boolean;
 }
@@ -18,10 +19,17 @@ export interface CanvasIframePortalRef {
 }
 
 export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframePortalProps>(
-  ({ canvasData, viewportMode, page, isPublicView = false }, ref) => {
+  ({ canvasData, viewportMode, selectedId, page, isPublicView = false }, ref) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
     const [iframeDoc, setIframeDoc] = useState<Document | null>(null);
+    const selectedIdRef = useRef<string | null>(selectedId || null);
+    const lastClickedNodeIdRef = useRef<string | null>(null);
+    const lastClickedTimeRef = useRef<number>(0);
+
+    useEffect(() => {
+      selectedIdRef.current = selectedId || null;
+    }, [selectedId]);
 
     useImperativeHandle(ref, () => ({
       iframeEl: iframeRef.current,
@@ -39,6 +47,22 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
         resetStyle.setAttribute('data-box-sizing-reset', 'true');
         resetStyle.textContent = '*, *::before, *::after { box-sizing: border-box !important; }';
         doc.head.appendChild(resetStyle);
+      }
+
+      // Injeta estilos globais de edição inline e cursor de texto
+      if (!doc.head.querySelector('[data-editing-reset]')) {
+        const editingStyle = doc.createElement('style');
+        editingStyle.setAttribute('data-editing-reset', 'true');
+        editingStyle.textContent = `
+          [contenteditable="true"] {
+            outline: 2px dashed #9333ea !important;
+            outline-offset: 2px !important;
+            cursor: text !important;
+            caret-color: #9333ea !important;
+            -webkit-text-fill-color: initial !important;
+          }
+        `;
+        doc.head.appendChild(editingStyle);
       }
 
       // Injeta estilos das tags <style> e <link rel="stylesheet"> do pai
@@ -102,7 +126,7 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
           setMountNode(doc.body);
 
           // Helper de ativação da edição inline de texto
-          const activateInlineTextEdit = (el: HTMLElement, nodeId: string) => {
+          const activateInlineTextEdit = (el: HTMLElement, nodeId: string, clickEv?: MouseEvent) => {
             let textContainer: HTMLElement = el;
             const textChild = el.querySelector('h1, h2, h3, h4, h5, h6, p, span, a, button, label');
             if (textChild && textChild instanceof HTMLElement) {
@@ -116,16 +140,51 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
             textContainer.style.outline = '2px dashed #9333ea';
             textContainer.style.outlineOffset = '2px';
             textContainer.style.cursor = 'text';
+            textContainer.style.caretColor = '#9333ea';
+
+            const origWebkitFill = textContainer.style.webkitTextFillColor;
+            if (
+              win.getComputedStyle(textContainer).webkitTextFillColor === 'rgba(0, 0, 0, 0)' ||
+              win.getComputedStyle(textContainer).color === 'rgba(0, 0, 0, 0)'
+            ) {
+              textContainer.style.webkitTextFillColor = 'initial';
+            }
 
             textContainer.focus();
 
-            try {
-              const range = doc.createRange();
-              range.selectNodeContents(textContainer);
-              const sel = win.getSelection();
-              sel?.removeAllRanges();
-              sel?.addRange(range);
-            } catch (_) {}
+            // Posiciona o cursor de texto exatamente onde o usuário clicou (ou no final)
+            const placeCaret = () => {
+              try {
+                const sel = win.getSelection();
+                if (!sel) return;
+
+                let range: Range | null = null;
+
+                if (clickEv && typeof doc.caretRangeFromPoint === 'function') {
+                  range = doc.caretRangeFromPoint(clickEv.clientX, clickEv.clientY);
+                } else if (clickEv && (doc as any).caretPositionFromPoint) {
+                  const pos = (doc as any).caretPositionFromPoint(clickEv.clientX, clickEv.clientY);
+                  if (pos) {
+                    range = doc.createRange();
+                    range.setStart(pos.offsetNode, pos.offset);
+                    range.collapse(true);
+                  }
+                }
+
+                if (!range) {
+                  range = doc.createRange();
+                  range.selectNodeContents(textContainer);
+                  range.collapse(false);
+                }
+
+                sel.removeAllRanges();
+                sel.addRange(range);
+              } catch (_) {}
+            };
+
+            placeCaret();
+            requestAnimationFrame(placeCaret);
+            setTimeout(placeCaret, 20);
 
             const handlePaste = (pe: ClipboardEvent) => {
               pe.preventDefault();
@@ -153,6 +212,8 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
               textContainer.style.outline = '';
               textContainer.style.outlineOffset = '';
               textContainer.style.cursor = '';
+              textContainer.style.caretColor = '';
+              textContainer.style.webkitTextFillColor = origWebkitFill || '';
 
               textContainer.removeEventListener('paste', handlePaste);
               textContainer.removeEventListener('keydown', handleKeyDown);
@@ -206,35 +267,101 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
           doc.removeEventListener('click', handlePreventNavigation, true);
           doc.addEventListener('click', handlePreventNavigation, true);
 
-          // 2. Duplo Clique para Ativar Edição Inline de Texto
-          const handleDblClick = (e: MouseEvent) => {
+          const getResolvedNodeFromTarget = (target: HTMLElement | null) => {
+            if (!target) return { nodeId: null, type: null, isGlobalInstance: false };
+
+            const globalInstanceEl = target.closest('[data-is-global-instance="true"], [data-node-type="global_instance"]') as HTMLElement | null;
+            if (globalInstanceEl) {
+              const nodeId = globalInstanceEl.getAttribute('data-node-id');
+              if (nodeId) {
+                return { nodeId, type: 'global_instance', isGlobalInstance: true };
+              }
+            }
+
+            const closest = target.closest('[data-node-id]') as HTMLElement | null;
+            if (!closest) return { nodeId: null, type: null, isGlobalInstance: false };
+
+            const nodeId = closest.getAttribute('data-node-id');
+            const type = closest.getAttribute('data-node-type') || closest.tagName.toLowerCase();
+            return { nodeId, type, isGlobalInstance: false };
+          };
+
+          // 2. Mousedown: Ativa a edição de texto inline IMEDIATAMENTE no mousedown para capturar o ponto exato do clique
+          const handleMouseDown = (e: MouseEvent) => {
+            if (e.button !== 0) return;
             const target = e.target as HTMLElement | null;
+            const resolved = getResolvedNodeFromTarget(target);
+            if (!resolved.nodeId || resolved.isGlobalInstance) return;
+
             const closest = target?.closest('[data-node-id]') as HTMLElement | null;
             if (!closest) return;
-            const nodeId = closest.getAttribute('data-node-id');
-            if (nodeId) {
-              activateInlineTextEdit(closest, nodeId);
+
+            const textChild = closest.querySelector('h1, h2, h3, h4, h5, h6, p, span, a, button, label') || (
+              ['H1','H2','H3','H4','H5','H6','P','SPAN','A','BUTTON','LABEL'].includes(closest.tagName) ? closest : null
+            );
+
+            if (textChild && textChild instanceof HTMLElement && !textChild.isContentEditable) {
+              activateInlineTextEdit(closest, resolved.nodeId, e);
+            }
+          };
+
+          doc.removeEventListener('mousedown', handleMouseDown);
+          doc.addEventListener('mousedown', handleMouseDown);
+
+          // 3. Duplo Clique para Ativar Edição Inline de Texto (Fallback)
+          const handleDblClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement | null;
+            const resolved = getResolvedNodeFromTarget(target);
+            if (!resolved.nodeId || resolved.isGlobalInstance) return;
+
+            const closest = target?.closest('[data-node-id]') as HTMLElement | null;
+            if (closest) {
+              activateInlineTextEdit(closest, resolved.nodeId, e);
             }
           };
 
           doc.removeEventListener('dblclick', handleDblClick);
           doc.addEventListener('dblclick', handleDblClick);
 
-          // 2. Telemetria de Hover (MouseMove / MouseLeave)
-          const handleMouseMove = (e: MouseEvent) => {
-            const target = e.target as HTMLElement | null;
-            const closest = target?.closest('[data-node-id]');
-            const nodeId = closest?.getAttribute('data-node-id') || null;
+          // 2. Telemetria de Hover (MouseMove / MouseLeave / Scroll sync)
+          let lastClientX: number | null = null;
+          let lastClientY: number | null = null;
+          let hoverScrollRafId: number | null = null;
+
+          const updateHoverFromPoint = (x: number, y: number) => {
+            if (!doc) return;
+            const target = doc.elementFromPoint(x, y) as HTMLElement | null;
+            const resolved = getResolvedNodeFromTarget(target);
             win.parent.postMessage(
               {
                 type: 'CANVAS_ELEMENT_HOVERED',
-                payload: { nodeId },
+                payload: { nodeId: resolved.nodeId },
+              },
+              '*'
+            );
+          };
+
+          const handleMouseMove = (e: MouseEvent) => {
+            lastClientX = e.clientX;
+            lastClientY = e.clientY;
+            const target = e.target as HTMLElement | null;
+            const resolved = getResolvedNodeFromTarget(target);
+            win.parent.postMessage(
+              {
+                type: 'CANVAS_ELEMENT_HOVERED',
+                payload: { nodeId: resolved.nodeId },
               },
               '*'
             );
           };
 
           const handleMouseLeave = () => {
+            lastClientX = null;
+            lastClientY = null;
+            if (hoverScrollRafId !== null) {
+              win.cancelAnimationFrame(hoverScrollRafId);
+              hoverScrollRafId = null;
+            }
             win.parent.postMessage(
               {
                 type: 'CANVAS_ELEMENT_HOVERED',
@@ -249,20 +376,33 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
           doc.removeEventListener('mouseleave', handleMouseLeave);
           doc.addEventListener('mouseleave', handleMouseLeave, { passive: true });
 
-          // 3. Telemetria de Clique / Seleção de Elemento
+          // 3. Telemetria de Clique / Seleção de Elemento (Ativa seleção E edição de texto no 1º clique)
           const handleClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement | null;
-            const closest = target?.closest('[data-node-id]');
-            const nodeId = closest?.getAttribute('data-node-id') || null;
-            const type = closest?.tagName.toLowerCase() || null;
+            const resolved = getResolvedNodeFromTarget(target);
 
-            win.parent.postMessage(
-              {
-                type: 'CANVAS_ELEMENT_CLICKED',
-                payload: { nodeId, type },
-              },
-              '*'
-            );
+            if (resolved.nodeId) {
+              win.parent.postMessage(
+                {
+                  type: 'CANVAS_ELEMENT_CLICKED',
+                  payload: { nodeId: resolved.nodeId, type: resolved.type },
+                },
+                '*'
+              );
+
+              if (!resolved.isGlobalInstance) {
+                const closest = target?.closest('[data-node-id]') as HTMLElement | null;
+                if (closest) {
+                  const textChild = closest.querySelector('h1, h2, h3, h4, h5, h6, p, span, a, button, label') || (
+                    ['H1','H2','H3','H4','H5','H6','P','SPAN','A','BUTTON','LABEL'].includes(closest.tagName) ? closest : null
+                  );
+
+                  if (textChild && textChild instanceof HTMLElement && !textChild.isContentEditable) {
+                    activateInlineTextEdit(closest, resolved.nodeId, e);
+                  }
+                }
+              }
+            }
           };
 
           doc.removeEventListener('click', handleClick);
@@ -273,9 +413,7 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
             e.preventDefault();
             e.stopPropagation();
             const target = e.target as HTMLElement | null;
-            const closest = target?.closest('[data-node-id]');
-            const nodeId = closest?.getAttribute('data-node-id') || null;
-            const type = closest?.tagName.toLowerCase() || null;
+            const resolved = getResolvedNodeFromTarget(target);
 
             const iframeRect = iframe.getBoundingClientRect();
             const x = e.clientX + iframeRect.left;
@@ -284,7 +422,7 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
             win.parent.postMessage(
               {
                 type: 'CANVAS_CONTEXT_MENU',
-                payload: { nodeId, type, x, y },
+                payload: { nodeId: resolved.nodeId, type: resolved.type, x, y },
               },
               '*'
             );
@@ -559,6 +697,18 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
               },
               '*'
             );
+
+            if (lastClientX !== null && lastClientY !== null) {
+              if (hoverScrollRafId !== null) {
+                win.cancelAnimationFrame(hoverScrollRafId);
+              }
+              const cx = lastClientX;
+              const cy = lastClientY;
+              hoverScrollRafId = win.requestAnimationFrame(() => {
+                hoverScrollRafId = null;
+                updateHoverFromPoint(cx, cy);
+              });
+            }
           };
 
           win.removeEventListener('scroll', handleScroll);
@@ -603,7 +753,7 @@ export const CanvasIframePortal = forwardRef<CanvasIframePortalRef, CanvasIframe
               (target.tagName === 'INPUT' ||
                 target.tagName === 'TEXTAREA' ||
                 target.isContentEditable ||
-                target.getAttribute('contenteditable') === 'true' ||
+                (typeof target.getAttribute === 'function' && target.getAttribute('contenteditable') === 'true') ||
                 (typeof target.closest === 'function' && target.closest('[contenteditable="true"]') !== null));
 
             if (isEditingText) return;

@@ -36,6 +36,14 @@
     - Instead of full tree object snapshots, `useEditorHistory.ts` records `patches` and `inversePatches` with a max ceiling of `MAX_HISTORY = 50`.
 13. **ALWAYS batch continuous slider/drag transactions until `onPointerUp`**:
     - During continuous property adjustments (`isAdjusting === true` via `useIsAdjustingProperty`), visual mutations render in real time while consolidating **exactly 1 single patch delta** into the history stack when the gesture completes.
+14. **ALWAYS enforce 100% parent container alignment control (`alignItems`) & pure CSS Flexbox**:
+    - Container `alignItems` governs 100% of child element alignment. `alignSelf` overrides are eliminated across default component models, wrappers (`DivWrapper`, `AtomicComponentWrapper`), and database JSON schemas.
+15. **ALWAYS enforce `box-sizing: border-box !important` across all canvas elements & app reset**:
+    - Universal reset enforced globally in `globals.css` (`web`, `sites`, `admin`) and injected into the `<head>` of `CanvasIframePortal.tsx`.
+16. **ALWAYS use 0-slider compact spacing controls & iframe keydown event bridge**:
+    - Espaçamentos (Padding e Margem) usam grid compacto em 4 colunas sem sliders de faixa, com digitação numérica, rolagem de scroll, seletor de unidade e sincronização. O iframe redireciona eventos de teclado para `window.parent` garantindo atalhos universais (`Escape`, `Ctrl+S`, `Ctrl+Z`, `Ctrl+Y`, `Ctrl+C`, `Ctrl+V`, `Ctrl+Shift+V`, `Ctrl+X`, `Ctrl+D`, `Delete`/`Backspace`).
+17. **ALWAYS maintain persistent 3-tab sidebar navigation (`EditorSidebar`) regardless of element selection**:
+    - The sidebar tab header (`Propriedades` / `+ Adicionar`, `Camadas`, `Configurações`) remains permanently visible. Selecting an element preserves `selectedId` and updates the active highlight in `LayersPanel` while allowing full navigation across tabs without deselecting. The first tab integrates `<PropertiesPanel>` when an element is active and returns to `<AddPalette>` when deselected.
 
 ---
 
@@ -48,6 +56,7 @@
 | **Staging, Publicação & Domínios** | [.agents/site_editor/03_staging_publishing_and_domains.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/03_staging_publishing_and_domains.md) | `draft_data` vs `canvas_data`, RPC `publish_capture_page`, subdomínios Cloudflare e Nginx wildcard. |
 | **Herança do Wizard & Identidade** | [.agents/site_editor/04_wizard_inheritance_and_bootstrapping.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/04_wizard_inheritance_and_bootstrapping.md) | RPC `bootstrap_workspace`, variáveis `{{psychologist_name}}`, `{{crp}}` e variáveis CSS do tema. |
 | **Catálogo de Elementos & Templates** | [.agents/site_editor/05_elements_and_templates_catalog.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/site_editor/05_elements_and_templates_catalog.md) | 17 Elementos Atômicos, construtores `createDefault*`, templates de página (Navbar, Hero, FAQ) e CTAs. |
+| **Memória de Estado (Accordions, Layers & Scroll)** | [.agents/architectures/editor_state_memory.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/editor_state_memory.md) | `EditorStateMemoryContext`, escopos de acordeões (`element:<id>` / `type:*`), estado `openLayerIds`, `useSidebarScrollMemory` e sincronização via `sessionStorage`. |
 
 ---
 

@@ -12,6 +12,7 @@ import {
   createDefaultDiv,
   createDefaultCarousel,
   createDefaultComponent,
+  createDefaultGlobalInstance,
   isDescendantOf,
 } from '@psi/canvas-renderer';
 import {
@@ -130,6 +131,9 @@ export function CanvasOverlay({
         const nodeId = el.getAttribute('data-node-id');
         const isContainer = el.getAttribute('data-is-container') === 'true';
         if (!nodeId) return;
+
+        const isInsideGlobalInstance = !!el.parentElement?.closest('[data-is-global-instance="true"], [data-node-type="global_instance"]');
+        if (isInsideGlobalInstance) return;
 
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
@@ -265,6 +269,10 @@ export function CanvasOverlay({
               newComp = createDefaultDiv('Container (Div)');
             } else if (data.itemType === 'carousel') {
               newComp = createDefaultCarousel();
+            } else if (data.itemType === 'global_instance') {
+              const masterId = data.globalComponentId || data.preset;
+              const masterName = canvasData?.globalComponentsMap?.[masterId]?.name;
+              newComp = createDefaultGlobalInstance(masterId, masterName);
             } else {
               newComp = createDefaultComponent(data.itemType, data.preset);
             }
@@ -665,25 +673,32 @@ export function CanvasOverlay({
       </div>
 
       {/* 4. MENU DE CONTEXTO FLUTUANTE (BOTÃO DIREITO NO PARENT) */}
-      <ContextMenu
-        menuState={contextMenu}
-        onClose={() => setContextMenu((prev: ContextMenuState) => ({ ...prev, isOpen: false }))}
-        onEdit={(id: string) => onSelectElement(id)}
-        onDuplicate={(id: string) => onDuplicateElement && onDuplicateElement(id)}
-        onCopy={(id: string) => onCopyElement && onCopyElement(id)}
-        onPaste={(id: string) => onPasteElement && onPasteElement(id)}
-        onPasteStyle={(id: string) => onPasteStyleElement && onPasteStyleElement(id)}
-        onSaveAsGlobal={onSaveAsGlobal}
-        onDelete={(id: string, type: any) => {
-          if (type === 'section') {
-            onRemoveSection(id);
-          } else {
-            onRemoveComponent(id);
-          }
-        }}
-        canPaste={canPaste}
-        canPasteStyle={!!copiedElement}
-      />
+      {(() => {
+        const targetElement = contextMenu.targetId && canvasData ? findElementInCanvas(canvasData, contextMenu.targetId)?.element : null;
+        const isStyleMatch = !!copiedElement && !!targetElement && copiedElement.type === targetElement.type;
+
+        return (
+          <ContextMenu
+            menuState={contextMenu}
+            onClose={() => setContextMenu((prev: ContextMenuState) => ({ ...prev, isOpen: false }))}
+            onEdit={(id: string, type: any) => onSelectElement(id, type)}
+            onDuplicate={(id: string) => onDuplicateElement && onDuplicateElement(id)}
+            onCopy={(id: string) => onCopyElement && onCopyElement(id)}
+            onPaste={(id: string) => onPasteElement && onPasteElement(id)}
+            onPasteStyle={(id: string) => onPasteStyleElement && onPasteStyleElement(id)}
+            onSaveAsGlobal={onSaveAsGlobal}
+            onDelete={(id: string, type: any) => {
+              if (type === 'section') {
+                onRemoveSection(id);
+              } else {
+                onRemoveComponent(id);
+              }
+            }}
+            canPaste={canPaste}
+            canPasteStyle={isStyleMatch}
+          />
+        );
+      })()}
     </div>
   );
 }

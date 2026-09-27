@@ -181,6 +181,7 @@ export function CanvasRenderer({
               onHover={handleHover}
               viewportMode={viewportMode}
               page={page}
+              canvasData={denormalizedCanvasData}
               onSelect={onSelectElement}
               onRemoveSection={onRemoveSection}
               onRemoveComponent={onRemoveComponent}

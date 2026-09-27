@@ -54,6 +54,10 @@ export function ComponentWrapper({
 
     return (
       <div
+        data-node-id={instance.id}
+        data-node-type="global_instance"
+        data-is-global-instance="true"
+        data-global-master-id={instance.globalComponentId}
         className={`relative transition-all duration-150 ${
           isInstanceSelected ? 'outline outline-2 outline-purple-500 dark:outline-purple-400 -outline-offset-2 rounded-lg shadow-lg shadow-purple-500/10' : ''
         }`}

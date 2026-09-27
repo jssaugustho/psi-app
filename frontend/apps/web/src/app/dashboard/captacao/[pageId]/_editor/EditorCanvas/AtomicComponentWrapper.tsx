@@ -777,8 +777,11 @@ export function AtomicComponentWrapper({
         {component.type === 'button' && (() => {
           const buttonDefaults = getThemeButtonDefaults(page, effectiveProps.templateId || effectiveProps.buttonTemplateId);
           const typo = getTypographyStyle('buttons');
-          const legacyDefaultBg = 'linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end))';
-          const hasCustomBg = !!effectiveStyle.backgroundColor && effectiveStyle.backgroundColor !== legacyDefaultBg;
+          const customStyleBg =
+            effectiveStyle.backgroundColor ||
+            (effectiveStyle as any).background ||
+            (effectiveStyle as any).gradientString;
+          const hasCustomBg = !!customStyleBg;
           const hasCustomColor =
             (!!effectiveStyle.color && effectiveStyle.color !== 'var(--brand-contrast-color)') ||
             !!effectiveProps.textColor ||
@@ -791,14 +794,14 @@ export function AtomicComponentWrapper({
 
           let computedBg = buttonDefaults.gradientString || 'linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end))';
           let computedColor =
-            effectiveStyle.color ||
             effectiveProps.textColor ||
             effectiveProps.color ||
+            effectiveStyle.color ||
             ((buttonDefaults.color && buttonDefaults.color !== '#000000' && buttonDefaults.color !== '#18181B') ? buttonDefaults.color : (contrast || 'var(--brand-contrast-color)'));
           let computedBorderColor = buttonDefaults.borderColor || 'transparent';
 
-          if (hasCustomBg && effectiveStyle.backgroundColor) {
-            computedBg = effectiveStyle.backgroundColor;
+          if (hasCustomBg && customStyleBg) {
+            computedBg = customStyleBg;
           } else if (buttonVariant === 'solid') {
             computedBg = buttonDefaults.backgroundColor || primaryStart;
           } else if (buttonVariant === 'glass') {
@@ -831,8 +834,8 @@ export function AtomicComponentWrapper({
           if (effectiveProps.rounded === 'full') roundedRadius = '9999px';
 
           // Hover styles computation
-          const hoverBg = effectiveStyle.hoverBackgroundColor || buttonDefaults.hoverBackgroundColor;
-          const hoverColor = effectiveStyle.hoverColor || buttonDefaults.hoverColor;
+          const hoverBg = effectiveStyle.hoverBackgroundColor || (effectiveStyle as any).hoverBackground || (effectiveStyle as any).hoverGradientString || buttonDefaults.hoverBackgroundColor;
+          const hoverColor = effectiveStyle.hoverColor || (effectiveStyle as any).hoverTextColor || buttonDefaults.hoverColor;
           const hoverBorderColor = effectiveStyle.hoverBorderColor || buttonDefaults.hoverBorderColor;
           const hoverShadow = effectiveStyle.hoverBoxShadow || buttonDefaults.hoverBoxShadow;
           const hoverOpacity = effectiveStyle.hoverOpacity !== undefined ? effectiveStyle.hoverOpacity : buttonDefaults.hoverOpacity;
@@ -842,14 +845,15 @@ export function AtomicComponentWrapper({
           const duration = effectiveStyle.transitionDurationMs !== undefined ? `${effectiveStyle.transitionDurationMs}ms` : `${buttonDefaults.transitionDurationMs || 200}ms`;
           const timing = effectiveStyle.transitionTimingFunction || buttonDefaults.transitionTimingFunction || 'ease-in-out';
 
-          if (isSelfHovered) {
+          if (isStylingHovered) {
             if (hoverBg) computedBg = hoverBg;
             if (hoverColor) computedColor = hoverColor;
             if (hoverBorderColor) computedBorderColor = hoverBorderColor;
           }
 
           const btnTransforms: string[] = [];
-          if (isSelfHovered) {
+          if (isStylingHovered) {
+            if (hoverScale !== undefined && hoverScale !== 1) btnTransforms.push(`scale(${hoverScale})`);
             if (hoverScale !== undefined && hoverScale !== 1) btnTransforms.push(`scale(${hoverScale})`);
             if (hoverTranslateY !== undefined && hoverTranslateY !== 0) {
               const ty = typeof hoverTranslateY === 'number' ? `${hoverTranslateY}px` : hoverTranslateY;

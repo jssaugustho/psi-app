@@ -71,3 +71,19 @@ export function getSectionDisplayName(section: Section, index: number): string {
 
   return `Seção ${index + 1}`;
 }
+
+/**
+ * Retorna a largura máxima do conteúdo global do site.
+ * Todas as seções do site herdam este valor como largura máxima do contêiner interno.
+ */
+export function getGlobalContentMaxWidth(page?: any, canvasData?: any): string {
+  return (
+    page?.siteConfig?.containerMaxWidth ||
+    page?.siteConfig?.layoutWidth ||
+    canvasData?.globalStyles?.contentMaxWidth ||
+    canvasData?.globalStyles?.containerMaxWidth ||
+    page?.siteConfig?.theme?.contentMaxWidth ||
+    page?.siteConfig?.theme?.containerMaxWidth ||
+    '1200px'
+  );
+}

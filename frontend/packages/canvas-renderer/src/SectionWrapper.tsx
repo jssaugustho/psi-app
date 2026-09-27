@@ -4,8 +4,8 @@ import React, { useState, useRef } from 'react';
 import { Section, ViewportMode, CanvasData } from './types';
 import { ComponentWrapper } from './ComponentWrapper';
 import { Layout, Trash2, Plus, Eye, EyeOff, ChevronUp, ChevronDown } from 'lucide-react';
-import { createDefaultDiv, createDefaultCarousel, createDefaultComponent, createSectionFromPreset } from './constants';
-import { getSectionDisplayName } from './utils/sectionHelpers';
+import { createDefaultDiv, createDefaultCarousel, createDefaultComponent, createDefaultGlobalInstance, createSectionFromPreset } from './constants';
+import { getSectionDisplayName, getGlobalContentMaxWidth } from './utils/sectionHelpers';
 import { buildComponentCssStyle } from './utils/colorHelpers';
 import { useScrollThreshold, getPositionStyles } from './utils/positionHelpers';
 import { useParallaxEffect } from './hooks/useParallaxEffect';
@@ -147,6 +147,10 @@ export function SectionWrapper({
           newComp = createDefaultDiv('Container (Div)');
         } else if (data.itemType === 'carousel') {
           newComp = createDefaultCarousel();
+        } else if (data.itemType === 'global_instance') {
+          const masterId = data.globalComponentId || data.preset;
+          const masterName = canvasData?.globalComponentsMap?.[masterId]?.name;
+          newComp = createDefaultGlobalInstance(masterId, masterName);
         } else {
           newComp = createDefaultComponent(data.itemType, data.preset);
         }
@@ -350,9 +354,7 @@ export function SectionWrapper({
       <div
         className="w-full mx-auto flex-1 flex flex-col justify-inherit"
         style={{
-          maxWidth: (layout.maxContentWidth && layout.maxContentWidth !== '100%')
-            ? layout.maxContentWidth
-            : (page?.siteConfig?.theme?.contentMaxWidth || page?.siteConfig?.theme?.containerMaxWidth || '1200px'),
+          maxWidth: getGlobalContentMaxWidth(page, canvasData),
           justifyContent: layout.justifyContent || 'flex-start',
         }}
       >

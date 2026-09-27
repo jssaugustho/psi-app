@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Section, ViewportMode, getPositionStyles, useScrollThreshold, useParallaxEffect } from '@psi/canvas-renderer';
+import { Section, ViewportMode, getPositionStyles, useScrollThreshold, useParallaxEffect, getGlobalContentMaxWidth } from '@psi/canvas-renderer';
 import { ComponentWrapper } from './ComponentWrapper';
 import { Layout, Trash2, Plus, Eye, EyeOff, ChevronUp, ChevronDown } from 'lucide-react';
 import { createDefaultDiv, createDefaultCarousel, createDefaultComponent } from '../constants';
@@ -311,9 +311,7 @@ export function SectionWrapper({
       <div
         className="w-full mx-auto"
         style={{
-          maxWidth: (layout.maxContentWidth && layout.maxContentWidth !== '100%')
-            ? layout.maxContentWidth
-            : (page?.siteConfig?.theme?.contentMaxWidth || page?.siteConfig?.theme?.containerMaxWidth || '1200px'),
+          maxWidth: getGlobalContentMaxWidth(page),
         }}
       >
         {section.components.length > 0 ? (

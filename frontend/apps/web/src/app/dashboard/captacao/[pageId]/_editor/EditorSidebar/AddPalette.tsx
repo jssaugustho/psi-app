@@ -26,10 +26,13 @@ import {
   GripVertical,
   PanelBottom,
   Share2,
-  Globe
+  Globe,
+  Pencil,
+  Trash2
 } from 'lucide-react';
-import { AccordionItem } from '../PropertiesPanel/components/AccordionSection';
+import { AccordionItem, AccordionScopeProvider } from '../PropertiesPanel/components/AccordionSection';
 import { createSectionFromPreset, Section, AtomicComponentType, GlobalComponentMaster } from '@psi/canvas-renderer';
+import { ConfirmModal } from '@psi/ui';
 
 interface AddPaletteProps {
   onAddSection: (label?: string) => void;
@@ -37,6 +40,8 @@ interface AddPaletteProps {
   onAddComponent: (type: 'div' | 'carousel' | 'global_instance' | AtomicComponentType, preset?: string) => void;
   globalComponentsMap?: Record<string, GlobalComponentMaster> | null;
   onAddGlobalInstance?: (globalComponentId: string) => void;
+  onEditMaster?: (globalComponentId: string) => void;
+  onDeleteMaster?: (globalComponentId: string) => void;
 }
 
 interface PaletteItem {
@@ -48,7 +53,17 @@ interface PaletteItem {
   desc: string;
 }
 
-export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, globalComponentsMap, onAddGlobalInstance }: AddPaletteProps) {
+export function AddPalette({
+  onAddSection,
+  onAddCustomSection,
+  onAddComponent,
+  globalComponentsMap,
+  onAddGlobalInstance,
+  onEditMaster,
+  onDeleteMaster,
+}: AddPaletteProps) {
+  const [deletingGlobalId, setDeletingGlobalId] = React.useState<string | null>(null);
+  const [deletingGlobalName, setDeletingGlobalName] = React.useState<string>('');
   // Categorias Simplificadas em Acordeões Inteligentes
   const elementCategories: Array<{ title: string; icon: React.ComponentType<any>; items: PaletteItem[] }> = [
     {
@@ -116,7 +131,8 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, g
   };
 
   return (
-    <div className="p-3 space-y-3 custom-scrollbar overflow-y-auto">
+    <AccordionScopeProvider scopeId="panel:add">
+      <div className="p-3 space-y-3 custom-scrollbar overflow-y-auto">
       {elementCategories.map((cat, idx) => {
         const CategoryIcon = cat.icon;
         return (
@@ -174,7 +190,7 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, g
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             {globalItems.map((item, itemIdx) => {
               return (
                 <div
@@ -188,9 +204,9 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, g
                       onAddComponent('global_instance', item.globalComponentId);
                     }
                   }}
-                  className="p-2 rounded-xl border border-purple-500/30 bg-purple-500/5 hover:border-purple-500 hover:bg-purple-500/10 transition-all text-left flex flex-col justify-between space-y-1 group/card cursor-grab active:cursor-grabbing select-none min-w-0 shadow-sm"
+                  className="p-2.5 rounded-xl border border-purple-500/30 bg-purple-500/5 hover:border-purple-500 hover:bg-purple-500/10 transition-all text-left flex flex-col justify-between space-y-1.5 group/card cursor-grab active:cursor-grabbing select-none min-w-0 shadow-sm relative"
                 >
-                  <div className="flex items-center justify-between min-w-0">
+                  <div className="flex items-center justify-between gap-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="p-1 rounded-lg bg-purple-600 text-white shrink-0">
                         <Sparkles className="w-3.5 h-3.5" />
@@ -199,7 +215,39 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, g
                         {item.label}
                       </span>
                     </div>
-                    <GripVertical className="w-3 h-3 text-purple-400 opacity-0 group-hover/card:opacity-100 transition-opacity shrink-0" />
+
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {onEditMaster && item.globalComponentId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditMaster(item.globalComponentId!);
+                          }}
+                          className="p-1 rounded-lg hover:bg-purple-500/20 text-purple-600 dark:text-purple-300 hover:text-purple-700 transition-colors cursor-pointer"
+                          title="Editar propriedades e estrutura deste Elemento Global"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+
+                      {onDeleteMaster && item.globalComponentId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingGlobalId(item.globalComponentId!);
+                            setDeletingGlobalName(item.label);
+                          }}
+                          className="p-1 rounded-lg hover:bg-red-500/15 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                          title="Excluir este Elemento Global"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+
+                      <GripVertical className="w-3 h-3 text-purple-400 opacity-40 group-hover/card:opacity-100 transition-opacity shrink-0 ml-0.5" />
+                    </div>
                   </div>
                   <span className="text-[8.5px] text-purple-600 dark:text-purple-400 font-medium truncate block w-full" title={item.desc}>
                     {item.desc}
@@ -210,7 +258,28 @@ export function AddPalette({ onAddSection, onAddCustomSection, onAddComponent, g
           </div>
         )}
       </AccordionItem>
-    </div>
+      </div>
+
+      <ConfirmModal
+        isOpen={!!deletingGlobalId}
+        onClose={() => {
+          setDeletingGlobalId(null);
+          setDeletingGlobalName('');
+        }}
+        onConfirm={async () => {
+          if (deletingGlobalId && onDeleteMaster) {
+            await onDeleteMaster(deletingGlobalId);
+          }
+          setDeletingGlobalId(null);
+          setDeletingGlobalName('');
+        }}
+        title="Excluir Elemento Global"
+        description={`Tem certeza que deseja excluir o elemento global "${deletingGlobalName}"? Esta ação removerá a definição mestre do seu espaço de trabalho.`}
+        confirmText="Excluir Elemento"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+    </AccordionScopeProvider>
   );
 }
 

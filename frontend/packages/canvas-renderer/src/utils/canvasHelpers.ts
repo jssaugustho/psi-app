@@ -1,5 +1,6 @@
-import { CanvasData, Section, Component, DivComponent, CarouselComponent, AtomicComponent, ComponentType, SelectionState, CanvasNode, NormalizedCanvasData } from '../types';
+import { CanvasData, Section, Component, DivComponent, CarouselComponent, AtomicComponent, ComponentType, SelectionState, CanvasNode, NormalizedCanvasData, GlobalInstanceComponent, GlobalComponentMaster } from '../types';
 import { createDefaultSection, createDefaultDiv, createDefaultCarousel, createDefaultComponent } from '../constants';
+import { resolveGlobalInstance } from './resolveGlobalInstance';
 
 /**
  * Utilitários imutáveis para manipulação do CanvasData (Blueprint v2)
@@ -961,5 +962,45 @@ export function removeNodeCascadeInFlatCanvas(nodes: Record<string, CanvasNode>,
     delete nodes[id];
   });
 }
+
+/**
+ * Clona recursivamente um componente (Div ou Atômico) atribuindo novos UUIDs a todos os nós descendentes.
+ */
+export function cloneComponentWithNewIds(comp: Component): Component {
+  const cloned = structuredClone(comp);
+  const reassignIds = (node: any) => {
+    node.id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `comp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    delete node.__isGlobalInstance;
+    delete node.__globalMasterId;
+    delete node.__globalMasterName;
+    delete node.__customizableProps;
+    delete node.__instanceOverrides;
+
+    if (Array.isArray(node.components)) {
+      node.components.forEach(reassignIds);
+    }
+  };
+  reassignIds(cloned);
+  return cloned;
+}
+
+/**
+ * Desvincula uma instância global (Detach), convertendo-a em um nó estático normal na árvore do Canvas.
+ */
+export function unlinkGlobalInstanceInCanvas(
+  canvas: CanvasData,
+  instanceId: string,
+  globalComponentsMap?: Record<string, GlobalComponentMaster> | null
+): CanvasData {
+  const found = findElementInCanvas(canvas, instanceId);
+  if (!found || found.element.type !== 'global_instance') return canvas;
+
+  const instance = found.element as GlobalInstanceComponent;
+  const resolved = resolveGlobalInstance(instance, globalComponentsMap);
+  const standaloneComponent = cloneComponentWithNewIds(resolved);
+
+  return updateComponentInCanvas(canvas, instanceId, () => standaloneComponent);
+}
+
 
 
