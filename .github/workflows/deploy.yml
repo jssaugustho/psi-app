@@ -14,4 +14,4 @@ jobs:
         run: |
           cd /home/hector/Documents/Projects/psi-app
           git pull origin main
-          docker compose up -d --build --remove-orphans
+          docker compose up -d --build --remove-orphans2

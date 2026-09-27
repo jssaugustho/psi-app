@@ -1,4 +1,4 @@
-# 🤖 System Prompt Context & AI Protocol — PSI-APP
+# 🤖 System Prompt Context & AI Protocol — TheraOS
 
 > **CRITICAL INSTRUCTION FOR ALL AI AGENTS**: Read this file BEFORE making any code changes in this repository. Obey all `ALWAYS` and `NEVER` constraints strictly. This document is the primary context prompt for LLMs working on this repository, defining system boundaries, SOLID principles, code recipes, database migrations, and deploy commands.
 
