@@ -188,6 +188,20 @@ SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    action text NOT NULL,
+    category text,
+    service_name text,
+    status text,
+    user_id uuid,
+    workspace_id uuid,
+    ip text,
+    user_agent text,
+    details jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 --
 -- Name: capture_pages; Type: TABLE; Schema: public; Owner: -
 --
