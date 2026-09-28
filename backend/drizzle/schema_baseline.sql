@@ -397,7 +397,7 @@ CREATE TABLE public.profiles (
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.schema_migrations (
+CREATE TABLE IF NOT EXISTS public.schema_migrations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     version_name text NOT NULL,
     filename text NOT NULL,
@@ -412,7 +412,7 @@ CREATE TABLE public.schema_migrations (
 -- Name: schema_versions; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.schema_versions (
+CREATE TABLE IF NOT EXISTS public.schema_versions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     version_name text NOT NULL,
     description text,
@@ -621,36 +621,21 @@ ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
 
 
---
--- Name: schema_migrations schema_migrations_filename_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_filename_key UNIQUE (filename);
-
-
---
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (id);
-
-
---
--- Name: schema_versions schema_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_versions
-    ADD CONSTRAINT schema_versions_pkey PRIMARY KEY (id);
-
-
---
--- Name: schema_versions schema_versions_version_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_versions
-    ADD CONSTRAINT schema_versions_version_name_key UNIQUE (version_name);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schema_migrations_filename_key') THEN
+        ALTER TABLE ONLY public.schema_migrations ADD CONSTRAINT schema_migrations_filename_key UNIQUE (filename);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schema_migrations_pkey') THEN
+        ALTER TABLE ONLY public.schema_migrations ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schema_versions_pkey') THEN
+        ALTER TABLE ONLY public.schema_versions ADD CONSTRAINT schema_versions_pkey PRIMARY KEY (id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'schema_versions_version_name_key') THEN
+        ALTER TABLE ONLY public.schema_versions ADD CONSTRAINT schema_versions_version_name_key UNIQUE (version_name);
+    END IF;
+END $$;
 
 
 --

@@ -32,7 +32,7 @@ export async function runMigrations() {
     // 1. Executar automaticamente o Drizzle Kit Generate se houver alterações no schema.ts
     console.log('⏳ 1. Verificando alterações no schema TypeScript (drizzle-kit generate)...');
     try {
-      execSync('npx drizzle-kit generate', {
+      execSync('npx drizzle-kit generate --config=drizzle.config.ts', {
         cwd: backendDir,
         stdio: 'inherit',
       });
