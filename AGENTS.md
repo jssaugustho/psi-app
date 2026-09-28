@@ -71,6 +71,8 @@ Before executing tasks, read **ONLY** the specific context file relevant to your
 | Checklist Mestre do Editor & Formulários | [.agents/checklists/editor_e_formularios_checklist.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/checklists/editor_e_formularios_checklist.md) | Checklist mestre de auditoria e verificação de correções do criador/editor de páginas e formulários |
 | Guia de Criação de Elementos & Framework do Editor | [.agents/core/06_element_framework_and_creation_guide.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/core/06_element_framework_and_creation_guide.md) | Registro declarativo `ElementRegistry`, catálogo de propriedades, edição inline e adição de componentes |
 | Editor State Memory System (Accordions, Layers & Scroll) | [.agents/architectures/editor_state_memory.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/editor_state_memory.md) | Centralized state memory, scoped accordions (`scopeId`/`typeFallback`), `openLayerIds`, `useSidebarScrollMemory`, `sessionStorage` sync |
+| Production Deploy & CI/CD Pipeline | [.agents/architectures/production_deploy.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/production_deploy.md) | VPS Docker Compose (`docker-compose.prod.yml`), Self-Hosted GitHub Runner, DB migrations, Healthcheck |
+| Environment Variables & Platform Settings | [.agents/core/07_environment_variables_guide.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/core/07_environment_variables_guide.md) | Infrastructure vs DB env division, Zod schema rules, `.env.example`, `.env.production.example` |
 
 ---
 

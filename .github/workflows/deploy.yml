@@ -1,18 +1,61 @@
-name: Deploy Automático no Servidor
+name: Deploy Automático (Production VPS)
 
 on:
   push:
     branches:
-      - main  # ou 'master', dependendo do nome da sua branch principal
+      - main
   workflow_dispatch:
+
 jobs:
   deploy:
+    name: Build, Migrate & Deploy (Self-Hosted Runner)
     runs-on: self-hosted
 
     steps:
-      - name: Atualizar arquivos e subir Docker Compose
+      - name: 1. Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: 2. Verificar e Configurar Arquivo .env
         run: |
-          cd /home/hector/Documents/Projects/psi-app
-          git pull origin main
-          cd backend
-          docker compose up -d --build --remove-orphans2
+          if [ ! -f backend/.env ]; then
+            echo "⚠️ Arquivo backend/.env não encontrado no Runner. Copiando backend/.env.production.example..."
+            cp backend/.env.production.example backend/.env
+            echo "⚠️ ATENÇÃO: Certifique-se de configurar os segredos reais no arquivo backend/.env na VPS!"
+          fi
+
+      - name: 3. Recompilar Imagens Docker em Produção
+        run: |
+          docker compose -f backend/docker-compose.prod.yml build
+
+      - name: 4. Iniciar Banco de Dados e Serviços de Infraestrutura
+        run: |
+          docker compose -f backend/docker-compose.prod.yml up -d postgres rabbitmq gotrue postgrest
+
+      - name: 5. Executar Migrações do Banco de Dados (db:migrate:prod)
+        run: |
+          docker compose -f backend/docker-compose.prod.yml run --rm api npm run db:migrate:prod
+
+      - name: 6. Subir Stack Completa em Produção
+        run: |
+          docker compose -f backend/docker-compose.prod.yml up -d --remove-orphans
+
+      - name: 7. Aguardar e Verificar Healthcheck da API Gateway
+        run: |
+          echo "🏥 Verificando saúde do Gateway Nginx & Fastify API..."
+          MAX_RETRIES=20
+          RETRY_COUNT=0
+          until curl -s -f http://localhost:8000/v1/health | grep -q "operational"; do
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+              echo "❌ Healthcheck falhou após $MAX_RETRIES tentativas!"
+              docker compose -f backend/docker-compose.prod.yml logs --tail=50 api nginx
+              exit 1
+            fi
+            echo "⏳ Aguardando serviços ficarem prontos ($RETRY_COUNT/$MAX_RETRIES)..."
+            sleep 3
+          done
+          echo "✅ API & Gateway Nginx estão 100% OPERACIONAIS!"
+
+      - name: 8. Limpeza de Imagens Antigas (Prune)
+        run: |
+          docker image prune -f

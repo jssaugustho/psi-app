@@ -29,8 +29,9 @@ COPY package*.json ./
 # Instalar todas as dependências (necessárias para dev e build)
 RUN npm ci --include=dev
 
-# Copiar o código transpilado do Builder
+# Copiar o código transpilado do Builder e a pasta de migrações
 COPY --from=builder /usr/src/app/dist ./dist
+COPY drizzle/ ./drizzle/
 
 # Expõe a porta padrão da API Fastify
 EXPOSE 5000
