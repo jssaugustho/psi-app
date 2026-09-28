@@ -30,15 +30,21 @@ export async function runMigrations() {
   const sql = postgres(DATABASE_URL);
 
   try {
-    // 1. Executar automaticamente o Drizzle Kit Generate se houver alterações no schema.ts
-    console.log('⏳ 1. Verificando alterações no schema TypeScript (drizzle-kit generate)...');
-    try {
-      execSync('npx drizzle-kit generate --config=drizzle.config.ts', {
-        cwd: backendDir,
-        stdio: 'inherit',
-      });
-    } catch (genErr: any) {
-      console.warn('⚠️ Alerta ao executar drizzle-kit generate:', genErr.message || genErr);
+    // 1. Executar automaticamente o Drizzle Kit Generate se houver alterações no schema.ts (somente em dev)
+    const isProd = process.env.NODE_ENV === 'production';
+    const hasSchemaTs = fs.existsSync(path.join(backendDir, 'src/shared/schema.ts'));
+    if (!isProd && hasSchemaTs) {
+      console.log('⏳ 1. Verificando alterações no schema TypeScript (drizzle-kit generate)...');
+      try {
+        execSync('npx drizzle-kit generate --config=drizzle.config.ts', {
+          cwd: backendDir,
+          stdio: 'inherit',
+        });
+      } catch (genErr: any) {
+        console.warn('⚠️ Alerta ao executar drizzle-kit generate:', genErr.message || genErr);
+      }
+    } else {
+      console.log('ℹ️ Modo produção detectado ou schema.ts ausente: ignorando drizzle-kit generate.');
     }
 
     // 2. Garantir que as tabelas de controle de versão e roles de autenticação existam
@@ -149,6 +155,7 @@ export async function runMigrations() {
 
       // Executa a migração dentro de um bloco transacional
       await sql.begin(async (tx) => {
+        await tx.unsafe('SET search_path TO public, auth;');
         await tx.unsafe(sqlContent);
 
         const executionTimeMs = Date.now() - startTime;

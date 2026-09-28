@@ -40,13 +40,13 @@ export function getAllSqlFiles(dir: string): SqlFileItem[] {
   let results: SqlFileItem[] = [];
   if (!fs.existsSync(dir)) return results;
 
+  // Lê apenas os arquivos .sql soltos na raiz de ./drizzle (baseline + migrações da versão ativa)
+  // Ignora subpastas de histórico/arquivamento como ./drizzle/migrations/
   const items = fs.readdirSync(dir, { withFileTypes: true });
 
   for (const item of items) {
     const fullPath = path.join(dir, item.name);
-    if (item.isDirectory()) {
-      results = results.concat(getAllSqlFiles(fullPath));
-    } else if (item.isFile() && item.name.endsWith('.sql')) {
+    if (item.isFile() && item.name.endsWith('.sql')) {
       results.push({
         filename: item.name,
         fullPath: fullPath,
