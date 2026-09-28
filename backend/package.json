@@ -20,6 +20,8 @@
     "db:reset-all": "ts-node src/scripts/reset-all.ts",
     "bootstrap": "ts-node src/scripts/bootstrap.ts",
     "bootstrap:auto": "ts-node src/scripts/bootstrap.ts --auto",
+    "bootstrap:prod": "node dist/scripts/bootstrap.js",
+    "bootstrap:prod:auto": "node dist/scripts/bootstrap.js --auto",
     "test-leads-webhook": "ts-node src/scripts/test-leads-webhook.ts",
     "reset-crm": "ts-node src/scripts/reset-crm.ts"
   },
