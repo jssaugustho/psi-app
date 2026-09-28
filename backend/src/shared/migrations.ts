@@ -103,6 +103,9 @@ export async function ensurePostgrestRoles(sql: postgres.Sql) {
   await sql.unsafe(`
     CREATE SCHEMA IF NOT EXISTS auth;
 
+    -- Sincroniza nome da tabela legada error_logs para logs se existir no banco
+    ALTER TABLE IF EXISTS public.error_logs RENAME TO logs;
+
     DO $do$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
