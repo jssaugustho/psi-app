@@ -14,13 +14,25 @@ jobs:
     steps:
       - name: 1. Checkout do Código
         uses: actions/checkout@v4
+        with:
+          clean: false
 
-      - name: 2. Verificar e Configurar Arquivo .env
+      - name: 2. Verificar, Restaurar e Proteger Arquivo .env
         run: |
+          # 1. Restaurar do backup persistente na Home da VPS se backend/.env não existir ou estiver vazio
+          if [ ! -s backend/.env ] && [ -f ~/.psi-app-backend.env ]; then
+            echo "📋 Restaurando backend/.env a partir do backup persistente (~/.psi-app-backend.env)..."
+            cp ~/.psi-app-backend.env backend/.env
+          fi
+
+          # 2. Se ainda assim não existir, cria a partir do exemplo
           if [ ! -f backend/.env ]; then
-            echo "⚠️ Arquivo backend/.env não encontrado no Runner. Copiando backend/.env.production.example..."
+            echo "⚠️ Arquivo backend/.env não encontrado. Copiando backend/.env.production.example..."
             cp backend/.env.production.example backend/.env
-            echo "⚠️ ATENÇÃO: Certifique-se de configurar os segredos reais no arquivo backend/.env na VPS!"
+            echo "⚠️ ATENÇÃO: Configure os segredos reais no arquivo backend/.env!"
+          else
+            echo "✅ backend/.env preservado. Sincronizando backup automático em ~/.psi-app-backend.env..."
+            cp backend/.env ~/.psi-app-backend.env 2>/dev/null || true
           fi
 
       - name: 3. Recompilar Imagens Docker em Produção
