@@ -32,6 +32,7 @@ RUN npm ci --include=dev
 # Copiar o código transpilado do Builder e a pasta de migrações
 COPY --from=builder /usr/src/app/dist ./dist
 COPY drizzle/ ./drizzle/
+COPY drizzle.config.ts ./
 
 # Expõe a porta padrão da API Fastify
 EXPOSE 5000

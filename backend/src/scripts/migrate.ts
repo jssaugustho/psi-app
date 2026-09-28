@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import {
   calculateChecksum,
   ensureMigrationTables,
+  ensurePostgrestRoles,
   getCurrentVersionName,
   getAllSqlFiles,
   notifyPostgrest,
@@ -40,8 +41,9 @@ export async function runMigrations() {
       console.warn('⚠️ Alerta ao executar drizzle-kit generate:', genErr.message || genErr);
     }
 
-    // 2. Garantir que as tabelas de controle de versão existam
+    // 2. Garantir que as tabelas de controle de versão e roles de autenticação existam
     await ensureMigrationTables(sql);
+    await ensurePostgrestRoles(sql);
     const currentVersion = await getCurrentVersionName(sql);
     console.log(`\n📌 Versão Ativa do App: \x1b[36m${currentVersion}\x1b[0m`);
 
