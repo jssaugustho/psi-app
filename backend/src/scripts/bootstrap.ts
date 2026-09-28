@@ -114,16 +114,28 @@ async function bootstrap() {
     const targetGoTrueUrl = await getResolvableGoTrueUrl(GOTRUE_URL);
 
     // 2. Criar usuário no GoTrue
-    const goTrueUser = await createGoTrueUser(
-      email,
-      password,
-      {
-        first_name: nome,
-        last_name: sobrenome,
-        phone: telefone || null,
-      },
-      targetGoTrueUrl
-    );
+    let goTrueUser;
+    try {
+      goTrueUser = await createGoTrueUser(
+        email,
+        password,
+        {
+          first_name: nome,
+          last_name: sobrenome,
+          phone: telefone || null,
+        },
+        targetGoTrueUrl
+      );
+    } catch (err: any) {
+      if (err?.message === 'fetch failed' || err?.cause?.code === 'ECONNREFUSED' || err?.code === 'ECONNREFUSED') {
+        throw new Error(
+          `Não foi possível conectar ao serviço GoTrue em [${targetGoTrueUrl}].\n` +
+          `  👉 Verifique o status com: docker ps\n` +
+          `  👉 Tente reiniciar o GoTrue executando: docker compose -f docker-compose.prod.yml restart gotrue`
+        );
+      }
+      throw err;
+    }
 
     const userId = goTrueUser.id;
 
