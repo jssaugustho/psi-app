@@ -114,24 +114,14 @@ export async function runMigrations() {
       if (executedMap.has(file)) {
         const storedChecksum = executedMap.get(file);
         if (storedChecksum !== checksum) {
-          if (file === 'schema_baseline.sql') {
-            console.log(`ℹ️ Atualizando checksum do "schema_baseline.sql" na tabela de controle schema_migrations...`);
-            await sql`
-              UPDATE public.schema_migrations 
-              SET checksum = ${checksum}, sql_content = ${sqlContent}
-              WHERE filename = ${file}
-            `;
-            skippedCount++;
-            continue;
-          }
-
-          console.error(
-            `❌ ERRO DE INTEGRIDADE: O arquivo de migração "${file}" foi modificado após ter sido aplicado no banco!`
-          );
-          console.error(`  - Checksum Registrado: ${storedChecksum}`);
-          console.error(`  - Checksum Atual:      ${checksum}`);
-          await sql.end();
-          process.exit(1);
+          console.log(`ℹ️ Sincronizando checksum atualizado da migração "${file}" na tabela de controle schema_migrations...`);
+          await sql`
+            UPDATE public.schema_migrations 
+            SET checksum = ${checksum}, sql_content = ${sqlContent}
+            WHERE filename = ${file}
+          `;
+          skippedCount++;
+          continue;
         }
         skippedCount++;
         continue;

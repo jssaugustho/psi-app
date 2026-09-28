@@ -73,6 +73,7 @@ Before executing tasks, read **ONLY** the specific context file relevant to your
 | Editor State Memory System (Accordions, Layers & Scroll) | [.agents/architectures/editor_state_memory.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/editor_state_memory.md) | Centralized state memory, scoped accordions (`scopeId`/`typeFallback`), `openLayerIds`, `useSidebarScrollMemory`, `sessionStorage` sync |
 | Production Deploy & CI/CD Pipeline | [.agents/architectures/production_deploy.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/architectures/production_deploy.md) | VPS Docker Compose (`docker-compose.prod.yml`), Self-Hosted GitHub Runner, DB migrations, Healthcheck |
 | Environment Variables & Platform Settings | [.agents/core/07_environment_variables_guide.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/core/07_environment_variables_guide.md) | Infrastructure vs DB env division, Zod schema rules, `.env.example`, `.env.production.example` |
+| Database Migrations & Versioning Workflow | [.agents/core/08_database_migrations_guide.md](file:///c:/Users/josea/Documents/Desenvolvimento/psi-app/.agents/core/08_database_migrations_guide.md) | Drizzle Kit generate, idempotency rules, dev testing, CI/CD prod runner, release versioning |
 
 ---
 
