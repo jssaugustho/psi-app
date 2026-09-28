@@ -1,1 +1,1 @@
-ALTER TABLE "logs" ADD COLUMN "session_id" uuid;
+ALTER TABLE IF EXISTS "logs" ADD COLUMN IF NOT EXISTS "session_id" uuid;

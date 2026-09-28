@@ -265,18 +265,21 @@ CREATE TABLE public.email_logs (
 );
 
 
---
--- Name: error_logs; Type: TABLE; Schema: public; Owner: -
---
+ALTER TABLE IF EXISTS public.error_logs RENAME TO logs;
 
-CREATE TABLE public.error_logs (
+CREATE TABLE IF NOT EXISTS public.logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
+    type text DEFAULT 'error'::text NOT NULL,
     name text,
     message text NOT NULL,
     stack text,
     url text,
+    client_app text,
+    user_role text,
     user_agent text,
     user_id uuid,
+    workspace_id uuid,
+    session_id uuid,
     service_name text NOT NULL,
     severity text DEFAULT 'error'::text NOT NULL,
     metadata jsonb,
@@ -557,12 +560,12 @@ ALTER TABLE ONLY public.email_logs
     ADD CONSTRAINT email_logs_pkey PRIMARY KEY (id);
 
 
---
--- Name: error_logs error_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.error_logs
-    ADD CONSTRAINT error_logs_pkey PRIMARY KEY (id);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'logs_pkey') THEN
+        ALTER TABLE ONLY public.logs ADD CONSTRAINT logs_pkey PRIMARY KEY (id);
+    END IF;
+END $$;
 
 
 --
@@ -798,12 +801,12 @@ ALTER TABLE ONLY public.contacts
     ADD CONSTRAINT contacts_workspace_id_workspaces_id_fk FOREIGN KEY (workspace_id) REFERENCES public.workspaces(id) ON DELETE CASCADE;
 
 
---
--- Name: error_logs error_logs_user_id_profiles_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.error_logs
-    ADD CONSTRAINT error_logs_user_id_profiles_id_fk FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'logs_user_id_profiles_id_fk') THEN
+        ALTER TABLE ONLY public.logs ADD CONSTRAINT logs_user_id_profiles_id_fk FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 
 --
@@ -947,17 +950,10 @@ ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY email_logs_admin_policy ON public.email_logs TO authenticated USING (public.is_platform_admin()) WITH CHECK (public.is_platform_admin());
 
 
---
--- Name: error_logs; Type: ROW SECURITY; Schema: public; Owner: -
---
+ALTER TABLE public.logs ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
-
---
--- Name: error_logs error_logs_admin_policy; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY error_logs_admin_policy ON public.error_logs TO authenticated USING (public.is_platform_admin()) WITH CHECK (public.is_platform_admin());
+DROP POLICY IF EXISTS logs_admin_policy ON public.logs;
+CREATE POLICY logs_admin_policy ON public.logs TO authenticated USING (public.is_platform_admin()) WITH CHECK (public.is_platform_admin());
 
 
 --

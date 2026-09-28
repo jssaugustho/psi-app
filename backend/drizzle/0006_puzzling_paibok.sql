@@ -1,1 +1,1 @@
-ALTER TABLE "workspaces" ADD COLUMN "social_links" jsonb DEFAULT '{}'::jsonb NOT NULL;
+ALTER TABLE IF EXISTS "workspaces" ADD COLUMN IF NOT EXISTS "social_links" jsonb DEFAULT '{}'::jsonb NOT NULL;

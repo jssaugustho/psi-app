@@ -1,1 +1,1 @@
-ALTER TABLE "workspaces" ADD COLUMN "webhook_secret" text;
+ALTER TABLE IF EXISTS "workspaces" ADD COLUMN IF NOT EXISTS "webhook_secret" text;

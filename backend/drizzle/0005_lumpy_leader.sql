@@ -1,2 +1,2 @@
-ALTER TABLE "logs" ADD COLUMN "client_app" text;--> statement-breakpoint
-ALTER TABLE "logs" ADD COLUMN "user_role" text;
+ALTER TABLE IF EXISTS "logs" ADD COLUMN IF NOT EXISTS "client_app" text;
+ALTER TABLE IF EXISTS "logs" ADD COLUMN IF NOT EXISTS "user_role" text;

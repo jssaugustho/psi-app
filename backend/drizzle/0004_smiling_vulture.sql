@@ -1,4 +1,4 @@
-ALTER TABLE "email_logs" ALTER COLUMN "status" SET DEFAULT 'pending';--> statement-breakpoint
-ALTER TABLE "email_logs" ALTER COLUMN "sent_at" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "email_logs" ALTER COLUMN "sent_at" DROP NOT NULL;--> statement-breakpoint
-ALTER TABLE "email_logs" ADD COLUMN "retry_count" integer DEFAULT 0 NOT NULL;
+ALTER TABLE IF EXISTS "email_logs" ALTER COLUMN "status" SET DEFAULT 'pending';
+ALTER TABLE IF EXISTS "email_logs" ALTER COLUMN "sent_at" DROP DEFAULT;
+ALTER TABLE IF EXISTS "email_logs" ALTER COLUMN "sent_at" DROP NOT NULL;
+ALTER TABLE IF EXISTS "email_logs" ADD COLUMN IF NOT EXISTS "retry_count" integer DEFAULT 0 NOT NULL;
